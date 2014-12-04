@@ -3,14 +3,10 @@
 package server
 
 import (
-	"encoding/json"
-	"fmt"
 	"net/http"
 
 	"gopkg.in/errgo.v1"
 	"gopkg.in/mgo.v2"
-
-	"github.com/CanonicalLtd/blues-identity/params"
 )
 
 // NewAPIHandlerFunc is a function that returns a new API handler.
@@ -41,10 +37,5 @@ func handle(mux *http.ServeMux, path string, handler http.Handler) {
 }
 
 func notFoundHandler(w http.ResponseWriter, req *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusNotFound)
-	json.NewEncoder(w).Encode(params.Error{
-		Message: fmt.Sprintf("no handler for %q", req.URL),
-		Code:    params.ErrNotFound,
-	})
 }

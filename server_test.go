@@ -3,7 +3,6 @@
 package identity_test
 
 import (
-	"fmt"
 	"net/http"
 	"testing"
 
@@ -74,14 +73,9 @@ func assertServesVersion(c *gc.C, h http.Handler, vers string) {
 }
 
 func assertDoesNotServeVersion(c *gc.C, h http.Handler, vers string) {
-	url := "/" + vers + "/debug"
-	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
-		Handler:      h,
-		URL:          url,
-		ExpectStatus: http.StatusNotFound,
-		ExpectBody: params.Error{
-			Message: fmt.Sprintf("no handler for %q", url),
-			Code:    params.ErrNotFound,
-		},
+	rec := httptesting.DoRequest(c, httptesting.DoRequestParams{
+		Handler: h,
+		URL:     "/" + vers + "/some/path",
 	})
+	c.Assert(rec.Code, gc.Equals, http.StatusNotFound)
 }
