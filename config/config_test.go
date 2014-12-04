@@ -50,14 +50,20 @@ func (s *configSuite) TestRead(c *gc.C) {
 	})
 }
 
-func (s *configSuite) TestReadConfigError(c *gc.C) {
+func (s *configSuite) TestReadErrorNotFound(c *gc.C) {
 	cfg, err := config.Read(path.Join(c.MkDir(), "no-such-file.yaml"))
 	c.Assert(err, gc.ErrorMatches, ".* no such file or directory")
 	c.Assert(cfg, gc.IsNil)
 }
 
-func (s *configSuite) TestValidateConfigError(c *gc.C) {
+func (s *configSuite) TestReadErrorEmpty(c *gc.C) {
 	cfg, err := s.readConfig(c, "")
 	c.Assert(err, gc.ErrorMatches, "missing fields mongo-addr, api-addr in config file")
+	c.Assert(cfg, gc.IsNil)
+}
+
+func (s *configSuite) TestReadErrorInvalidYAML(c *gc.C) {
+	cfg, err := s.readConfig(c, ":")
+	c.Assert(err, gc.ErrorMatches, "cannot parse .*: YAML error: did not find expected key")
 	c.Assert(cfg, gc.IsNil)
 }
