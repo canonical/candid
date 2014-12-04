@@ -113,4 +113,4 @@ help:
 	@echo 'make format - Format the source files.'
 	@echo 'make simplify - Format and simplify the source files.'
 
-.PHONY: build check install clean format simplify sysdeps help
+.PHONY: build check install clean format server simplify sysdeps help
