@@ -27,8 +27,8 @@ const (
 
 // Error represents an error - it is returned for any response that fails.
 type Error struct {
-	Message string
-	Code    ErrorCode
+	Message string    `json:"message,omitempty"`
+	Code    ErrorCode `json:"code,omitempty"`
 }
 
 // NewError returns a new *Error with the given error code
