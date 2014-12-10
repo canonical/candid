@@ -19,10 +19,11 @@ func (code ErrorCode) ErrorCode() ErrorCode {
 }
 
 const (
-	ErrNotFound     ErrorCode = "not found"
-	ErrForbidden    ErrorCode = "forbidden"
-	ErrBadRequest   ErrorCode = "bad request"
-	ErrUnauthorized ErrorCode = "unauthorized"
+	ErrNotFound      ErrorCode = "not found"
+	ErrForbidden     ErrorCode = "forbidden"
+	ErrBadRequest    ErrorCode = "bad request"
+	ErrUnauthorized  ErrorCode = "unauthorized"
+	ErrAlreadyExists ErrorCode = "already exists"
 )
 
 // Error represents an error - it is returned for any response that fails.

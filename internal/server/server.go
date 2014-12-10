@@ -7,12 +7,12 @@ import (
 
 	"gopkg.in/errgo.v1"
 	"gopkg.in/mgo.v2"
+
+	"github.com/CanonicalLtd/blues-identity/internal/store"
 )
 
 // NewAPIHandlerFunc is a function that returns a new API handler.
-// TODO (frankban): make this function receive the db object
-//                  (or more likely a store object).
-type NewAPIHandlerFunc func() http.Handler
+type NewAPIHandlerFunc func(*store.Store) http.Handler
 
 // New returns a handler that serves the given identity API versions using the
 // db to store identity data. The key of the versions map is the version name.
@@ -21,9 +21,16 @@ func New(db *mgo.Database, versions map[string]NewAPIHandlerFunc) (http.Handler,
 		return nil, errgo.Newf("identity server must serve at least one version of the API")
 	}
 
+	// Create the identities store.
+	store, err := store.New(db)
+	if err != nil {
+		return nil, errgo.Notef(err, "cannot make store")
+	}
+
+	// Create the HTTP server.
 	mux := http.NewServeMux()
 	for vers, newAPI := range versions {
-		handle(mux, "/"+vers, newAPI())
+		handle(mux, "/"+vers, newAPI(store))
 	}
 	// TODO (frankban): implement a router and use
 	// github.com/juju/utils/jsonhttp.

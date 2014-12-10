@@ -10,6 +10,7 @@ import (
 	gc "gopkg.in/check.v1"
 
 	"github.com/CanonicalLtd/blues-identity/internal/idtesting"
+	"github.com/CanonicalLtd/blues-identity/internal/store"
 )
 
 type serverSuite struct {
@@ -32,7 +33,7 @@ type versionResponse struct {
 func (s *serverSuite) TestNewServerWithVersions(c *gc.C) {
 	db := s.Session.DB("foo")
 	serveVersion := func(vers string) NewAPIHandlerFunc {
-		return func() http.Handler {
+		return func(*store.Store) http.Handler {
 			return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 				w.Header().Set("Content-Type", "application/json")
 				response := versionResponse{
