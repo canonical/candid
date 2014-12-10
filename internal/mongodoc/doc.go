@@ -6,7 +6,7 @@ package mongodoc
 // Mongo collection.
 type Identity struct {
 	// UUID holds the unique identifier for the identity. The key can be used
-	// as a forign key in other parts that are linked to the identity
+	// as a foreign key in other parts that are linked to the identity
 	// (for example groups, environments, etc.).
 	UUID string `bson:"_id"`
 

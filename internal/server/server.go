@@ -12,8 +12,6 @@ import (
 )
 
 // NewAPIHandlerFunc is a function that returns a new API handler.
-// TODO (frankban): make this function receive the db object
-//                  (or more likely a store object).
 type NewAPIHandlerFunc func(*store.Store) http.Handler
 
 // New returns a handler that serves the given identity API versions using the
