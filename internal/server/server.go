@@ -8,6 +8,7 @@ import (
 	"gopkg.in/errgo.v1"
 	"gopkg.in/mgo.v2"
 
+	"github.com/CanonicalLtd/blues-identity/internal/router"
 	"github.com/CanonicalLtd/blues-identity/internal/store"
 )
 
@@ -28,21 +29,14 @@ func New(db *mgo.Database, versions map[string]NewAPIHandlerFunc) (http.Handler,
 	}
 
 	// Create the HTTP server.
-	mux := http.NewServeMux()
+	mux := router.NewServeMux()
 	for vers, newAPI := range versions {
 		handle(mux, "/"+vers, newAPI(store))
 	}
-	// TODO (frankban): implement a router and use
-	// github.com/juju/utils/jsonhttp.
-	handle(mux, "", http.HandlerFunc(notFoundHandler))
 	return mux, nil
 }
 
-func handle(mux *http.ServeMux, path string, handler http.Handler) {
+func handle(mux *router.ServeMux, path string, handler http.Handler) {
 	handler = http.StripPrefix(path, handler)
 	mux.Handle(path+"/", handler)
-}
-
-func notFoundHandler(w http.ResponseWriter, req *http.Request) {
-	w.WriteHeader(http.StatusNotFound)
 }
