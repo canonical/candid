@@ -27,24 +27,46 @@ func (s *jsonSuite) SetUpTest(c *gc.C) {
 }
 
 func (s *jsonSuite) TestHandleErrors(c *gc.C) {
-	// Set up server paths.
-	s.mux.Handle("/forbidden/", router.HandleErrors(func(http.ResponseWriter, *http.Request) error {
-		return errgo.WithCausef(nil, params.ErrForbidden, "bad wolf")
+	for httpErr, paramsErr := range map[int]params.ErrorCode{
+		http.StatusNotFound:     params.ErrNotFound,
+		http.StatusForbidden:    params.ErrForbidden,
+		http.StatusBadRequest:   params.ErrBadRequest,
+		http.StatusUnauthorized: params.ErrUnauthorized,
+	} {
+		mux := http.NewServeMux()
+		mux.Handle("/error/", router.HandleErrors(func(http.ResponseWriter, *http.Request) error {
+			return errgo.WithCausef(nil, paramsErr, "bad wolf")
+		}))
+		httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+			Handler:      mux,
+			URL:          "/error/",
+			ExpectStatus: httpErr,
+			ExpectBody: params.Error{
+				Message: "bad wolf",
+				Code:    paramsErr,
+			},
+		})
+	}
+}
+
+func (s *jsonSuite) TestHandleErrorsInternalServerError(c *gc.C) {
+	s.mux.Handle("/error/", router.HandleErrors(func(http.ResponseWriter, *http.Request) error {
+		return errgo.New("bad wolf")
 	}))
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Handler:      s.mux,
+		URL:          "/error/",
+		ExpectStatus: http.StatusInternalServerError,
+		ExpectBody: params.Error{
+			Message: "bad wolf",
+		},
+	})
+}
+
+func (s *jsonSuite) TestHandleErrorsSuccess(c *gc.C) {
 	s.mux.Handle("/valid/", router.HandleErrors(func(http.ResponseWriter, *http.Request) error {
 		return nil
 	}))
-
-	// The forbidden path returns an error response.
-	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
-		Handler:      s.mux,
-		URL:          "/forbidden/",
-		ExpectStatus: http.StatusForbidden,
-		ExpectBody: params.Error{
-			Message: "bad wolf",
-			Code:    params.ErrForbidden,
-		},
-	})
 
 	// The valid path returns a response without errors.
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
