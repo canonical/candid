@@ -5,6 +5,7 @@ package v1
 import (
 	"net/http"
 
+	"github.com/CanonicalLtd/blues-identity/version"
 	"github.com/juju/utils/debugstatus"
 )
 
@@ -20,4 +21,9 @@ func (h *Handler) serveDebugStatus(_ http.Header, req *http.Request) (interface{
 		debugstatus.Connection(h.store.DB.Session),
 		debugstatus.MongoCollections(h.store.DB),
 	), nil
+}
+
+// GET /debug/info .
+func (h *Handler) serveDebugInfo(_ http.Header, req *http.Request) (interface{}, error) {
+	return version.VersionInfo, nil
 }

@@ -8,6 +8,9 @@ endif
 PROJECT := github.com/CanonicalLtd/blues-identity
 PROJECT_DIR := $(shell go list -e -f '{{.Dir}}' $(PROJECT))
 
+GIT_COMMIT := $(shell git rev-parse --verify HEAD)
+GIT_VERSION := $(shell git describe --dirty)
+
 ifeq ($(shell uname -p | sed -r 's/.*(x86|armel|armhf).*/golang/'), golang)
 	GO_C := golang
 	INSTALL_FLAGS :=
@@ -33,17 +36,18 @@ $(GOPATH)/bin/godeps:
 # and will only work - when this tree is found on the GOPATH.
 ifeq ($(CURDIR),$(PROJECT_DIR))
 
-build:
+build: version/init.go
 	go build $(PROJECT)/...
 
-check:
+check: version/init.go
 	go test $(PROJECT)/...
 
-install:
+install: version/init.go
 	go install $(INSTALL_FLAGS) -v $(PROJECT)/...
 
 clean:
 	go clean $(PROJECT)/...
+	-$(RM) version/init.go
 
 else
 
@@ -82,6 +86,10 @@ deps: $(GOPATH)/bin/godeps
 create-deps: $(GOPATH)/bin/godeps
 	godeps -t $(shell go list $(PROJECT)/...) > dependencies.tsv || true
 
+# Generate version information
+version/init.go: version/init.go.tmpl FORCE
+	gofmt -r "unknownVersion -> Version{GitCommit: \"${GIT_COMMIT}\", Version: \"${GIT_VERSION}\",}" $< > $@
+
 # Install packages required to develop the identity service and run tests.
 APT_BASED := $(shell command -v apt-get >/dev/null; echo $$?)
 sysdeps:
@@ -113,4 +121,6 @@ help:
 	@echo 'make format - Format the source files.'
 	@echo 'make simplify - Format and simplify the source files.'
 
-.PHONY: build check install clean format server simplify sysdeps help
+.PHONY: build check install clean format server simplify sysdeps help FORCE
+
+FORCE:

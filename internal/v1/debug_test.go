@@ -10,6 +10,7 @@ import (
 	"github.com/juju/testing/httptesting"
 	gc "gopkg.in/check.v1"
 
+	buildver "github.com/CanonicalLtd/blues-identity/version"
 	"github.com/juju/utils/debugstatus"
 )
 
@@ -43,4 +44,13 @@ func (s *debugSuite) TestServeDebugStatus(c *gc.C) {
 		Passed: true,
 	})
 	c.Assert(results["server_started"].Passed, jc.IsTrue)
+}
+
+func (s *debugSuite) TestServeDebugInfo(c *gc.C) {
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Handler:      s.srv,
+		URL:          apiURL("debug/info"),
+		ExpectStatus: http.StatusOK,
+		ExpectBody:   buildver.VersionInfo,
+	})
 }
