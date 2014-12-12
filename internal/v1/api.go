@@ -21,6 +21,7 @@ func NewAPIHandler(s *store.Store) http.Handler {
 	}
 	h.Router = router.New(map[string]http.Handler{
 		"debug":        router.HandleErrors(h.serveDebug),
+		"debug/info":   router.HandleJSON(h.serveDebugInfo),
 		"debug/status": router.HandleJSON(h.serveDebugStatus),
 	})
 	return h
