@@ -4,6 +4,8 @@ package v1
 
 import (
 	"net/http"
+
+	"github.com/juju/utils/debugstatus"
 )
 
 // GET /debug
@@ -13,6 +15,9 @@ func (h *Handler) serveDebug(http.ResponseWriter, *http.Request) error {
 
 // GET /debug/status
 func (h *Handler) serveDebugStatus(_ http.Header, req *http.Request) (interface{}, error) {
-	// TODO frankban: implement the debug status handler.
-	return nil, errNotImplemented
+	return debugstatus.Check(
+		debugstatus.StartTime,
+		debugstatus.Connection(h.store.DB.Session),
+		debugstatus.MongoCollections(h.store.DB),
+	), nil
 }
