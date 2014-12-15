@@ -17,7 +17,7 @@ func (h *Handler) serveDebug(http.ResponseWriter, *http.Request) error {
 // GET /debug/status
 func (h *Handler) serveDebugStatus(_ http.Header, req *http.Request) (interface{}, error) {
 	return debugstatus.Check(
-		debugstatus.StartTime,
+		debugstatus.ServerStartTime,
 		debugstatus.Connection(h.store.DB.Session),
 		debugstatus.MongoCollections(h.store.DB),
 	), nil
