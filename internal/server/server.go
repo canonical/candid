@@ -13,11 +13,11 @@ import (
 )
 
 // NewAPIHandlerFunc is a function that returns a new API handler.
-type NewAPIHandlerFunc func(*store.Store) http.Handler
+type NewAPIHandlerFunc func(*store.Store, *Authorization) http.Handler
 
 // New returns a handler that serves the given identity API versions using the
 // db to store identity data. The key of the versions map is the version name.
-func New(db *mgo.Database, versions map[string]NewAPIHandlerFunc) (http.Handler, error) {
+func New(db *mgo.Database, username, password string, versions map[string]NewAPIHandlerFunc) (http.Handler, error) {
 	if len(versions) == 0 {
 		return nil, errgo.Newf("identity server must serve at least one version of the API")
 	}
@@ -28,10 +28,13 @@ func New(db *mgo.Database, versions map[string]NewAPIHandlerFunc) (http.Handler,
 		return nil, errgo.Notef(err, "cannot make store")
 	}
 
+	// Create the Authorization.
+	auth := NewAuthorization(username, password)
+
 	// Create the HTTP server.
 	mux := router.NewServeMux()
 	for vers, newAPI := range versions {
-		handle(mux, "/"+vers, newAPI(store))
+		handle(mux, "/"+vers, newAPI(store, auth))
 	}
 	return mux, nil
 }

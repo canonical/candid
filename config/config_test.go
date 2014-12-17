@@ -29,6 +29,8 @@ mongo-addr: localhost:23456
 api-addr: 1.2.3.4:5678
 foo: 1
 bar: false
+auth-username: myuser
+auth-password: mypasswd
 `
 
 func (s *configSuite) readConfig(c *gc.C, content string) (*config.Config, error) {
@@ -45,8 +47,10 @@ func (s *configSuite) TestRead(c *gc.C) {
 	conf, err := s.readConfig(c, testConfig)
 	c.Assert(err, gc.IsNil)
 	c.Assert(conf, jc.DeepEquals, &config.Config{
-		MongoAddr: "localhost:23456",
-		APIAddr:   "1.2.3.4:5678",
+		MongoAddr:    "localhost:23456",
+		APIAddr:      "1.2.3.4:5678",
+		AuthUsername: "myuser",
+		AuthPassword: "mypasswd",
 	})
 }
 
@@ -58,7 +62,7 @@ func (s *configSuite) TestReadErrorNotFound(c *gc.C) {
 
 func (s *configSuite) TestReadErrorEmpty(c *gc.C) {
 	cfg, err := s.readConfig(c, "")
-	c.Assert(err, gc.ErrorMatches, "missing fields mongo-addr, api-addr in config file")
+	c.Assert(err, gc.ErrorMatches, "missing fields mongo-addr, api-addr, auth-username, auth-password in config file")
 	c.Assert(cfg, gc.IsNil)
 }
 

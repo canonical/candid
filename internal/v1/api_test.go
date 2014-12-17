@@ -14,7 +14,11 @@ import (
 	"github.com/CanonicalLtd/blues-identity/internal/v1"
 )
 
-const version = "v1"
+const (
+	version       = "v1"
+	adminUsername = "admin"
+	adminPassword = "password"
+)
 
 type apiSuite struct {
 	idtesting.IsolatedMgoSuite
@@ -45,7 +49,7 @@ func newServer(c *gc.C, session *mgo.Session) (http.Handler, *store.Store) {
 	db := session.DB("testing")
 	store, err := store.New(db)
 	c.Assert(err, gc.IsNil)
-	srv, err := server.New(db, map[string]server.NewAPIHandlerFunc{
+	srv, err := server.New(db, adminUsername, adminPassword, map[string]server.NewAPIHandlerFunc{
 		version: v1.NewAPIHandler,
 	})
 	c.Assert(err, gc.IsNil)

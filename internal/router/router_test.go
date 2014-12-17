@@ -84,3 +84,62 @@ func (s *muxSuite) TestNew(c *gc.C) {
 		})
 	}
 }
+
+func (s *muxSuite) TestAccessCheckingHandler(c *gc.C) {
+	tests := []struct {
+		about        string
+		f            func(*http.Request) bool
+		h            http.Handler
+		method       string
+		expectStatus int
+		expectBody   interface{}
+	}{{
+		about: "allowed request",
+		f: func(_ *http.Request) bool {
+			return true
+		},
+		h: router.HandleJSON(func(_ http.Header, _ *http.Request) (interface{}, error) {
+			return "OK", nil
+		}),
+		expectStatus: http.StatusOK,
+		expectBody:   "OK",
+	}, {
+		about: "forbidden request",
+		f: func(_ *http.Request) bool {
+			return false
+		},
+		expectStatus: http.StatusForbidden,
+		expectBody:   params.Error{"forbidden", "forbidden"},
+	}, {
+		about: "allowed GET request",
+		f: func(r *http.Request) bool {
+			return r.Method == "GET"
+		},
+		h: router.HandleJSON(func(_ http.Header, _ *http.Request) (interface{}, error) {
+			return "OK", nil
+		}),
+		expectStatus: http.StatusOK,
+		expectBody:   "OK",
+	}, {
+		about: "forbidden POST request",
+		f: func(r *http.Request) bool {
+			return r.Method == "GET"
+		},
+		method:       "POST",
+		expectStatus: http.StatusForbidden,
+		expectBody:   params.Error{"forbidden", "forbidden"},
+	}}
+	for i, test := range tests {
+		c.Logf("%d. %s", i, test.about)
+		h := router.AccessCheckingHandler{
+			Access:  test.f,
+			Handler: test.h,
+		}
+		httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+			Handler:      h,
+			Method:       test.method,
+			ExpectStatus: test.expectStatus,
+			ExpectBody:   test.expectBody,
+		})
+	}
+}

@@ -5,23 +5,42 @@ package v1
 import (
 	"net/http"
 
+	"github.com/juju/httpprof"
 	"github.com/juju/loggo"
 	"gopkg.in/errgo.v1"
 
 	"github.com/CanonicalLtd/blues-identity/internal/router"
+	"github.com/CanonicalLtd/blues-identity/internal/server"
 	"github.com/CanonicalLtd/blues-identity/internal/store"
 )
 
 var logger = loggo.GetLogger("identity.internal.v1")
 
 // NewAPIHandler returns a new instance of the v1 API handler.
-func NewAPIHandler(s *store.Store) http.Handler {
+func NewAPIHandler(s *store.Store, auth *server.Authorization) http.Handler {
 	h := &Handler{
 		store: s,
+		auth:  auth,
 	}
 	h.Router = router.New(map[string]http.Handler{
-		"debug":        router.HandleErrors(h.serveDebug),
-		"debug/info":   router.HandleJSON(h.serveDebugInfo),
+		"debug":      router.HandleErrors(h.serveDebug),
+		"debug/info": router.HandleJSON(h.serveDebugInfo),
+		"debug/pprof/": router.AccessCheckingHandler{
+			auth.HasAdminCredentials,
+			pprof.IndexAtRoot("/"),
+		},
+		"debug/pprof/cmdline": router.AccessCheckingHandler{
+			auth.HasAdminCredentials,
+			http.HandlerFunc(pprof.Cmdline),
+		},
+		"debug/pprof/profile": router.AccessCheckingHandler{
+			auth.HasAdminCredentials,
+			http.HandlerFunc(pprof.Profile),
+		},
+		"debug/pprof/symbol": router.AccessCheckingHandler{
+			auth.HasAdminCredentials,
+			http.HandlerFunc(pprof.Symbol),
+		},
 		"debug/status": router.HandleJSON(h.serveDebugStatus),
 	})
 	return h
@@ -30,6 +49,7 @@ func NewAPIHandler(s *store.Store) http.Handler {
 type Handler struct {
 	*router.Router
 	store *store.Store
+	auth  *server.Authorization
 }
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, req *http.Request) {

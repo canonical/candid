@@ -35,7 +35,7 @@ func Versions() []string {
 // NewServer returns a new handler that handles identity service requests and
 // stores its data in the given database. The handler will serve the specified
 // versions of the API.
-func NewServer(db *mgo.Database, serveVersions ...string) (http.Handler, error) {
+func NewServer(db *mgo.Database, username, password string, serveVersions ...string) (http.Handler, error) {
 	newAPIs := make(map[string]server.NewAPIHandlerFunc)
 	for _, vers := range serveVersions {
 		newAPI := versions[vers]
@@ -44,5 +44,5 @@ func NewServer(db *mgo.Database, serveVersions ...string) (http.Handler, error) 
 		}
 		newAPIs[vers] = newAPI
 	}
-	return server.New(db, newAPIs)
+	return server.New(db, username, password, newAPIs)
 }
