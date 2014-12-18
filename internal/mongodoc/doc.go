@@ -16,3 +16,18 @@ type Identity struct {
 
 	// TODO frankban: implement the Identity doc.
 }
+
+// IdentityProvider holds the in-database representation of the an identity provider in the
+// IdentityProviders Mongo Collection.
+type IdentityProvider struct {
+	// Name is the name of the identity provider within the identiy manager system.
+	Name string `bson:"_id"`
+
+	// Protocol is the protocol used by the identity provider.
+	Protocol string `bson:"protocol"`
+
+	// OpenID 2.0 Settings.
+
+	// LoginURL is the URL to which login is redirected.
+	LoginURL string `bson:"login_url,omitempty"`
+}
