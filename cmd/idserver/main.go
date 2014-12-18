@@ -61,7 +61,14 @@ func serve(confPath string) error {
 	db := session.DB("juju")
 
 	logger.Infof("setting up the identity server")
-	server, err := identity.NewServer(db, conf.AuthUsername, conf.AuthPassword, identity.V1)
+	server, err := identity.NewServer(
+		db,
+		identity.ServerParams{
+			conf.AuthUsername,
+			conf.AuthPassword,
+		},
+		identity.V1,
+	)
 	if err != nil {
 		return errgo.Notef(err, "cannot create new server at %q", conf.APIAddr)
 	}

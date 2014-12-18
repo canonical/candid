@@ -20,7 +20,7 @@ type serverSuite struct {
 var _ = gc.Suite(&serverSuite{})
 
 func (s *serverSuite) TestNewServerWithNoVersions(c *gc.C) {
-	h, err := New(s.Session.DB("foo"), "", "", nil)
+	h, err := New(s.Session.DB("foo"), ServerParams{}, nil)
 	c.Assert(err, gc.ErrorMatches, `identity server must serve at least one version of the API`)
 	c.Assert(h, gc.IsNil)
 }
@@ -47,7 +47,7 @@ func (s *serverSuite) TestNewServerWithVersions(c *gc.C) {
 		}
 	}
 
-	h, err := New(db, "", "", map[string]NewAPIHandlerFunc{
+	h, err := New(db, ServerParams{}, map[string]NewAPIHandlerFunc{
 		"version1": serveVersion("version1"),
 	})
 	c.Assert(err, gc.IsNil)
@@ -55,7 +55,7 @@ func (s *serverSuite) TestNewServerWithVersions(c *gc.C) {
 	assertDoesNotServeVersion(c, h, "version2")
 	assertDoesNotServeVersion(c, h, "version3")
 
-	h, err = New(db, "", "", map[string]NewAPIHandlerFunc{
+	h, err = New(db, ServerParams{}, map[string]NewAPIHandlerFunc{
 		"version1": serveVersion("version1"),
 		"version2": serveVersion("version2"),
 	})
@@ -64,7 +64,7 @@ func (s *serverSuite) TestNewServerWithVersions(c *gc.C) {
 	assertServesVersion(c, h, "version2")
 	assertDoesNotServeVersion(c, h, "version3")
 
-	h, err = New(db, "", "", map[string]NewAPIHandlerFunc{
+	h, err = New(db, ServerParams{}, map[string]NewAPIHandlerFunc{
 		"version1": serveVersion("version1"),
 		"version2": serveVersion("version2"),
 		"version3": serveVersion("version3"),

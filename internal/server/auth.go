@@ -16,9 +16,9 @@ type Authorization struct {
 }
 
 // NewAuthorization creates a new Authorization using the supplied credentials.
-func NewAuthorization(username, password string) *Authorization {
+func NewAuthorization(params ServerParams) *Authorization {
 	return &Authorization{
-		creds: utils.BasicAuthHeader(username, password).Get(authorizationHeader),
+		creds: utils.BasicAuthHeader(params.AuthUsername, params.AuthPassword).Get(authorizationHeader),
 	}
 }
 

@@ -66,5 +66,7 @@ func (h AccessCheckingHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 		h.Handler.ServeHTTP(w, r)
 		return
 	}
+	// TODO(mhilton) update the logic here to return Unauthorized with appropriate
+	// headers, and make sure that macaroons are processed correctly.
 	WriteError(w, params.ErrForbidden)
 }

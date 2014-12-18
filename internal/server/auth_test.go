@@ -13,7 +13,12 @@ type authSuite struct{}
 var _ = gc.Suite(&authSuite{})
 
 func (s *authSuite) TestHasAdminCredentials(c *gc.C) {
-	auth := NewAuthorization("test-admin", "open sesame")
+	auth := NewAuthorization(
+		ServerParams{
+			"test-admin",
+			"open sesame",
+		},
+	)
 	tests := []struct {
 		about    string
 		header   http.Header
