@@ -26,13 +26,13 @@ type serverSuite struct {
 var _ = gc.Suite(&serverSuite{})
 
 func (s *serverSuite) TestNewServerWithNoVersions(c *gc.C) {
-	h, err := identity.NewServer(s.Session.DB("foo"))
+	h, err := identity.NewServer(s.Session.DB("foo"), identity.ServerParams{})
 	c.Assert(err, gc.ErrorMatches, `identity server must serve at least one version of the API`)
 	c.Assert(h, gc.IsNil)
 }
 
 func (s *serverSuite) TestNewServerWithUnregisteredVersion(c *gc.C) {
-	h, err := identity.NewServer(s.Session.DB("foo"), "wrong")
+	h, err := identity.NewServer(s.Session.DB("foo"), identity.ServerParams{}, "wrong")
 	c.Assert(err, gc.ErrorMatches, `unknown version "wrong"`)
 	c.Assert(h, gc.IsNil)
 }
@@ -47,7 +47,7 @@ func (s *serverSuite) TestVersions(c *gc.C) {
 }
 
 func (s *serverSuite) TestNewServerWithVersions(c *gc.C) {
-	h, err := identity.NewServer(s.Session.DB("foo"), identity.V1)
+	h, err := identity.NewServer(s.Session.DB("foo"), identity.ServerParams{}, identity.V1)
 	c.Assert(err, gc.IsNil)
 
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{

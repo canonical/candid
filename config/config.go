@@ -4,6 +4,7 @@
 package config
 
 import (
+	"fmt"
 	"io/ioutil"
 	"os"
 	"strings"
@@ -14,8 +15,10 @@ import (
 
 // Config holds the configuration parameters for the identity service.
 type Config struct {
-	MongoAddr string `yaml:"mongo-addr"`
-	APIAddr   string `yaml:"api-addr"`
+	MongoAddr    string `yaml:"mongo-addr"`
+	APIAddr      string `yaml:"api-addr"`
+	AuthUsername string `yaml:"auth-username"`
+	AuthPassword string `yaml:"auth-password"`
 }
 
 func (c *Config) validate() error {
@@ -25,6 +28,15 @@ func (c *Config) validate() error {
 	}
 	if c.APIAddr == "" {
 		missing = append(missing, "api-addr")
+	}
+	if c.AuthUsername == "" {
+		missing = append(missing, "auth-username")
+	}
+	if strings.Contains(c.AuthUsername, ":") {
+		return fmt.Errorf("invalid user name %q (contains ':')", c.AuthUsername)
+	}
+	if c.AuthPassword == "" {
+		missing = append(missing, "auth-password")
 	}
 	if len(missing) != 0 {
 		return errgo.Newf("missing fields %s in config file", strings.Join(missing, ", "))

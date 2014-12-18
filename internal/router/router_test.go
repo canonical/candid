@@ -84,3 +84,76 @@ func (s *muxSuite) TestNew(c *gc.C) {
 		})
 	}
 }
+
+func (s *muxSuite) TestAuthorizingHandler(c *gc.C) {
+	tests := []struct {
+		about        string
+		f            func(*http.Request) error
+		h            http.Handler
+		method       string
+		expectStatus int
+		expectBody   interface{}
+	}{{
+		about: "allowed request",
+		f: func(_ *http.Request) error {
+			return nil
+		},
+		h: router.HandleJSON(func(_ http.Header, _ *http.Request) (interface{}, error) {
+			return "OK", nil
+		}),
+		expectStatus: http.StatusOK,
+		expectBody:   "OK",
+	}, {
+		about: "forbidden request",
+		f: func(_ *http.Request) error {
+			return errgo.WithCausef(nil, params.ErrForbidden, "forbidden")
+		},
+		expectStatus: http.StatusForbidden,
+		expectBody:   params.Error{"forbidden", "forbidden"},
+	}, {
+		about: "allowed GET request",
+		f: func(r *http.Request) error {
+			if r.Method == "GET" {
+				return nil
+			}
+			return errgo.WithCausef(nil, params.ErrForbidden, "forbidden")
+		},
+		h: router.HandleJSON(func(_ http.Header, _ *http.Request) (interface{}, error) {
+			return "OK", nil
+		}),
+		expectStatus: http.StatusOK,
+		expectBody:   "OK",
+	}, {
+		about: "forbidden POST request",
+		f: func(r *http.Request) error {
+			if r.Method == "GET" {
+				return nil
+			}
+			return errgo.WithCausef(nil, params.ErrForbidden, "forbidden")
+		},
+		method:       "POST",
+		expectStatus: http.StatusForbidden,
+		expectBody:   params.Error{"forbidden", "forbidden"},
+	}, {
+		about: "Unauthorized error",
+		f: func(r *http.Request) error {
+			return errgo.WithCausef(nil, params.ErrUnauthorized, "need auth")
+		},
+		method:       "POST",
+		expectStatus: http.StatusUnauthorized,
+		expectBody:   params.Error{"need auth", "unauthorized"},
+	}}
+	for i, test := range tests {
+		c.Logf("%d. %s", i, test.about)
+		h := router.AuthorizingHandler{
+			CheckAuthorized: test.f,
+			Handler:         test.h,
+		}
+		httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+			Handler:      h,
+			Method:       test.method,
+			ExpectStatus: test.expectStatus,
+			ExpectBody:   test.expectBody,
+		})
+	}
+}
