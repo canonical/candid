@@ -33,7 +33,7 @@ type versionResponse struct {
 func (s *serverSuite) TestNewServerWithVersions(c *gc.C) {
 	db := s.Session.DB("foo")
 	serveVersion := func(vers string) NewAPIHandlerFunc {
-		return func(*store.Store, *Authorization) http.Handler {
+		return func(*store.Store, *Authorizer) http.Handler {
 			return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 				w.Header().Set("Content-Type", "application/json")
 				response := versionResponse{

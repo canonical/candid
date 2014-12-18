@@ -17,27 +17,26 @@ import (
 var logger = loggo.GetLogger("identity.internal.v1")
 
 // NewAPIHandler returns a new instance of the v1 API handler.
-func NewAPIHandler(s *store.Store, auth *server.Authorization) http.Handler {
+func NewAPIHandler(s *store.Store, auth *server.Authorizer) http.Handler {
 	h := &Handler{
 		store: s,
-		auth:  auth,
 	}
 	h.Router = router.New(map[string]http.Handler{
 		"debug":      router.HandleErrors(h.serveDebug),
 		"debug/info": router.HandleJSON(h.serveDebugInfo),
-		"debug/pprof/": router.AccessCheckingHandler{
+		"debug/pprof/": router.AuthorizingHandler{
 			auth.HasAdminCredentials,
 			pprof.IndexAtRoot("/"),
 		},
-		"debug/pprof/cmdline": router.AccessCheckingHandler{
+		"debug/pprof/cmdline": router.AuthorizingHandler{
 			auth.HasAdminCredentials,
 			http.HandlerFunc(pprof.Cmdline),
 		},
-		"debug/pprof/profile": router.AccessCheckingHandler{
+		"debug/pprof/profile": router.AuthorizingHandler{
 			auth.HasAdminCredentials,
 			http.HandlerFunc(pprof.Profile),
 		},
-		"debug/pprof/symbol": router.AccessCheckingHandler{
+		"debug/pprof/symbol": router.AuthorizingHandler{
 			auth.HasAdminCredentials,
 			http.HandlerFunc(pprof.Symbol),
 		},
@@ -49,7 +48,6 @@ func NewAPIHandler(s *store.Store, auth *server.Authorization) http.Handler {
 type Handler struct {
 	*router.Router
 	store *store.Store
-	auth  *server.Authorization
 }
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, req *http.Request) {

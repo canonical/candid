@@ -13,7 +13,7 @@ import (
 )
 
 // NewAPIHandlerFunc is a function that returns a new API handler.
-type NewAPIHandlerFunc func(*store.Store, *Authorization) http.Handler
+type NewAPIHandlerFunc func(*store.Store, *Authorizer) http.Handler
 
 // New returns a handler that serves the given identity API versions using the
 // db to store identity data. The key of the versions map is the version name.
@@ -29,7 +29,7 @@ func New(db *mgo.Database, params ServerParams, versions map[string]NewAPIHandle
 	}
 
 	// Create the Authorization.
-	auth := NewAuthorization(params)
+	auth := NewAuthorizer(params)
 
 	// Create the HTTP server.
 	mux := router.NewServeMux()

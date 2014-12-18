@@ -54,19 +54,22 @@ func (r *Router) Handlers() map[string]http.Handler {
 	return r.handlers
 }
 
-// AccessCheckingHandler is a wrapper around an http.Handler that uses the
+// AuthorizingHandler is a wrapper around an http.Handler that uses the
 // Access function to check if the request has access to
-type AccessCheckingHandler struct {
-	Access  func(*http.Request) bool
-	Handler http.Handler
+type AuthorizingHandler struct {
+	CheckAuthorized func(*http.Request) error
+	Handler         http.Handler
 }
 
-func (h AccessCheckingHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if h.Access(r) {
+func (h AuthorizingHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	err := h.CheckAuthorized(r)
+	if err == nil {
 		h.Handler.ServeHTTP(w, r)
 		return
 	}
-	// TODO(mhilton) update the logic here to return Unauthorized with appropriate
-	// headers, and make sure that macaroons are processed correctly.
-	WriteError(w, params.ErrForbidden)
+	if errgo.Cause(err) == params.ErrUnauthorized {
+		// TODO(mhilton) make the realm configurable?
+		w.Header().Set("WWW-Authenticate", `Basic realm="identity"`)
+	}
+	WriteError(w, err)
 }
