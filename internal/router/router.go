@@ -73,3 +73,32 @@ func (h AuthorizingHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	WriteError(w, err)
 }
+
+// Any returns a function that can be used with an AuthorizingHandler
+// that will return nil if any of the provided checks returns nil. If all of the
+// checks return a non-nil error then the function returns the last error.
+func Any(checks ...func(*http.Request) error) func(*http.Request) error {
+	return func(r *http.Request) error {
+		var err error
+		for _, c := range checks {
+			err = c(r)
+			if err == nil {
+				return nil
+			}
+		}
+		return err
+	}
+}
+
+// HasMethod returns a function that can be used with an AuthorizingHandler
+// that will allow access if the request method is one of those specified.
+func HasMethod(methods ...string) func(*http.Request) error {
+	return func(r *http.Request) error {
+		for _, m := range methods {
+			if r.Method == m {
+				return nil
+			}
+		}
+		return errgo.WithCausef(nil, params.ErrBadRequest, `unsupported method "%s"`, r.Method)
+	}
+}

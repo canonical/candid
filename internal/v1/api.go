@@ -41,6 +41,13 @@ func NewAPIHandler(s *store.Store, auth *server.Authorizer) http.Handler {
 			http.HandlerFunc(pprof.Symbol),
 		},
 		"debug/status": router.HandleJSON(h.serveDebugStatus),
+		"idps/": router.AuthorizingHandler{
+			router.Any(
+				router.HasMethod("GET"),
+				auth.HasAdminCredentials,
+			),
+			router.HandleJSON(h.serveIdentityProviders),
+		},
 	})
 	return h
 }

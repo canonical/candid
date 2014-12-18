@@ -3,6 +3,7 @@
 package router_test
 
 import (
+	"errors"
 	"net/http"
 
 	jujutesting "github.com/juju/testing"
@@ -155,5 +156,112 @@ func (s *muxSuite) TestAuthorizingHandler(c *gc.C) {
 			ExpectStatus: test.expectStatus,
 			ExpectBody:   test.expectBody,
 		})
+	}
+}
+
+func (s *muxSuite) TestAnyAccessChecker(c *gc.C) {
+	err := errors.New("test error")
+	tests := []struct {
+		about       string
+		f           []func(*http.Request) error
+		expectError error
+	}{{
+		about: "single success",
+		f: []func(*http.Request) error{
+			func(_ *http.Request) error {
+				return nil
+			},
+		},
+		expectError: nil,
+	}, {
+		about: "single failure",
+		f: []func(*http.Request) error{
+			func(_ *http.Request) error {
+				return err
+			},
+		},
+		expectError: err,
+	}, {
+		about:       "zero suceeds",
+		f:           []func(*http.Request) error{},
+		expectError: nil,
+	}, {
+		about: "many all fail",
+		f: []func(*http.Request) error{
+			func(_ *http.Request) error {
+				return err
+			},
+			func(_ *http.Request) error {
+				return err
+			},
+		},
+		expectError: err,
+	}, {
+		about: "many one succeeds",
+		f: []func(*http.Request) error{
+			func(_ *http.Request) error {
+				return err
+			},
+			func(_ *http.Request) error {
+				return nil
+			},
+		},
+		expectError: nil,
+	}}
+	for i, test := range tests {
+		c.Logf("%d. %s", i, test.about)
+		f := router.Any(test.f...)
+		obtained := f(nil)
+		c.Assert(obtained, gc.Equals, test.expectError)
+	}
+}
+
+func (s *muxSuite) TestHasMethodAccessChecker(c *gc.C) {
+	tests := []struct {
+		about       string
+		methods     []string
+		method      string
+		expectCause error
+	}{{
+		about: "single match",
+		methods: []string{
+			"GET",
+		},
+		method:      "GET",
+		expectCause: nil,
+	}, {
+		about: "single non-match",
+		methods: []string{
+			"GET",
+		},
+		method:      "POST",
+		expectCause: params.ErrBadRequest,
+	}, {
+		about:       "no methods",
+		methods:     []string{},
+		method:      "GET",
+		expectCause: params.ErrBadRequest,
+	}, {
+		about: "many with match",
+		methods: []string{
+			"GET",
+			"HEAD",
+		},
+		method:      "GET",
+		expectCause: nil,
+	}, {
+		about: "many without match",
+		methods: []string{
+			"GET",
+			"HEAD",
+		},
+		method:      "CONNECT",
+		expectCause: params.ErrBadRequest,
+	}}
+	for i, test := range tests {
+		c.Logf("%d. %s", i, test.about)
+		f := router.HasMethod(test.methods...)
+		obtained := f(&http.Request{Method: test.method})
+		c.Assert(errgo.Cause(obtained), gc.Equals, test.expectCause)
 	}
 }

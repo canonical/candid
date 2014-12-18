@@ -40,6 +40,12 @@ func (s *Store) ensureIndexes() error {
 			Key:    []string{"username"},
 			Unique: true,
 		},
+	}, {
+		s.DB.IdentityProviders(),
+		mgo.Index{
+			Key:    []string{"_id"},
+			Unique: true,
+		},
 	}}
 	for _, idx := range indexes {
 		err := idx.c.EnsureIndex(idx.i)
@@ -95,6 +101,7 @@ func (s StoreDatabase) Identities() *mgo.Collection {
 // function returning that collection.
 var allCollections = []func(StoreDatabase) *mgo.Collection{
 	StoreDatabase.Identities,
+	StoreDatabase.IdentityProviders,
 }
 
 // Collections returns a slice of all the collections used
