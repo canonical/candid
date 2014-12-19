@@ -55,7 +55,7 @@ func (r *Router) Handlers() map[string]http.Handler {
 }
 
 // AuthorizingHandler is a wrapper around an http.Handler that uses the
-// Access function to check if the request has access to
+// CheckAuthorized function to check if the request has access to Handler.
 type AuthorizingHandler struct {
 	CheckAuthorized func(*http.Request) error
 	Handler         http.Handler

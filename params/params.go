@@ -19,3 +19,9 @@ type IdentityProvider struct {
 	Protocol string                 `json:"protocol"`
 	Settings map[string]interface{} `json:"settings"`
 }
+
+// User represents a user in the system.
+type User struct {
+	UserName         string `json:"username"`
+	IdentityProvider string `json:"identity_provider"`
+}
