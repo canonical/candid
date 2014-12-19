@@ -14,6 +14,13 @@ type Identity struct {
 	// associated to the URL accessed through jaas.io/u/username.
 	UserName string
 
+	// IdentityProvider holds the name of the IdentityProvider to use to identify
+	// the user.
+	IdentityProvider string
+
+	// IdentityToken holds a unique identifier for this use with the identity provider
+	IdentityToken string `bson:",omitempty"`
+
 	// TODO frankban: implement the Identity doc.
 }
 

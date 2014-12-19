@@ -25,28 +25,32 @@ func NewAPIHandler(s *store.Store, auth *server.Authorizer) http.Handler {
 		"debug":      router.HandleErrors(h.serveDebug),
 		"debug/info": router.HandleJSON(h.serveDebugInfo),
 		"debug/pprof/": router.AuthorizingHandler{
-			auth.HasAdminCredentials,
-			pprof.IndexAtRoot("/"),
+			CheckAuthorized: auth.HasAdminCredentials,
+			Handler:         pprof.IndexAtRoot("/"),
 		},
 		"debug/pprof/cmdline": router.AuthorizingHandler{
-			auth.HasAdminCredentials,
-			http.HandlerFunc(pprof.Cmdline),
+			CheckAuthorized: auth.HasAdminCredentials,
+			Handler:         http.HandlerFunc(pprof.Cmdline),
 		},
 		"debug/pprof/profile": router.AuthorizingHandler{
-			auth.HasAdminCredentials,
-			http.HandlerFunc(pprof.Profile),
+			CheckAuthorized: auth.HasAdminCredentials,
+			Handler:         http.HandlerFunc(pprof.Profile),
 		},
 		"debug/pprof/symbol": router.AuthorizingHandler{
-			auth.HasAdminCredentials,
-			http.HandlerFunc(pprof.Symbol),
+			CheckAuthorized: auth.HasAdminCredentials,
+			Handler:         http.HandlerFunc(pprof.Symbol),
 		},
 		"debug/status": router.HandleJSON(h.serveDebugStatus),
 		"idps/": router.AuthorizingHandler{
-			router.Any(
+			CheckAuthorized: router.Any(
 				router.HasMethod("GET"),
 				auth.HasAdminCredentials,
 			),
-			router.HandleJSON(h.serveIdentityProviders),
+			Handler: router.HandleJSON(h.serveIdentityProviders),
+		},
+		"u": router.AuthorizingHandler{
+			CheckAuthorized: router.HasMethod("POST"),
+			Handler:         router.HandleJSON(h.serveCreateUser),
 		},
 	})
 	return h

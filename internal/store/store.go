@@ -57,10 +57,11 @@ func (s *Store) ensureIndexes() error {
 }
 
 // AddIdentity adds an identity to the identities collection.
-func (s *Store) AddIdentity(username string) error {
+func (s *Store) AddIdentity(username, idp string) error {
 	doc := &mongodoc.Identity{
-		UUID:     bson.NewObjectId().Hex(),
-		UserName: username,
+		UUID:             bson.NewObjectId().Hex(),
+		UserName:         username,
+		IdentityProvider: idp,
 	}
 	err := s.DB.Identities().Insert(doc)
 	if mgo.IsDup(err) {

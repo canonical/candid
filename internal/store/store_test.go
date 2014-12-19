@@ -23,7 +23,8 @@ func (s *storeSuite) TestNew(c *gc.C) {
 
 	// Add an identity to the identities collection using mgo directly.
 	err := db.C("identities").Insert(mongodoc.Identity{
-		UserName: "who",
+		UserName:         "who",
+		IdentityProvider: "usso",
 	})
 	c.Assert(err, gc.IsNil)
 
@@ -36,6 +37,7 @@ func (s *storeSuite) TestNew(c *gc.C) {
 	err = store.DB.Identities().Find(nil).One(&doc)
 	c.Assert(err, gc.IsNil)
 	c.Assert(doc.UserName, gc.Equals, "who")
+	c.Assert(doc.IdentityProvider, gc.Equals, "usso")
 }
 
 func (s *storeSuite) TestAddIdentity(c *gc.C) {
@@ -43,7 +45,7 @@ func (s *storeSuite) TestAddIdentity(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 
 	// Add an identity to the store.
-	err = store.AddIdentity("jean-luc")
+	err = store.AddIdentity("jean-luc", "usso")
 	c.Assert(err, gc.IsNil)
 
 	// Retrieve the newly created identity.
@@ -51,9 +53,10 @@ func (s *storeSuite) TestAddIdentity(c *gc.C) {
 	err = store.DB.Identities().Find(nil).One(&doc)
 	c.Assert(err, gc.IsNil)
 	c.Assert(doc.UserName, gc.Equals, "jean-luc")
+	c.Assert(doc.IdentityProvider, gc.Equals, "usso")
 
 	// Inserting the identity again fails because the user name must be unique.
-	err = store.AddIdentity("jean-luc")
+	err = store.AddIdentity("jean-luc", "usso")
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrAlreadyExists)
 }
 
