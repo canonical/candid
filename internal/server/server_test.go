@@ -8,6 +8,7 @@ import (
 
 	"github.com/juju/testing/httptesting"
 	gc "gopkg.in/check.v1"
+	"gopkg.in/macaroon-bakery.v0/bakery"
 
 	"github.com/CanonicalLtd/blues-identity/internal/idtesting"
 	"github.com/CanonicalLtd/blues-identity/internal/store"
@@ -33,7 +34,7 @@ type versionResponse struct {
 func (s *serverSuite) TestNewServerWithVersions(c *gc.C) {
 	db := s.Session.DB("foo")
 	serveVersion := func(vers string) NewAPIHandlerFunc {
-		return func(*store.Store, *Authorizer) http.Handler {
+		return func(*store.Store, *Authorizer, *bakery.Service) http.Handler {
 			return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 				w.Header().Set("Content-Type", "application/json")
 				response := versionResponse{

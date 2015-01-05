@@ -8,6 +8,8 @@ import (
 	"github.com/juju/httpprof"
 	"github.com/juju/loggo"
 	"gopkg.in/errgo.v1"
+	"gopkg.in/macaroon-bakery.v0/bakery"
+	"gopkg.in/macaroon-bakery.v0/httpbakery"
 
 	"github.com/CanonicalLtd/blues-identity/internal/router"
 	"github.com/CanonicalLtd/blues-identity/internal/server"
@@ -17,10 +19,13 @@ import (
 var logger = loggo.GetLogger("identity.internal.v1")
 
 // NewAPIHandler returns a new instance of the v1 API handler.
-func NewAPIHandler(s *store.Store, auth *server.Authorizer) http.Handler {
+func NewAPIHandler(s *store.Store, auth *server.Authorizer, svc *bakery.Service) http.Handler {
 	h := &Handler{
 		store: s,
+		svc:   svc,
 	}
+	mux := http.NewServeMux()
+	httpbakery.AddDischargeHandler(mux, "/", svc, h.checkThirdPartyCaveat)
 	h.Router = router.New(map[string]http.Handler{
 		"debug":      router.HandleErrors(h.serveDebug),
 		"debug/info": router.HandleJSON(h.serveDebugInfo),
@@ -41,6 +46,7 @@ func NewAPIHandler(s *store.Store, auth *server.Authorizer) http.Handler {
 			Handler:         http.HandlerFunc(pprof.Symbol),
 		},
 		"debug/status": router.HandleJSON(h.serveDebugStatus),
+		"discharge/":   mux,
 		"idps/": router.AuthorizingHandler{
 			CheckAuthorized: router.Any(
 				router.HasMethod("GET"),
@@ -59,6 +65,7 @@ func NewAPIHandler(s *store.Store, auth *server.Authorizer) http.Handler {
 type Handler struct {
 	*router.Router
 	store *store.Store
+	svc   *bakery.Service
 }
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, req *http.Request) {

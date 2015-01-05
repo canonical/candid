@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	gc "gopkg.in/check.v1"
+	"gopkg.in/macaroon-bakery.v0/bakery"
 	"gopkg.in/mgo.v2"
 
 	"github.com/CanonicalLtd/blues-identity/internal/idtesting"
@@ -24,6 +25,7 @@ type apiSuite struct {
 	idtesting.IsolatedMgoSuite
 	srv   http.Handler
 	store *store.Store
+	key   *bakery.PublicKey
 }
 
 var _ = gc.Suite(&apiSuite{})
@@ -38,20 +40,31 @@ func (s *apiSuite) TearDownSuite(c *gc.C) {
 
 func (s *apiSuite) SetUpTest(c *gc.C) {
 	s.IsolatedMgoSuite.SetUpTest(c)
-	s.srv, s.store = newServer(c, s.Session)
+	key, err := bakery.GenerateKey()
+	c.Assert(err, gc.IsNil)
+	s.srv, s.store = newServer(c, s.Session, key)
+	s.key = &key.Public
 }
 
 func (s *apiSuite) TearDownTest(c *gc.C) {
 	s.IsolatedMgoSuite.TearDownTest(c)
 }
 
-func newServer(c *gc.C, session *mgo.Session) (http.Handler, *store.Store) {
+func newServer(c *gc.C, session *mgo.Session, key *bakery.KeyPair) (http.Handler, *store.Store) {
 	db := session.DB("testing")
 	store, err := store.New(db)
 	c.Assert(err, gc.IsNil)
-	srv, err := server.New(db, server.ServerParams{adminUsername, adminPassword}, map[string]server.NewAPIHandlerFunc{
-		version: v1.NewAPIHandler,
-	})
+	srv, err := server.New(
+		db,
+		server.ServerParams{
+			AuthUsername: adminUsername,
+			AuthPassword: adminPassword,
+			Key:          key,
+		},
+		map[string]server.NewAPIHandlerFunc{
+			version: v1.NewAPIHandler,
+		},
+	)
 	c.Assert(err, gc.IsNil)
 	return srv, store
 }

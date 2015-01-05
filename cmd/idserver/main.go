@@ -64,8 +64,8 @@ func serve(confPath string) error {
 	server, err := identity.NewServer(
 		db,
 		identity.ServerParams{
-			conf.AuthUsername,
-			conf.AuthPassword,
+			AuthUsername: conf.AuthUsername,
+			AuthPassword: conf.AuthPassword,
 		},
 		identity.V1,
 	)
