@@ -7,6 +7,7 @@ import (
 	"sort"
 
 	"gopkg.in/errgo.v1"
+	"gopkg.in/macaroon-bakery.v0/bakery"
 	"gopkg.in/mgo.v2"
 
 	"github.com/CanonicalLtd/blues-identity/internal/server"
@@ -36,6 +37,7 @@ func Versions() []string {
 type ServerParams struct {
 	AuthUsername string
 	AuthPassword string
+	Key          *bakery.KeyPair
 }
 
 // NewServer returns a new handler that handles identity service requests and

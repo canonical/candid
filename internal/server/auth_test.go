@@ -15,8 +15,9 @@ var _ = gc.Suite(&authSuite{})
 func (s *authSuite) TestHasAdminCredentials(c *gc.C) {
 	auth := NewAuthorizer(
 		ServerParams{
-			"test-admin",
-			"open sesame",
+			AuthUsername: "test-admin",
+			AuthPassword: "open sesame",
+			Key:          nil,
 		},
 	)
 	tests := []struct {

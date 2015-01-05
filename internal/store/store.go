@@ -46,6 +46,12 @@ func (s *Store) ensureIndexes() error {
 			Key:    []string{"_id"},
 			Unique: true,
 		},
+	}, {
+		s.DB.Macaroons(),
+		mgo.Index{
+			Key:    []string{"_id"},
+			Unique: true,
+		},
 	}}
 	for _, idx := range indexes {
 		err := idx.c.EnsureIndex(idx.i)
@@ -98,11 +104,17 @@ func (s StoreDatabase) Identities() *mgo.Collection {
 	return s.C("identities")
 }
 
+// Macaroons returns the mongo collection where macaroons are stored.
+func (s StoreDatabase) Macaroons() *mgo.Collection {
+	return s.C("macaroons")
+}
+
 // allCollections holds for each collection used by the identity service a
 // function returning that collection.
 var allCollections = []func(StoreDatabase) *mgo.Collection{
 	StoreDatabase.Identities,
 	StoreDatabase.IdentityProviders,
+	StoreDatabase.Macaroons,
 }
 
 // Collections returns a slice of all the collections used
