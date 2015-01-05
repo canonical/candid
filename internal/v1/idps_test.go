@@ -15,7 +15,13 @@ import (
 	"github.com/CanonicalLtd/blues-identity/params"
 )
 
-func (s *apiSuite) TestPutIDPS(c *gc.C) {
+type idpsSuite struct {
+	apiSuite
+}
+
+var _ = gc.Suite(&idpsSuite{})
+
+func (s *idpsSuite) TestPutIDPS(c *gc.C) {
 	tests := []struct {
 		about    string
 		username string
@@ -149,7 +155,7 @@ func (s *apiSuite) TestPutIDPS(c *gc.C) {
 	}
 }
 
-func (s *apiSuite) TestGetIDPS(c *gc.C) {
+func (s *idpsSuite) TestGetIDPS(c *gc.C) {
 	provider1 := &mongodoc.IdentityProvider{
 		Name:     "provider1",
 		Protocol: params.ProtocolOpenID20,
@@ -194,7 +200,7 @@ func (s *apiSuite) TestGetIDPS(c *gc.C) {
 	}
 }
 
-func (s *apiSuite) TestListIDPS(c *gc.C) {
+func (s *idpsSuite) TestListIDPS(c *gc.C) {
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Handler:    s.srv,
 		Method:     "GET",
@@ -231,7 +237,7 @@ func (s *apiSuite) TestListIDPS(c *gc.C) {
 	})
 }
 
-func (s *apiSuite) TestPostIDPS(c *gc.C) {
+func (s *idpsSuite) TestPostIDPS(c *gc.C) {
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Handler: s.srv,
 		Method:  "POST",
