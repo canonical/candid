@@ -58,6 +58,7 @@ func NewAPIHandler(s *store.Store, auth *server.Authorizer, svc *bakery.Service)
 			CheckAuthorized: router.HasMethod("POST"),
 			Handler:         router.HandleJSON(h.serveCreateUser),
 		},
+		"u/": router.HandleJSON(h.serveUser),
 	})
 	return h
 }
