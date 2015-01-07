@@ -10,7 +10,7 @@ import (
 	"github.com/CanonicalLtd/blues-identity/internal/mongodoc"
 )
 
-// Entities returns the mongo collection where entities are stored.
+// IdentityProviders returns the mongo collection where identity providers are stored.
 func (s StoreDatabase) IdentityProviders() *mgo.Collection {
 	return s.C("identity_providers")
 }

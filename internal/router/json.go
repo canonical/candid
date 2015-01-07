@@ -23,7 +23,7 @@ func errToResp(err error) (int, interface{}) {
 	switch errorBody.Code {
 	case params.ErrNotFound:
 		status = http.StatusNotFound
-	case params.ErrForbidden:
+	case params.ErrForbidden, params.ErrAlreadyExists:
 		status = http.StatusForbidden
 	case params.ErrBadRequest:
 		status = http.StatusBadRequest

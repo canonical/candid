@@ -3,6 +3,7 @@
 package store
 
 import (
+	"code.google.com/p/go-uuid/uuid"
 	"github.com/juju/loggo"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/mgo.v2"
@@ -13,6 +14,7 @@ import (
 )
 
 var logger = loggo.GetLogger("identity.internal.store")
+var IdentityNamespace = uuid.Parse("685c2eaa-9721-11e4-b717-a7bf1a250a86")
 
 // Store represents the underlying identity data stores.
 type Store struct {
@@ -41,15 +43,9 @@ func (s *Store) ensureIndexes() error {
 			Unique: true,
 		},
 	}, {
-		s.DB.IdentityProviders(),
+		s.DB.Identities(),
 		mgo.Index{
-			Key:    []string{"_id"},
-			Unique: true,
-		},
-	}, {
-		s.DB.Macaroons(),
-		mgo.Index{
-			Key:    []string{"_id"},
+			Key:    []string{"external_id"},
 			Unique: true,
 		},
 	}}
@@ -62,16 +58,21 @@ func (s *Store) ensureIndexes() error {
 	return nil
 }
 
-// AddIdentity adds an identity to the identities collection.
-func (s *Store) AddIdentity(username, idp string) error {
-	doc := &mongodoc.Identity{
-		UUID:             bson.NewObjectId().Hex(),
-		UserName:         username,
-		IdentityProvider: idp,
-	}
-	err := s.DB.Identities().Insert(doc)
+// UpsertIdentity adds or updates an identity to the identities collection.
+// UpsertIdentity will only update an existing entry when both the UserName and
+// ExternalID match the destination record. If the Identity clashes with an existing
+// Identity then an error is returned with the cause params.ErrAlreadyExists.
+func (s *Store) UpsertIdentity(doc *mongodoc.Identity) error {
+	doc.UUID = uuid.NewSHA1(IdentityNamespace, []byte(doc.UserName)).String()
+	_, err := s.DB.Identities().Upsert(
+		bson.M{
+			"username":    doc.UserName,
+			"external_id": doc.ExternalID,
+		},
+		doc,
+	)
 	if mgo.IsDup(err) {
-		return params.ErrAlreadyExists
+		return errgo.WithCausef(nil, params.ErrAlreadyExists, "cannot add user: duplicate username or external_id")
 	}
 	if err != nil {
 		return errgo.Mask(err)
@@ -113,8 +114,6 @@ func (s StoreDatabase) Macaroons() *mgo.Collection {
 // function returning that collection.
 var allCollections = []func(StoreDatabase) *mgo.Collection{
 	StoreDatabase.Identities,
-	StoreDatabase.IdentityProviders,
-	StoreDatabase.Macaroons,
 }
 
 // Collections returns a slice of all the collections used

@@ -90,6 +90,20 @@ func Any(checks ...func(*http.Request) error) func(*http.Request) error {
 	}
 }
 
+// CheckAll returns a function that can be used with an AuthorizingHandler
+// that will return nil if all of the provided checks returns nil. If any of the
+// checks return a non-nil error then the function returns the first error.
+func CheckAll(checks ...func(*http.Request) error) func(*http.Request) error {
+	return func(r *http.Request) error {
+		for _, c := range checks {
+			if err := c(r); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+}
+
 // HasMethod returns a function that can be used with an AuthorizingHandler
 // that will allow access if the request method is one of those specified.
 func HasMethod(methods ...string) func(*http.Request) error {
