@@ -316,6 +316,25 @@ func (s *usersSuite) TestUser(c *gc.C) {
 			Code:    "unauthorized",
 			Message: "unauthorized: invalid or missing HTTP auth header",
 		},
+	}, {
+		about:  "bad username",
+		url:    apiURL("u/jbloggs{}"),
+		method: "PUT",
+		body: marshal(c, params.User{
+			ExternalID: "http://example.com/jbloggs",
+			Email:      "jbloggs@example.com",
+			FullName:   "Joe Bloggs",
+			Groups: []string{
+				"test",
+			},
+		}),
+		username:     adminUsername,
+		password:     adminPassword,
+		expectStatus: http.StatusBadRequest,
+		expectBody: params.Error{
+			Code:    "bad request",
+			Message: `illegal username: "jbloggs{}"`,
+		},
 	}}
 	for i, test := range tests {
 		c.Logf("%d. %s", i, test.about)
