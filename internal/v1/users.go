@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/juju/names"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
@@ -41,6 +42,8 @@ func (h *Handler) serveQueryUsers(hdr http.Header, req *http.Request) (interface
 func (h *Handler) serveUser(hdr http.Header, req *http.Request) (interface{}, error) {
 	switch req.Method {
 	case "GET":
+		// TODO(mhilton) In future the username may only be part of the URL suffix.
+		// Extract the username from the relevent part of the URL.
 		u := strings.TrimPrefix(req.URL.Path, "/")
 		var user mongodoc.Identity
 		if err := h.store.DB.Identities().Find(bson.M{"username": u}).One(&user); err != nil {
@@ -56,9 +59,14 @@ func (h *Handler) serveUser(hdr http.Header, req *http.Request) (interface{}, er
 			Groups:     user.Groups,
 		}, nil
 	case "PUT":
+		// TODO(mhilton) In future the username may only be part of the URL suffix.
+		// Extract the username from the relevent part of the URL.
 		u := strings.TrimPrefix(req.URL.Path, "/")
 		if u == "" {
 			return nil, errgo.WithCausef(nil, params.ErrBadRequest, "cannot store blank user")
+		}
+		if !names.IsValidUserName(u) {
+			return nil, errgo.WithCausef(nil, params.ErrBadRequest, "illegal username: %q", u)
 		}
 		var user params.User
 		dec := json.NewDecoder(req.Body)
