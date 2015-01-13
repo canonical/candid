@@ -22,6 +22,9 @@ type IdentityProvider struct {
 
 // User represents a user in the system.
 type User struct {
-	UserName         string `json:"username"`
-	IdentityProvider string `json:"identity_provider"`
+	UserName   string   `json:"username"`
+	ExternalID string   `json:"external_id"`
+	FullName   string   `json:"fullname"`
+	Email      string   `json:"email"`
+	Groups     []string `json:"groups"`
 }

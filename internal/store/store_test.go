@@ -22,9 +22,14 @@ func (s *storeSuite) TestNew(c *gc.C) {
 	db := s.Session.DB("testing")
 
 	// Add an identity to the identities collection using mgo directly.
-	err := db.C("identities").Insert(mongodoc.Identity{
-		UserName:         "who",
-		IdentityProvider: "usso",
+	err := db.C("identities").Insert(&mongodoc.Identity{
+		UserName:   "who",
+		ExternalID: "http://example.com/who",
+		Email:      "who@example.com",
+		FullName:   "Who Am I",
+		Groups: []string{
+			"group1",
+		},
 	})
 	c.Assert(err, gc.IsNil)
 
@@ -37,26 +42,82 @@ func (s *storeSuite) TestNew(c *gc.C) {
 	err = store.DB.Identities().Find(nil).One(&doc)
 	c.Assert(err, gc.IsNil)
 	c.Assert(doc.UserName, gc.Equals, "who")
-	c.Assert(doc.IdentityProvider, gc.Equals, "usso")
+	c.Assert(doc.ExternalID, gc.Equals, "http://example.com/who")
+	c.Assert(doc.Email, gc.Equals, "who@example.com")
+	c.Assert(doc.FullName, gc.Equals, "Who Am I")
+	c.Assert(doc.Groups, gc.DeepEquals, []string{"group1"})
 }
 
-func (s *storeSuite) TestAddIdentity(c *gc.C) {
+func (s *storeSuite) TestUpsertIdentity(c *gc.C) {
 	store, err := store.New(s.Session.DB("testing"))
 	c.Assert(err, gc.IsNil)
 
 	// Add an identity to the store.
-	err = store.AddIdentity("jean-luc", "usso")
+	err = store.UpsertIdentity(&mongodoc.Identity{
+		UserName:   "test",
+		ExternalID: "http://example.com/test",
+		Email:      "test@example.com",
+		FullName:   "Test User",
+		Groups: []string{
+			"test",
+		},
+	})
 	c.Assert(err, gc.IsNil)
 
-	// Retrieve the newly created identity.
+	// Check the newly created identity.
 	var doc mongodoc.Identity
 	err = store.DB.Identities().Find(nil).One(&doc)
 	c.Assert(err, gc.IsNil)
-	c.Assert(doc.UserName, gc.Equals, "jean-luc")
-	c.Assert(doc.IdentityProvider, gc.Equals, "usso")
+	c.Assert(doc.UserName, gc.Equals, "test")
+	c.Assert(doc.ExternalID, gc.Equals, "http://example.com/test")
+	c.Assert(doc.Email, gc.Equals, "test@example.com")
+	c.Assert(doc.FullName, gc.Equals, "Test User")
+	c.Assert(doc.Groups, gc.DeepEquals, []string{"test"})
 
-	// Inserting the identity again fails because the user name must be unique.
-	err = store.AddIdentity("jean-luc", "usso")
+	// Update the Identity
+	err = store.UpsertIdentity(&mongodoc.Identity{
+		UserName:   "test",
+		ExternalID: "http://example.com/test",
+		Email:      "test2@example.com",
+		FullName:   "Test User Updated",
+		Groups: []string{
+			"test",
+			"test2",
+		},
+	})
+	c.Assert(err, gc.IsNil)
+
+	// Check the updated identity.
+	err = store.DB.Identities().Find(nil).One(&doc)
+	c.Assert(err, gc.IsNil)
+	c.Assert(doc.UserName, gc.Equals, "test")
+	c.Assert(doc.ExternalID, gc.Equals, "http://example.com/test")
+	c.Assert(doc.Email, gc.Equals, "test2@example.com")
+	c.Assert(doc.FullName, gc.Equals, "Test User Updated")
+	c.Assert(doc.Groups, gc.DeepEquals, []string{"test", "test2"})
+
+	// Attempt to insert a clashing username
+	err = store.UpsertIdentity(&mongodoc.Identity{
+		UserName:   "test",
+		ExternalID: "http://example.com/test3",
+		Email:      "test3@example.com",
+		FullName:   "Test User III",
+		Groups: []string{
+			"test3",
+		},
+	})
+	c.Assert(errgo.Cause(err), gc.Equals, params.ErrAlreadyExists)
+
+	// Attempt to insert a clashing external_id
+	err = store.UpsertIdentity(&mongodoc.Identity{
+		UserName:   "test2",
+		ExternalID: "http://example.com/test",
+		Email:      "test@example.com",
+		FullName:   "Test User",
+		Groups: []string{
+			"test",
+		},
+	})
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrAlreadyExists)
 }
 
@@ -68,7 +129,10 @@ func (s *storeSuite) TestCollections(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 
 	// Some collections don't have indexes so they are created only when used.
-	createdOnUse := map[string]bool{}
+	createdOnUse := map[string]bool{
+		"identity_providers": true,
+		"macaroons":          true,
+	}
 
 	// Check that all collections mentioned are actually created.
 	for _, coll := range colls {

@@ -54,11 +54,19 @@ func NewAPIHandler(s *store.Store, auth *server.Authorizer, svc *bakery.Service)
 			),
 			Handler: router.HandleJSON(h.serveIdentityProviders),
 		},
+		// /u is used to provide facilities to search the identity database.
 		"u": router.AuthorizingHandler{
-			CheckAuthorized: router.HasMethod("POST"),
-			Handler:         router.HandleJSON(h.serveCreateUser),
+			CheckAuthorized: router.CheckAll(
+				router.HasMethod("GET"),
+				auth.HasAdminCredentials,
+			),
+			Handler: router.HandleJSON(h.serveQueryUsers),
 		},
-		"u/": router.HandleJSON(h.serveUser),
+		// /u/... provides access to update and query the identity database.
+		"u/": router.AuthorizingHandler{
+			CheckAuthorized: auth.HasAdminCredentials,
+			Handler:         router.HandleJSON(h.serveUser),
+		},
 	})
 	return h
 }
