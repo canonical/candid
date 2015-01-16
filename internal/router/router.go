@@ -116,3 +116,26 @@ func HasMethod(methods ...string) func(*http.Request) error {
 		return errgo.WithCausef(nil, params.ErrBadRequest, `unsupported method "%s"`, r.Method)
 	}
 }
+
+// StorePathComponent pops the next path component from the URL path and stores it
+// for later processing. Currently the value will be stored as a header in
+// "X-Saved-Value-" + name.
+func StorePathComponent(name string, h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var start, end int
+		if strings.HasPrefix(r.URL.Path, "/") {
+			start++
+		}
+		for end = start; end < len(r.URL.Path); end++ {
+			if r.URL.Path[end] == '/' {
+				break
+			}
+		}
+		r.Header.Add("X-Saved-Value-"+name, r.URL.Path[start:end])
+		r.URL.Path = r.URL.Path[end:]
+		if r.URL.Path == "" {
+			r.URL.Path = "/"
+		}
+		h.ServeHTTP(w, r)
+	})
+}

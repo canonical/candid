@@ -26,5 +26,5 @@ type User struct {
 	ExternalID string   `json:"external_id"`
 	FullName   string   `json:"fullname"`
 	Email      string   `json:"email"`
-	Groups     []string `json:"groups"`
+	IDPGroups  []string `json:"idpgroups"`
 }
