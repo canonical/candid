@@ -26,21 +26,19 @@ func (s *usersSuite) TestUser(c *gc.C) {
 		ExternalID: "http://example.com/jbloggs2",
 		Email:      "jbloggs2@example.com",
 		FullName:   "Joe Bloggs II",
-		Groups: []string{
+		IDPGroups: []string{
 			"test",
 		},
-	},
-	)
+	})
 	s.createUser(c, &params.User{
 		UserName:   "jbloggs3",
 		ExternalID: "http://example.com/jbloggs3",
 		Email:      "jbloggs3@example.com",
 		FullName:   "Joe Bloggs III",
-		Groups: []string{
+		IDPGroups: []string{
 			"test",
 		},
-	},
-	)
+	})
 	tests := []struct {
 		about        string
 		url          string
@@ -59,7 +57,7 @@ func (s *usersSuite) TestUser(c *gc.C) {
 			ExternalID: "http://example.com/jbloggs",
 			Email:      "jbloggs@example.com",
 			FullName:   "Joe Bloggs",
-			Groups: []string{
+			IDPGroups: []string{
 				"test",
 			},
 		}),
@@ -71,7 +69,7 @@ func (s *usersSuite) TestUser(c *gc.C) {
 			ExternalID: "http://example.com/jbloggs",
 			Email:      "jbloggs@example.com",
 			FullName:   "Joe Bloggs",
-			Groups: []string{
+			IDPGroups: []string{
 				"test",
 			},
 		},
@@ -84,7 +82,7 @@ func (s *usersSuite) TestUser(c *gc.C) {
 			ExternalID: "http://example.com/jbloggs2",
 			Email:      "jbloggs2@example.com",
 			FullName:   "Joe Bloggs II",
-			Groups: []string{
+			IDPGroups: []string{
 				"test",
 				"test2",
 			},
@@ -97,7 +95,7 @@ func (s *usersSuite) TestUser(c *gc.C) {
 			ExternalID: "http://example.com/jbloggs2",
 			Email:      "jbloggs2@example.com",
 			FullName:   "Joe Bloggs II",
-			Groups: []string{
+			IDPGroups: []string{
 				"test",
 				"test2",
 			},
@@ -111,7 +109,7 @@ func (s *usersSuite) TestUser(c *gc.C) {
 			ExternalID: "http://example.com/joe.bloggs2",
 			Email:      "jbloggs2@example.com",
 			FullName:   "Joe Bloggs II",
-			Groups: []string{
+			IDPGroups: []string{
 				"test",
 				"test2",
 			},
@@ -132,7 +130,7 @@ func (s *usersSuite) TestUser(c *gc.C) {
 			ExternalID: "http://example.com/jbloggs2",
 			Email:      "jbloggs5@example.com",
 			FullName:   "Joe Bloggs V",
-			Groups: []string{
+			IDPGroups: []string{
 				"test",
 			},
 		}),
@@ -155,7 +153,7 @@ func (s *usersSuite) TestUser(c *gc.C) {
 			ExternalID: "http://example.com/jbloggs3",
 			Email:      "jbloggs3@example.com",
 			FullName:   "Joe Bloggs III",
-			Groups: []string{
+			IDPGroups: []string{
 				"test",
 			},
 		},
@@ -192,7 +190,7 @@ func (s *usersSuite) TestUser(c *gc.C) {
 			ExternalID: "http://example.com/jbloggs",
 			Email:      "jbloggs@example.com",
 			FullName:   "Joe Bloggs",
-			Groups: []string{
+			IDPGroups: []string{
 				"test",
 			},
 		}),
@@ -212,14 +210,14 @@ func (s *usersSuite) TestUser(c *gc.C) {
 			ExternalID: "http://example.com/jbloggs",
 			Email:      "jbloggs@example.com",
 			FullName:   "Joe Bloggs",
-			Groups: []string{
+			IDPGroups: []string{
 				"test",
 			},
 		}),
 		expectStatus: http.StatusBadRequest,
 		expectBody: params.Error{
 			Code:    "bad request",
-			Message: "cannot store blank user",
+			Message: "illegal username: \"\"",
 		},
 	}, {
 		about:    "put userid mismatch",
@@ -232,7 +230,7 @@ func (s *usersSuite) TestUser(c *gc.C) {
 			ExternalID: "http://example.com/jbloggs6",
 			Email:      "jbloggs6@example.com",
 			FullName:   "Joe Bloggs VI",
-			Groups: []string{
+			IDPGroups: []string{
 				"test6",
 			},
 		}),
@@ -242,7 +240,7 @@ func (s *usersSuite) TestUser(c *gc.C) {
 			ExternalID: "http://example.com/jbloggs6",
 			Email:      "jbloggs6@example.com",
 			FullName:   "Joe Bloggs VI",
-			Groups: []string{
+			IDPGroups: []string{
 				"test6",
 			},
 		},
@@ -269,7 +267,7 @@ func (s *usersSuite) TestUser(c *gc.C) {
 			ExternalID: "http://example.com/jbloggs",
 			Email:      "jbloggs@example.com",
 			FullName:   "Joe Bloggs",
-			Groups: []string{
+			IDPGroups: []string{
 				"test",
 			},
 		}),
@@ -289,7 +287,7 @@ func (s *usersSuite) TestUser(c *gc.C) {
 			ExternalID: "http://example.com/jbloggs",
 			Email:      "jbloggs@example.com",
 			FullName:   "Joe Bloggs",
-			Groups: []string{
+			IDPGroups: []string{
 				"test",
 			},
 		}),
@@ -307,7 +305,7 @@ func (s *usersSuite) TestUser(c *gc.C) {
 			ExternalID: "http://example.com/jbloggs",
 			Email:      "jbloggs@example.com",
 			FullName:   "Joe Bloggs",
-			Groups: []string{
+			IDPGroups: []string{
 				"test",
 			},
 		}),
@@ -324,7 +322,7 @@ func (s *usersSuite) TestUser(c *gc.C) {
 			ExternalID: "http://example.com/jbloggs",
 			Email:      "jbloggs@example.com",
 			FullName:   "Joe Bloggs",
-			Groups: []string{
+			IDPGroups: []string{
 				"test",
 			},
 		}),
@@ -334,6 +332,62 @@ func (s *usersSuite) TestUser(c *gc.C) {
 		expectBody: params.Error{
 			Code:    "bad request",
 			Message: `illegal username: "jbloggs{}"`,
+		},
+	}, {
+		about:  "long username",
+		url:    apiURL("u/jbloggs001jbloggs002jbloggs003jbloggs004jbloggs005jbloggs006jbloggs007jbloggs008jbloggs009jbloggs010jbloggs011jbloggs012jbloggs013jbloggs014jbloggs015jbloggs016jbloggs017jbloggs018jbloggs019jbloggs020jbloggs021jbloggs022jbloggs023jbloggs024jbloggs025jbloggs026"),
+		method: "PUT",
+		body: marshal(c, params.User{
+			ExternalID: "http://example.com/jbloggs",
+			Email:      "jbloggs@example.com",
+			FullName:   "Joe Bloggs",
+			IDPGroups: []string{
+				"test",
+			},
+		}),
+		username:     adminUsername,
+		password:     adminPassword,
+		expectStatus: http.StatusBadRequest,
+		expectBody: params.Error{
+			Code:    "bad request",
+			Message: `username longer than 256 characters`,
+		},
+	}, {
+		about:  "invalid subpath",
+		url:    apiURL("u/jbloggs2/notthere"),
+		method: "GET",
+		body: marshal(c, params.User{
+			ExternalID: "http://example.com/jbloggs",
+			Email:      "jbloggs@example.com",
+			FullName:   "Joe Bloggs",
+			IDPGroups: []string{
+				"test",
+			},
+		}),
+		username:     adminUsername,
+		password:     adminPassword,
+		expectStatus: http.StatusNotFound,
+		expectBody: params.Error{
+			Code:    "not found",
+			Message: `/notthere not found`,
+		},
+	}, {
+		about:  "no external_id",
+		url:    apiURL("u/jbloggs8"),
+		method: "PUT",
+		body: marshal(c, params.User{
+			Email:    "jbloggs8@example.com",
+			FullName: "Joe Bloggs VIII",
+			IDPGroups: []string{
+				"test",
+			},
+		}),
+		username:     adminUsername,
+		password:     adminPassword,
+		expectStatus: http.StatusBadRequest,
+		expectBody: params.Error{
+			Code:    "bad request",
+			Message: `external_id not specified`,
 		},
 	}}
 	for i, test := range tests {
@@ -367,7 +421,7 @@ func (s *usersSuite) TestCreateUserWritesToDatabase(c *gc.C) {
 			ExternalID: "http://example.com/jbloggs",
 			Email:      "jbloggs@example.com",
 			FullName:   "Joe Bloggs",
-			Groups: []string{
+			IDPGroups: []string{
 				"test",
 			},
 		}),
@@ -379,7 +433,7 @@ func (s *usersSuite) TestCreateUserWritesToDatabase(c *gc.C) {
 			ExternalID: "http://example.com/jbloggs",
 			Email:      "jbloggs@example.com",
 			FullName:   "Joe Bloggs",
-			Groups: []string{
+			IDPGroups: []string{
 				"test",
 			},
 		},
@@ -400,7 +454,7 @@ func (s *usersSuite) TestQueryUsers(c *gc.C) {
 		ExternalID: "http://example.com/jbloggs2",
 		Email:      "jbloggs2@example.com",
 		FullName:   "Joe Bloggs II",
-		Groups: []string{
+		IDPGroups: []string{
 			"test",
 		},
 	},
@@ -464,7 +518,7 @@ func (s *usersSuite) TestQueryUsers(c *gc.C) {
 			ExternalID: "http://example.com/jbloggs",
 			Email:      "jbloggs@example.com",
 			FullName:   "Joe Bloggs",
-			Groups: []string{
+			IDPGroups: []string{
 				"test",
 			},
 		}),
@@ -484,7 +538,7 @@ func (s *usersSuite) TestQueryUsers(c *gc.C) {
 			ExternalID: "http://example.com/jbloggs",
 			Email:      "jbloggs@example.com",
 			FullName:   "Joe Bloggs",
-			Groups: []string{
+			IDPGroups: []string{
 				"test",
 			},
 		}),
@@ -502,7 +556,7 @@ func (s *usersSuite) TestQueryUsers(c *gc.C) {
 			ExternalID: "http://example.com/jbloggs",
 			Email:      "jbloggs@example.com",
 			FullName:   "Joe Bloggs",
-			Groups: []string{
+			IDPGroups: []string{
 				"test",
 			},
 		}),
@@ -522,6 +576,85 @@ func (s *usersSuite) TestQueryUsers(c *gc.C) {
 				"Content-Type": []string{"application/json"},
 			},
 			Body:         test.body,
+			Username:     test.username,
+			Password:     test.password,
+			ExpectStatus: test.expectStatus,
+			ExpectBody:   test.expectBody,
+		})
+	}
+}
+
+func (s *usersSuite) TestUserIDPGroups(c *gc.C) {
+	s.createUser(c, &params.User{
+		UserName:   "test",
+		ExternalID: "http://example.com/test",
+		Email:      "test@example.com",
+		FullName:   "Test User",
+		IDPGroups:  []string{},
+	})
+	s.createUser(c, &params.User{
+		UserName:   "test2",
+		ExternalID: "http://example.com/test2",
+		Email:      "test2@example.com",
+		FullName:   "Test User II",
+		IDPGroups: []string{
+			"test",
+		},
+	})
+	s.createUser(c, &params.User{
+		UserName:   "test3",
+		ExternalID: "http://example.com/test3",
+		Email:      "test3@example.com",
+		FullName:   "Test User III",
+		IDPGroups: []string{
+			"test",
+			"test2",
+		},
+	})
+	tests := []struct {
+		about        string
+		url          string
+		username     string
+		password     string
+		expectStatus int
+		expectBody   interface{}
+	}{{
+		about:        "user without groups",
+		url:          apiURL("u/test/idpgroups"),
+		username:     adminUsername,
+		password:     adminPassword,
+		expectStatus: http.StatusOK,
+		expectBody:   []string{},
+	}, {
+		about:        "user with 1 group",
+		url:          apiURL("u/test2/idpgroups"),
+		username:     adminUsername,
+		password:     adminPassword,
+		expectStatus: http.StatusOK,
+		expectBody:   []string{"test"},
+	}, {
+		about:        "user with 2 groups",
+		url:          apiURL("u/test3/idpgroups"),
+		username:     adminUsername,
+		password:     adminPassword,
+		expectStatus: http.StatusOK,
+		expectBody:   []string{"test", "test2"},
+	}, {
+		about:        "unknown user",
+		url:          apiURL("u/test4/idpgroups"),
+		username:     adminUsername,
+		password:     adminPassword,
+		expectStatus: http.StatusNotFound,
+		expectBody: params.Error{
+			Code:    "not found",
+			Message: `user "test4" not found: not found`,
+		},
+	}}
+	for i, test := range tests {
+		c.Logf("%d. %s", i, test.about)
+		httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+			Handler:      s.srv,
+			URL:          test.url,
 			Username:     test.username,
 			Password:     test.password,
 			ExpectStatus: test.expectStatus,

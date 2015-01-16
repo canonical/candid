@@ -5,7 +5,7 @@ package v1
 import (
 	"encoding/json"
 	"net/http"
-	"strings"
+	"unicode/utf8"
 
 	"github.com/juju/names"
 	"gopkg.in/errgo.v1"
@@ -40,33 +40,17 @@ func (h *Handler) serveQueryUsers(hdr http.Header, req *http.Request) (interface
 //serveUser serves the /u/$username endpoint. See http://tinyurl.com/lrdjwmw for
 // details.
 func (h *Handler) serveUser(hdr http.Header, req *http.Request) (interface{}, error) {
+	if req.URL.Path != "/" {
+		return nil, errgo.WithCausef(nil, params.ErrNotFound, "%s not found", req.URL.Path)
+	}
 	switch req.Method {
-	case "GET":
-		// TODO(mhilton) In future the username may only be part of the URL suffix.
-		// Extract the username from the relevent part of the URL.
-		u := strings.TrimPrefix(req.URL.Path, "/")
-		var user mongodoc.Identity
-		if err := h.store.DB.Identities().Find(bson.M{"username": u}).One(&user); err != nil {
-			if errgo.Cause(err) == mgo.ErrNotFound {
-				return nil, errgo.WithCausef(err, params.ErrNotFound, "user %q not found", u)
-			}
-		}
-		return &params.User{
-			UserName:   user.UserName,
-			ExternalID: user.ExternalID,
-			FullName:   user.FullName,
-			Email:      user.Email,
-			Groups:     user.Groups,
-		}, nil
 	case "PUT":
-		// TODO(mhilton) In future the username may only be part of the URL suffix.
-		// Extract the username from the relevent part of the URL.
-		u := strings.TrimPrefix(req.URL.Path, "/")
-		if u == "" {
-			return nil, errgo.WithCausef(nil, params.ErrBadRequest, "cannot store blank user")
+		un := req.Header.Get("X-Saved-Value-Username")
+		if utf8.RuneCountInString(un) > 256 {
+			return nil, errgo.WithCausef(nil, params.ErrBadRequest, "username longer than 256 characters")
 		}
-		if !names.IsValidUserName(u) {
-			return nil, errgo.WithCausef(nil, params.ErrBadRequest, "illegal username: %q", u)
+		if !names.IsValidUserName(un) {
+			return nil, errgo.WithCausef(nil, params.ErrBadRequest, "illegal username: %q", un)
 		}
 		var user params.User
 		dec := json.NewDecoder(req.Body)
@@ -75,19 +59,54 @@ func (h *Handler) serveUser(hdr http.Header, req *http.Request) (interface{}, er
 			return nil, errgo.WithCausef(err, params.ErrBadRequest, `invalid JSON data`)
 		}
 		doc := &mongodoc.Identity{
-			UserName:   u,
+			UserName:   un,
 			ExternalID: user.ExternalID,
 			Email:      user.Email,
 			FullName:   user.FullName,
-			Groups:     user.Groups,
+			Groups:     user.IDPGroups,
+		}
+		if doc.ExternalID == "" {
+			return nil, errgo.WithCausef(err, params.ErrBadRequest, `external_id not specified`)
 		}
 		err = h.store.UpsertIdentity(doc)
 		if err != nil {
 			return nil, errgo.NoteMask(err, "cannot store identity", errgo.Is(params.ErrAlreadyExists))
 		}
-		user.UserName = u
-		return user, nil
+		fallthrough
+	case "GET":
+		user, err := h.lookupIdentity(req)
+		if err != nil {
+			return nil, err
+		}
+		return &params.User{
+			UserName:   user.UserName,
+			ExternalID: user.ExternalID,
+			FullName:   user.FullName,
+			Email:      user.Email,
+			IDPGroups:  user.Groups,
+		}, nil
 	default:
 		return nil, errgo.WithCausef(nil, params.ErrBadRequest, "unsupported method %q", req.Method)
 	}
+}
+
+// serveUserGroups serves the /u/$username/idpgroups endpoint, and returns
+// the list of groups associated with the user.
+func (h *Handler) serveUserGroups(hdr http.Header, req *http.Request) (interface{}, error) {
+	user, err := h.lookupIdentity(req)
+	if err != nil {
+		return nil, err
+	}
+	return user.Groups, nil
+}
+
+func (h *Handler) lookupIdentity(r *http.Request) (*mongodoc.Identity, error) {
+	var id mongodoc.Identity
+	un := r.Header.Get("X-Saved-Value-Username")
+	if err := h.store.DB.Identities().Find(bson.M{"username": un}).One(&id); err != nil {
+		if errgo.Cause(err) == mgo.ErrNotFound {
+			return nil, errgo.WithCausef(err, params.ErrNotFound, "user %q not found", un)
+		}
+	}
+	return &id, nil
 }

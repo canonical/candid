@@ -65,7 +65,13 @@ func NewAPIHandler(s *store.Store, auth *server.Authorizer, svc *bakery.Service)
 		// /u/... provides access to update and query the identity database.
 		"u/": router.AuthorizingHandler{
 			CheckAuthorized: auth.HasAdminCredentials,
-			Handler:         router.HandleJSON(h.serveUser),
+			Handler: router.StorePathComponent(
+				"Username",
+				router.New(map[string]http.Handler{
+					"":          router.HandleJSON(h.serveUser),
+					"idpgroups": router.HandleJSON(h.serveUserGroups),
+				}),
+			),
 		},
 	})
 	return h
