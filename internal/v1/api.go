@@ -70,9 +70,11 @@ func NewAPIHandler(s *store.Store, auth *server.Authorizer, svc *bakery.Service)
 				router.New(map[string]http.Handler{
 					"":          router.HandleJSON(h.serveUser),
 					"idpgroups": router.HandleJSON(h.serveUserGroups),
+					"macaroon":  router.HandleJSON(h.serveUserToken),
 				}),
 			),
 		},
+		"verify": router.HandleJSON(h.serveVerifyToken),
 	})
 	return h
 }

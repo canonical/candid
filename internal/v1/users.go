@@ -5,10 +5,13 @@ package v1
 import (
 	"encoding/json"
 	"net/http"
+	"time"
 	"unicode/utf8"
 
 	"github.com/juju/names"
 	"gopkg.in/errgo.v1"
+	"gopkg.in/macaroon-bakery.v0/bakery/checkers"
+	"gopkg.in/macaroon.v1"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 
@@ -98,6 +101,39 @@ func (h *Handler) serveUserGroups(hdr http.Header, req *http.Request) (interface
 		return nil, err
 	}
 	return user.Groups, nil
+}
+
+func (h *Handler) serveUserToken(hdr http.Header, req *http.Request) (interface{}, error) {
+	user, err := h.lookupIdentity(req)
+	if err != nil {
+		return nil, err
+	}
+	m, err := h.svc.NewMacaroon("", nil, []checkers.Caveat{
+		checkers.DeclaredCaveat("uuid", user.UUID),
+		checkers.DeclaredCaveat("username", user.UserName),
+		checkers.TimeBeforeCaveat(time.Now().Add(24 * time.Hour)),
+	})
+	if err != nil {
+		return nil, errgo.Notef(err, "cannot mint macaroon")
+	}
+	return m, nil
+}
+
+func (h *Handler) serveVerifyToken(hdr http.Header, req *http.Request) (interface{}, error) {
+	var ms macaroon.Slice
+	dec := json.NewDecoder(req.Body)
+	if err := dec.Decode(&ms); err != nil {
+		return nil, errgo.WithCausef(err, params.ErrBadRequest, `invalid JSON data`)
+	}
+	d := checkers.InferDeclared(ms)
+	err := h.svc.Check(ms, checkers.New(
+		checkers.TimeBefore,
+		d,
+	))
+	if err != nil {
+		return nil, errgo.WithCausef(err, params.ErrForbidden, `verification failure`)
+	}
+	return d, nil
 }
 
 func (h *Handler) lookupIdentity(r *http.Request) (*mongodoc.Identity, error) {
