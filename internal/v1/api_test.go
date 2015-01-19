@@ -7,6 +7,8 @@ import (
 
 	gc "gopkg.in/check.v1"
 	"gopkg.in/macaroon-bakery.v0/bakery"
+	"gopkg.in/macaroon-bakery.v0/bakery/mgostorage"
+	"gopkg.in/macaroon.v1"
 	"gopkg.in/mgo.v2"
 
 	"github.com/CanonicalLtd/blues-identity/internal/idtesting"
@@ -26,6 +28,7 @@ type apiSuite struct {
 	srv   http.Handler
 	store *store.Store
 	key   *bakery.PublicKey
+	svc   *bakery.Service
 }
 
 var _ = gc.Suite(&apiSuite{})
@@ -43,6 +46,17 @@ func (s *apiSuite) SetUpTest(c *gc.C) {
 	key, err := bakery.GenerateKey()
 	c.Assert(err, gc.IsNil)
 	s.srv, s.store = newServer(c, s.Session, key)
+	// Create Macaroon storage.
+	ms, err := mgostorage.New(s.store.DB.Macaroons())
+	c.Assert(err, gc.IsNil)
+
+	// Create the bakery Service.
+	svc, err := bakery.NewService(bakery.NewServiceParams{
+		Store: ms,
+		Key:   key,
+	})
+	c.Assert(err, gc.IsNil)
+	s.svc = svc
 	s.key = &key.Public
 }
 
@@ -67,6 +81,11 @@ func newServer(c *gc.C, session *mgo.Session, key *bakery.KeyPair) (http.Handler
 	)
 	c.Assert(err, gc.IsNil)
 	return srv, store
+}
+
+func (s *apiSuite) assertMacaroon(c *gc.C, ms macaroon.Slice, check bakery.FirstPartyChecker) {
+	err := s.svc.Check(ms, check)
+	c.Assert(err, gc.IsNil)
 }
 
 func apiURL(path string) string {

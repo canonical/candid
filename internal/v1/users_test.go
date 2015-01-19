@@ -3,12 +3,17 @@
 package v1_test
 
 import (
+	"encoding/json"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 
+	jc "github.com/juju/testing/checkers"
 	"github.com/juju/testing/httptesting"
 	gc "gopkg.in/check.v1"
+	"gopkg.in/macaroon-bakery.v0/bakery/checkers"
+	"gopkg.in/macaroon.v1"
 
 	"github.com/CanonicalLtd/blues-identity/internal/mongodoc"
 	"github.com/CanonicalLtd/blues-identity/params"
@@ -584,6 +589,119 @@ func (s *usersSuite) TestQueryUsers(c *gc.C) {
 	}
 }
 
+func (s *usersSuite) TestUserToken(c *gc.C) {
+	s.createUser(c, &params.User{
+		UserName:   "jbloggs",
+		ExternalID: "http://example.com/jbloggs",
+		Email:      "jbloggs@example.com",
+		FullName:   "Joe Bloggs",
+		IDPGroups: []string{
+			"test",
+		},
+	})
+	tests := []struct {
+		about         string
+		url           string
+		username      string
+		password      string
+		checkResponse func(*gc.C, *httptest.ResponseRecorder)
+	}{{
+		about:    "get user token",
+		url:      apiURL("u/jbloggs/macaroon"),
+		username: adminUsername,
+		password: adminPassword,
+		checkResponse: func(c *gc.C, resp *httptest.ResponseRecorder) {
+			c.Assert(resp.Code, gc.Equals, http.StatusOK)
+			var m macaroon.Macaroon
+			err := json.Unmarshal(resp.Body.Bytes(), &m)
+			c.Assert(err, gc.IsNil)
+			s.assertMacaroon(c, macaroon.Slice{&m}, checkers.New(
+				checkers.Declared(
+					map[string]string{
+						"username": "jbloggs",
+						"uuid":     "34737258-2146-5fb3-8e59-aba081f88346",
+					},
+				),
+				checkers.TimeBefore,
+			))
+		},
+	}, {
+		about:    "no user",
+		url:      apiURL("u/jbloggs2/macaroon"),
+		username: adminUsername,
+		password: adminPassword,
+		checkResponse: func(c *gc.C, resp *httptest.ResponseRecorder) {
+			c.Assert(resp.Code, gc.Equals, http.StatusNotFound)
+			c.Assert(resp.Body.String(), jc.JSONEquals, params.Error{
+				Code:    "not found",
+				Message: `user "jbloggs2" not found: not found`,
+			})
+		},
+	}}
+	for i, test := range tests {
+		c.Logf("%d. %s", i, test.about)
+		resp := httptesting.DoRequest(c, httptesting.DoRequestParams{
+			Handler:  s.srv,
+			URL:      test.url,
+			Method:   "GET",
+			Username: test.username,
+			Password: test.password,
+		})
+		test.checkResponse(c, resp)
+	}
+}
+
+func (s *usersSuite) TestVerifyUserToken(c *gc.C) {
+	s.createUser(c, &params.User{
+		UserName:   "jbloggs",
+		ExternalID: "http://example.com/jbloggs",
+		Email:      "jbloggs@example.com",
+		FullName:   "Joe Bloggs",
+		IDPGroups: []string{
+			"test",
+		},
+	})
+	m := s.getToken(c, "jbloggs")
+	badm, err := macaroon.New([]byte{}, "no such macaroon", "loc")
+	c.Assert(err, gc.IsNil)
+	tests := []struct {
+		about        string
+		body         io.Reader
+		expectStatus int
+		expectBody   interface{}
+	}{{
+		about:        "verify token",
+		body:         marshal(c, macaroon.Slice{m}),
+		expectStatus: http.StatusOK,
+		expectBody: map[string]string{
+			"username": "jbloggs",
+			"uuid":     "34737258-2146-5fb3-8e59-aba081f88346",
+		},
+	}, {
+		about:        "bad token",
+		body:         marshal(c, macaroon.Slice{badm}),
+		expectStatus: http.StatusForbidden,
+		expectBody: params.Error{
+			Code:    "forbidden",
+			Message: "verification failure: verification failed: macaroon not found in storage",
+		},
+	}}
+	for i, test := range tests {
+		c.Logf("%d. %s", i, test.about)
+		httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+			Handler: s.srv,
+			URL:     apiURL("verify"),
+			Method:  "GET",
+			Header: http.Header{
+				"Content-Type": []string{"application/json"},
+			},
+			Body:         test.body,
+			ExpectStatus: test.expectStatus,
+			ExpectBody:   test.expectBody,
+		})
+	}
+}
+
 func (s *usersSuite) TestUserIDPGroups(c *gc.C) {
 	s.createUser(c, &params.User{
 		UserName:   "test",
@@ -677,4 +795,18 @@ func (s *usersSuite) createUser(c *gc.C, user *params.User) {
 		ExpectStatus: http.StatusOK,
 		ExpectBody:   user,
 	})
+}
+
+func (s *usersSuite) getToken(c *gc.C, un string) *macaroon.Macaroon {
+	resp := httptesting.DoRequest(c, httptesting.DoRequestParams{
+		Handler:  s.srv,
+		URL:      apiURL("u/" + un + "/macaroon"),
+		Method:   "GET",
+		Username: adminUsername,
+		Password: adminPassword,
+	})
+	var m macaroon.Macaroon
+	err := json.Unmarshal(resp.Body.Bytes(), &m)
+	c.Assert(err, gc.IsNil)
+	return &m
 }
