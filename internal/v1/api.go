@@ -23,6 +23,7 @@ func NewAPIHandler(s *store.Store, auth *server.Authorizer, svc *bakery.Service)
 	h := &Handler{
 		store: s,
 		svc:   svc,
+		auth:  auth,
 	}
 	mux := http.NewServeMux()
 	httpbakery.AddDischargeHandler(mux, "/", svc, h.checkThirdPartyCaveat)
@@ -30,19 +31,19 @@ func NewAPIHandler(s *store.Store, auth *server.Authorizer, svc *bakery.Service)
 		"debug":      router.HandleErrors(h.serveDebug),
 		"debug/info": router.HandleJSON(h.serveDebugInfo),
 		"debug/pprof/": router.AuthorizingHandler{
-			CheckAuthorized: auth.HasAdminCredentials,
+			CheckAuthorized: auth.CheckAdminCredentials,
 			Handler:         pprof.IndexAtRoot("/"),
 		},
 		"debug/pprof/cmdline": router.AuthorizingHandler{
-			CheckAuthorized: auth.HasAdminCredentials,
+			CheckAuthorized: auth.CheckAdminCredentials,
 			Handler:         http.HandlerFunc(pprof.Cmdline),
 		},
 		"debug/pprof/profile": router.AuthorizingHandler{
-			CheckAuthorized: auth.HasAdminCredentials,
+			CheckAuthorized: auth.CheckAdminCredentials,
 			Handler:         http.HandlerFunc(pprof.Profile),
 		},
 		"debug/pprof/symbol": router.AuthorizingHandler{
-			CheckAuthorized: auth.HasAdminCredentials,
+			CheckAuthorized: auth.CheckAdminCredentials,
 			Handler:         http.HandlerFunc(pprof.Symbol),
 		},
 		"debug/status": router.HandleJSON(h.serveDebugStatus),
@@ -50,7 +51,7 @@ func NewAPIHandler(s *store.Store, auth *server.Authorizer, svc *bakery.Service)
 		"idps/": router.AuthorizingHandler{
 			CheckAuthorized: router.Any(
 				router.HasMethod("GET"),
-				auth.HasAdminCredentials,
+				auth.CheckAdminCredentials,
 			),
 			Handler: router.HandleJSON(h.serveIdentityProviders),
 		},
@@ -58,13 +59,13 @@ func NewAPIHandler(s *store.Store, auth *server.Authorizer, svc *bakery.Service)
 		"u": router.AuthorizingHandler{
 			CheckAuthorized: router.CheckAll(
 				router.HasMethod("GET"),
-				auth.HasAdminCredentials,
+				auth.CheckAdminCredentials,
 			),
 			Handler: router.HandleJSON(h.serveQueryUsers),
 		},
 		// /u/... provides access to update and query the identity database.
 		"u/": router.AuthorizingHandler{
-			CheckAuthorized: auth.HasAdminCredentials,
+			CheckAuthorized: auth.CheckAdminCredentials,
 			Handler: router.StorePathComponent(
 				"Username",
 				router.New(map[string]http.Handler{
@@ -83,6 +84,7 @@ type Handler struct {
 	*router.Router
 	store *store.Store
 	svc   *bakery.Service
+	auth  *server.Authorizer
 }
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, req *http.Request) {

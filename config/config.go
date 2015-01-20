@@ -19,6 +19,8 @@ type Config struct {
 	APIAddr      string `yaml:"api-addr"`
 	AuthUsername string `yaml:"auth-username"`
 	AuthPassword string `yaml:"auth-password"`
+	PublicKey    string `yaml:"public-key"`
+	PrivateKey   string `yaml:"private-key"`
 }
 
 func (c *Config) validate() error {
@@ -37,6 +39,12 @@ func (c *Config) validate() error {
 	}
 	if c.AuthPassword == "" {
 		missing = append(missing, "auth-password")
+	}
+	if c.PrivateKey == "" {
+		missing = append(missing, "private-key")
+	}
+	if c.PublicKey == "" {
+		missing = append(missing, "public-key")
 	}
 	if len(missing) != 0 {
 		return errgo.Newf("missing fields %s in config file", strings.Join(missing, ", "))

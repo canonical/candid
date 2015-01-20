@@ -2,3 +2,5 @@ mongo-addr: localhost:27017
 api-addr: :8081
 auth-username: admin
 auth-password: password
+private-key: 8PjzjakvIlh3BVFKe8axinRDutF6EDIfjtuf4+JaNow=
+public-key: CIdWcEUN+0OZnKW9KwruRQnQDY/qqzVdD30CijwiWCk=
