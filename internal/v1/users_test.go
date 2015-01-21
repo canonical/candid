@@ -691,7 +691,7 @@ func (s *usersSuite) TestVerifyUserToken(c *gc.C) {
 		httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 			Handler: s.srv,
 			URL:     apiURL("verify"),
-			Method:  "GET",
+			Method:  "POST",
 			Header: http.Header{
 				"Content-Type": []string{"application/json"},
 			},
