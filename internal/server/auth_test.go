@@ -12,7 +12,7 @@ type authSuite struct{}
 
 var _ = gc.Suite(&authSuite{})
 
-func (s *authSuite) TestHasAdminCredentials(c *gc.C) {
+func (s *authSuite) TestCheckAdminCredentials(c *gc.C) {
 	auth := NewAuthorizer(
 		ServerParams{
 			AuthUsername: "test-admin",
@@ -73,7 +73,7 @@ func (s *authSuite) TestHasAdminCredentials(c *gc.C) {
 	}}
 	for i, test := range tests {
 		c.Logf("%d. %s", i, test.about)
-		obtained := auth.HasAdminCredentials(&http.Request{
+		obtained := auth.CheckAdminCredentials(&http.Request{
 			Header: test.header,
 		})
 		if test.expectErrorMessage == "" {

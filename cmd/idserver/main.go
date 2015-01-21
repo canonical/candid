@@ -11,6 +11,7 @@ import (
 
 	"github.com/juju/loggo"
 	"gopkg.in/errgo.v1"
+	"gopkg.in/macaroon-bakery.v0/bakery"
 	"gopkg.in/mgo.v2"
 
 	"github.com/CanonicalLtd/blues-identity"
@@ -61,11 +62,19 @@ func serve(confPath string) error {
 	db := session.DB("juju")
 
 	logger.Infof("setting up the identity server")
+	var keypair bakery.KeyPair
+	if err := keypair.Private.UnmarshalText([]byte(conf.PrivateKey)); err != nil {
+		return errgo.Notef(err, "cannot unmarshal private key")
+	}
+	if err := keypair.Public.UnmarshalText([]byte(conf.PublicKey)); err != nil {
+		return errgo.Notef(err, "cannot unmarshal public key")
+	}
 	server, err := identity.NewServer(
 		db,
 		identity.ServerParams{
 			AuthUsername: conf.AuthUsername,
 			AuthPassword: conf.AuthPassword,
+			Key:          &keypair,
 		},
 		identity.V1,
 	)
