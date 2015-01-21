@@ -41,8 +41,9 @@ func New(db *mgo.Database, params ServerParams, versions map[string]NewAPIHandle
 
 	// Create the bakery Service.
 	svc, err := bakery.NewService(bakery.NewServiceParams{
-		Store: ms,
-		Key:   params.Key,
+		Location: "identity",
+		Store:    ms,
+		Key:      params.Key,
 	})
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot create bakery service")
