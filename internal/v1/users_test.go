@@ -316,8 +316,8 @@ func (s *usersSuite) TestUser(c *gc.C) {
 		}),
 		expectStatus: http.StatusUnauthorized,
 		expectBody: params.Error{
-			Code:    "unauthorized",
-			Message: "unauthorized: invalid or missing HTTP auth header",
+			Code:    "no admin credentials provided",
+			Message: "no admin credentials provided",
 		},
 	}, {
 		about:  "bad username",
@@ -586,8 +586,8 @@ func (s *usersSuite) TestQueryUsers(c *gc.C) {
 		}),
 		expectStatus: http.StatusUnauthorized,
 		expectBody: params.Error{
-			Code:    "unauthorized",
-			Message: "unauthorized: invalid or missing HTTP auth header",
+			Code:    "no admin credentials provided",
+			Message: "no admin credentials provided",
 		},
 	}}
 	for i, test := range tests {

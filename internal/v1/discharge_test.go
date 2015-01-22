@@ -8,7 +8,6 @@ import (
 	"net/http/httptest"
 	"net/url"
 
-	"github.com/juju/testing/httptesting"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/macaroon-bakery.v0/bakery"
 	"gopkg.in/macaroon-bakery.v0/bakery/checkers"
@@ -30,12 +29,54 @@ func (s *dischargeSuite) SetUpTest(c *gc.C) {
 	s.apiSuite.SetUpTest(c)
 	s.locator = bakery.NewPublicKeyRing()
 	s.netSrv = httptest.NewServer(s.srv)
-	s.locator.AddPublicKeyForLocation(s.netSrv.URL, true, s.key)
+	s.locator.AddPublicKeyForLocation(s.netSrv.URL, true, &s.keyPair.Public)
 }
 
 func (s *dischargeSuite) TearDownTest(c *gc.C) {
 	s.netSrv.Close()
 	s.apiSuite.TearDownTest(c)
+}
+
+func (s *dischargeSuite) TestDischargeWhenLoggedIn(c *gc.C) {
+	s.createUser(c, &params.User{
+		UserName:   "test-user",
+		ExternalID: "http://example.com/test-user",
+		Email:      "test-user@example.com",
+		FullName:   "Test User III",
+		IDPGroups: []string{
+			"test",
+			"test2",
+		},
+	})
+	// Create the service which will issue the third party caveat.
+	svc, err := bakery.NewService(bakery.NewServiceParams{
+		Locator: s.locator,
+	})
+	c.Assert(err, gc.IsNil)
+	m, err := svc.NewMacaroon("", nil, []checkers.Caveat{{
+		Location:  s.netSrv.URL + "/v1/discharger/",
+		Condition: "is-authenticated-user",
+	}})
+	c.Assert(err, gc.IsNil)
+	// Fake a copy of the bakery service to create login cookies.
+	idsvc, err := bakery.NewService(bakery.NewServiceParams{
+		Store: s.store.Macaroons,
+		Key:   s.keyPair,
+	})
+	c.Assert(err, gc.IsNil)
+	idm, err := idsvc.NewMacaroon("", nil, []checkers.Caveat{
+		checkers.DeclaredCaveat("username", "test-user"),
+	})
+	c.Assert(err, gc.IsNil)
+	u, err := url.Parse(s.netSrv.URL)
+	c.Assert(err, gc.IsNil)
+	httpClient := httpbakery.NewHTTPClient()
+	err = httpbakery.SetCookie(httpClient.Jar, u, macaroon.Slice{idm})
+	c.Assert(err, gc.IsNil)
+	ms, err := httpbakery.DischargeAll(m, httpClient, noVisit)
+	c.Assert(err, gc.IsNil)
+	err = svc.Check(ms, always)
+	c.Assert(err, gc.IsNil)
 }
 
 func (s *dischargeSuite) TestDischarge(c *gc.C) {
@@ -93,7 +134,7 @@ func (s *dischargeSuite) TestDischarge(c *gc.C) {
 				r.URL.RawQuery += "&discharge-for-user=jbloggs"
 			},
 		},
-		expectErr: ".*cannot discharge: unauthorized: unauthorized: invalid or missing HTTP auth header",
+		expectErr: `cannot get discharge from "[^"]*": cannot start interactive session: unexpected call to visit`,
 	}, {
 		about: "unsupported user",
 		m: newMacaroon(c, svc, []checkers.Caveat{{
@@ -116,7 +157,7 @@ func (s *dischargeSuite) TestDischarge(c *gc.C) {
 		modifier: &requestModifier{
 			f: func(r *http.Request) {
 				r.SetBasicAuth(adminUsername, adminPassword)
-				r.Header.Add("X-Discharge-For-Username", "jbloggs2")
+				r.URL.RawQuery += "&discharge-for-user=jbloggs2"
 			},
 		},
 		expectErr: `.*caveat not recognized`,
@@ -151,6 +192,10 @@ var never = bakery.FirstPartyCheckerFunc(func(string) error {
 	return errors.New("unexpected first party caveat")
 })
 
+var always = bakery.FirstPartyCheckerFunc(func(string) error {
+	return nil
+})
+
 // requestModifier implements an http RoundTripper
 // that modifies any requests using the given function
 // before calling the transport RoundTripper.
@@ -172,20 +217,4 @@ func newMacaroon(c *gc.C, svc *bakery.Service, cav []checkers.Caveat) *macaroon.
 	m, err := svc.NewMacaroon("", nil, cav)
 	c.Assert(err, gc.IsNil)
 	return m
-}
-
-func (s *dischargeSuite) createUser(c *gc.C, user *params.User) {
-	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
-		Handler: s.srv,
-		URL:     apiURL("u/" + user.UserName),
-		Method:  "PUT",
-		Header: http.Header{
-			"Content-Type": []string{"application/json"},
-		},
-		Body:         marshal(c, user),
-		Username:     adminUsername,
-		Password:     adminPassword,
-		ExpectStatus: http.StatusOK,
-		ExpectBody:   user,
-	})
 }

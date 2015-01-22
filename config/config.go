@@ -21,6 +21,7 @@ type Config struct {
 	AuthPassword string `yaml:"auth-password"`
 	PublicKey    string `yaml:"public-key"`
 	PrivateKey   string `yaml:"private-key"`
+	Location     string `yaml:"location"`
 }
 
 func (c *Config) validate() error {
@@ -45,6 +46,10 @@ func (c *Config) validate() error {
 	}
 	if c.PublicKey == "" {
 		missing = append(missing, "public-key")
+	}
+	if c.Location == "" {
+		// TODO check it's a valid URL
+		missing = append(missing, "location")
 	}
 	if len(missing) != 0 {
 		return errgo.Newf("missing fields %s in config file", strings.Join(missing, ", "))

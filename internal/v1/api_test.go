@@ -5,6 +5,7 @@ package v1_test
 import (
 	"net/http"
 
+	"github.com/juju/testing/httptesting"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/macaroon-bakery.v0/bakery"
 	"gopkg.in/macaroon-bakery.v0/bakery/mgostorage"
@@ -15,6 +16,7 @@ import (
 	"github.com/CanonicalLtd/blues-identity/internal/server"
 	"github.com/CanonicalLtd/blues-identity/internal/store"
 	"github.com/CanonicalLtd/blues-identity/internal/v1"
+	"github.com/CanonicalLtd/blues-identity/params"
 )
 
 const (
@@ -25,10 +27,10 @@ const (
 
 type apiSuite struct {
 	idtesting.IsolatedMgoSuite
-	srv   http.Handler
-	store *store.Store
-	key   *bakery.PublicKey
-	svc   *bakery.Service
+	srv     http.Handler
+	store   *store.Store
+	keyPair *bakery.KeyPair
+	svc     *bakery.Service
 }
 
 var _ = gc.Suite(&apiSuite{})
@@ -57,7 +59,7 @@ func (s *apiSuite) SetUpTest(c *gc.C) {
 	})
 	c.Assert(err, gc.IsNil)
 	s.svc = svc
-	s.key = &key.Public
+	s.keyPair = key
 }
 
 func (s *apiSuite) TearDownTest(c *gc.C) {
@@ -86,6 +88,22 @@ func newServer(c *gc.C, session *mgo.Session, key *bakery.KeyPair) (http.Handler
 func (s *apiSuite) assertMacaroon(c *gc.C, ms macaroon.Slice, check bakery.FirstPartyChecker) {
 	err := s.svc.Check(ms, check)
 	c.Assert(err, gc.IsNil)
+}
+
+func (s *apiSuite) createUser(c *gc.C, user *params.User) {
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Handler: s.srv,
+		URL:     apiURL("u/" + user.UserName),
+		Method:  "PUT",
+		Header: http.Header{
+			"Content-Type": []string{"application/json"},
+		},
+		Body:         marshal(c, user),
+		Username:     adminUsername,
+		Password:     adminPassword,
+		ExpectStatus: http.StatusOK,
+		ExpectBody:   user,
+	})
 }
 
 func apiURL(path string) string {

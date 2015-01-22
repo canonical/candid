@@ -1,6 +1,9 @@
 // Copyright 2014 Canonical Ltd.
 
 package params
+import (
+	"gopkg.in/macaroon.v1"
+)
 
 const (
 	ProtocolOpenID20 = "openid20"
@@ -27,4 +30,10 @@ type User struct {
 	FullName   string   `json:"fullname"`
 	Email      string   `json:"email"`
 	IDPGroups  []string `json:"idpgroups"`
+}
+
+// WaitResponse holds the response from the wait endpoint.
+type WaitResponse struct {
+	// Macaroon holds the acquired discharge macaroon.
+	Macaroon *macaroon.Macaroon
 }

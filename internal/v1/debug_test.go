@@ -7,10 +7,10 @@ import (
 	"time"
 
 	"github.com/juju/testing/httptesting"
+	"github.com/juju/utils/debugstatus"
 	gc "gopkg.in/check.v1"
 
 	buildver "github.com/CanonicalLtd/blues-identity/version"
-	"github.com/juju/utils/debugstatus"
 )
 
 type debugSuite struct {

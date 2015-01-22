@@ -75,6 +75,7 @@ func serve(confPath string) error {
 			AuthUsername: conf.AuthUsername,
 			AuthPassword: conf.AuthPassword,
 			Key:          &keypair,
+			Location:     conf.Location,
 		},
 		identity.V1,
 	)

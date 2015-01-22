@@ -6,7 +6,9 @@ github.com/juju/loggo	git	d2fb76909109d51bf42f3671abdee01104dac83f	2014-11-12T02
 github.com/juju/names	git	4bd61d19a7fce663e2821fe05ddf69f774d444da	2014-11-21T15:38:57Z
 github.com/juju/testing	git	d0fb1a32e1702bda28711881f27c3a255e46ed0d	2014-12-03T16:55:57Z
 github.com/juju/utils	git	04cc398f8e1bc862ffdc438d679790aa6b344ae3	2014-12-18T18:40:19Z
+github.com/kushaldas/openid.go	git	c705925b332c8a68b7821aa3d340ecf4f302bca3	2013-09-17T09:51:43Z
 golang.org/x/crypto	git	4ed45ec682102c643324fae5dff8dab085b6c300	2015-01-12T22:01:33Z
+golang.org/x/net	git	cbcac7bb8415db9b6cb4d1ebab1dc9afbd688b97	2014-12-10T04:17:44Z
 gopkg.in/check.v1	git	64131543e7896d5bcc6bd5a76287eb75ea96c673	2014-10-24T13:38:53Z
 gopkg.in/errgo.v1	git	81357a83344ddd9f7772884874e5622c2a3da21c	2014-10-13T17:33:38Z
 gopkg.in/macaroon-bakery.v0	git	1325f88019853c3154aba05ac310ec5a0df75ef2	2015-01-21T16:33:28Z

@@ -6,6 +6,8 @@ import (
 	"net/http"
 
 	gc "gopkg.in/check.v1"
+
+	"github.com/CanonicalLtd/blues-identity/params"
 )
 
 type authSuite struct{}
@@ -57,7 +59,7 @@ func (s *authSuite) TestCheckAdminCredentials(c *gc.C) {
 	}, {
 		about:              "no authorization",
 		header:             http.Header{},
-		expectErrorMessage: "unauthorized: invalid or missing HTTP auth header",
+		expectErrorMessage: params.ErrNoAdminCredsProvided.Error(),
 	}, {
 		about: "invalid base64",
 		header: http.Header{

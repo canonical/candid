@@ -33,6 +33,7 @@ auth-username: myuser
 auth-password: mypasswd
 private-key: 8PjzjakvIlh3BVFKe8axinRDutF6EDIfjtuf4+JaNow=
 public-key: CIdWcEUN+0OZnKW9KwruRQnQDY/qqzVdD30CijwiWCk=
+location: http://foo.com:1234
 `
 
 func (s *configSuite) readConfig(c *gc.C, content string) (*config.Config, error) {
@@ -55,6 +56,7 @@ func (s *configSuite) TestRead(c *gc.C) {
 		AuthPassword: "mypasswd",
 		PrivateKey:   "8PjzjakvIlh3BVFKe8axinRDutF6EDIfjtuf4+JaNow=",
 		PublicKey:    "CIdWcEUN+0OZnKW9KwruRQnQDY/qqzVdD30CijwiWCk=",
+		Location:     "http://foo.com:1234",
 	})
 }
 
@@ -66,7 +68,7 @@ func (s *configSuite) TestReadErrorNotFound(c *gc.C) {
 
 func (s *configSuite) TestReadErrorEmpty(c *gc.C) {
 	cfg, err := s.readConfig(c, "")
-	c.Assert(err, gc.ErrorMatches, "missing fields mongo-addr, api-addr, auth-username, auth-password, private-key, public-key in config file")
+	c.Assert(err, gc.ErrorMatches, "missing fields mongo-addr, api-addr, auth-username, auth-password, private-key, public-key, location in config file")
 	c.Assert(cfg, gc.IsNil)
 }
 

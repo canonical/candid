@@ -41,7 +41,7 @@ func New(db *mgo.Database, params ServerParams, versions map[string]NewAPIHandle
 
 	// Create the bakery Service.
 	svc, err := bakery.NewService(bakery.NewServiceParams{
-		Location: "identity",
+		Location: params.Location,
 		Store:    ms,
 		Key:      params.Key,
 	})
@@ -67,4 +67,7 @@ type ServerParams struct {
 	AuthUsername string
 	AuthPassword string
 	Key          *bakery.KeyPair
+	// Location holds a URL representing the externally accessible
+	// base URL of the service, without a trailing slash.
+	Location string
 }

@@ -131,7 +131,6 @@ func (s *storeSuite) TestCollections(c *gc.C) {
 	// Some collections don't have indexes so they are created only when used.
 	createdOnUse := map[string]bool{
 		"identity_providers": true,
-		"macaroons":          true,
 	}
 
 	// Check that all collections mentioned are actually created.
