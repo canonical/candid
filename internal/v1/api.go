@@ -47,7 +47,7 @@ func NewAPIHandler(s *store.Store, auth *server.Authorizer, svc *bakery.Service)
 			Handler:         http.HandlerFunc(pprof.Symbol),
 		},
 		"debug/status": router.HandleJSON(h.serveDebugStatus),
-		"discharge/":   mux,
+		"discharger/":  mux,
 		"idps/": router.AuthorizingHandler{
 			CheckAuthorized: router.Any(
 				router.HasMethod("GET"),

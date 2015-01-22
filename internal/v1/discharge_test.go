@@ -60,7 +60,7 @@ func (s *dischargeSuite) TestDischarge(c *gc.C) {
 	}{{
 		about: "discharge macaroon",
 		m: newMacaroon(c, svc, []checkers.Caveat{{
-			Location:  s.netSrv.URL + "/v1/discharge/",
+			Location:  s.netSrv.URL + "/v1/discharger/",
 			Condition: "is-authenticated-user",
 		}}),
 		modifier: &requestModifier{
@@ -73,7 +73,7 @@ func (s *dischargeSuite) TestDischarge(c *gc.C) {
 	}, {
 		about: "no discharge user",
 		m: newMacaroon(c, svc, []checkers.Caveat{{
-			Location:  s.netSrv.URL + "/v1/discharge/",
+			Location:  s.netSrv.URL + "/v1/discharger/",
 			Condition: "is-authenticated-user",
 		}}),
 		modifier: &requestModifier{
@@ -85,7 +85,7 @@ func (s *dischargeSuite) TestDischarge(c *gc.C) {
 	}, {
 		about: "no authentication",
 		m: newMacaroon(c, svc, []checkers.Caveat{{
-			Location:  s.netSrv.URL + "/v1/discharge/",
+			Location:  s.netSrv.URL + "/v1/discharger/",
 			Condition: "is-authenticated-user",
 		}}),
 		modifier: &requestModifier{
@@ -97,7 +97,7 @@ func (s *dischargeSuite) TestDischarge(c *gc.C) {
 	}, {
 		about: "unsupported user",
 		m: newMacaroon(c, svc, []checkers.Caveat{{
-			Location:  s.netSrv.URL + "/v1/discharge/",
+			Location:  s.netSrv.URL + "/v1/discharger/",
 			Condition: "is-authenticated-user",
 		}}),
 		modifier: &requestModifier{
@@ -110,7 +110,7 @@ func (s *dischargeSuite) TestDischarge(c *gc.C) {
 	}, {
 		about: "unsupported condition",
 		m: newMacaroon(c, svc, []checkers.Caveat{{
-			Location:  s.netSrv.URL + "/v1/discharge/",
+			Location:  s.netSrv.URL + "/v1/discharger/",
 			Condition: "is-authenticated-group",
 		}}),
 		modifier: &requestModifier{
