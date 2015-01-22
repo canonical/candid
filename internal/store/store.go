@@ -6,10 +6,13 @@ import (
 	"code.google.com/p/go-uuid/uuid"
 	"github.com/juju/loggo"
 	"gopkg.in/errgo.v1"
+	"gopkg.in/macaroon-bakery.v0/bakery"
+	"gopkg.in/macaroon-bakery.v0/bakery/mgostorage"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 
 	"github.com/CanonicalLtd/blues-identity/internal/mongodoc"
+	"github.com/CanonicalLtd/blues-identity/meeting"
 	"github.com/CanonicalLtd/blues-identity/params"
 )
 
@@ -18,17 +21,31 @@ var IdentityNamespace = uuid.Parse("685c2eaa-9721-11e4-b717-a7bf1a250a86")
 
 // Store represents the underlying identity data stores.
 type Store struct {
+	// DB holds the mongodb-backed identity store.
 	DB StoreDatabase
+
+	// Macaroons holds the mongodb-backed macaroon store.
+	Macaroons bakery.Storage
+
+	// Place holds the place where openid-callback rendezvous
+	// are created.
+	Place *meeting.Place
 }
 
 // New returns a Store that uses the given database.
 func New(db *mgo.Database) (*Store, error) {
 	s := &Store{
-		DB: StoreDatabase{db},
+		DB:    StoreDatabase{db},
+		Place: meeting.New(),
 	}
 	if err := s.ensureIndexes(); err != nil {
 		return nil, errgo.Notef(err, "cannot ensure indexes")
 	}
+	ms, err := mgostorage.New(s.DB.Macaroons())
+	if err != nil {
+		return nil, errgo.Notef(err, "cannot create macaroon store")
+	}
+	s.Macaroons = ms
 	return s, nil
 }
 
@@ -114,6 +131,7 @@ func (s StoreDatabase) Macaroons() *mgo.Collection {
 // function returning that collection.
 var allCollections = []func(StoreDatabase) *mgo.Collection{
 	StoreDatabase.Identities,
+	StoreDatabase.Macaroons,
 }
 
 // Collections returns a slice of all the collections used

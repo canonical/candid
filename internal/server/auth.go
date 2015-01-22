@@ -28,7 +28,12 @@ func NewAuthorizer(params ServerParams) *Authorizer {
 // CheckAdminCredentials checks if the request has credentials that match the
 // configured administration credentials for the server. If the credentials match
 // nil will be reurned, otherwise the error will describe the failure.
+//
+// If there are no credentials in the request, it returns params.ErrNoAdminCredsProvided.
 func (a Authorizer) CheckAdminCredentials(req *http.Request) error {
+	if _, ok := req.Header["Authorization"]; !ok {
+		return params.ErrNoAdminCredsProvided
+	}
 	u, p, err := utils.ParseBasicAuthHeader(req.Header)
 	if err != nil {
 		return errgo.WithCausef(err, params.ErrUnauthorized, "")

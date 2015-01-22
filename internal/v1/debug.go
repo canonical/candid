@@ -5,8 +5,9 @@ package v1
 import (
 	"net/http"
 
-	"github.com/CanonicalLtd/blues-identity/version"
 	"github.com/juju/utils/debugstatus"
+
+	"github.com/CanonicalLtd/blues-identity/version"
 )
 
 // GET /debug

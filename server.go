@@ -38,6 +38,9 @@ type ServerParams struct {
 	AuthUsername string
 	AuthPassword string
 	Key          *bakery.KeyPair
+	// Location holds a URL representing the externally accessible
+	// base URL of the service, without a trailing slash.
+	Location string
 }
 
 // NewServer returns a new handler that handles identity service requests and

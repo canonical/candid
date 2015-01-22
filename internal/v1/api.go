@@ -18,12 +18,21 @@ import (
 
 var logger = loggo.GetLogger("identity.internal.v1")
 
-// NewAPIHandler returns a new instance of the v1 API handler.
+// NewAPIHandler returns a new Handler as an http Handler.
+// It is defined for the convenience of callers that require a
+// server.NewAPIHandlerFunc.
 func NewAPIHandler(s *store.Store, auth *server.Authorizer, svc *bakery.Service) http.Handler {
+	return New(s, auth, svc)
+}
+
+// New returns a new instance of the v1 API handler.
+func New(s *store.Store, auth *server.Authorizer, svc *bakery.Service) *Handler {
 	h := &Handler{
-		store: s,
-		svc:   svc,
-		auth:  auth,
+		store:    s,
+		svc:      svc,
+		place:    &place{s.Place},
+		provider: newUSSOProvider(),
+		auth:     auth,
 	}
 	mux := http.NewServeMux()
 	httpbakery.AddDischargeHandler(mux, "/", svc, h.checkThirdPartyCaveat)
@@ -46,8 +55,9 @@ func NewAPIHandler(s *store.Store, auth *server.Authorizer, svc *bakery.Service)
 			CheckAuthorized: auth.CheckAdminCredentials,
 			Handler:         http.HandlerFunc(pprof.Symbol),
 		},
-		"debug/status": router.HandleJSON(h.serveDebugStatus),
-		"discharger/":  mux,
+		"debug/status":      router.HandleJSON(h.serveDebugStatus),
+		"discharger/":       mux,
+		"idp/usso/callback": h.loginCallbackHandler(h.provider),
 		"idps/": router.AuthorizingHandler{
 			CheckAuthorized: router.Any(
 				router.HasMethod("GET"),
@@ -75,6 +85,7 @@ func NewAPIHandler(s *store.Store, auth *server.Authorizer, svc *bakery.Service)
 				}),
 			),
 		},
+		"wait":   router.HandleJSON(h.serveWait),
 		"verify": router.HandleJSON(h.serveVerifyToken),
 	})
 	return h
@@ -82,9 +93,11 @@ func NewAPIHandler(s *store.Store, auth *server.Authorizer, svc *bakery.Service)
 
 type Handler struct {
 	*router.Router
-	store *store.Store
-	svc   *bakery.Service
-	auth  *server.Authorizer
+	store    *store.Store
+	svc      *bakery.Service
+	place    *place
+	provider idProvider
+	auth     *server.Authorizer
 }
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
@@ -92,3 +105,19 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 }
 
 var errNotImplemented = errgo.Newf("method not implemented")
+
+// idProvider implements the non-portable parts of an
+// external identity provider.
+type idProvider interface {
+	// verifyCallback handles the login callback from the authentication request.
+	// It returns the verified user info, if any.
+	verifyCallback(w http.ResponseWriter, req *http.Request) (*verifiedUserInfo, error)
+
+	// loginURL returns the URL to visit in order to
+	// login.
+	loginURL(baseURL, waitid string) (string, error)
+}
+
+func (h *Handler) idProviderBaseURL() string {
+	return h.svc.Location() + "/v1/idp/usso/callback"
+}

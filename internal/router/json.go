@@ -7,6 +7,7 @@ import (
 
 	"github.com/juju/utils/jsonhttp"
 	"gopkg.in/errgo.v1"
+	"gopkg.in/macaroon-bakery.v0/httpbakery"
 
 	"github.com/CanonicalLtd/blues-identity/params"
 )
@@ -18,6 +19,11 @@ var (
 )
 
 func errToResp(err error) (int, interface{}) {
+	// Allow bakery errors to be returned as the bakery would
+	// like them, so that httpbakery.Client.Do will work.
+	if err, ok := errgo.Cause(err).(*httpbakery.Error); ok {
+		return httpbakery.ErrorToResponse(err)
+	}
 	errorBody := errorResponseBody(err)
 	status := http.StatusInternalServerError
 	switch errorBody.Code {
@@ -27,7 +33,7 @@ func errToResp(err error) (int, interface{}) {
 		status = http.StatusForbidden
 	case params.ErrBadRequest:
 		status = http.StatusBadRequest
-	case params.ErrUnauthorized:
+	case params.ErrUnauthorized, params.ErrNoAdminCredsProvided:
 		status = http.StatusUnauthorized
 	}
 	return status, errorBody
