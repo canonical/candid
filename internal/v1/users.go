@@ -19,6 +19,11 @@ import (
 	"github.com/CanonicalLtd/blues-identity/params"
 )
 
+var blacklistUsernames = map[string]bool{
+	"admin":    true,
+	"everyone": true,
+}
+
 // serverQueryUsers serves the /u endpoint. See http://tinyurl.com/lu3mmr9 for
 // details.
 func (h *Handler) serveQueryUsers(hdr http.Header, req *http.Request) (interface{}, error) {
@@ -54,6 +59,9 @@ func (h *Handler) serveUser(hdr http.Header, req *http.Request) (interface{}, er
 		}
 		if !names.IsValidUserName(un) {
 			return nil, errgo.WithCausef(nil, params.ErrBadRequest, "illegal username: %q", un)
+		}
+		if blacklistUsernames[un] {
+			return nil, errgo.WithCausef(nil, params.ErrForbidden, "username reserved: %s", un)
 		}
 		var user params.User
 		dec := json.NewDecoder(req.Body)

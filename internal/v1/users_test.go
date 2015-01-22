@@ -394,6 +394,25 @@ func (s *usersSuite) TestUser(c *gc.C) {
 			Code:    "bad request",
 			Message: `external_id not specified`,
 		},
+	}, {
+		about:  "reserved username",
+		url:    apiURL("u/everyone"),
+		method: "PUT",
+		body: marshal(c, params.User{
+			ExternalID: "http://example.com/jbloggs8",
+			Email:      "jbloggs8@example.com",
+			FullName:   "Joe Bloggs VIII",
+			IDPGroups: []string{
+				"test",
+			},
+		}),
+		username:     adminUsername,
+		password:     adminPassword,
+		expectStatus: http.StatusForbidden,
+		expectBody: params.Error{
+			Code:    "forbidden",
+			Message: `username reserved: everyone`,
+		},
 	}}
 	for i, test := range tests {
 		c.Logf("%d. %s", i, test.about)
