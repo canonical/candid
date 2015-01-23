@@ -11,8 +11,10 @@ import (
 	"gopkg.in/macaroon-bakery.v0/bakery/mgostorage"
 	"gopkg.in/macaroon.v1"
 	"gopkg.in/mgo.v2"
+	"gopkg.in/mgo.v2/bson"
 
 	"github.com/CanonicalLtd/blues-identity/internal/idtesting"
+	"github.com/CanonicalLtd/blues-identity/internal/mongodoc"
 	"github.com/CanonicalLtd/blues-identity/internal/server"
 	"github.com/CanonicalLtd/blues-identity/internal/store"
 	"github.com/CanonicalLtd/blues-identity/internal/v1"
@@ -90,7 +92,7 @@ func (s *apiSuite) assertMacaroon(c *gc.C, ms macaroon.Slice, check bakery.First
 	c.Assert(err, gc.IsNil)
 }
 
-func (s *apiSuite) createUser(c *gc.C, user *params.User) {
+func (s *apiSuite) createUser(c *gc.C, user *params.User) (uuid string) {
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Handler: s.srv,
 		URL:     apiURL("u/" + user.UserName),
@@ -104,6 +106,14 @@ func (s *apiSuite) createUser(c *gc.C, user *params.User) {
 		ExpectStatus: http.StatusOK,
 		ExpectBody:   user,
 	})
+
+	// Retrieve and return the newly created user's UUID.
+	var id mongodoc.Identity
+	err := s.store.DB.Identities().Find(
+		bson.D{{"username", user.UserName}},
+	).Select(bson.D{{"baseurl", 1}}).One(&id)
+	c.Assert(err, gc.IsNil)
+	return id.UUID
 }
 
 func apiURL(path string) string {

@@ -5,6 +5,7 @@ package v1
 import (
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"gopkg.in/errgo.v1"
@@ -72,6 +73,7 @@ func (h *Handler) checkAuthenticatedUser(username string) ([]checkers.Caveat, er
 	return []checkers.Caveat{
 		checkers.DeclaredCaveat("uuid", user.UUID),
 		checkers.DeclaredCaveat("username", user.UserName),
+		checkers.DeclaredCaveat("groups", strings.Join(user.Groups, " ")),
 		checkers.TimeBeforeCaveat(time.Now().Add(24 * time.Hour)),
 	}, nil
 }
