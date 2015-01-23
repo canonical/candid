@@ -1,6 +1,7 @@
 // Copyright 2014 Canonical Ltd.
 
 package params
+
 import (
 	"gopkg.in/macaroon.v1"
 )

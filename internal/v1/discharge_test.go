@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 
+	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/macaroon-bakery.v0/bakery"
 	"gopkg.in/macaroon-bakery.v0/bakery/checkers"
@@ -38,7 +39,7 @@ func (s *dischargeSuite) TearDownTest(c *gc.C) {
 }
 
 func (s *dischargeSuite) TestDischargeWhenLoggedIn(c *gc.C) {
-	s.createUser(c, &params.User{
+	uuid := s.createUser(c, &params.User{
 		UserName:   "test-user",
 		ExternalID: "http://example.com/test-user",
 		Email:      "test-user@example.com",
@@ -75,8 +76,14 @@ func (s *dischargeSuite) TestDischargeWhenLoggedIn(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 	ms, err := httpbakery.DischargeAll(m, httpClient, noVisit)
 	c.Assert(err, gc.IsNil)
-	err = svc.Check(ms, always)
+	d := checkers.InferDeclared(ms)
+	err = svc.Check(ms, checkers.New(d, checkers.TimeBefore))
 	c.Assert(err, gc.IsNil)
+	c.Assert(d, jc.DeepEquals, checkers.Declared{
+		"uuid":     uuid,
+		"username": "test-user",
+		"groups":   "test test2",
+	})
 }
 
 func (s *dischargeSuite) TestDischarge(c *gc.C) {
