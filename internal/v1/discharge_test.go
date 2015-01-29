@@ -170,7 +170,7 @@ func (s *dischargeSuite) TestDischarge(c *gc.C) {
 		expectErr: `.*caveat not recognized`,
 	}}
 	for i, test := range tests {
-		c.Logf("%d. %s", i, test.about)
+		c.Logf("test %d. %s", i, test.about)
 		client := httpbakery.NewHTTPClient()
 		if test.modifier != nil {
 			test.modifier.transport = client.Transport
