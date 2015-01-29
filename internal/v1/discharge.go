@@ -28,7 +28,7 @@ type verifiedUserInfo struct {
 	Nickname string
 	FullName string
 	Email    string
-	Teams    string
+	Groups   []string
 }
 
 // checkThirdPartyCaveat checks the given caveat. This function is called by the httpbakery
@@ -168,6 +168,7 @@ func (h *Handler) loginCallback1(
 		ExternalID: info.User,
 		Email:      info.Email,
 		FullName:   info.FullName,
+		Groups:     info.Groups,
 	}); err != nil {
 		return nil, nil, errgo.Mask(err)
 	}
