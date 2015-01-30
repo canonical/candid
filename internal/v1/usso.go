@@ -34,6 +34,10 @@ func newUSSOProvider() idProvider {
 // groups in advance.
 const openIdRequestedTeams = "yellow,blues-development,charm-beta"
 
+// openidRedirectURL is defined as a variable so that it
+// can be replaced for testing purposes.
+var openidRedirectURL = openid.RedirectUrl
+
 // loginURL returns a URL that, when visited, will provide a login
 // page and then redirect back to the USSO provider to complete
 // the macaroon acquisition.
