@@ -47,6 +47,11 @@ func (s *apiSuite) TearDownSuite(c *gc.C) {
 
 func (s *apiSuite) SetUpTest(c *gc.C) {
 	s.IsolatedMgoSuite.SetUpTest(c)
+
+	// Make sure that we don't invoke the real openid package's redirectURL
+	// function, which makes network calls.
+	s.PatchValue(v1.OpenidRedirectURL, fakeRedirectURL)
+
 	key, err := bakery.GenerateKey()
 	c.Assert(err, gc.IsNil)
 	s.srv, s.store = newServer(c, s.Session, key)
@@ -62,6 +67,10 @@ func (s *apiSuite) SetUpTest(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 	s.svc = svc
 	s.keyPair = key
+}
+
+func fakeRedirectURL(_, _, _ string) (string, error) {
+	return "http://0.1.2.3/nowhere", nil
 }
 
 func (s *apiSuite) TearDownTest(c *gc.C) {

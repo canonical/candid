@@ -4,6 +4,8 @@ package v1
 
 import (
 	"net/http"
+	"net/url"
+	"strings"
 
 	"github.com/kushaldas/openid.go/src/openid"
 	"gopkg.in/errgo.v1"
@@ -28,12 +30,58 @@ func newUSSOProvider() idProvider {
 	}
 }
 
+// TODO It should not be necessary to know all the possible
+// groups in advance.
+const openIdRequestedTeams = "yellow,blues-development,charm-beta"
+
+// openidRedirectURL is defined as a variable so that it
+// can be replaced for testing purposes.
+var openidRedirectURL = openid.RedirectUrl
+
 // loginURL returns a URL that, when visited, will provide a login
 // page and then redirect back to the USSO provider to complete
 // the macaroon acquisition.
 func (p *ussoProvider) loginURL(baseURL, waitId string) (string, error) {
 	callback := baseURL + "?waitid=" + waitId
-	return openid.RedirectUrl(ussoLoginURL, callback, ussoRealm)
+	redirectURL, err := openid.RedirectUrl(ussoLoginURL, callback, ussoRealm)
+	if err != nil {
+		return "", errgo.Mask(err)
+	}
+	u, err := parseQURL(redirectURL)
+	if err != nil {
+		return "", errgo.Mask(err)
+	}
+	u.Query.Set("openid.lp.query_membership", openIdRequestedTeams)
+	return u.String(), nil
+}
+
+// qURL holds a URL and its parsed query values.
+type qURL struct {
+	*url.URL
+	Query url.Values
+}
+
+func parseQURL(s string) (*qURL, error) {
+	u, err := url.Parse(s)
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
+	qu := &qURL{
+		URL: u,
+	}
+	q, err := url.ParseQuery(u.RawQuery)
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
+	qu.Query = q
+	qu.URL.RawQuery = ""
+	return qu, nil
+}
+
+func (qu *qURL) String() string {
+	u := *qu.URL
+	u.RawQuery = qu.Query.Encode()
+	return u.String()
 }
 
 // verifyCallback is invoked when we get a openid callback made
@@ -58,7 +106,11 @@ func (p *ussoProvider) verifyCallback(w http.ResponseWriter, req *http.Request) 
 		Nickname: openIdInfo["nick"],
 		FullName: openIdInfo["fullname"],
 		Email:    openIdInfo["email"],
-		Teams:    openIdInfo["teams"],
+		Groups:   strings.FieldsFunc(openIdInfo["teams"], isComma),
 	}
 	return info, nil
+}
+
+func isComma(r rune) bool {
+	return r == ','
 }
