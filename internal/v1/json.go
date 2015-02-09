@@ -1,11 +1,11 @@
 // Copyright 2014 Canonical Ltd.
 
-package router
+package v1
 
 import (
 	"net/http"
 
-	"github.com/juju/utils/jsonhttp"
+	"github.com/juju/httprequest"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v0/httpbakery"
 
@@ -13,9 +13,11 @@ import (
 )
 
 var (
-	HandleErrors = jsonhttp.HandleErrors(errToResp)
-	HandleJSON   = jsonhttp.HandleJSON(errToResp)
-	WriteError   = jsonhttp.WriteError(errToResp)
+	errorMapper  = httprequest.ErrorMapper(errToResp)
+	handle       = errorMapper.Handle
+	handleErrors = errorMapper.HandleErrors
+	handleJSON   = errorMapper.HandleJSON
+	writeError   = errorMapper.WriteError
 )
 
 func errToResp(err error) (int, interface{}) {
@@ -47,18 +49,12 @@ func errorResponseBody(err error) *params.Error {
 	cause := errgo.Cause(err)
 	if coder, ok := cause.(errorCoder); ok {
 		errResp.Code = coder.ErrorCode()
+	} else if errgo.Cause(err) == httprequest.ErrUnmarshal {
+		errResp.Code = params.ErrBadRequest
 	}
 	return errResp
 }
 
 type errorCoder interface {
 	ErrorCode() params.ErrorCode
-}
-
-// NotFoundHandler is like http.NotFoundHandler except it
-// returns a JSON error response.
-func NotFoundHandler() http.Handler {
-	return HandleErrors(func(w http.ResponseWriter, req *http.Request) error {
-		return errgo.WithCausef(nil, params.ErrNotFound, params.ErrNotFound.Error())
-	})
 }

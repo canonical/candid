@@ -2,10 +2,12 @@ code.google.com/p/go-uuid	hg	35bc42037350f0078e3c974c6ea690f1926603ab	14
 code.google.com/p/go.net	hg	937a34c9de13c766c814510f76bca091dee06028	239
 github.com/juju/errors	git	c3aaee403f140e8ab35eca129eb0a514bed780eb	2015-01-08T02:04:25Z
 github.com/juju/httpprof	git	14bf14c307672fd2456bdbf35d19cf0ccd3cf565	2014-12-17T16:00:36Z
+github.com/juju/httprequest	git	011c73b8c1629e30b3a73aa565086741a61da0fe	2015-02-06T19:48:23Z
 github.com/juju/loggo	git	dc8e19f7c70a62a59c69c40f85b8df09ff20742c	2014-11-17T04:05:26Z
 github.com/juju/names	git	e7394f4ce9389fb57cfb7cbe9fa30790d01a8875	2014-12-17T04:05:00Z
 github.com/juju/testing	git	006244fdb8dc686679d221bc720562a0155ebb5f	2015-01-20T14:33:09Z
 github.com/juju/utils	git	b4b94187f1f3fec782eb1fceb2b3ac33c616e409	2015-01-22T01:31:30Z
+github.com/julienschmidt/httprouter	git	00ce1c6a267162792c367acc43b1681a884e1872	2015-01-24T06:28:53Z
 github.com/kushaldas/openid.go	git	c705925b332c8a68b7821aa3d340ecf4f302bca3	2013-09-17T09:51:43Z
 golang.org/x/crypto	git	4ed45ec682102c643324fae5dff8dab085b6c300	2015-01-12T22:01:33Z
 golang.org/x/net	git	cbcac7bb8415db9b6cb4d1ebab1dc9afbd688b97	2014-12-10T04:17:44Z

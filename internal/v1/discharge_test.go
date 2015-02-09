@@ -40,7 +40,7 @@ func (s *dischargeSuite) TearDownTest(c *gc.C) {
 
 func (s *dischargeSuite) TestDischargeWhenLoggedIn(c *gc.C) {
 	uuid := s.createUser(c, &params.User{
-		UserName:   "test-user",
+		Username:   "test-user",
 		ExternalID: "http://example.com/test-user",
 		Email:      "test-user@example.com",
 		FullName:   "Test User III",
@@ -88,7 +88,7 @@ func (s *dischargeSuite) TestDischargeWhenLoggedIn(c *gc.C) {
 
 func (s *dischargeSuite) TestDischarge(c *gc.C) {
 	s.createUser(c, &params.User{
-		UserName:   "jbloggs",
+		Username:   "jbloggs",
 		ExternalID: "http://example.com/jbloggs",
 		Email:      "jbloggs@example.com",
 		FullName:   "Joe Bloggs",

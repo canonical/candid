@@ -23,7 +23,7 @@ func (s *storeSuite) TestNew(c *gc.C) {
 
 	// Add an identity to the identities collection using mgo directly.
 	err := db.C("identities").Insert(&mongodoc.Identity{
-		UserName:   "who",
+		Username:   "who",
 		ExternalID: "http://example.com/who",
 		Email:      "who@example.com",
 		FullName:   "Who Am I",
@@ -41,7 +41,7 @@ func (s *storeSuite) TestNew(c *gc.C) {
 	var doc mongodoc.Identity
 	err = store.DB.Identities().Find(nil).One(&doc)
 	c.Assert(err, gc.IsNil)
-	c.Assert(doc.UserName, gc.Equals, "who")
+	c.Assert(doc.Username, gc.Equals, "who")
 	c.Assert(doc.ExternalID, gc.Equals, "http://example.com/who")
 	c.Assert(doc.Email, gc.Equals, "who@example.com")
 	c.Assert(doc.FullName, gc.Equals, "Who Am I")
@@ -54,7 +54,7 @@ func (s *storeSuite) TestUpsertIdentity(c *gc.C) {
 
 	// Add an identity to the store.
 	err = store.UpsertIdentity(&mongodoc.Identity{
-		UserName:   "test",
+		Username:   "test",
 		ExternalID: "http://example.com/test",
 		Email:      "test@example.com",
 		FullName:   "Test User",
@@ -68,7 +68,7 @@ func (s *storeSuite) TestUpsertIdentity(c *gc.C) {
 	var doc mongodoc.Identity
 	err = store.DB.Identities().Find(nil).One(&doc)
 	c.Assert(err, gc.IsNil)
-	c.Assert(doc.UserName, gc.Equals, "test")
+	c.Assert(doc.Username, gc.Equals, "test")
 	c.Assert(doc.ExternalID, gc.Equals, "http://example.com/test")
 	c.Assert(doc.Email, gc.Equals, "test@example.com")
 	c.Assert(doc.FullName, gc.Equals, "Test User")
@@ -76,7 +76,7 @@ func (s *storeSuite) TestUpsertIdentity(c *gc.C) {
 
 	// Update the Identity
 	err = store.UpsertIdentity(&mongodoc.Identity{
-		UserName:   "test",
+		Username:   "test",
 		ExternalID: "http://example.com/test",
 		Email:      "test2@example.com",
 		FullName:   "Test User Updated",
@@ -90,7 +90,7 @@ func (s *storeSuite) TestUpsertIdentity(c *gc.C) {
 	// Check the updated identity.
 	err = store.DB.Identities().Find(nil).One(&doc)
 	c.Assert(err, gc.IsNil)
-	c.Assert(doc.UserName, gc.Equals, "test")
+	c.Assert(doc.Username, gc.Equals, "test")
 	c.Assert(doc.ExternalID, gc.Equals, "http://example.com/test")
 	c.Assert(doc.Email, gc.Equals, "test2@example.com")
 	c.Assert(doc.FullName, gc.Equals, "Test User Updated")
@@ -98,7 +98,7 @@ func (s *storeSuite) TestUpsertIdentity(c *gc.C) {
 
 	// Attempt to insert a clashing username
 	err = store.UpsertIdentity(&mongodoc.Identity{
-		UserName:   "test",
+		Username:   "test",
 		ExternalID: "http://example.com/test3",
 		Email:      "test3@example.com",
 		FullName:   "Test User III",
@@ -110,7 +110,7 @@ func (s *storeSuite) TestUpsertIdentity(c *gc.C) {
 
 	// Attempt to insert a clashing external_id
 	err = store.UpsertIdentity(&mongodoc.Identity{
-		UserName:   "test2",
+		Username:   "test2",
 		ExternalID: "http://example.com/test",
 		Email:      "test@example.com",
 		FullName:   "Test User",

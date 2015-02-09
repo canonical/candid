@@ -23,44 +23,45 @@ var _ = gc.Suite(&idpsSuite{})
 
 func (s *idpsSuite) TestPutIDPS(c *gc.C) {
 	tests := []struct {
-		about    string
-		username string
-		password string
-		idp      params.IdentityProvider
-		status   int
-		result   interface{}
+		about        string
+		url          string
+		username     string
+		password     string
+		idp          params.IdentityProvider
+		expectStatus int
+		expectBody   interface{}
 	}{{
 		about:    "OpenID 2.0 provider",
+		url:      "idps/provider1",
 		username: adminUsername,
 		password: adminPassword,
 		idp: params.IdentityProvider{
-			Name:     "provider1",
 			Protocol: params.ProtocolOpenID20,
 			Settings: map[string]interface{}{
 				params.OpenID20LoginURL: "https://login.example.com",
 			},
 		},
-		status: http.StatusOK,
-		result: true,
+		expectStatus: http.StatusOK,
 	}, {
 		about:    "unsupported protocol provider",
+		url:      "idps/provider2",
 		username: adminUsername,
 		password: adminPassword,
 		idp: params.IdentityProvider{
-			Name:     "provider1",
 			Protocol: "unsupported",
 			Settings: map[string]interface{}{
 				params.OpenID20LoginURL: "https://login.example.com",
 			},
 		},
-		status: http.StatusBadRequest,
-		result: params.Error{
+		expectStatus: http.StatusBadRequest,
+		expectBody: params.Error{
 			Message: `unsupported identity protocol "unsupported"`,
 			Code:    params.ErrBadRequest,
 		},
 	}, {
 		about:    "invalid username",
-		username: "big bad wolfe",
+		url:      "idps/provider2",
+		username: "big bad wolf",
 		password: adminPassword,
 		idp: params.IdentityProvider{
 			Name:     "provider1",
@@ -69,13 +70,14 @@ func (s *idpsSuite) TestPutIDPS(c *gc.C) {
 				params.OpenID20LoginURL: "https://login.example.com",
 			},
 		},
-		status: http.StatusUnauthorized,
-		result: params.Error{
+		expectStatus: http.StatusUnauthorized,
+		expectBody: params.Error{
 			Message: `invalid credentials`,
 			Code:    params.ErrUnauthorized,
 		},
 	}, {
 		about:    "invalid password",
+		url:      "idps/provider2",
 		username: adminUsername,
 		password: "let me in",
 		idp: params.IdentityProvider{
@@ -85,13 +87,14 @@ func (s *idpsSuite) TestPutIDPS(c *gc.C) {
 				params.OpenID20LoginURL: "https://login.example.com",
 			},
 		},
-		status: http.StatusUnauthorized,
-		result: params.Error{
+		expectStatus: http.StatusUnauthorized,
+		expectBody: params.Error{
 			Message: `invalid credentials`,
 			Code:    params.ErrUnauthorized,
 		},
 	}, {
 		about:    "no provider name",
+		url:      "idps/",
 		username: adminUsername,
 		password: adminPassword,
 		idp: params.IdentityProvider{
@@ -101,27 +104,28 @@ func (s *idpsSuite) TestPutIDPS(c *gc.C) {
 				params.OpenID20LoginURL: "https://login.example.com",
 			},
 		},
-		status: http.StatusBadRequest,
-		result: params.Error{
-			Message: `No name for identity provider`,
-			Code:    params.ErrBadRequest,
+		expectStatus: http.StatusNotFound,
+		expectBody: params.Error{
+			Message: `not found: /idps/ (PUT)`,
+			Code:    params.ErrNotFound,
 		},
 	}, {
 		about:    "no login url",
+		url:      "idps/provider2",
 		username: adminUsername,
 		password: adminPassword,
 		idp: params.IdentityProvider{
-			Name:     "provider1",
 			Protocol: params.ProtocolOpenID20,
 			Settings: map[string]interface{}{},
 		},
-		status: http.StatusBadRequest,
-		result: params.Error{
+		expectStatus: http.StatusBadRequest,
+		expectBody: params.Error{
 			Message: `openid.login_url not specified`,
 			Code:    params.ErrBadRequest,
 		},
 	}, {
 		about:    "login url wrong type",
+		url:      "idps/provider2",
 		username: adminUsername,
 		password: adminPassword,
 		idp: params.IdentityProvider{
@@ -131,8 +135,8 @@ func (s *idpsSuite) TestPutIDPS(c *gc.C) {
 				params.OpenID20LoginURL: 43.4,
 			},
 		},
-		status: http.StatusBadRequest,
-		result: params.Error{
+		expectStatus: http.StatusBadRequest,
+		expectBody: params.Error{
 			Message: `openid.login_url not specified`,
 			Code:    params.ErrBadRequest,
 		},
@@ -142,15 +146,15 @@ func (s *idpsSuite) TestPutIDPS(c *gc.C) {
 		httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 			Handler: s.srv,
 			Method:  "PUT",
-			URL:     "/" + version + "/idps/",
+			URL:     apiURL(test.url),
 			Body:    marshal(c, test.idp),
 			Header: http.Header{
 				"Content-Type": []string{"application/json"},
 			},
 			Username:     test.username,
 			Password:     test.password,
-			ExpectStatus: test.status,
-			ExpectBody:   test.result,
+			ExpectStatus: test.expectStatus,
+			ExpectBody:   test.expectBody,
 		})
 	}
 }
@@ -184,7 +188,7 @@ func (s *idpsSuite) TestGetIDPS(c *gc.C) {
 		provider: "provider2",
 		status:   http.StatusNotFound,
 		result: params.Error{
-			Message: `cannot find identity provider "provider2"`,
+			Message: `cannot find identity provider "provider2": not found`,
 			Code:    params.ErrNotFound,
 		},
 	}}
@@ -204,7 +208,7 @@ func (s *idpsSuite) TestListIDPS(c *gc.C) {
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Handler:    s.srv,
 		Method:     "GET",
-		URL:        fmt.Sprintf("/%s/idps/", version),
+		URL:        fmt.Sprintf("/%s/idps", version),
 		ExpectBody: []string{},
 	})
 	err := s.store.SetIdentityProvider(
@@ -218,7 +222,7 @@ func (s *idpsSuite) TestListIDPS(c *gc.C) {
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Handler:    s.srv,
 		Method:     "GET",
-		URL:        fmt.Sprintf("/%s/idps/", version),
+		URL:        fmt.Sprintf("/%s/idps", version),
 		ExpectBody: []string{"idp1"},
 	})
 	err = s.store.SetIdentityProvider(
@@ -232,26 +236,8 @@ func (s *idpsSuite) TestListIDPS(c *gc.C) {
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Handler:    s.srv,
 		Method:     "GET",
-		URL:        fmt.Sprintf("/%s/idps/", version),
+		URL:        fmt.Sprintf("/%s/idps", version),
 		ExpectBody: []string{"idp1", "idp2"},
-	})
-}
-
-func (s *idpsSuite) TestPostIDPS(c *gc.C) {
-	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
-		Handler: s.srv,
-		Method:  "POST",
-		URL:     fmt.Sprintf("/%s/idps/", version),
-		Header: http.Header{
-			"Content-Type": []string{"application/json"},
-		},
-		Username:     adminUsername,
-		Password:     adminPassword,
-		ExpectStatus: http.StatusBadRequest,
-		ExpectBody: params.Error{
-			Message: `unsupported method "POST"`,
-			Code:    params.ErrBadRequest,
-		},
 	})
 }
 

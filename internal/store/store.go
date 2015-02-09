@@ -80,10 +80,10 @@ func (s *Store) ensureIndexes() error {
 // ExternalID match the destination record. If the Identity clashes with an existing
 // Identity then an error is returned with the cause params.ErrAlreadyExists.
 func (s *Store) UpsertIdentity(doc *mongodoc.Identity) error {
-	doc.UUID = uuid.NewSHA1(IdentityNamespace, []byte(doc.UserName)).String()
+	doc.UUID = uuid.NewSHA1(IdentityNamespace, []byte(doc.Username)).String()
 	_, err := s.DB.Identities().Upsert(
 		bson.M{
-			"username":    doc.UserName,
+			"username":    doc.Username,
 			"external_id": doc.ExternalID,
 		},
 		doc,
@@ -95,6 +95,20 @@ func (s *Store) UpsertIdentity(doc *mongodoc.Identity) error {
 		return errgo.Mask(err)
 	}
 	return nil
+}
+
+// GetIdentity retrieves the identity with the given username. If the
+// identity does not exist an error is returned with a cause of
+// params.ErrNotFound.
+func (s *Store) GetIdentity(username params.Username) (*mongodoc.Identity, error) {
+	var id mongodoc.Identity
+	if err := s.DB.Identities().Find(bson.M{"username": username}).One(&id); err != nil {
+		if errgo.Cause(err) == mgo.ErrNotFound {
+			return nil, errgo.WithCausef(err, params.ErrNotFound, "user %q not found", username)
+		}
+		return nil, errgo.Mask(err)
+	}
+	return &id, nil
 }
 
 // StoreDatabase wraps an mgo.DB ands adds a few convenience methods.

@@ -5,18 +5,19 @@ package v1
 import (
 	"net/http"
 
+	"github.com/juju/httprequest"
 	"github.com/juju/utils/debugstatus"
 
 	"github.com/CanonicalLtd/blues-identity/version"
 )
 
 // GET /debug
-func (h *Handler) serveDebug(http.ResponseWriter, *http.Request) error {
+func (h *Handler) serveDebug(http.ResponseWriter, httprequest.Params) error {
 	return errNotImplemented
 }
 
 // GET /debug/status
-func (h *Handler) serveDebugStatus(_ http.Header, req *http.Request) (interface{}, error) {
+func (h *Handler) serveDebugStatus(http.Header, httprequest.Params) (interface{}, error) {
 	return debugstatus.Check(
 		debugstatus.ServerStartTime,
 		debugstatus.Connection(h.store.DB.Session),
@@ -25,6 +26,6 @@ func (h *Handler) serveDebugStatus(_ http.Header, req *http.Request) (interface{
 }
 
 // GET /debug/info .
-func (h *Handler) serveDebugInfo(_ http.Header, req *http.Request) (interface{}, error) {
+func (h *Handler) serveDebugInfo(http.Header, httprequest.Params) (interface{}, error) {
 	return version.VersionInfo, nil
 }

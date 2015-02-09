@@ -3,48 +3,38 @@
 package v1
 
 import (
-	"encoding/json"
 	"net/http"
-	"strings"
 
+	"github.com/juju/httprequest"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/mgo.v2"
 
 	"github.com/CanonicalLtd/blues-identity/internal/mongodoc"
+	"github.com/CanonicalLtd/blues-identity/internal/store"
 	"github.com/CanonicalLtd/blues-identity/params"
 )
 
-// serveIdentityProvider serves the /idps endpints. See http://tinyurl.com/oanmhy5 for
-// details.
-func (h *Handler) serveIdentityProviders(hdr http.Header, req *http.Request) (interface{}, error) {
-	switch req.Method {
-	case "GET":
-		p := strings.TrimPrefix(req.URL.Path, "/")
-		if p == "" {
-			return h.store.IdentityProviderNames()
-		}
-		return h.getIdentityProvider(p)
-	case "PUT":
-		var idp params.IdentityProvider
-		dec := json.NewDecoder(req.Body)
-		err := dec.Decode(&idp)
-		if err != nil {
-			return nil, errgo.WithCausef(err, params.ErrBadRequest, `invalid identity provider`)
-		}
-		return h.setIdentityProvider(&idp)
-	}
-	return nil, errgo.WithCausef(nil, params.ErrBadRequest, `unsupported method "%s"`, req.Method)
+type identityProvider struct {
+	Name string `httprequest:"idp,path"`
 }
 
-// getIdentityProvider retrieves the identity provider information from
-// the store and creates the response.
-func (h *Handler) getIdentityProvider(p string) (*params.IdentityProvider, error) {
-	doc, err := h.store.IdentityProvider(p)
-	if err != nil {
-		if errgo.Cause(err) == mgo.ErrNotFound {
-			return nil, errgo.WithCausef(nil, params.ErrNotFound, `cannot find identity provider "%v"`, p)
-		}
-		return nil, err
+func (i *identityProvider) get(s *store.Store, idp *mongodoc.IdentityProvider) error {
+	if err := s.DB.IdentityProviders().FindId(i.Name).One(&idp); err != nil {
+		return errgo.WithCausef(err, params.ErrNotFound, `cannot find identity provider "%v"`, i.Name)
+	}
+	return nil
+}
+
+// serveIdentityProvider serves the /idps endpints. See http://tinyurl.com/oanmhy5 for
+// details.
+func (h *Handler) serveIdentityProviders(hdr http.Header, p httprequest.Params) (interface{}, error) {
+	return h.store.IdentityProviderNames()
+}
+
+func (h *Handler) serveIdentityProvider(_ http.Header, _ httprequest.Params, i *identityProvider) (*params.IdentityProvider, error) {
+	var doc mongodoc.IdentityProvider
+	// At this point i.Name will have been populated from the request.
+	if err := i.get(h.store, &doc); err != nil {
+		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
 	idp := params.IdentityProvider{
 		Name:     doc.Name,
@@ -59,30 +49,48 @@ func (h *Handler) getIdentityProvider(p string) (*params.IdentityProvider, error
 	return &idp, nil
 }
 
-// setIdentityProvider stores the identity provider in idp in the store.
-func (h *Handler) setIdentityProvider(idp *params.IdentityProvider) (bool, error) {
-	switch idp.Protocol {
-	case params.ProtocolOpenID20:
-		if idp.Name == "" {
-			return false, errgo.WithCausef(nil, params.ErrBadRequest, "No name for identity provider")
-		}
-		var loginURL string
-		if data, ok := idp.Settings[params.OpenID20LoginURL]; ok {
-			loginURL, ok = data.(string)
-		}
-		if loginURL == "" {
-			return false, errgo.WithCausef(nil, params.ErrBadRequest, "%s not specified", params.OpenID20LoginURL)
-		}
-		doc := &mongodoc.IdentityProvider{
-			Name:     idp.Name,
-			Protocol: idp.Protocol,
-			LoginURL: loginURL,
-		}
-		if err := h.store.SetIdentityProvider(doc); err != nil {
-			return false, errgo.Notef(err, "cannot set identity provider")
-		}
-		return true, nil
-	default:
-		return false, errgo.WithCausef(nil, params.ErrBadRequest, `unsupported identity protocol "%v"`, idp.Protocol)
+type setIdentityProviderParams struct {
+	*params.IdentityProvider `httprequest:",body"`
+	Name                     string `httprequest:"idp,path"`
+}
+
+func (i *setIdentityProviderParams) set(s *store.Store, idp *mongodoc.IdentityProvider) error {
+	_, err := s.DB.IdentityProviders().UpsertId(i.Name, idp)
+	if err != nil {
+		return errgo.WithCausef(err, params.ErrNotFound, `cannot find identity provider "%v"`, i.Name)
 	}
+	return nil
+}
+
+func (h *Handler) servePutIdentityProvider(_ http.ResponseWriter, _ httprequest.Params, i *setIdentityProviderParams) error {
+	var doc mongodoc.IdentityProvider
+	if i.Name == "" {
+		return errgo.WithCausef(nil, params.ErrBadRequest, "no name for identity provider")
+	}
+	doc.Name = i.Name
+	switch i.Protocol {
+	case params.ProtocolOpenID20:
+		doc.Protocol = params.ProtocolOpenID20
+		if err := openid2IdentityProvider(&doc, i.IdentityProvider); err != nil {
+			return errgo.Mask(err, errgo.Is(params.ErrBadRequest))
+		}
+	default:
+		return errgo.WithCausef(nil, params.ErrBadRequest, `unsupported identity protocol "%v"`, i.IdentityProvider.Protocol)
+	}
+	if err := i.set(h.store, &doc); err != nil {
+		return errgo.Notef(err, "cannot set identity provider")
+	}
+	return nil
+}
+
+func openid2IdentityProvider(doc *mongodoc.IdentityProvider, idp *params.IdentityProvider) error {
+	var loginURL string
+	if data, ok := idp.Settings[params.OpenID20LoginURL]; ok {
+		loginURL, ok = data.(string)
+	}
+	if loginURL == "" {
+		return errgo.WithCausef(nil, params.ErrBadRequest, "%s not specified", params.OpenID20LoginURL)
+	}
+	doc.LoginURL = loginURL
+	return nil
 }
