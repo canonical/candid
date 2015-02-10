@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/juju/httprequest"
+	"github.com/julienschmidt/httprouter"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v0/bakery"
 	"gopkg.in/macaroon-bakery.v0/bakery/checkers"
@@ -17,7 +19,6 @@ import (
 	"gopkg.in/mgo.v2/bson"
 
 	"github.com/CanonicalLtd/blues-identity/internal/mongodoc"
-	"github.com/CanonicalLtd/blues-identity/internal/router"
 	"github.com/CanonicalLtd/blues-identity/params"
 )
 
@@ -72,7 +73,7 @@ func (h *Handler) checkAuthenticatedUser(username string) ([]checkers.Caveat, er
 	}
 	return []checkers.Caveat{
 		checkers.DeclaredCaveat("uuid", user.UUID),
-		checkers.DeclaredCaveat("username", user.UserName),
+		checkers.DeclaredCaveat("username", user.Username),
 		checkers.DeclaredCaveat("groups", strings.Join(user.Groups, " ")),
 		checkers.TimeBeforeCaveat(time.Now().Add(24 * time.Hour)),
 	}, nil
@@ -111,9 +112,9 @@ func (h *Handler) needLoginError(cavId, caveat string, why string) error {
 // loginCallbackHandler returns a handler which handles a callback
 // from the given id provider, calling idp.login to obtain information
 // on the request that was made.
-func (h *Handler) loginCallbackHandler(idp idProvider) http.Handler {
-	return router.HandleErrors(func(w http.ResponseWriter, req *http.Request) error {
-		return h.loginCallback(w, req, idp)
+func (h *Handler) loginCallbackHandler(idp idProvider) httprouter.Handle {
+	return handleErrors(func(w http.ResponseWriter, p httprequest.Params) error {
+		return h.loginCallback(w, p.Request, idp)
 	})
 }
 
@@ -164,7 +165,7 @@ func (h *Handler) loginCallback1(
 	}
 	// Create the user information if necessary.
 	if err := h.store.UpsertIdentity(&mongodoc.Identity{
-		UserName:   info.Nickname,
+		Username:   info.Nickname,
 		ExternalID: info.User,
 		Email:      info.Email,
 		FullName:   info.FullName,
@@ -193,16 +194,18 @@ func (h *Handler) loginCallback1(
 	return m, info, nil
 }
 
+type wait struct {
+	WaitID string `httprequest:"wait_id,form"`
+}
+
 // serveWait serves an HTTP endpoint that waits until a macaroon
 // has been discharged, and returns the discharge macaroon.
-func (h *Handler) serveWait(header http.Header, req *http.Request) (interface{}, error) {
-	req.ParseForm()
-	waitId := req.Form.Get("waitid")
-	if waitId == "" {
-		return nil, errgo.New("wait id parameter not found")
+func (h *Handler) serveWait(header http.Header, p httprequest.Params, w *wait) (*params.WaitResponse, error) {
+	if w.WaitID == "" {
+		return nil, errgo.WithCausef(nil, params.ErrBadRequest, "wait id parameter not found")
 	}
 	// TODO don't wait forever here.
-	caveat, login, err := h.place.Wait(waitId)
+	caveat, login, err := h.place.Wait(w.WaitID)
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot wait")
 	}
@@ -220,9 +223,9 @@ func (h *Handler) serveWait(header http.Header, req *http.Request) (interface{},
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot make cookie")
 	}
-	req.AddCookie(cookie)
+	p.AddCookie(cookie)
 	checker := bakery.ThirdPartyCheckerFunc(func(cavId, cav string) ([]checkers.Caveat, error) {
-		return h.checkThirdPartyCaveat(req, cavId, cav)
+		return h.checkThirdPartyCaveat(p.Request, cavId, cav)
 	})
 	m, err := h.svc.Discharge(checker, caveat.CaveatId)
 	if err != nil {
@@ -240,7 +243,7 @@ func (h *Handler) serveWait(header http.Header, req *http.Request) (interface{},
 	// request).
 	header.Add("Set-Cookie", cookie.String())
 
-	return params.WaitResponse{
+	return &params.WaitResponse{
 		Macaroon: m,
 	}, nil
 }

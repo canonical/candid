@@ -1,29 +1,31 @@
 // Copyright 2014 Canonical Ltd.
 
-package router_test
+package v1_test
 
 import (
 	"net/http"
 
+	"github.com/juju/httprequest"
 	jujutesting "github.com/juju/testing"
 	"github.com/juju/testing/httptesting"
+	"github.com/julienschmidt/httprouter"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
 
-	"github.com/CanonicalLtd/blues-identity/internal/router"
+	"github.com/CanonicalLtd/blues-identity/internal/v1"
 	"github.com/CanonicalLtd/blues-identity/params"
 )
 
 type jsonSuite struct {
 	jujutesting.IsolationSuite
-	mux *http.ServeMux
+	mux *httprouter.Router
 }
 
 var _ = gc.Suite(&jsonSuite{})
 
 func (s *jsonSuite) SetUpTest(c *gc.C) {
 	s.IsolationSuite.SetUpTest(c)
-	s.mux = http.NewServeMux()
+	s.mux = httprouter.New()
 }
 
 func (s *jsonSuite) TestHandleErrors(c *gc.C) {
@@ -33,8 +35,8 @@ func (s *jsonSuite) TestHandleErrors(c *gc.C) {
 		http.StatusBadRequest:   params.ErrBadRequest,
 		http.StatusUnauthorized: params.ErrUnauthorized,
 	} {
-		mux := http.NewServeMux()
-		mux.Handle("/error/", router.HandleErrors(func(http.ResponseWriter, *http.Request) error {
+		mux := httprouter.New()
+		mux.Handle("GET", "/error/", v1.HandleErrors(func(http.ResponseWriter, httprequest.Params) error {
 			return errgo.WithCausef(nil, paramsErr, "bad wolf")
 		}))
 		httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
@@ -50,7 +52,7 @@ func (s *jsonSuite) TestHandleErrors(c *gc.C) {
 }
 
 func (s *jsonSuite) TestHandleErrorsInternalServerError(c *gc.C) {
-	s.mux.Handle("/error/", router.HandleErrors(func(http.ResponseWriter, *http.Request) error {
+	s.mux.Handle("GET", "/error/", v1.HandleErrors(func(http.ResponseWriter, httprequest.Params) error {
 		return errgo.New("bad wolf")
 	}))
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
@@ -64,7 +66,7 @@ func (s *jsonSuite) TestHandleErrorsInternalServerError(c *gc.C) {
 }
 
 func (s *jsonSuite) TestHandleErrorsSuccess(c *gc.C) {
-	s.mux.Handle("/valid/", router.HandleErrors(func(http.ResponseWriter, *http.Request) error {
+	s.mux.Handle("GET", "/valid/", v1.HandleErrors(func(http.ResponseWriter, httprequest.Params) error {
 		return nil
 	}))
 
@@ -77,10 +79,10 @@ func (s *jsonSuite) TestHandleErrorsSuccess(c *gc.C) {
 
 func (s *jsonSuite) TestHandleJSON(c *gc.C) {
 	// Set up server paths.
-	s.mux.Handle("/bad-request/", router.HandleJSON(func(http.Header, *http.Request) (interface{}, error) {
+	s.mux.Handle("GET", "/bad-request/", v1.HandleJSON(func(http.Header, httprequest.Params) (interface{}, error) {
 		return nil, errgo.WithCausef(nil, params.ErrBadRequest, "bad wolf")
 	}))
-	s.mux.Handle("/valid/", router.HandleJSON(func(http.Header, *http.Request) (interface{}, error) {
+	s.mux.Handle("GET", "/valid/", v1.HandleJSON(func(http.Header, httprequest.Params) (interface{}, error) {
 		return "success", nil
 	}))
 
@@ -100,18 +102,5 @@ func (s *jsonSuite) TestHandleJSON(c *gc.C) {
 		Handler:    s.mux,
 		URL:        "/valid/",
 		ExpectBody: "success",
-	})
-}
-
-func (s *jsonSuite) TestNotFoundHandler(c *gc.C) {
-	s.mux.Handle("/no-such/", router.NotFoundHandler())
-	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
-		Handler:      s.mux,
-		URL:          "/no-such/",
-		ExpectStatus: http.StatusNotFound,
-		ExpectBody: params.Error{
-			Message: params.ErrNotFound.Error(),
-			Code:    params.ErrNotFound,
-		},
 	})
 }

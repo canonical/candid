@@ -27,7 +27,7 @@ var _ = gc.Suite(&usersSuite{})
 
 func (s *usersSuite) TestUser(c *gc.C) {
 	s.createUser(c, &params.User{
-		UserName:   "jbloggs2",
+		Username:   "jbloggs2",
 		ExternalID: "http://example.com/jbloggs2",
 		Email:      "jbloggs2@example.com",
 		FullName:   "Joe Bloggs II",
@@ -36,7 +36,7 @@ func (s *usersSuite) TestUser(c *gc.C) {
 		},
 	})
 	s.createUser(c, &params.User{
-		UserName:   "jbloggs3",
+		Username:   "jbloggs3",
 		ExternalID: "http://example.com/jbloggs3",
 		Email:      "jbloggs3@example.com",
 		FullName:   "Joe Bloggs III",
@@ -58,7 +58,7 @@ func (s *usersSuite) TestUser(c *gc.C) {
 		url:    apiURL("u/jbloggs"),
 		method: "PUT",
 		body: marshal(c, params.User{
-			UserName:   "jbloggs",
+			Username:   "jbloggs",
 			ExternalID: "http://example.com/jbloggs",
 			Email:      "jbloggs@example.com",
 			FullName:   "Joe Bloggs",
@@ -69,21 +69,12 @@ func (s *usersSuite) TestUser(c *gc.C) {
 		username:     adminUsername,
 		password:     adminPassword,
 		expectStatus: http.StatusOK,
-		expectBody: params.User{
-			UserName:   "jbloggs",
-			ExternalID: "http://example.com/jbloggs",
-			Email:      "jbloggs@example.com",
-			FullName:   "Joe Bloggs",
-			IDPGroups: []string{
-				"test",
-			},
-		},
 	}, {
 		about:  "update existing user",
 		url:    apiURL("u/jbloggs2"),
 		method: "PUT",
 		body: marshal(c, params.User{
-			UserName:   "jbloggs2",
+			Username:   "jbloggs2",
 			ExternalID: "http://example.com/jbloggs2",
 			Email:      "jbloggs2@example.com",
 			FullName:   "Joe Bloggs II",
@@ -95,22 +86,12 @@ func (s *usersSuite) TestUser(c *gc.C) {
 		username:     adminUsername,
 		password:     adminPassword,
 		expectStatus: http.StatusOK,
-		expectBody: params.User{
-			UserName:   "jbloggs2",
-			ExternalID: "http://example.com/jbloggs2",
-			Email:      "jbloggs2@example.com",
-			FullName:   "Joe Bloggs II",
-			IDPGroups: []string{
-				"test",
-				"test2",
-			},
-		},
 	}, {
 		about:  "update existing username with different user",
 		url:    apiURL("u/jbloggs2"),
 		method: "PUT",
 		body: marshal(c, params.User{
-			UserName:   "jbloggs2",
+			Username:   "jbloggs2",
 			ExternalID: "http://example.com/joe.bloggs2",
 			Email:      "jbloggs2@example.com",
 			FullName:   "Joe Bloggs II",
@@ -131,7 +112,7 @@ func (s *usersSuite) TestUser(c *gc.C) {
 		url:    apiURL("u/jbloggs5"),
 		method: "PUT",
 		body: marshal(c, params.User{
-			UserName:   "jbloggs5",
+			Username:   "jbloggs5",
 			ExternalID: "http://example.com/jbloggs2",
 			Email:      "jbloggs5@example.com",
 			FullName:   "Joe Bloggs V",
@@ -154,7 +135,7 @@ func (s *usersSuite) TestUser(c *gc.C) {
 		password:     adminPassword,
 		expectStatus: http.StatusOK,
 		expectBody: params.User{
-			UserName:   "jbloggs3",
+			Username:   "jbloggs3",
 			ExternalID: "http://example.com/jbloggs3",
 			Email:      "jbloggs3@example.com",
 			FullName:   "Joe Bloggs III",
@@ -179,10 +160,10 @@ func (s *usersSuite) TestUser(c *gc.C) {
 		method:       "GET",
 		username:     adminUsername,
 		password:     adminPassword,
-		expectStatus: http.StatusNotFound,
+		expectStatus: http.StatusBadRequest,
 		expectBody: params.Error{
-			Code:    "not found",
-			Message: `user "" not found: not found`,
+			Code:    params.ErrBadRequest,
+			Message: `cannot unmarshal parameters: cannot unmarshal into field: illegal username ""`,
 		},
 	}, {
 		about:    "unsupported method",
@@ -191,7 +172,7 @@ func (s *usersSuite) TestUser(c *gc.C) {
 		username: adminUsername,
 		password: adminPassword,
 		body: marshal(c, params.User{
-			UserName:   "jbloggs",
+			Username:   "jbloggs",
 			ExternalID: "http://example.com/jbloggs",
 			Email:      "jbloggs@example.com",
 			FullName:   "Joe Bloggs",
@@ -199,10 +180,10 @@ func (s *usersSuite) TestUser(c *gc.C) {
 				"test",
 			},
 		}),
-		expectStatus: http.StatusBadRequest,
+		expectStatus: http.StatusNotFound,
 		expectBody: params.Error{
-			Code:    "bad request",
-			Message: "unsupported method \"POST\"",
+			Code:    "not found",
+			Message: "not found: /u/jbloggs (POST)",
 		},
 	}, {
 		about:    "put no userid",
@@ -211,7 +192,7 @@ func (s *usersSuite) TestUser(c *gc.C) {
 		username: adminUsername,
 		password: adminPassword,
 		body: marshal(c, params.User{
-			UserName:   "jbloggs",
+			Username:   "jbloggs",
 			ExternalID: "http://example.com/jbloggs",
 			Email:      "jbloggs@example.com",
 			FullName:   "Joe Bloggs",
@@ -219,10 +200,10 @@ func (s *usersSuite) TestUser(c *gc.C) {
 				"test",
 			},
 		}),
-		expectStatus: http.StatusBadRequest,
+		expectStatus: http.StatusNotFound,
 		expectBody: params.Error{
-			Code:    "bad request",
-			Message: "illegal username: \"\"",
+			Code:    "not found",
+			Message: "not found: /u/ (PUT)",
 		},
 	}, {
 		about:    "put userid mismatch",
@@ -231,7 +212,7 @@ func (s *usersSuite) TestUser(c *gc.C) {
 		username: adminUsername,
 		password: adminPassword,
 		body: marshal(c, params.User{
-			UserName:   "jbloggs",
+			Username:   "jbloggs",
 			ExternalID: "http://example.com/jbloggs6",
 			Email:      "jbloggs6@example.com",
 			FullName:   "Joe Bloggs VI",
@@ -240,15 +221,6 @@ func (s *usersSuite) TestUser(c *gc.C) {
 			},
 		}),
 		expectStatus: http.StatusOK,
-		expectBody: params.User{
-			UserName:   "jbloggs6",
-			ExternalID: "http://example.com/jbloggs6",
-			Email:      "jbloggs6@example.com",
-			FullName:   "Joe Bloggs VI",
-			IDPGroups: []string{
-				"test6",
-			},
-		},
 	}, {
 		about:        "bad json",
 		url:          apiURL("u/jbloggs2"),
@@ -259,7 +231,7 @@ func (s *usersSuite) TestUser(c *gc.C) {
 		expectStatus: http.StatusBadRequest,
 		expectBody: params.Error{
 			Code:    "bad request",
-			Message: "invalid JSON data: invalid character 'i' looking for beginning of value",
+			Message: "cannot unmarshal parameters: cannot unmarshal into field: cannot unmarshal request body: invalid character 'i' looking for beginning of value",
 		},
 	}, {
 		about:    "incorrect username",
@@ -268,7 +240,7 @@ func (s *usersSuite) TestUser(c *gc.C) {
 		username: "bad user",
 		password: adminPassword,
 		body: marshal(c, params.User{
-			UserName:   "jbloggs",
+			Username:   "jbloggs",
 			ExternalID: "http://example.com/jbloggs",
 			Email:      "jbloggs@example.com",
 			FullName:   "Joe Bloggs",
@@ -288,7 +260,7 @@ func (s *usersSuite) TestUser(c *gc.C) {
 		username: adminUsername,
 		password: "bad password",
 		body: marshal(c, params.User{
-			UserName:   "jbloggs",
+			Username:   "jbloggs",
 			ExternalID: "http://example.com/jbloggs",
 			Email:      "jbloggs@example.com",
 			FullName:   "Joe Bloggs",
@@ -306,7 +278,7 @@ func (s *usersSuite) TestUser(c *gc.C) {
 		url:    apiURL("u/jbloggs2"),
 		method: "PUT",
 		body: marshal(c, params.User{
-			UserName:   "jbloggs",
+			Username:   "jbloggs",
 			ExternalID: "http://example.com/jbloggs",
 			Email:      "jbloggs@example.com",
 			FullName:   "Joe Bloggs",
@@ -336,7 +308,7 @@ func (s *usersSuite) TestUser(c *gc.C) {
 		expectStatus: http.StatusBadRequest,
 		expectBody: params.Error{
 			Code:    "bad request",
-			Message: `illegal username: "jbloggs{}"`,
+			Message: `cannot unmarshal parameters: cannot unmarshal into field: illegal username "jbloggs{}"`,
 		},
 	}, {
 		about:  "long username",
@@ -355,7 +327,7 @@ func (s *usersSuite) TestUser(c *gc.C) {
 		expectStatus: http.StatusBadRequest,
 		expectBody: params.Error{
 			Code:    "bad request",
-			Message: `username longer than 256 characters`,
+			Message: `cannot unmarshal parameters: cannot unmarshal into field: username longer than 256 characters`,
 		},
 	}, {
 		about:  "invalid subpath",
@@ -374,7 +346,7 @@ func (s *usersSuite) TestUser(c *gc.C) {
 		expectStatus: http.StatusNotFound,
 		expectBody: params.Error{
 			Code:    "not found",
-			Message: `/notthere not found`,
+			Message: `not found: /u/jbloggs2/notthere (GET)`,
 		},
 	}, {
 		about:  "no external_id",
@@ -411,7 +383,7 @@ func (s *usersSuite) TestUser(c *gc.C) {
 		expectStatus: http.StatusForbidden,
 		expectBody: params.Error{
 			Code:    "forbidden",
-			Message: `username reserved: everyone`,
+			Message: `username "everyone" is reserved`,
 		},
 	}}
 	for i, test := range tests {
@@ -441,7 +413,7 @@ func (s *usersSuite) TestCreateUserWritesToDatabase(c *gc.C) {
 			"Content-Type": []string{"application/json"},
 		},
 		Body: marshal(c, params.User{
-			UserName:   "jbloggs",
+			Username:   "jbloggs",
 			ExternalID: "http://example.com/jbloggs",
 			Email:      "jbloggs@example.com",
 			FullName:   "Joe Bloggs",
@@ -452,20 +424,11 @@ func (s *usersSuite) TestCreateUserWritesToDatabase(c *gc.C) {
 		Username:     adminUsername,
 		Password:     adminPassword,
 		ExpectStatus: http.StatusOK,
-		ExpectBody: params.User{
-			UserName:   "jbloggs",
-			ExternalID: "http://example.com/jbloggs",
-			Email:      "jbloggs@example.com",
-			FullName:   "Joe Bloggs",
-			IDPGroups: []string{
-				"test",
-			},
-		},
 	})
 	var doc mongodoc.Identity
 	err := s.store.DB.Identities().Find(nil).One(&doc)
 	c.Assert(err, gc.IsNil)
-	c.Assert(doc.UserName, gc.Equals, "jbloggs")
+	c.Assert(doc.Username, gc.Equals, "jbloggs")
 	c.Assert(doc.ExternalID, gc.Equals, "http://example.com/jbloggs")
 	c.Assert(doc.Email, gc.Equals, "jbloggs@example.com")
 	c.Assert(doc.FullName, gc.Equals, "Joe Bloggs")
@@ -474,7 +437,7 @@ func (s *usersSuite) TestCreateUserWritesToDatabase(c *gc.C) {
 
 func (s *usersSuite) TestQueryUsers(c *gc.C) {
 	s.createUser(c, &params.User{
-		UserName:   "jbloggs2",
+		Username:   "jbloggs2",
 		ExternalID: "http://example.com/jbloggs2",
 		Email:      "jbloggs2@example.com",
 		FullName:   "Joe Bloggs II",
@@ -526,10 +489,10 @@ func (s *usersSuite) TestQueryUsers(c *gc.C) {
 		body:         nil,
 		username:     adminUsername,
 		password:     adminPassword,
-		expectStatus: http.StatusBadRequest,
+		expectStatus: http.StatusNotFound,
 		expectBody: params.Error{
-			Code:    "bad request",
-			Message: "unsupported method \"DELETE\"",
+			Code:    "not found",
+			Message: "not found: /u (DELETE)",
 		},
 	}, {
 		about:    "incorrect username",
@@ -538,7 +501,7 @@ func (s *usersSuite) TestQueryUsers(c *gc.C) {
 		username: "bad user",
 		password: adminPassword,
 		body: marshal(c, params.User{
-			UserName:   "jbloggs",
+			Username:   "jbloggs",
 			ExternalID: "http://example.com/jbloggs",
 			Email:      "jbloggs@example.com",
 			FullName:   "Joe Bloggs",
@@ -558,7 +521,7 @@ func (s *usersSuite) TestQueryUsers(c *gc.C) {
 		username: adminUsername,
 		password: "bad password",
 		body: marshal(c, params.User{
-			UserName:   "jbloggs",
+			Username:   "jbloggs",
 			ExternalID: "http://example.com/jbloggs",
 			Email:      "jbloggs@example.com",
 			FullName:   "Joe Bloggs",
@@ -576,7 +539,7 @@ func (s *usersSuite) TestQueryUsers(c *gc.C) {
 		url:    apiURL("u?external_id=http://example.com/jbloggs2"),
 		method: "GET",
 		body: marshal(c, params.User{
-			UserName:   "jbloggs",
+			Username:   "jbloggs",
 			ExternalID: "http://example.com/jbloggs",
 			Email:      "jbloggs@example.com",
 			FullName:   "Joe Bloggs",
@@ -610,7 +573,7 @@ func (s *usersSuite) TestQueryUsers(c *gc.C) {
 
 func (s *usersSuite) TestUserToken(c *gc.C) {
 	s.createUser(c, &params.User{
-		UserName:   "jbloggs",
+		Username:   "jbloggs",
 		ExternalID: "http://example.com/jbloggs",
 		Email:      "jbloggs@example.com",
 		FullName:   "Joe Bloggs",
@@ -672,7 +635,7 @@ func (s *usersSuite) TestUserToken(c *gc.C) {
 
 func (s *usersSuite) TestVerifyUserToken(c *gc.C) {
 	s.createUser(c, &params.User{
-		UserName:   "jbloggs",
+		Username:   "jbloggs",
 		ExternalID: "http://example.com/jbloggs",
 		Email:      "jbloggs@example.com",
 		FullName:   "Joe Bloggs",
@@ -723,14 +686,14 @@ func (s *usersSuite) TestVerifyUserToken(c *gc.C) {
 
 func (s *usersSuite) TestUserIDPGroups(c *gc.C) {
 	s.createUser(c, &params.User{
-		UserName:   "test",
+		Username:   "test",
 		ExternalID: "http://example.com/test",
 		Email:      "test@example.com",
 		FullName:   "Test User",
 		IDPGroups:  []string{},
 	})
 	s.createUser(c, &params.User{
-		UserName:   "test2",
+		Username:   "test2",
 		ExternalID: "http://example.com/test2",
 		Email:      "test2@example.com",
 		FullName:   "Test User II",
@@ -739,7 +702,7 @@ func (s *usersSuite) TestUserIDPGroups(c *gc.C) {
 		},
 	})
 	s.createUser(c, &params.User{
-		UserName:   "test3",
+		Username:   "test3",
 		ExternalID: "http://example.com/test3",
 		Email:      "test3@example.com",
 		FullName:   "Test User III",
@@ -803,7 +766,7 @@ func (s *usersSuite) TestUserIDPGroups(c *gc.C) {
 func (s *usersSuite) createUser(c *gc.C, user *params.User) {
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Handler: s.srv,
-		URL:     apiURL("u/" + user.UserName),
+		URL:     apiURL("u/" + string(user.Username)),
 		Method:  "PUT",
 		Header: http.Header{
 			"Content-Type": []string{"application/json"},
@@ -812,7 +775,6 @@ func (s *usersSuite) createUser(c *gc.C, user *params.User) {
 		Username:     adminUsername,
 		Password:     adminPassword,
 		ExpectStatus: http.StatusOK,
-		ExpectBody:   user,
 	})
 }
 

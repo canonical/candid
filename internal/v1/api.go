@@ -7,16 +7,27 @@ import (
 
 	"github.com/juju/httpprof"
 	"github.com/juju/loggo"
+	"github.com/julienschmidt/httprouter"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v0/bakery"
 	"gopkg.in/macaroon-bakery.v0/httpbakery"
 
-	"github.com/CanonicalLtd/blues-identity/internal/router"
 	"github.com/CanonicalLtd/blues-identity/internal/server"
 	"github.com/CanonicalLtd/blues-identity/internal/store"
+	"github.com/CanonicalLtd/blues-identity/params"
 )
 
 var logger = loggo.GetLogger("identity.internal.v1")
+
+// Handler handles the /v1 api requests. Handler implements http.Handler
+type Handler struct {
+	r        *httprouter.Router
+	store    *store.Store
+	svc      *bakery.Service
+	place    *place
+	provider idProvider
+	auth     *server.Authorizer
+}
 
 // NewAPIHandler returns a new Handler as an http Handler.
 // It is defined for the convenience of callers that require a
@@ -28,80 +39,47 @@ func NewAPIHandler(s *store.Store, auth *server.Authorizer, svc *bakery.Service)
 // New returns a new instance of the v1 API handler.
 func New(s *store.Store, auth *server.Authorizer, svc *bakery.Service) *Handler {
 	h := &Handler{
+		r:        httprouter.New(),
 		store:    s,
 		svc:      svc,
 		place:    &place{s.Place},
 		provider: newUSSOProvider(),
 		auth:     auth,
 	}
+	h.r.NotFound = NotFound
+	// setting HandleMethodNotAllowed to false stops httprouter.Router from
+	// attempting to determine if the wrong method is being used in the
+	// request and returning a different, internally generated, error.
+	h.r.HandleMethodNotAllowed = false
 	mux := http.NewServeMux()
-	httpbakery.AddDischargeHandler(mux, "/", svc, h.checkThirdPartyCaveat)
-	h.Router = router.New(map[string]http.Handler{
-		"debug":      router.HandleErrors(h.serveDebug),
-		"debug/info": router.HandleJSON(h.serveDebugInfo),
-		"debug/pprof/": router.AuthorizingHandler{
-			CheckAuthorized: auth.CheckAdminCredentials,
-			Handler:         pprof.IndexAtRoot("/"),
-		},
-		"debug/pprof/cmdline": router.AuthorizingHandler{
-			CheckAuthorized: auth.CheckAdminCredentials,
-			Handler:         http.HandlerFunc(pprof.Cmdline),
-		},
-		"debug/pprof/profile": router.AuthorizingHandler{
-			CheckAuthorized: auth.CheckAdminCredentials,
-			Handler:         http.HandlerFunc(pprof.Profile),
-		},
-		"debug/pprof/symbol": router.AuthorizingHandler{
-			CheckAuthorized: auth.CheckAdminCredentials,
-			Handler:         http.HandlerFunc(pprof.Symbol),
-		},
-		"debug/status":      router.HandleJSON(h.serveDebugStatus),
-		"discharger/":       mux,
-		"idp/usso/callback": h.loginCallbackHandler(h.provider),
-		"idps/": router.AuthorizingHandler{
-			CheckAuthorized: router.Any(
-				router.HasMethod("GET"),
-				auth.CheckAdminCredentials,
-			),
-			Handler: router.HandleJSON(h.serveIdentityProviders),
-		},
-		// /u is used to provide facilities to search the identity database.
-		"u": router.AuthorizingHandler{
-			CheckAuthorized: router.CheckAll(
-				router.HasMethod("GET"),
-				auth.CheckAdminCredentials,
-			),
-			Handler: router.HandleJSON(h.serveQueryUsers),
-		},
-		// /u/... provides access to update and query the identity database.
-		"u/": router.AuthorizingHandler{
-			CheckAuthorized: auth.CheckAdminCredentials,
-			Handler: router.StorePathComponent(
-				"Username",
-				router.New(map[string]http.Handler{
-					"":          router.HandleJSON(h.serveUser),
-					"idpgroups": router.HandleJSON(h.serveUserGroups),
-					"macaroon":  router.HandleJSON(h.serveUserToken),
-				}),
-			),
-		},
-		"wait":   router.HandleJSON(h.serveWait),
-		"verify": router.HandleJSON(h.serveVerifyToken),
-	})
+	const dischargePath = "/discharger"
+	httpbakery.AddDischargeHandler(mux, dischargePath, svc, h.checkThirdPartyCaveat)
+	h.r.GET("/debug", handleErrors(h.serveDebug))
+	h.r.GET("/debug/info", handleJSON(h.serveDebugInfo))
+	h.r.GET("/debug/pprof", h.adminRequiredHandler(pprof.IndexAtRoot("/debug/pprof")))
+	h.r.GET("/debug/pprof/cmdline", h.adminRequiredHandler(http.HandlerFunc(pprof.Cmdline)))
+	h.r.GET("/debug/pprof/profile", h.adminRequiredHandler(http.HandlerFunc(pprof.Profile)))
+	h.r.GET("/debug/pprof/symbol", h.adminRequiredHandler(http.HandlerFunc(pprof.Symbol)))
+	h.r.GET("/debug/status", handleJSON(h.serveDebugStatus))
+	h.r.Handler("GET", dischargePath+"/*path", mux)
+	h.r.Handler("POST", dischargePath+"/*path", mux)
+	h.r.GET("/idp/usso/callback", h.loginCallbackHandler(h.provider))
+	h.r.GET("/idps", handleJSON(h.serveIdentityProviders))
+	h.r.GET("/idps/:idp", handle(h.serveIdentityProvider))
+	h.r.PUT("/idps/:idp", h.adminRequired(handle(h.servePutIdentityProvider)))
+	h.r.GET("/u", h.adminRequired(handle(h.serveQueryUsers)))
+	h.r.GET("/u/", h.adminRequired(handle(h.serveUser)))
+	h.r.GET("/u/:username", h.adminRequired(handle(h.serveUser)))
+	h.r.PUT("/u/:username", h.adminRequired(handle(h.servePutUser)))
+	h.r.GET("/u/:username/idpgroups", h.adminRequired(handle(h.serveUserGroups)))
+	h.r.GET("/u/:username/macaroon", h.adminRequired(handle(h.serveUserToken)))
+	h.r.GET("/wait", handle(h.serveWait))
+	h.r.POST("/verify", handle(h.serveVerifyToken))
 	return h
 }
 
-type Handler struct {
-	*router.Router
-	store    *store.Store
-	svc      *bakery.Service
-	place    *place
-	provider idProvider
-	auth     *server.Authorizer
-}
-
 func (h *Handler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	h.Router.ServeHTTP(w, req)
+	h.r.ServeHTTP(w, req)
 }
 
 var errNotImplemented = errgo.Newf("method not implemented")
@@ -120,4 +98,30 @@ type idProvider interface {
 
 func (h *Handler) idProviderBaseURL() string {
 	return h.svc.Location() + "/v1/idp/usso/callback"
+}
+
+func (h *Handler) adminRequired(f httprouter.Handle) httprouter.Handle {
+	return func(w http.ResponseWriter, req *http.Request, p httprouter.Params) {
+		if err := h.auth.CheckAdminCredentials(req); err != nil {
+			writeError(w, err)
+			return
+		}
+		f(w, req, p)
+	}
+}
+
+func (h *Handler) adminRequiredHandler(handler http.Handler) httprouter.Handle {
+	return func(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+		if err := h.auth.CheckAdminCredentials(req); err != nil {
+			writeError(w, err)
+			return
+		}
+		handler.ServeHTTP(w, req)
+	}
+}
+
+// NotFound is the handler that is called when a handler cannot be found for the requested
+// endpoint.
+func NotFound(w http.ResponseWriter, req *http.Request) {
+	writeError(w, errgo.WithCausef(nil, params.ErrNotFound, "not found: %s (%s)", req.URL.Path, req.Method))
 }

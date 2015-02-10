@@ -104,7 +104,7 @@ func (s *apiSuite) assertMacaroon(c *gc.C, ms macaroon.Slice, check bakery.First
 func (s *apiSuite) createUser(c *gc.C, user *params.User) (uuid string) {
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Handler: s.srv,
-		URL:     apiURL("u/" + user.UserName),
+		URL:     apiURL("u/" + string(user.Username)),
 		Method:  "PUT",
 		Header: http.Header{
 			"Content-Type": []string{"application/json"},
@@ -113,13 +113,12 @@ func (s *apiSuite) createUser(c *gc.C, user *params.User) (uuid string) {
 		Username:     adminUsername,
 		Password:     adminPassword,
 		ExpectStatus: http.StatusOK,
-		ExpectBody:   user,
 	})
 
 	// Retrieve and return the newly created user's UUID.
 	var id mongodoc.Identity
 	err := s.store.DB.Identities().Find(
-		bson.D{{"username", user.UserName}},
+		bson.D{{"username", user.Username}},
 	).Select(bson.D{{"baseurl", 1}}).One(&id)
 	c.Assert(err, gc.IsNil)
 	return id.UUID

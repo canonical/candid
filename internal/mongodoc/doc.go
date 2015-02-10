@@ -14,9 +14,9 @@ type Identity struct {
 	// inadvertently when updating other fields in an Identity document.
 	UUID string `bson:"_id,omitempty"`
 
-	// UserName holds the unique name for the user of the system, which is
+	// Username holds the unique name for the user of the system, which is
 	// associated to the URL accessed through jaas.io/u/username.
-	UserName string
+	Username string
 
 	// ExternalID holds a globally unique name for the user.
 	ExternalID string `bson:"external_id"`
