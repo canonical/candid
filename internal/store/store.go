@@ -111,6 +111,19 @@ func (s *Store) GetIdentity(username params.Username) (*mongodoc.Identity, error
 	return &id, nil
 }
 
+// UpdateIdentity updates the identity with the given username. If the
+// identity does not exist an error is returned with a cause of
+// params.ErrNotFound.
+func (s *Store) UpdateIdentity(username params.Username, update bson.D) error {
+	if err := s.DB.Identities().Update(bson.D{{"username", username}}, update); err != nil {
+		if errgo.Cause(err) == mgo.ErrNotFound {
+			return errgo.WithCausef(err, params.ErrNotFound, "user %q not found", username)
+		}
+		return errgo.Mask(err)
+	}
+	return nil
+}
+
 // StoreDatabase wraps an mgo.DB ands adds a few convenience methods.
 type StoreDatabase struct {
 	*mgo.Database

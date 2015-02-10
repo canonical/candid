@@ -29,6 +29,10 @@ type Identity struct {
 
 	// Groups holds a list of group names to which the user belongs.
 	Groups []string
+
+	// ExtraInfo holds additional information about the user that
+	// is required by other parts of the system.
+	ExtraInfo map[string][]byte `bson:",omitempty" json:",omitempty"`
 }
 
 // IdentityProvider holds the in-database representation of the an identity provider in the
