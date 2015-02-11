@@ -3,13 +3,16 @@
 package v1
 
 import (
+	"encoding/json"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/juju/httprequest"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v0/bakery/checkers"
 	"gopkg.in/macaroon.v1"
+	"gopkg.in/mgo.v2/bson"
 
 	"github.com/CanonicalLtd/blues-identity/internal/mongodoc"
 	"github.com/CanonicalLtd/blues-identity/params"
@@ -124,4 +127,84 @@ func (h *Handler) serveVerifyToken(_ http.Header, _ httprequest.Params, p *verif
 		return nil, errgo.WithCausef(err, params.ErrForbidden, `verification failure`)
 	}
 	return d, nil
+}
+
+//serverUserExtraInfo serves the /u/:username/extra-info endpoint, see
+//http://tinyurl.com/mxo24yy for details.
+func (h *Handler) serveUserExtraInfo(_ http.Header, _ httprequest.Params, p *usernameParam) (map[string]*json.RawMessage, error) {
+	id, err := h.store.GetIdentity(p.Username)
+	if err != nil {
+		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	}
+	res := make(map[string]*json.RawMessage, len(id.ExtraInfo))
+	for k, v := range id.ExtraInfo {
+		jmsg := json.RawMessage(v)
+		res[k] = &jmsg
+	}
+	return res, nil
+}
+
+type putExtraInfoParams struct {
+	usernameParam
+	ExtraInfo map[string]json.RawMessage `httprequest:",body"`
+}
+
+// serverUserPutExtraInfo serves the /u/:username/extra-info endpoint, see
+// http://tinyurl.com/mqpynlw for details.
+func (h *Handler) serveUserPutExtraInfo(_ http.ResponseWriter, _ httprequest.Params, p *putExtraInfoParams) error {
+	ei := make(bson.D, 0, len(p.ExtraInfo))
+	for k, v := range p.ExtraInfo {
+		if err := checkExtraInfoKey(k); err != nil {
+			return errgo.Mask(err, errgo.Is(params.ErrBadRequest))
+		}
+		ei = append(ei, bson.DocElem{"extrainfo." + k, v})
+	}
+	err := h.store.UpdateIdentity(p.Username, bson.D{{"$set", ei}})
+	if err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	}
+	return nil
+}
+
+type extraInfoItemParams struct {
+	usernameParam
+	Item string `httprequest:"item,path"`
+}
+
+// serverUserExtraInfoItem serves the /u/:username/extra-info/:item
+// endpoint, see http://tinyurl.com/mjuu7dt for details.
+func (h *Handler) serveUserExtraInfoItem(_ http.Header, _ httprequest.Params, p *extraInfoItemParams) (*json.RawMessage, error) {
+	id, err := h.store.GetIdentity(p.Username)
+	if err != nil {
+		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	}
+	var res json.RawMessage = id.ExtraInfo[p.Item]
+	return &res, nil
+}
+
+type putExtraInfoItemParams struct {
+	extraInfoItemParams
+	Data json.RawMessage `httprequest:",body"`
+}
+
+// serverUserPutExtraInfoItem serves the /u/:username/extra-info/:item
+// endpoint, see http://tinyurl.com/l5dc4r4 for details.
+func (h *Handler) serveUserPutExtraInfoItem(_ http.ResponseWriter, _ httprequest.Params, p *putExtraInfoItemParams) error {
+	if err := checkExtraInfoKey(p.Item); err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrBadRequest))
+	}
+	err := h.store.UpdateIdentity(p.Username, bson.D{{"$set", bson.D{
+		{"extrainfo." + p.Item, p.Data},
+	}}})
+	if err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	}
+	return nil
+}
+
+func checkExtraInfoKey(key string) error {
+	if strings.ContainsAny(key, "./$") {
+		return errgo.WithCausef(nil, params.ErrBadRequest, "%q bad key for extra-info", key)
+	}
+	return nil
 }

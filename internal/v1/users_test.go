@@ -14,6 +14,7 @@ import (
 	gc "gopkg.in/check.v1"
 	"gopkg.in/macaroon-bakery.v0/bakery/checkers"
 	"gopkg.in/macaroon.v1"
+	"gopkg.in/mgo.v2/bson"
 
 	"github.com/CanonicalLtd/blues-identity/internal/mongodoc"
 	"github.com/CanonicalLtd/blues-identity/params"
@@ -790,4 +791,214 @@ func (s *usersSuite) getToken(c *gc.C, un string) *macaroon.Macaroon {
 	err := json.Unmarshal(resp.Body.Bytes(), &m)
 	c.Assert(err, gc.IsNil)
 	return &m
+}
+
+var extraInfoTests = []struct {
+	about           string
+	user            string
+	item            string
+	method          string
+	body            interface{}
+	expectStatus    int
+	expectBody      interface{}
+	expectExtraInfo map[string]interface{}
+}{{
+	about:        "get extra-info",
+	user:         "jbloggs",
+	method:       "GET",
+	expectStatus: http.StatusOK,
+	expectBody: map[string]interface{}{
+		"item1": 1,
+		"item2": "two",
+	},
+}, {
+	about:  "set extra-info",
+	user:   "jbloggs",
+	method: "PUT",
+	body: map[string]interface{}{
+		"item1": 11,
+		"item2": "twotwo",
+	},
+	expectStatus: http.StatusOK,
+	expectExtraInfo: map[string]interface{}{
+		"item1": 11,
+		"item2": "twotwo",
+	},
+}, {
+	about:  "set extra-info does not change unmentioned fields",
+	user:   "jbloggs",
+	method: "PUT",
+	body: map[string]interface{}{
+		"item3": 3,
+		"item2": "twotwo",
+	},
+	expectStatus: http.StatusOK,
+	expectExtraInfo: map[string]interface{}{
+		"item1": 1,
+		"item2": "twotwo",
+		"item3": 3,
+	},
+}, {
+	about:        "get extra-info item",
+	user:         "jbloggs",
+	item:         "item1",
+	method:       "GET",
+	expectStatus: http.StatusOK,
+	expectBody:   1,
+}, {
+	about:        "set extra-info item",
+	user:         "jbloggs",
+	item:         "item1",
+	method:       "PUT",
+	body:         10.0,
+	expectStatus: http.StatusOK,
+	expectExtraInfo: map[string]interface{}{
+		"item1": 10.0,
+		"item2": "two",
+	},
+}, {
+	about:        "get extra-info no user",
+	user:         "jbloggs2",
+	method:       "GET",
+	expectStatus: http.StatusNotFound,
+	expectBody: params.Error{
+		Code:    params.ErrNotFound,
+		Message: `user "jbloggs2" not found: not found`,
+	},
+}, {
+	about:  "set extra-info no user",
+	user:   "jbloggs2",
+	method: "PUT",
+	body: map[string]interface{}{
+		"item1": 11,
+		"item2": "twotwo",
+	},
+	expectStatus: http.StatusNotFound,
+	expectBody: params.Error{
+		Code:    params.ErrNotFound,
+		Message: `user "jbloggs2" not found: not found`,
+	},
+}, {
+	about:        "get extra-info item no user",
+	user:         "jbloggs2",
+	item:         "item1",
+	method:       "GET",
+	expectStatus: http.StatusNotFound,
+	expectBody: params.Error{
+		Code:    params.ErrNotFound,
+		Message: `user "jbloggs2" not found: not found`,
+	},
+}, {
+	about:        "set extra-info item no user",
+	user:         "jbloggs2",
+	item:         "item1",
+	method:       "PUT",
+	body:         10.0,
+	expectStatus: http.StatusNotFound,
+	expectBody: params.Error{
+		Code:    params.ErrNotFound,
+		Message: `user "jbloggs2" not found: not found`,
+	},
+}, {
+	about:  "set extra-info when none present",
+	user:   "jbloggs3",
+	method: "PUT",
+	body: map[string]interface{}{
+		"item1": 11,
+		"item2": "twotwo",
+	},
+	expectStatus: http.StatusOK,
+	expectExtraInfo: map[string]interface{}{
+		"item1": 11,
+		"item2": "twotwo",
+	},
+}, {
+	about:        "set extra-info item when none present",
+	user:         "jbloggs3",
+	item:         "item4",
+	method:       "PUT",
+	body:         4,
+	expectStatus: http.StatusOK,
+	expectExtraInfo: map[string]interface{}{
+		"item4": 4,
+	},
+}, {
+	about:  "set extra-info bad key",
+	user:   "jbloggs3",
+	method: "PUT",
+	body: map[string]interface{}{
+		"$item1": 1,
+		"item2":  "twotwo",
+	},
+	expectStatus: http.StatusBadRequest,
+	expectBody: params.Error{
+		Code:    params.ErrBadRequest,
+		Message: `"$item1" bad key for extra-info`,
+	},
+}, {
+	about:        "set extra-info item bad key",
+	user:         "jbloggs3",
+	item:         "item.4",
+	method:       "PUT",
+	body:         4,
+	expectStatus: http.StatusBadRequest,
+	expectBody: params.Error{
+		Code:    params.ErrBadRequest,
+		Message: `"item.4" bad key for extra-info`,
+	},
+}}
+
+func (s *usersSuite) TestExtraInfo(c *gc.C) {
+	s.createUser(c, &params.User{
+		Username:   "jbloggs",
+		ExternalID: "http://example.com/jbloggs",
+	})
+	s.createUser(c, &params.User{
+		Username:   "jbloggs3",
+		ExternalID: "http://example.com/jbloggs3",
+	})
+	for i, test := range extraInfoTests {
+		c.Logf("%d. %s", i, test.about)
+		// Reset the stored extra-info for jbloggs
+		err := s.store.UpdateIdentity("jbloggs", bson.D{{"$set", bson.D{{"extrainfo",
+			map[string]json.RawMessage{
+				"item1": json.RawMessage(`1`),
+				"item2": json.RawMessage(`"two"`),
+			},
+		}}}})
+		// Delete any stored extra-info for jbloggs3
+		err = s.store.UpdateIdentity("jbloggs3", bson.D{{"$unset", bson.D{{"extrainfo", ""}}}})
+		c.Assert(err, gc.IsNil)
+		url := "u/" + test.user + "/extra-info"
+		if test.item != "" {
+			url += "/" + test.item
+		}
+		params := httptesting.JSONCallParams{
+			Handler:  s.srv,
+			URL:      apiURL(url),
+			Method:   test.method,
+			Username: adminUsername,
+			Password: adminPassword,
+			Header: http.Header{
+				"Content-Type": []string{"application/json"},
+			},
+			ExpectStatus: test.expectStatus,
+			ExpectBody:   test.expectBody,
+		}
+		if test.body != nil {
+			params.Body = marshal(c, test.body)
+		}
+		httptesting.AssertJSONCall(c, params)
+		if test.expectExtraInfo != nil {
+			httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+				Handler:      s.srv,
+				URL:          apiURL("u/" + test.user + "/extra-info"),
+				Method:       "GET",
+				Username:     adminUsername,
+				Password:     adminPassword,
+				ExpectStatus: http.StatusOK,
+				ExpectBody:   test.expectExtraInfo,
+			})
+		}
+	}
 }

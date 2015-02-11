@@ -5,6 +5,7 @@ package store_test
 import (
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
+	"gopkg.in/mgo.v2/bson"
 
 	"github.com/CanonicalLtd/blues-identity/internal/idtesting"
 	"github.com/CanonicalLtd/blues-identity/internal/mongodoc"
@@ -161,4 +162,68 @@ func (s *storeSuite) TestCollections(c *gc.C) {
 			c.Errorf("extra collection %q found", name)
 		}
 	}
+}
+
+func (s *storeSuite) TestGetIdentity(c *gc.C) {
+	store, err := store.New(s.Session.DB("testing"))
+	c.Assert(err, gc.IsNil)
+
+	// Add an identity to the store.
+	err = store.UpsertIdentity(&mongodoc.Identity{
+		Username:   "test",
+		ExternalID: "http://example.com/test",
+		Email:      "test@example.com",
+		FullName:   "Test User",
+		Groups: []string{
+			"test",
+		},
+	})
+	c.Assert(err, gc.IsNil)
+
+	// Get the identity from the store
+	id, err := store.GetIdentity(params.Username("test"))
+	c.Assert(err, gc.IsNil)
+	c.Assert(id.Username, gc.Equals, "test")
+	c.Assert(id.ExternalID, gc.Equals, "http://example.com/test")
+	c.Assert(id.Email, gc.Equals, "test@example.com")
+	c.Assert(id.FullName, gc.Equals, "Test User")
+	c.Assert(id.Groups, gc.DeepEquals, []string{"test"})
+
+	// Get an identity not in the store
+	id, err = store.GetIdentity(params.Username("noone"))
+	c.Assert(id, gc.IsNil)
+	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
+}
+
+func (s *storeSuite) TestUpdateIdentity(c *gc.C) {
+	store, err := store.New(s.Session.DB("testing"))
+	c.Assert(err, gc.IsNil)
+
+	// Add an identity to the store.
+	err = store.UpsertIdentity(&mongodoc.Identity{
+		Username:   "test",
+		ExternalID: "http://example.com/test",
+		Email:      "test@example.com",
+		FullName:   "Test User",
+		Groups: []string{
+			"test",
+		},
+	})
+	c.Assert(err, gc.IsNil)
+
+	// Get the identity from the store
+	err = store.UpdateIdentity(params.Username("test"), bson.D{{"$set", bson.D{{"extrainfo.foo", []byte("true")}}}})
+	c.Assert(err, gc.IsNil)
+	id, err := store.GetIdentity(params.Username("test"))
+	c.Assert(err, gc.IsNil)
+	c.Assert(id.Username, gc.Equals, "test")
+	c.Assert(id.ExternalID, gc.Equals, "http://example.com/test")
+	c.Assert(id.Email, gc.Equals, "test@example.com")
+	c.Assert(id.FullName, gc.Equals, "Test User")
+	c.Assert(id.Groups, gc.DeepEquals, []string{"test"})
+	c.Assert(id.ExtraInfo, gc.DeepEquals, map[string][]byte{"foo": []byte("true")})
+
+	// Update an identity not in the store.
+	err = store.UpdateIdentity(params.Username("noone"), bson.D{{"$set", bson.D{{"extrainfo.foo", []byte("false")}}}})
+	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 }
