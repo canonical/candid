@@ -37,6 +37,8 @@ func errToResp(err error) (int, interface{}) {
 		status = http.StatusBadRequest
 	case params.ErrUnauthorized, params.ErrNoAdminCredsProvided:
 		status = http.StatusUnauthorized
+	case params.ErrMethodNotAllowed:
+		status = http.StatusMethodNotAllowed
 	}
 	return status, errorBody
 }

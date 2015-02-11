@@ -106,7 +106,7 @@ func (s *idpsSuite) TestPutIDPS(c *gc.C) {
 		},
 		expectStatus: http.StatusNotFound,
 		expectBody: params.Error{
-			Message: `not found: /idps/ (PUT)`,
+			Message: `not found: /idps/`,
 			Code:    params.ErrNotFound,
 		},
 	}, {
