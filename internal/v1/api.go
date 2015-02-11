@@ -46,11 +46,12 @@ func New(s *store.Store, auth *server.Authorizer, svc *bakery.Service) *Handler 
 		provider: newUSSOProvider(),
 		auth:     auth,
 	}
-	h.r.NotFound = NotFound
-	// setting HandleMethodNotAllowed to false stops httprouter.Router from
-	// attempting to determine if the wrong method is being used in the
-	// request and returning a different, internally generated, error.
-	h.r.HandleMethodNotAllowed = false
+	h.r.NotFound = notFound
+	h.r.MethodNotAllowed = methodNotAllowed
+	// Redirection does not work because the router does not know
+	// about the /v1 prefix. Disable the automatic redirection features.
+	h.r.RedirectTrailingSlash = false
+	h.r.RedirectFixedPath = false
 	mux := http.NewServeMux()
 	const dischargePath = "/discharger"
 	httpbakery.AddDischargeHandler(mux, dischargePath, svc, h.checkThirdPartyCaveat)
@@ -68,7 +69,6 @@ func New(s *store.Store, auth *server.Authorizer, svc *bakery.Service) *Handler 
 	h.r.GET("/idps/:idp", handle(h.serveIdentityProvider))
 	h.r.PUT("/idps/:idp", h.adminRequired(handle(h.servePutIdentityProvider)))
 	h.r.GET("/u", h.adminRequired(handle(h.serveQueryUsers)))
-	h.r.GET("/u/", h.adminRequired(handle(h.serveUser)))
 	h.r.GET("/u/:username", h.adminRequired(handle(h.serveUser)))
 	h.r.PUT("/u/:username", h.adminRequired(handle(h.servePutUser)))
 	h.r.GET("/u/:username/extra-info", h.adminRequired(handle(h.serveUserExtraInfo)))
@@ -124,8 +124,15 @@ func (h *Handler) adminRequiredHandler(handler http.Handler) httprouter.Handle {
 	}
 }
 
-// NotFound is the handler that is called when a handler cannot be found for the requested
-// endpoint.
-func NotFound(w http.ResponseWriter, req *http.Request) {
-	writeError(w, errgo.WithCausef(nil, params.ErrNotFound, "not found: %s (%s)", req.URL.Path, req.Method))
+//notFound is the handler that is called when a handler cannot be found
+//for the requested endpoint.
+func notFound(w http.ResponseWriter, req *http.Request) {
+	writeError(w, errgo.WithCausef(nil, params.ErrNotFound, "not found: %s", req.URL.Path))
+}
+
+//methodNotAllowed is the handler that is called when a handler cannot
+//be found for the requested endpoint with the request method, but
+//there is a handler avaiable using a different method.
+func methodNotAllowed(w http.ResponseWriter, req *http.Request) {
+	writeError(w, errgo.WithCausef(nil, params.ErrMethodNotAllowed, "%s not allowed for %s", req.Method, req.URL.Path))
 }

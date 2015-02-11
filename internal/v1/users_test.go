@@ -161,10 +161,10 @@ func (s *usersSuite) TestUser(c *gc.C) {
 		method:       "GET",
 		username:     adminUsername,
 		password:     adminPassword,
-		expectStatus: http.StatusBadRequest,
+		expectStatus: http.StatusNotFound,
 		expectBody: params.Error{
-			Code:    params.ErrBadRequest,
-			Message: `cannot unmarshal parameters: cannot unmarshal into field: illegal username ""`,
+			Code:    params.ErrNotFound,
+			Message: `not found: /u/`,
 		},
 	}, {
 		about:    "unsupported method",
@@ -181,10 +181,10 @@ func (s *usersSuite) TestUser(c *gc.C) {
 				"test",
 			},
 		}),
-		expectStatus: http.StatusNotFound,
+		expectStatus: http.StatusMethodNotAllowed,
 		expectBody: params.Error{
-			Code:    "not found",
-			Message: "not found: /u/jbloggs (POST)",
+			Code:    params.ErrMethodNotAllowed,
+			Message: "POST not allowed for /u/jbloggs",
 		},
 	}, {
 		about:    "put no userid",
@@ -204,7 +204,7 @@ func (s *usersSuite) TestUser(c *gc.C) {
 		expectStatus: http.StatusNotFound,
 		expectBody: params.Error{
 			Code:    "not found",
-			Message: "not found: /u/ (PUT)",
+			Message: "not found: /u/",
 		},
 	}, {
 		about:    "put userid mismatch",
@@ -347,7 +347,7 @@ func (s *usersSuite) TestUser(c *gc.C) {
 		expectStatus: http.StatusNotFound,
 		expectBody: params.Error{
 			Code:    "not found",
-			Message: `not found: /u/jbloggs2/notthere (GET)`,
+			Message: `not found: /u/jbloggs2/notthere`,
 		},
 	}, {
 		about:  "no external_id",
@@ -490,10 +490,10 @@ func (s *usersSuite) TestQueryUsers(c *gc.C) {
 		body:         nil,
 		username:     adminUsername,
 		password:     adminPassword,
-		expectStatus: http.StatusNotFound,
+		expectStatus: http.StatusMethodNotAllowed,
 		expectBody: params.Error{
-			Code:    "not found",
-			Message: "not found: /u (DELETE)",
+			Code:    params.ErrMethodNotAllowed,
+			Message: "DELETE not allowed for /u",
 		},
 	}, {
 		about:    "incorrect username",

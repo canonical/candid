@@ -25,6 +25,7 @@ const (
 	ErrUnauthorized         ErrorCode = "unauthorized"
 	ErrAlreadyExists        ErrorCode = "already exists"
 	ErrNoAdminCredsProvided ErrorCode = "no admin credentials provided"
+	ErrMethodNotAllowed     ErrorCode = "method not allowed"
 )
 
 // Error represents an error - it is returned for any response that fails.
