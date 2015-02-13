@@ -195,7 +195,7 @@ func (h *Handler) loginCallback1(
 }
 
 type wait struct {
-	WaitID string `httprequest:"wait_id,form"`
+	WaitID string `httprequest:"waitid,form"`
 }
 
 // serveWait serves an HTTP endpoint that waits until a macaroon
