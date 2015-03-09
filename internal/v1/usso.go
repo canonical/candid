@@ -12,6 +12,7 @@ import (
 )
 
 type ussoProvider struct {
+	baseURL        string
 	nonceStore     *openid.SimpleNonceStore
 	discoveryCache *openid.SimpleDiscoveryCache
 }
@@ -21,8 +22,9 @@ const (
 	ussoLoginURL = "https://login.ubuntu.com"
 )
 
-func newUSSOProvider() idProvider {
+func newUSSOProvider(baseURL string) idProvider {
 	return &ussoProvider{
+		baseURL: baseURL,
 		nonceStore: &openid.SimpleNonceStore{
 			Store: make(map[string][]*openid.Nonce),
 		},
@@ -90,7 +92,7 @@ func (qu *qURL) String() string {
 //
 // It implements idProvider.verifyCallback
 func (p *ussoProvider) verifyCallback(w http.ResponseWriter, req *http.Request) (*verifiedUserInfo, error) {
-	reqURL := "http://" + req.Host + req.RequestURI
+	reqURL := p.baseURL + req.RequestURI
 
 	// TODO the RequestURI may not be the same as in the original
 	// callback URL because of frontend processing. We could

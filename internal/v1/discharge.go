@@ -104,7 +104,7 @@ func (h *Handler) needLoginError(cavId, caveat string, why string) error {
 		Code:    httpbakery.ErrInteractionRequired,
 		Info: &httpbakery.ErrorInfo{
 			VisitURL: loginURL,
-			WaitURL:  "/v1/wait?waitid=" + waitId,
+			WaitURL:  h.svc.Location() + "/v1/wait?waitid=" + waitId,
 		},
 	}
 }
