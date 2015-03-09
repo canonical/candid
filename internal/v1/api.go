@@ -43,7 +43,7 @@ func New(s *store.Store, auth *server.Authorizer, svc *bakery.Service) *Handler 
 		store:    s,
 		svc:      svc,
 		place:    &place{s.Place},
-		provider: newUSSOProvider(),
+		provider: newUSSOProvider(svc.Location()),
 		auth:     auth,
 	}
 	h.r.NotFound = notFound
