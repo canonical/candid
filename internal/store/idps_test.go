@@ -4,6 +4,7 @@ package store_test
 
 import (
 	gc "gopkg.in/check.v1"
+	"launchpad.net/lpad"
 
 	"github.com/CanonicalLtd/blues-identity/internal/mongodoc"
 	"github.com/CanonicalLtd/blues-identity/internal/store"
@@ -21,7 +22,7 @@ func (s *storeSuite) TestIdentityProvider(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 
 	// Set up a new store.
-	st, err := store.New(db)
+	st, err := store.New(db, lpad.Staging)
 	c.Assert(err, gc.IsNil)
 
 	// Retrieve the identity provider using the store object.
@@ -36,7 +37,7 @@ func (s *storeSuite) TestIdentityProviderNotFound(c *gc.C) {
 	db := s.Session.DB("testing")
 
 	// Set up a new store.
-	st, err := store.New(db)
+	st, err := store.New(db, lpad.Staging)
 	c.Assert(err, gc.IsNil)
 
 	// Retrieve the identity provider using the store object.
@@ -48,7 +49,7 @@ func (s *storeSuite) TestSetIdentityProvider(c *gc.C) {
 	db := s.Session.DB("testing")
 
 	// Set up a new store.
-	st, err := store.New(db)
+	st, err := store.New(db, lpad.Staging)
 	c.Assert(err, gc.IsNil)
 
 	// Set an identity provider using the store object
@@ -71,7 +72,7 @@ func (s *storeSuite) TestUpdateIdentityProvider(c *gc.C) {
 	db := s.Session.DB("testing")
 
 	// Set up a new store.
-	st, err := store.New(db)
+	st, err := store.New(db, lpad.Staging)
 	c.Assert(err, gc.IsNil)
 
 	// Set an identity provider using the store object
@@ -102,7 +103,7 @@ func (s *storeSuite) TestListIdentityProviders(c *gc.C) {
 	db := s.Session.DB("testing")
 
 	// Set up a new store.
-	st, err := store.New(db)
+	st, err := store.New(db, lpad.Staging)
 	c.Assert(err, gc.IsNil)
 
 	idps, err := st.IdentityProviderNames()

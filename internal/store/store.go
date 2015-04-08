@@ -10,6 +10,7 @@ import (
 	"gopkg.in/macaroon-bakery.v0/bakery/mgostorage"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
+	"launchpad.net/lpad"
 
 	"github.com/CanonicalLtd/blues-identity/internal/mongodoc"
 	"github.com/CanonicalLtd/blues-identity/meeting"
@@ -30,13 +31,17 @@ type Store struct {
 	// Place holds the place where openid-callback rendezvous
 	// are created.
 	Place *meeting.Place
+
+	// Launchpad holds the API base URL for launchpad.
+	Launchpad lpad.APIBase
 }
 
 // New returns a Store that uses the given database.
-func New(db *mgo.Database) (*Store, error) {
+func New(db *mgo.Database, lp lpad.APIBase) (*Store, error) {
 	s := &Store{
-		DB:    StoreDatabase{db},
-		Place: meeting.New(),
+		DB:        StoreDatabase{db},
+		Place:     meeting.New(),
+		Launchpad: lp,
 	}
 	if err := s.ensureIndexes(); err != nil {
 		return nil, errgo.Notef(err, "cannot ensure indexes")
@@ -81,7 +86,15 @@ func (s *Store) ensureIndexes() error {
 // Identity then an error is returned with the cause params.ErrAlreadyExists.
 func (s *Store) UpsertIdentity(doc *mongodoc.Identity) error {
 	doc.UUID = uuid.NewSHA1(IdentityNamespace, []byte(doc.Username)).String()
-	_, err := s.DB.Identities().Upsert(
+	// TODO(mhilton) When we support other identity providers avoid
+	// calling the launchpad API.
+	groups, err := s.getLaunchpadGroups(doc.Email)
+	if err == nil {
+		doc.Groups = groups
+	} else {
+		logger.Warningf("failed to fetch list of groups from launchpad for %q: %s", doc.Email, err)
+	}
+	_, err = s.DB.Identities().Upsert(
 		bson.M{
 			"username":    doc.Username,
 			"external_id": doc.ExternalID,
@@ -95,6 +108,38 @@ func (s *Store) UpsertIdentity(doc *mongodoc.Identity) error {
 		return errgo.Mask(err)
 	}
 	return nil
+}
+
+// getLaunchpadGroups tries to fetch the list of teams the user
+// belongs to in launchpad. Only public teams are supported.
+func (s *Store) getLaunchpadGroups(email string) ([]string, error) {
+	root, err := lpad.Login(s.Launchpad, &lpad.OAuth{Consumer: "blues", Anonymous: true})
+	if err != nil {
+		return nil, errgo.Notef(err, "cannot connect to launchpad")
+	}
+	people, err := root.FindPeople(email)
+	if err != nil {
+		return nil, errgo.Notef(err, "cannot find user %q", email)
+	}
+	if people.TotalSize() != 1 {
+		return nil, errgo.Newf("cannot find user %q", email)
+	}
+	var user *lpad.Person
+	people.For(func(p *lpad.Person) error {
+		user = p
+		return nil
+	})
+	teams := user.Link("super_teams_collection_link")
+	teams, err = teams.Get(nil)
+	if err != nil {
+		return nil, errgo.Notef(err, "cannot get team list for launchpad user %q", user.Name())
+	}
+	groups := make([]string, 0, teams.TotalSize())
+	teams.For(func(team *lpad.Value) error {
+		groups = append(groups, team.StringField("name"))
+		return nil
+	})
+	return groups, nil
 }
 
 // GetIdentity retrieves the identity with the given username. If the

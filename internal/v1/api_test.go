@@ -5,6 +5,8 @@ package v1_test
 import (
 	"net/http"
 
+	"launchpad.net/lpad"
+
 	"github.com/juju/testing/httptesting"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/macaroon-bakery.v0/bakery"
@@ -79,7 +81,7 @@ func (s *apiSuite) TearDownTest(c *gc.C) {
 
 func newServer(c *gc.C, session *mgo.Session, key *bakery.KeyPair) (http.Handler, *store.Store) {
 	db := session.DB("testing")
-	store, err := store.New(db)
+	store, err := store.New(db, lpad.Staging)
 	c.Assert(err, gc.IsNil)
 	srv, err := server.New(
 		db,
