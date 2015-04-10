@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"net/http"
 
+	"launchpad.net/lpad"
+
 	"github.com/juju/httprequest"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v0/bakery"
@@ -27,7 +29,7 @@ func New(db *mgo.Database, p ServerParams, versions map[string]NewAPIHandlerFunc
 	}
 
 	// Create the identities store.
-	store, err := store.New(db)
+	store, err := store.New(db, lpad.Production)
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot make store")
 	}
