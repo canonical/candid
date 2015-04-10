@@ -59,3 +59,17 @@ type WaitResponse struct {
 	// Macaroon holds the acquired discharge macaroon.
 	Macaroon *macaroon.Macaroon
 }
+
+// LoginMethods holds the response from the login endpoint
+// when called with "Accept: application/json". This enumerates
+// the available methods for the client to log in.
+type LoginMethods struct {
+	// Interactive is the endpoint to connect to, if the user can
+	// interact with the login process.
+	Interactive string `json:"interactive,omitempty"`
+
+	// UbuntuSSO OAuth is the endpoint to send a request, signed with
+	// UbuntuSSO OAuth credentials, to if the client wishes to use
+	// oauth to log in to Identity Manager. Ubuntu SSO uses oauth 1.0.
+	UbuntuSSOOAuth string `json:"usso_oauth,omitempty"`
+}

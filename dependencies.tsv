@@ -1,5 +1,6 @@
 code.google.com/p/go-uuid	hg	35bc42037350f0078e3c974c6ea690f1926603ab	14
 code.google.com/p/go.net	hg	937a34c9de13c766c814510f76bca091dee06028	239
+github.com/garyburd/go-oauth	git	3131beb69b81ff119923bdefbf029318f1f53794	2015-03-29T16:01:46Z
 github.com/gorilla/handlers	git	a24b39a6a2c8a7af2fe664dd4573205c99904035	2015-04-12T18:40:04Z
 github.com/juju/errors	git	036046bfdccf6f576e2e5dec7f7878597bcaebe7	2015-02-11T20:59:49Z
 github.com/juju/httpprof	git	14bf14c307672fd2456bdbf35d19cf0ccd3cf565	2014-12-17T16:00:36Z
@@ -10,6 +11,7 @@ github.com/juju/testing	git	b93c38205ac2e3817b7b1d9d60e89e69c99a6362	2015-03-16T
 github.com/juju/utils	git	a90aa2e02b9e7fe354ab816e05b1e0a77f27242d	2015-02-23T16:02:32Z
 github.com/julienschmidt/httprouter	git	b855addf42820c4e5e596b07788a4db8f4d703d8	2015-02-11T03:14:41Z
 github.com/kushaldas/openid.go	git	c705925b332c8a68b7821aa3d340ecf4f302bca3	2013-09-17T09:51:43Z
+github.com/mhilton/openid	git	7922a4e937d8433528e1cbc30ed742f1573bc9fb	2015-05-11T10:32:07Z
 golang.org/x/crypto	git	4ed45ec682102c643324fae5dff8dab085b6c300	2015-01-12T22:01:33Z
 golang.org/x/net	git	7dbad50ab5b31073856416cdcfeb2796d682f844	2015-03-20T03:46:21Z
 gopkg.in/check.v1	git	64131543e7896d5bcc6bd5a76287eb75ea96c673	2014-10-24T13:38:53Z
