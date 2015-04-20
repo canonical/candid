@@ -55,17 +55,19 @@ func New(db *mgo.Database, lp lpad.APIBase) (*Store, error) {
 }
 
 func (s *Store) ensureIndexes() error {
+	db := s.DB.Copy()
+	defer db.Close()
 	indexes := []struct {
 		c *mgo.Collection
 		i mgo.Index
 	}{{
-		s.DB.Identities(),
+		db.Identities(),
 		mgo.Index{
 			Key:    []string{"username"},
 			Unique: true,
 		},
 	}, {
-		s.DB.Identities(),
+		db.Identities(),
 		mgo.Index{
 			Key:    []string{"external_id"},
 			Unique: true,
@@ -94,7 +96,9 @@ func (s *Store) UpsertIdentity(doc *mongodoc.Identity) error {
 	} else {
 		logger.Warningf("failed to fetch list of groups from launchpad for %q: %s", doc.Email, err)
 	}
-	_, err = s.DB.Identities().Upsert(
+	db := s.DB.Copy()
+	defer db.Close()
+	_, err = db.Identities().Upsert(
 		bson.M{
 			"username":    doc.Username,
 			"external_id": doc.ExternalID,
@@ -146,8 +150,10 @@ func (s *Store) getLaunchpadGroups(email string) ([]string, error) {
 // identity does not exist an error is returned with a cause of
 // params.ErrNotFound.
 func (s *Store) GetIdentity(username params.Username) (*mongodoc.Identity, error) {
+	db := s.DB.Copy()
+	defer db.Close()
 	var id mongodoc.Identity
-	if err := s.DB.Identities().Find(bson.M{"username": username}).One(&id); err != nil {
+	if err := db.Identities().Find(bson.M{"username": username}).One(&id); err != nil {
 		if errgo.Cause(err) == mgo.ErrNotFound {
 			return nil, errgo.WithCausef(err, params.ErrNotFound, "user %q not found", username)
 		}
@@ -160,7 +166,9 @@ func (s *Store) GetIdentity(username params.Username) (*mongodoc.Identity, error
 // identity does not exist an error is returned with a cause of
 // params.ErrNotFound.
 func (s *Store) UpdateIdentity(username params.Username, update bson.D) error {
-	if err := s.DB.Identities().Update(bson.D{{"username", username}}, update); err != nil {
+	db := s.DB.Copy()
+	defer db.Close()
+	if err := db.Identities().Update(bson.D{{"username", username}}, update); err != nil {
 		if errgo.Cause(err) == mgo.ErrNotFound {
 			return errgo.WithCausef(err, params.ErrNotFound, "user %q not found", username)
 		}

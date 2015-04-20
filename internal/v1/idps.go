@@ -9,19 +9,11 @@ import (
 	"gopkg.in/errgo.v1"
 
 	"github.com/CanonicalLtd/blues-identity/internal/mongodoc"
-	"github.com/CanonicalLtd/blues-identity/internal/store"
 	"github.com/CanonicalLtd/blues-identity/params"
 )
 
 type identityProvider struct {
 	Name string `httprequest:"idp,path"`
-}
-
-func (i *identityProvider) get(s *store.Store, idp *mongodoc.IdentityProvider) error {
-	if err := s.DB.IdentityProviders().FindId(i.Name).One(&idp); err != nil {
-		return errgo.WithCausef(err, params.ErrNotFound, `cannot find identity provider "%v"`, i.Name)
-	}
-	return nil
 }
 
 // serveIdentityProvider serves the /idps endpints. See http://tinyurl.com/oanmhy5 for
@@ -31,9 +23,8 @@ func (h *Handler) serveIdentityProviders(hdr http.Header, p httprequest.Params) 
 }
 
 func (h *Handler) serveIdentityProvider(_ http.Header, _ httprequest.Params, i *identityProvider) (*params.IdentityProvider, error) {
-	var doc mongodoc.IdentityProvider
-	// At this point i.Name will have been populated from the request.
-	if err := i.get(h.store, &doc); err != nil {
+	doc, err := h.store.IdentityProvider(i.Name)
+	if err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
 	idp := params.IdentityProvider{
@@ -54,14 +45,6 @@ type setIdentityProviderParams struct {
 	Name                     string `httprequest:"idp,path"`
 }
 
-func (i *setIdentityProviderParams) set(s *store.Store, idp *mongodoc.IdentityProvider) error {
-	_, err := s.DB.IdentityProviders().UpsertId(i.Name, idp)
-	if err != nil {
-		return errgo.WithCausef(err, params.ErrNotFound, `cannot find identity provider "%v"`, i.Name)
-	}
-	return nil
-}
-
 func (h *Handler) servePutIdentityProvider(_ http.ResponseWriter, _ httprequest.Params, i *setIdentityProviderParams) error {
 	var doc mongodoc.IdentityProvider
 	if i.Name == "" {
@@ -77,7 +60,7 @@ func (h *Handler) servePutIdentityProvider(_ http.ResponseWriter, _ httprequest.
 	default:
 		return errgo.WithCausef(nil, params.ErrBadRequest, `unsupported identity protocol "%v"`, i.IdentityProvider.Protocol)
 	}
-	if err := i.set(h.store, &doc); err != nil {
+	if err := h.store.SetIdentityProvider(&doc); err != nil {
 		return errgo.Notef(err, "cannot set identity provider")
 	}
 	return nil
