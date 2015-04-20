@@ -76,7 +76,6 @@ func (h *Handler) checkAuthenticatedUser(username string) ([]checkers.Caveat, er
 	return []checkers.Caveat{
 		checkers.DeclaredCaveat("uuid", user.UUID),
 		checkers.DeclaredCaveat("username", user.Username),
-		checkers.DeclaredCaveat("groups", strings.Join(user.Groups, " ")),
 		checkers.TimeBeforeCaveat(time.Now().Add(24 * time.Hour)),
 	}, nil
 }
