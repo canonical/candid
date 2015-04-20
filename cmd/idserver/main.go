@@ -9,10 +9,12 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/gorilla/handlers"
 	"github.com/juju/loggo"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v0/bakery"
 	"gopkg.in/mgo.v2"
+	"gopkg.in/natefinch/lumberjack.v2"
 
 	"github.com/CanonicalLtd/blues-identity"
 	"github.com/CanonicalLtd/blues-identity/config"
@@ -81,6 +83,16 @@ func serve(confPath string) error {
 	)
 	if err != nil {
 		return errgo.Notef(err, "cannot create new server at %q", conf.APIAddr)
+	}
+
+	if conf.AccessLog != "" {
+		accesslog := &lumberjack.Logger{
+			Filename:   conf.AccessLog,
+			MaxSize:    500, // megabytes
+			MaxBackups: 3,
+			MaxAge:     28, //days
+		}
+		server = handlers.CombinedLoggingHandler(accesslog, server)
 	}
 
 	logger.Infof("starting the identity server")
