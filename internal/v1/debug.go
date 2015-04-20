@@ -18,10 +18,12 @@ func (h *Handler) serveDebug(http.ResponseWriter, httprequest.Params) error {
 
 // GET /debug/status
 func (h *Handler) serveDebugStatus(http.Header, httprequest.Params) (interface{}, error) {
+	db := h.store.DB.Copy()
+	defer db.Close()
 	return debugstatus.Check(
 		debugstatus.ServerStartTime,
-		debugstatus.Connection(h.store.DB.Session),
-		debugstatus.MongoCollections(h.store.DB),
+		debugstatus.Connection(db.Session),
+		debugstatus.MongoCollections(db),
 	), nil
 }
 

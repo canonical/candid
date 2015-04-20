@@ -188,7 +188,7 @@ func (s *idpsSuite) TestGetIDPS(c *gc.C) {
 		provider: "provider2",
 		status:   http.StatusNotFound,
 		result: params.Error{
-			Message: `cannot find identity provider "provider2": not found`,
+			Message: `cannot get identity provider "provider2": not found`,
 			Code:    params.ErrNotFound,
 		},
 	}}

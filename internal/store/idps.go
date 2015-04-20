@@ -8,6 +8,7 @@ import (
 	"gopkg.in/mgo.v2/bson"
 
 	"github.com/CanonicalLtd/blues-identity/internal/mongodoc"
+	"github.com/CanonicalLtd/blues-identity/params"
 )
 
 // IdentityProviders returns the mongo collection where identity providers are stored.
@@ -20,7 +21,9 @@ func (s StoreDatabase) IdentityProviders() *mgo.Collection {
 func (s *Store) IdentityProviderNames() ([]string, error) {
 	providers := []string{}
 	var idp mongodoc.IdentityProvider
-	it := s.DB.IdentityProviders().Find(nil).Select(bson.M{"_id": 1}).Iter()
+	db := s.DB.Copy()
+	defer db.Close()
+	it := db.IdentityProviders().Find(nil).Select(bson.M{"_id": 1}).Iter()
 	for it.Next(&idp) {
 		providers = append(providers, idp.Name)
 	}
@@ -30,12 +33,14 @@ func (s *Store) IdentityProviderNames() ([]string, error) {
 	return providers, nil
 }
 
-// GetIdentityProvider returns the IdentityProvider information describing
+// IdentityProvider returns the IdentityProvider information describing
 // the named identity provider.
 func (s *Store) IdentityProvider(p string) (*mongodoc.IdentityProvider, error) {
 	var idp mongodoc.IdentityProvider
-	if err := s.DB.IdentityProviders().FindId(p).One(&idp); err != nil {
-		return nil, errgo.WithCausef(err, err, `cannot get identity provider "%v"`, p)
+	db := s.DB.Copy()
+	defer db.Close()
+	if err := db.IdentityProviders().FindId(p).One(&idp); err != nil {
+		return nil, errgo.WithCausef(err, params.ErrNotFound, `cannot get identity provider "%v"`, p)
 	}
 	return &idp, nil
 }
@@ -43,7 +48,9 @@ func (s *Store) IdentityProvider(p string) (*mongodoc.IdentityProvider, error) {
 // SetIdentityProvider sets the identity provider specified by p to be the settings
 // supplied in idp.
 func (s *Store) SetIdentityProvider(idp *mongodoc.IdentityProvider) error {
-	if _, err := s.DB.IdentityProviders().UpsertId(idp.Name, idp); err != nil {
+	db := s.DB.Copy()
+	defer db.Close()
+	if _, err := db.IdentityProviders().UpsertId(idp.Name, idp); err != nil {
 		return errgo.Notef(err, `cannot set identity provider "%v"`, idp.Name)
 	}
 	return nil

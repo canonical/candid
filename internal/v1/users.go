@@ -30,9 +30,11 @@ type queryUsersParams struct {
 // serverQueryUsers serves the /u endpoint. See http://tinyurl.com/lu3mmr9 for
 // details.
 func (h *Handler) serveQueryUsers(_ http.Header, _ httprequest.Params, q *queryUsersParams) ([]string, error) {
+	db := h.store.DB.Copy()
+	defer db.Close()
 	usernames := make([]string, 0, 1)
 	var user mongodoc.Identity
-	it := h.store.DB.Identities().Find(q).Iter()
+	it := db.Identities().Find(q).Iter()
 	for it.Next(&user) {
 		usernames = append(usernames, user.Username)
 	}

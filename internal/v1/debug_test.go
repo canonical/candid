@@ -3,9 +3,11 @@
 package v1_test
 
 import (
+	"encoding/json"
 	"net/http"
 	"time"
 
+	jc "github.com/juju/testing/checkers"
 	"github.com/juju/testing/httptesting"
 	"github.com/juju/utils/debugstatus"
 	gc "gopkg.in/check.v1"
@@ -30,23 +32,32 @@ func (s *debugSuite) TestServeDebugStatus(c *gc.C) {
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Handler: s.srv,
 		URL:     apiURL("debug/status"),
-		ExpectBody: map[string]debugstatus.CheckResult{
-			"server_started": {
-				Name:   "Server started",
-				Value:  startTime.String(),
-				Passed: true,
-			},
-			"mongo_connected": {
-				Name:   "MongoDB is connected",
-				Value:  "Connected",
-				Passed: true,
-			},
-			"mongo_collections": {
-				Name:   "MongoDB collections",
-				Value:  "All required collections exist",
-				Passed: true,
-			},
-		},
+		ExpectBody: httptesting.BodyAsserter(func(c *gc.C, body json.RawMessage) {
+			var result map[string]debugstatus.CheckResult
+			err := json.Unmarshal(body, &result)
+			c.Assert(err, gc.IsNil)
+			for k, v := range result {
+				v.Duration = 0
+				result[k] = v
+			}
+			c.Assert(result, jc.DeepEquals, map[string]debugstatus.CheckResult{
+				"server_started": {
+					Name:   "Server started",
+					Value:  startTime.String(),
+					Passed: true,
+				},
+				"mongo_connected": {
+					Name:   "MongoDB is connected",
+					Value:  "Connected",
+					Passed: true,
+				},
+				"mongo_collections": {
+					Name:   "MongoDB collections",
+					Value:  "All required collections exist",
+					Passed: true,
+				},
+			})
+		}),
 	})
 }
 

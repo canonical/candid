@@ -15,8 +15,6 @@ import (
 	"gopkg.in/macaroon-bakery.v0/bakery/checkers"
 	"gopkg.in/macaroon-bakery.v0/httpbakery"
 	"gopkg.in/macaroon.v1"
-	"gopkg.in/mgo.v2"
-	"gopkg.in/mgo.v2/bson"
 
 	"github.com/CanonicalLtd/blues-identity/internal/mongodoc"
 	"github.com/CanonicalLtd/blues-identity/params"
@@ -65,11 +63,9 @@ func (h *Handler) checkThirdPartyCaveat(req *http.Request, cavId, cav string) ([
 // checkAuthenticatedUser checks a third-party caveat for "is-authenticated-user". Currently the discharge
 // macaroon will only be created for users with admin credentials.
 func (h *Handler) checkAuthenticatedUser(username string) ([]checkers.Caveat, error) {
-	var user mongodoc.Identity
-	if err := h.store.DB.Identities().Find(bson.M{"username": username}).One(&user); err != nil {
-		if errgo.Cause(err) == mgo.ErrNotFound {
-			return nil, errgo.WithCausef(err, params.ErrForbidden, "user %q not found", username)
-		}
+	user, err := h.store.GetIdentity(params.Username(username))
+	if err != nil {
+		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
 	return []checkers.Caveat{
 		checkers.DeclaredCaveat("uuid", user.UUID),
