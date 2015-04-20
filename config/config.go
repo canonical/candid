@@ -22,6 +22,7 @@ type Config struct {
 	PublicKey    string `yaml:"public-key"`
 	PrivateKey   string `yaml:"private-key"`
 	Location     string `yaml:"location"`
+	AccessLog    string `yaml:"access-log"`
 }
 
 func (c *Config) validate() error {
