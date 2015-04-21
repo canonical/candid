@@ -52,9 +52,15 @@ func (h *Handler) checkThirdPartyCaveat(req *http.Request, cavId, cav string) ([
 		}
 		username = attrs["username"]
 	}
-	switch cav {
+	cond, arg, err := checkers.ParseCaveat(cav)
+	if err != nil {
+		return nil, errgo.WithCausef(err, params.ErrBadRequest, "error parsing caveat: %q", cav)
+	}
+	switch cond {
 	case "is-authenticated-user":
 		return h.checkAuthenticatedUser(username)
+	case "is-member-of":
+		return h.checkMemberOfGroup(username, arg)
 	default:
 		return nil, checkers.ErrCaveatNotRecognized
 	}
@@ -73,6 +79,23 @@ func (h *Handler) checkAuthenticatedUser(username string) ([]checkers.Caveat, er
 		checkers.DeclaredCaveat("groups", strings.Join(user.Groups, " ")),
 		checkers.TimeBeforeCaveat(time.Now().Add(24 * time.Hour)),
 	}, nil
+}
+
+// checkMemberOfGroup checks if user is member of the specified group
+// and declares group membership in discharge macaroon.
+func (h *Handler) checkMemberOfGroup(username, targetGroup string) ([]checkers.Caveat, error) {
+	user, err := h.store.GetIdentity(params.Username(username))
+	if err != nil {
+		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	}
+	for _, group := range user.Groups {
+		if group == targetGroup {
+			return []checkers.Caveat{
+				checkers.DeclaredCaveat("member-of", targetGroup),
+			}, nil
+		}
+	}
+	return []checkers.Caveat{}, nil
 }
 
 // needLoginError returns an error suitable for returning
