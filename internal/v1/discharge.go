@@ -95,7 +95,7 @@ func (h *Handler) checkMemberOfGroup(username, targetGroup string) ([]checkers.C
 			}, nil
 		}
 	}
-	return []checkers.Caveat{}, nil
+	return nil, errgo.Notef(err, "unauthorized")
 }
 
 // needLoginError returns an error suitable for returning

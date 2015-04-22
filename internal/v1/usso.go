@@ -34,7 +34,7 @@ func newUSSOProvider(baseURL string) idProvider {
 
 // TODO It should not be necessary to know all the possible
 // groups in advance.
-const openIdRequestedTeams = "yellow,blues-development,charm-beta,cloud-green"
+const openIdRequestedTeams = "yellow,blues-development,charm-beta"
 
 // openidRedirectURL is defined as a variable so that it
 // can be replaced for testing purposes.
