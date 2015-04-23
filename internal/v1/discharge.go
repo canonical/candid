@@ -81,8 +81,7 @@ func (h *Handler) checkAuthenticatedUser(username string) ([]checkers.Caveat, er
 	}, nil
 }
 
-// checkMemberOfGroup checks if user is member of specified groups
-// and declares group membership in discharge macaroon.
+// checkMemberOfGroup checks if user is member of any of the specified groups.
 func (h *Handler) checkMemberOfGroup(username, targetGroups string) ([]checkers.Caveat, error) {
 	groups := strings.Fields(targetGroups)
 
