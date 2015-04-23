@@ -10,6 +10,7 @@ import (
 
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
+	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v0/bakery"
 	"gopkg.in/macaroon-bakery.v0/bakery/checkers"
 	"gopkg.in/macaroon-bakery.v0/httpbakery"
@@ -84,6 +85,108 @@ func (s *dischargeSuite) TestDischargeWhenLoggedIn(c *gc.C) {
 		"username": "test-user",
 		"groups":   "test test2",
 	})
+}
+
+func (s *dischargeSuite) TestDischargeMemberOf(c *gc.C) {
+	s.createUser(c, &params.User{
+		Username:   "test-user",
+		ExternalID: "http://example.com/test-user",
+		Email:      "test-user@example.com",
+		FullName:   "Test User III",
+		IDPGroups: []string{
+			"test",
+			"test2",
+		},
+	})
+	// Create the service which will issue the third party caveat.
+	svc, err := bakery.NewService(bakery.NewServiceParams{
+		Locator: s.locator,
+	})
+	c.Assert(err, gc.IsNil)
+
+	tests := []struct {
+		about          string
+		createMacaroon func() (*macaroon.Macaroon, error)
+		expectError    string
+		expectDeclared checkers.Declared
+	}{{
+		about: "test membership in single group - matches",
+		createMacaroon: func() (*macaroon.Macaroon, error) {
+			return svc.NewMacaroon("", nil, []checkers.Caveat{{
+				Location:  s.netSrv.URL + "/v1/discharger/",
+				Condition: "is-member-of test",
+			}})
+		},
+		expectDeclared: checkers.Declared{},
+	}, {
+		about: "test membership in a set of groups",
+		createMacaroon: func() (*macaroon.Macaroon, error) {
+			return svc.NewMacaroon("", nil, []checkers.Caveat{{
+				Location:  s.netSrv.URL + "/v1/discharger/",
+				Condition: "is-member-of test test2",
+			}})
+		},
+		expectDeclared: checkers.Declared{},
+	}, {
+		about: "test membership in single group - no match",
+		createMacaroon: func() (*macaroon.Macaroon, error) {
+			return svc.NewMacaroon("", nil, []checkers.Caveat{{
+				Location:  s.netSrv.URL + "/v1/discharger/",
+				Condition: "is-member-of test1",
+			}})
+		},
+		expectError: "third party refused discharge: cannot discharge: user is not a member of required groups",
+	}, {
+		about: "test membership in a set of groups - one group matches",
+		createMacaroon: func() (*macaroon.Macaroon, error) {
+			return svc.NewMacaroon("", nil, []checkers.Caveat{{
+				Location:  s.netSrv.URL + "/v1/discharger/",
+				Condition: "is-member-of test test3 test4",
+			}})
+		},
+		expectDeclared: checkers.Declared{},
+	}, {
+		about: "test membership in a set of groups fail - no match",
+		createMacaroon: func() (*macaroon.Macaroon, error) {
+			return svc.NewMacaroon("", nil, []checkers.Caveat{{
+				Location:  s.netSrv.URL + "/v1/discharger/",
+				Condition: "is-member-of test1 test3",
+			}})
+		},
+		expectError: "third party refused discharge: cannot discharge: user is not a member of required groups",
+	},
+	}
+
+	for _, test := range tests {
+		c.Logf("test: %q", test.about)
+		m, err := test.createMacaroon()
+		c.Assert(err, gc.IsNil)
+		// Fake a copy of the bakery service to create login cookies.
+		idsvc, err := bakery.NewService(bakery.NewServiceParams{
+			Store: s.store.Macaroons,
+			Key:   s.keyPair,
+		})
+		c.Assert(err, gc.IsNil)
+		idm, err := idsvc.NewMacaroon("", nil, []checkers.Caveat{
+			checkers.DeclaredCaveat("username", "test-user"),
+		})
+		c.Assert(err, gc.IsNil)
+		u, err := url.Parse(s.netSrv.URL)
+		c.Assert(err, gc.IsNil)
+		httpClient := httpbakery.NewHTTPClient()
+		err = httpbakery.SetCookie(httpClient.Jar, u, macaroon.Slice{idm})
+		c.Assert(err, gc.IsNil)
+		ms, err := httpbakery.DischargeAll(m, httpClient, noVisit)
+		if test.expectError != "" {
+			c.Assert(errgo.Cause(err), gc.ErrorMatches, test.expectError)
+		} else {
+			c.Assert(err, gc.IsNil)
+			d := checkers.InferDeclared(ms)
+			err = svc.Check(ms, checkers.New(d, checkers.TimeBefore))
+			c.Assert(err, gc.IsNil)
+			c.Assert(d, jc.DeepEquals, test.expectDeclared)
+		}
+	}
 }
 
 func (s *dischargeSuite) TestDischarge(c *gc.C) {
