@@ -110,29 +110,25 @@ func (s *dischargeSuite) TestDischargeMemberOf(c *gc.C) {
 		expectError    string
 		expectDeclared checkers.Declared
 	}{{
-		about: "test membership in single group",
+		about: "test membership in single group - matches",
 		createMacaroon: func() (*macaroon.Macaroon, error) {
 			return svc.NewMacaroon("", nil, []checkers.Caveat{{
 				Location:  s.netSrv.URL + "/v1/discharger/",
 				Condition: "is-member-of test",
 			}})
 		},
-		expectDeclared: checkers.Declared{
-			"member-of": "test",
-		},
+		expectDeclared: checkers.Declared{},
 	}, {
 		about: "test membership in a set of groups",
 		createMacaroon: func() (*macaroon.Macaroon, error) {
 			return svc.NewMacaroon("", nil, []checkers.Caveat{{
 				Location:  s.netSrv.URL + "/v1/discharger/",
-				Condition: "is-member-of test,test2",
+				Condition: "is-member-of test test2",
 			}})
 		},
-		expectDeclared: checkers.Declared{
-			"member-of": "test,test2",
-		},
+		expectDeclared: checkers.Declared{},
 	}, {
-		about: "test membership in single group fail",
+		about: "test membership in single group - no match",
 		createMacaroon: func() (*macaroon.Macaroon, error) {
 			return svc.NewMacaroon("", nil, []checkers.Caveat{{
 				Location:  s.netSrv.URL + "/v1/discharger/",
@@ -141,20 +137,20 @@ func (s *dischargeSuite) TestDischargeMemberOf(c *gc.C) {
 		},
 		expectError: "third party refused discharge: cannot discharge: unauthorized",
 	}, {
-		about: "test membership in a set of groups fail 1",
+		about: "test membership in a set of groups - one group matches",
 		createMacaroon: func() (*macaroon.Macaroon, error) {
 			return svc.NewMacaroon("", nil, []checkers.Caveat{{
 				Location:  s.netSrv.URL + "/v1/discharger/",
-				Condition: "is-member-of test,test2,test3",
+				Condition: "is-member-of test test3 test4",
 			}})
 		},
-		expectError: "third party refused discharge: cannot discharge: unauthorized",
+		expectDeclared: checkers.Declared{},
 	}, {
-		about: "test membership in a set of groups fail 2",
+		about: "test membership in a set of groups fail - no match",
 		createMacaroon: func() (*macaroon.Macaroon, error) {
 			return svc.NewMacaroon("", nil, []checkers.Caveat{{
 				Location:  s.netSrv.URL + "/v1/discharger/",
-				Condition: "is-member-of test3, test4",
+				Condition: "is-member-of test1 test3",
 			}})
 		},
 		expectError: "third party refused discharge: cannot discharge: unauthorized",
