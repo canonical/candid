@@ -54,7 +54,7 @@ func (h *Handler) checkThirdPartyCaveat(req *http.Request, cavId, cav string) ([
 	}
 	cond, args, err := checkers.ParseCaveat(cav)
 	if err != nil {
-		return nil, errgo.WithCausef(err, params.ErrBadRequest, "error parsing caveat %q", cav)
+		return nil, errgo.WithCausef(err, params.ErrBadRequest, "cannot parse caveat %q", cav)
 	}
 	switch cond {
 	case "is-authenticated-user":
@@ -85,21 +85,19 @@ func (h *Handler) checkAuthenticatedUser(username string) ([]checkers.Caveat, er
 // and declares group membership in discharge macaroon.
 func (h *Handler) checkMemberOfGroup(username, targetGroups string) ([]checkers.Caveat, error) {
 	groups := strings.Fields(targetGroups)
-	targetGroupMap := make(map[string]struct{})
-	for _, g := range groups {
-		targetGroupMap[g] = struct{}{}
-	}
 
 	user, err := h.store.GetIdentity(params.Username(username))
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
-	for _, group := range user.Groups {
-		if _, ok := targetGroupMap[group]; ok {
-			return []checkers.Caveat{}, nil
+	for _, userGroup := range user.Groups {
+		for _, g := range groups {
+			if userGroup == g {
+				return nil, nil
+			}
 		}
 	}
-	return nil, errgo.Notef(err, "unauthorized")
+	return nil, errgo.Notef(err, "user is not a member of required groups")
 }
 
 // needLoginError returns an error suitable for returning

@@ -135,7 +135,7 @@ func (s *dischargeSuite) TestDischargeMemberOf(c *gc.C) {
 				Condition: "is-member-of test1",
 			}})
 		},
-		expectError: "third party refused discharge: cannot discharge: unauthorized",
+		expectError: "third party refused discharge: cannot discharge: user is not a member of required groups",
 	}, {
 		about: "test membership in a set of groups - one group matches",
 		createMacaroon: func() (*macaroon.Macaroon, error) {
@@ -153,7 +153,7 @@ func (s *dischargeSuite) TestDischargeMemberOf(c *gc.C) {
 				Condition: "is-member-of test1 test3",
 			}})
 		},
-		expectError: "third party refused discharge: cannot discharge: unauthorized",
+		expectError: "third party refused discharge: cannot discharge: user is not a member of required groups",
 	},
 	}
 
