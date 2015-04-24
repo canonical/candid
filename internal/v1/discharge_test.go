@@ -83,7 +83,6 @@ func (s *dischargeSuite) TestDischargeWhenLoggedIn(c *gc.C) {
 	c.Assert(d, jc.DeepEquals, checkers.Declared{
 		"uuid":     uuid,
 		"username": "test-user",
-		"groups":   "test test2",
 	})
 }
 
