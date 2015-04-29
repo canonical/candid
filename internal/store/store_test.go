@@ -282,5 +282,5 @@ func (s *storeSuite) TestRetrieveLaunchpadGroups(c *gc.C) {
 	c.Assert(id.ExternalID, gc.Equals, "http://example.com/test")
 	c.Assert(id.Email, gc.Equals, "test@example.com")
 	c.Assert(id.FullName, gc.Equals, "Test User")
-	c.Assert(id.Groups, gc.DeepEquals, []string{"test1", "test2"})
+	c.Assert(id.Groups, gc.DeepEquals, []string{"test", "test1", "test2"})
 }
