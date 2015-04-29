@@ -92,7 +92,7 @@ func (s *Store) UpsertIdentity(doc *mongodoc.Identity) error {
 	// calling the launchpad API.
 	groups, err := s.getLaunchpadGroups(doc.Email)
 	if err == nil {
-		doc.Groups = groups
+		doc.Groups = append(doc.Groups, groups...)
 	} else {
 		logger.Warningf("failed to fetch list of groups from launchpad for %q: %s", doc.Email, err)
 	}
