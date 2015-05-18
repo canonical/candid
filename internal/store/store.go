@@ -3,6 +3,8 @@
 package store
 
 import (
+	"strings"
+
 	"code.google.com/p/go-uuid/uuid"
 	"github.com/juju/loggo"
 	"gopkg.in/errgo.v1"
@@ -71,6 +73,7 @@ func (s *Store) ensureIndexes() error {
 		mgo.Index{
 			Key:    []string{"external_id"},
 			Unique: true,
+			Sparse: true,
 		},
 	}}
 	for _, idx := range indexes {
@@ -88,23 +91,29 @@ func (s *Store) ensureIndexes() error {
 // Identity then an error is returned with the cause params.ErrAlreadyExists.
 func (s *Store) UpsertIdentity(doc *mongodoc.Identity) error {
 	doc.UUID = uuid.NewSHA1(IdentityNamespace, []byte(doc.Username)).String()
-	// TODO(mhilton) When we support other identity providers avoid
-	// calling the launchpad API.
-	groups, err := s.getLaunchpadGroups(doc.Email)
-	if err == nil {
-		doc.Groups = append(doc.Groups, groups...)
-	} else {
-		logger.Warningf("failed to fetch list of groups from launchpad for %q: %s", doc.Email, err)
+	if strings.HasPrefix(doc.ExternalID, "https://login.ubuntu.com/+id/") {
+		groups, err := s.getLaunchpadGroups(doc.Email)
+		if err == nil {
+			doc.Groups = append(doc.Groups, groups...)
+		} else {
+			logger.Warningf("failed to fetch list of groups from launchpad for %q: %s", doc.Email, err)
+		}
 	}
 	db := s.DB.Copy()
 	defer db.Close()
-	_, err = db.Identities().Upsert(
-		bson.M{
-			"username":    doc.Username,
-			"external_id": doc.ExternalID,
-		},
-		doc,
-	)
+	query := bson.D{{"username", doc.Username}}
+	if doc.ExternalID != "" {
+		if doc.Owner != "" {
+			return errgo.New("both external_id and owner specified")
+		}
+		query = append(query, bson.DocElem{"external_id", doc.ExternalID})
+	} else if doc.Owner != "" {
+		query = append(query, bson.DocElem{"owner", doc.Owner})
+	} else {
+		return errgo.New("no external_id or owner specified")
+	}
+
+	_, err := db.Identities().Upsert(query, doc)
 	if mgo.IsDup(err) {
 		return errgo.WithCausef(nil, params.ErrAlreadyExists, "cannot add user: duplicate username or external_id")
 	}

@@ -7,11 +7,11 @@ import (
 	"net/http"
 	"net/http/httptest"
 
-	"launchpad.net/lpad"
-
+	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/mgo.v2/bson"
+	"launchpad.net/lpad"
 
 	"github.com/CanonicalLtd/blues-identity/internal/idtesting"
 	"github.com/CanonicalLtd/blues-identity/internal/mongodoc"
@@ -68,12 +68,13 @@ func (s *storeSuite) TestNew(c *gc.C) {
 	c.Assert(doc.Groups, gc.DeepEquals, []string{"group1"})
 }
 
-func (s *storeSuite) TestUpsertIdentity(c *gc.C) {
-	store, err := store.New(s.Session.DB("testing"), lpad.APIBase(s.launchpad.URL))
-	c.Assert(err, gc.IsNil)
-
-	// Add an identity to the store.
-	err = store.UpsertIdentity(&mongodoc.Identity{
+var upsertIdentityTests = []struct {
+	about     string
+	identity  *mongodoc.Identity
+	expectErr string
+}{{
+	about: "insert interactive user",
+	identity: &mongodoc.Identity{
 		Username:   "test",
 		ExternalID: "http://example.com/test",
 		Email:      "test@example.com",
@@ -81,64 +82,167 @@ func (s *storeSuite) TestUpsertIdentity(c *gc.C) {
 		Groups: []string{
 			"test",
 		},
-	})
-	c.Assert(err, gc.IsNil)
-
-	// Check the newly created identity.
-	var doc mongodoc.Identity
-	err = store.DB.Identities().Find(nil).One(&doc)
-	c.Assert(err, gc.IsNil)
-	c.Assert(doc.Username, gc.Equals, "test")
-	c.Assert(doc.ExternalID, gc.Equals, "http://example.com/test")
-	c.Assert(doc.Email, gc.Equals, "test@example.com")
-	c.Assert(doc.FullName, gc.Equals, "Test User")
-	c.Assert(doc.Groups, gc.DeepEquals, []string{"test"})
-
-	// Update the Identity
-	err = store.UpsertIdentity(&mongodoc.Identity{
-		Username:   "test",
-		ExternalID: "http://example.com/test",
-		Email:      "test2@example.com",
-		FullName:   "Test User Updated",
+	},
+}, {
+	about: "update interactive user",
+	identity: &mongodoc.Identity{
+		Username:   "existing",
+		ExternalID: "http://example.com/existing",
+		Email:      "existing@example.com",
+		FullName:   "Existing User",
 		Groups: []string{
 			"test",
 			"test2",
 		},
-	})
-	c.Assert(err, gc.IsNil)
-
-	// Check the updated identity.
-	err = store.DB.Identities().Find(nil).One(&doc)
-	c.Assert(err, gc.IsNil)
-	c.Assert(doc.Username, gc.Equals, "test")
-	c.Assert(doc.ExternalID, gc.Equals, "http://example.com/test")
-	c.Assert(doc.Email, gc.Equals, "test2@example.com")
-	c.Assert(doc.FullName, gc.Equals, "Test User Updated")
-	c.Assert(doc.Groups, gc.DeepEquals, []string{"test", "test2"})
-
-	// Attempt to insert a clashing username
-	err = store.UpsertIdentity(&mongodoc.Identity{
-		Username:   "test",
-		ExternalID: "http://example.com/test3",
-		Email:      "test3@example.com",
-		FullName:   "Test User III",
+	},
+}, {
+	about: "clashing username",
+	identity: &mongodoc.Identity{
+		Username:   "existing",
+		ExternalID: "http://example.com/test-clashing",
+		Email:      "existing@example.com",
+		FullName:   "Existing User",
 		Groups: []string{
-			"test3",
+			"test",
 		},
-	})
-	c.Assert(errgo.Cause(err), gc.Equals, params.ErrAlreadyExists)
+	},
+	expectErr: "cannot add user: duplicate username or external_id",
+}, {
+	about: "clashing external ID",
+	identity: &mongodoc.Identity{
+		Username:   "test-clashing",
+		ExternalID: "http://example.com/existing",
+		Email:      "existing@example.com",
+		FullName:   "Existing User",
+		Groups: []string{
+			"test",
+		},
+	},
+	expectErr: "cannot add user: duplicate username or external_id",
+}, {
+	about: "insert agent user",
+	identity: &mongodoc.Identity{
+		Username:   "agent",
+		ExternalID: "",
+		Email:      "existing@example.com",
+		FullName:   "Existing User",
+		Groups: []string{
+			"test",
+		},
+		Owner:      "owner",
+		PublicKeys: []mongodoc.PublicKey{{Key: []byte("0000000000000000000000000000000")}},
+	},
+}, {
+	about: "update existing agent",
+	identity: &mongodoc.Identity{
+		Username:   "existing-agent",
+		ExternalID: "",
+		Email:      "existing@example.com",
+		FullName:   "Existing User",
+		Groups: []string{
+			"test",
+		},
+		Owner: "owner",
+		PublicKeys: []mongodoc.PublicKey{
+			{Key: []byte("0000000000000000000000000000000")},
+			{Key: []byte("1111111111111111111111111111111")},
+		},
+	},
+}, {
+	about: "duplicate agent",
+	identity: &mongodoc.Identity{
+		Username:   "existing-agent",
+		ExternalID: "",
+		Email:      "existing@example.com",
+		FullName:   "Existing User",
+		Groups: []string{
+			"test",
+		},
+		Owner: "another owner",
+		PublicKeys: []mongodoc.PublicKey{
+			{Key: []byte("0000000000000000000000000000000")},
+			{Key: []byte("1111111111111111111111111111111")},
+		},
+	},
+	expectErr: "cannot add user: duplicate username or external_id",
+}, {
+	about: "not fully specified",
+	identity: &mongodoc.Identity{
+		Username:   "existing-agent",
+		ExternalID: "",
+		Email:      "existing@example.com",
+		FullName:   "Existing User",
+		Groups: []string{
+			"test",
+		},
+		Owner: "",
+		PublicKeys: []mongodoc.PublicKey{
+			{Key: []byte("0000000000000000000000000000000")},
+			{Key: []byte("1111111111111111111111111111111")},
+		},
+	},
+	expectErr: "no external_id or owner specified",
+}, {
+	about: "external_id and owner",
+	identity: &mongodoc.Identity{
+		Username:   "existing-agent",
+		ExternalID: "http://example.com/existing",
+		Email:      "existing@example.com",
+		FullName:   "Existing User",
+		Groups: []string{
+			"test",
+		},
+		Owner: "owner",
+		PublicKeys: []mongodoc.PublicKey{
+			{Key: []byte("0000000000000000000000000000000")},
+			{Key: []byte("1111111111111111111111111111111")},
+		},
+	},
+	expectErr: "both external_id and owner specified",
+}}
 
-	// Attempt to insert a clashing external_id
+func (s *storeSuite) TestUpsertIdentity(c *gc.C) {
+	store, err := store.New(s.Session.DB("testing"), lpad.APIBase(s.launchpad.URL))
+	c.Assert(err, gc.IsNil)
+
+	// Add existing interactive user.
 	err = store.UpsertIdentity(&mongodoc.Identity{
-		Username:   "test2",
-		ExternalID: "http://example.com/test",
-		Email:      "test@example.com",
-		FullName:   "Test User",
+		Username:   "existing",
+		ExternalID: "http://example.com/existing",
+		Email:      "existing@example.com",
+		FullName:   "Existing User",
 		Groups: []string{
 			"test",
 		},
 	})
-	c.Assert(errgo.Cause(err), gc.Equals, params.ErrAlreadyExists)
+	c.Assert(err, gc.IsNil)
+
+	// Add existing agent user
+	err = store.UpsertIdentity(&mongodoc.Identity{
+		Username: "existing-agent",
+		Email:    "existing@example.com",
+		FullName: "Existing User",
+		Groups: []string{
+			"test",
+		},
+		Owner:      "owner",
+		PublicKeys: []mongodoc.PublicKey{{Key: []byte("00000000000000000000000000000000")}},
+	})
+	c.Assert(err, gc.IsNil)
+
+	for i, test := range upsertIdentityTests {
+		c.Logf("%d: %s", i, test.about)
+		err := store.UpsertIdentity(test.identity)
+		if test.expectErr != "" {
+			c.Assert(err, gc.ErrorMatches, test.expectErr)
+			continue
+		}
+		c.Assert(err, gc.IsNil)
+		var doc mongodoc.Identity
+		err = store.DB.Identities().Find(bson.D{{"username", test.identity.Username}}).One(&doc)
+		c.Assert(err, gc.IsNil)
+		c.Assert(&doc, jc.DeepEquals, test.identity)
+	}
 }
 
 func (s *storeSuite) TestCollections(c *gc.C) {
@@ -266,7 +370,7 @@ func (s *storeSuite) TestRetrieveLaunchpadGroups(c *gc.C) {
 	// Add an identity to the store.
 	err = store.UpsertIdentity(&mongodoc.Identity{
 		Username:   "test",
-		ExternalID: "http://example.com/test",
+		ExternalID: "https://login.ubuntu.com/+id/test",
 		Email:      "test@example.com",
 		FullName:   "Test User",
 		Groups: []string{
@@ -279,7 +383,7 @@ func (s *storeSuite) TestRetrieveLaunchpadGroups(c *gc.C) {
 	id, err := store.GetIdentity(params.Username("test"))
 	c.Assert(err, gc.IsNil)
 	c.Assert(id.Username, gc.Equals, "test")
-	c.Assert(id.ExternalID, gc.Equals, "http://example.com/test")
+	c.Assert(id.ExternalID, gc.Equals, "https://login.ubuntu.com/+id/test")
 	c.Assert(id.Email, gc.Equals, "test@example.com")
 	c.Assert(id.FullName, gc.Equals, "Test User")
 	c.Assert(id.Groups, gc.DeepEquals, []string{"test", "test1", "test2"})
