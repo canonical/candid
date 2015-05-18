@@ -10,7 +10,7 @@ import (
 
 	"github.com/juju/httprequest"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v0/bakery/checkers"
+	"gopkg.in/macaroon-bakery.v1/bakery/checkers"
 	"gopkg.in/macaroon.v1"
 	"gopkg.in/mgo.v2/bson"
 

@@ -15,9 +15,9 @@ import (
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v0/bakery"
-	"gopkg.in/macaroon-bakery.v0/bakery/checkers"
-	"gopkg.in/macaroon-bakery.v0/httpbakery"
+	"gopkg.in/macaroon-bakery.v1/bakery"
+	"gopkg.in/macaroon-bakery.v1/bakery/checkers"
+	"gopkg.in/macaroon-bakery.v1/httpbakery"
 	"gopkg.in/macaroon.v1"
 
 	"github.com/CanonicalLtd/blues-identity/internal/idtesting/mockusso"
@@ -90,10 +90,10 @@ func (s *dischargeSuite) TestDischargeWhenLoggedIn(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 	u, err := url.Parse(s.netSrv.URL)
 	c.Assert(err, gc.IsNil)
-	httpClient := httpbakery.NewHTTPClient()
-	err = httpbakery.SetCookie(httpClient.Jar, u, macaroon.Slice{idm})
+	bakeryClient := httpbakery.NewClient()
+	err = httpbakery.SetCookie(bakeryClient.Client.Jar, u, macaroon.Slice{idm})
 	c.Assert(err, gc.IsNil)
-	ms, err := httpbakery.DischargeAll(m, httpClient, noVisit)
+	ms, err := bakeryClient.DischargeAll(m)
 	c.Assert(err, gc.IsNil)
 	d := checkers.InferDeclared(ms)
 	err = svc.Check(ms, checkers.New(d, checkers.TimeBefore))
@@ -190,10 +190,10 @@ func (s *dischargeSuite) TestDischargeMemberOf(c *gc.C) {
 		c.Assert(err, gc.IsNil)
 		u, err := url.Parse(s.netSrv.URL)
 		c.Assert(err, gc.IsNil)
-		httpClient := httpbakery.NewHTTPClient()
-		err = httpbakery.SetCookie(httpClient.Jar, u, macaroon.Slice{idm})
+		bakeryClient := httpbakery.NewClient()
+		err = httpbakery.SetCookie(bakeryClient.Client.Jar, u, macaroon.Slice{idm})
 		c.Assert(err, gc.IsNil)
-		ms, err := httpbakery.DischargeAll(m, httpClient, noVisit)
+		ms, err := bakeryClient.DischargeAll(m)
 		if test.expectError != "" {
 			c.Assert(errgo.Cause(err), gc.ErrorMatches, test.expectError)
 		} else {
@@ -261,7 +261,7 @@ func (s *dischargeSuite) TestAdminDischarge(c *gc.C) {
 				r.URL.RawQuery += "&discharge-for-user=jbloggs"
 			},
 		},
-		expectErr: `cannot get discharge from "[^"]*": cannot start interactive session: unexpected call to visit`,
+		expectErr: `cannot get discharge from "[^"]*": cannot start interactive session: interaction required but not possible`,
 	}, {
 		about: "unsupported user",
 		m: newMacaroon(c, svc, []checkers.Caveat{{
@@ -304,12 +304,12 @@ func (s *dischargeSuite) TestAdminDischarge(c *gc.C) {
 	}}
 	for i, test := range tests {
 		c.Logf("test %d. %s", i, test.about)
-		client := httpbakery.NewHTTPClient()
+		client := httpbakery.NewClient()
 		if test.modifier != nil {
-			test.modifier.transport = client.Transport
-			client.Transport = test.modifier
+			test.modifier.transport = client.Client.Transport
+			client.Client.Transport = test.modifier
 		}
-		ms, err := httpbakery.DischargeAll(test.m, client, noVisit)
+		ms, err := client.DischargeAll(test.m)
 		if test.expectErr != "" {
 			c.Assert(err, gc.ErrorMatches, test.expectErr)
 			continue
@@ -337,17 +337,18 @@ func (s *dischargeSuite) TestDischargeWithOpenID(c *gc.C) {
 		Locator: s.locator,
 	})
 	c.Assert(err, gc.IsNil)
-	client := httpbakery.NewHTTPClient()
-	client.Transport = transport{
+	client := httpbakery.NewClient()
+	client.Client.Transport = transport{
 		prefix: location,
 		srv:    s.srv,
 		rt:     http.DefaultTransport,
 	}
+	client.VisitWebPage = s.doVisit(c)
 	m := newMacaroon(c, svc, []checkers.Caveat{{
 		Location:  s.netSrv.URL + "/v1/discharger/",
 		Condition: "is-authenticated-user",
 	}})
-	ms, err := httpbakery.DischargeAll(m, client, s.doVisit(c))
+	ms, err := client.DischargeAll(m)
 	c.Assert(err, gc.IsNil)
 	d := checkers.InferDeclared(ms)
 	err = svc.Check(ms, checkers.New(
@@ -418,8 +419,9 @@ func (s *dischargeSuite) TestDischargeWithOAuth(c *gc.C) {
 		Condition: "is-authenticated-user",
 	}})
 	c.Assert(err, gc.IsNil)
-	httpClient := httpbakery.NewHTTPClient()
-	ms, err := httpbakery.DischargeAll(m, httpClient, oauthVisit(c, client, goodToken))
+	bakeryClient := httpbakery.NewClient()
+	bakeryClient.VisitWebPage = oauthVisit(c, client, goodToken)
+	ms, err := bakeryClient.DischargeAll(m)
 	c.Assert(err, gc.IsNil)
 	d := checkers.InferDeclared(ms)
 	err = svc.Check(ms, checkers.New(d, checkers.TimeBefore))
@@ -467,8 +469,9 @@ func (s *dischargeSuite) TestDischargeWithOAuthBadToken(c *gc.C) {
 		Condition: "is-authenticated-user",
 	}})
 	c.Assert(err, gc.IsNil)
-	httpClient := httpbakery.NewHTTPClient()
-	_, err = httpbakery.DischargeAll(m, httpClient, oauthVisit(c, client, badToken))
+	bakeryClient := httpbakery.NewClient()
+	bakeryClient.VisitWebPage = oauthVisit(c, client, badToken)
+	_, err = bakeryClient.DischargeAll(m)
 	c.Assert(err, gc.ErrorMatches, `cannot get discharge from ".*/v1/discharger/": cannot start interactive session: invalid OAuth credentials`)
 }
 
