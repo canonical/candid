@@ -24,6 +24,9 @@ type Identity struct {
 	// Email holds the email address of the user.
 	Email string
 
+	// GravatarID holds the md5 of email address of the user as a gravatar id.
+	GravatarID string
+
 	// FullName holds the full name of the user.
 	FullName string `bson:"fullname"`
 

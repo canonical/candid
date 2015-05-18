@@ -3,6 +3,8 @@
 package v1
 
 import (
+	"crypto/md5"
+	"encoding/hex"
 	"encoding/json"
 	"net/http"
 	"strings"
@@ -60,6 +62,7 @@ func (h *Handler) serveUser(hdr http.Header, _ httprequest.Params, p *usernamePa
 		ExternalID: id.ExternalID,
 		FullName:   id.FullName,
 		Email:      id.Email,
+		GravatarID: id.GravatarID,
 		IDPGroups:  id.Groups,
 	}, nil
 }
@@ -73,10 +76,16 @@ func (h *Handler) servePutUser(_ http.ResponseWriter, _ httprequest.Params, u *p
 	if blacklistUsernames[u.Username] {
 		return errgo.WithCausef(nil, params.ErrForbidden, "username %q is reserved", u.Username)
 	}
+
+	hasher := md5.New()
+	hasher.Write([]byte(u.User.Email))
+	md5 := hex.EncodeToString(hasher.Sum(nil))
+
 	doc := &mongodoc.Identity{
 		Username:   string(u.Username),
 		ExternalID: u.User.ExternalID,
 		Email:      u.User.Email,
+		GravatarID: md5,
 		FullName:   u.User.FullName,
 		Groups:     u.User.IDPGroups,
 	}
