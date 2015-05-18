@@ -8,7 +8,7 @@ import (
 
 	"github.com/juju/testing/httptesting"
 	gc "gopkg.in/check.v1"
-	"gopkg.in/macaroon-bakery.v0/bakery"
+	"gopkg.in/macaroon-bakery.v1/bakery"
 
 	"github.com/CanonicalLtd/blues-identity/internal/idtesting"
 	"github.com/CanonicalLtd/blues-identity/internal/store"
