@@ -19,7 +19,7 @@ type Identity struct {
 	Username string
 
 	// ExternalID holds a globally unique name for the user.
-	ExternalID string `bson:"external_id"`
+	ExternalID string `bson:"external_id,omitempty"`
 
 	// Email holds the email address of the user.
 	Email string
@@ -27,8 +27,14 @@ type Identity struct {
 	// FullName holds the full name of the user.
 	FullName string `bson:"fullname"`
 
+	// Owner holds the UUID of the owner of this user, if there is one.
+	Owner string `bson:",omitempty"`
+
 	// Groups holds a list of group names to which the user belongs.
 	Groups []string
+
+	// PublicKeys contains a list of public keys associated with this account.
+	PublicKeys []PublicKey `bson:"public_keys,omitempty"`
 
 	// ExtraInfo holds additional information about the user that
 	// is required by other parts of the system.
@@ -48,4 +54,8 @@ type IdentityProvider struct {
 
 	// LoginURL is the URL to which login is redirected.
 	LoginURL string `bson:"login_url,omitempty"`
+}
+
+type PublicKey struct {
+	Key []byte
 }

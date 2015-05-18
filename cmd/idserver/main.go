@@ -61,7 +61,7 @@ func serve(confPath string) error {
 		return errgo.Notef(err, "cannot dial mongo at %q", conf.MongoAddr)
 	}
 	defer session.Close()
-	db := session.DB("juju")
+	db := session.DB("identity")
 
 	logger.Infof("setting up the identity server")
 	var keypair bakery.KeyPair
