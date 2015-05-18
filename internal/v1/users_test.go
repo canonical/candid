@@ -445,8 +445,7 @@ func (s *usersSuite) TestQueryUsers(c *gc.C) {
 		IDPGroups: []string{
 			"test",
 		},
-	},
-	)
+	})
 	tests := []struct {
 		about        string
 		url          string
@@ -762,21 +761,6 @@ func (s *usersSuite) TestUserIDPGroups(c *gc.C) {
 			ExpectBody:   test.expectBody,
 		})
 	}
-}
-
-func (s *usersSuite) createUser(c *gc.C, user *params.User) {
-	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
-		Handler: s.srv,
-		URL:     apiURL("u/" + string(user.Username)),
-		Method:  "PUT",
-		Header: http.Header{
-			"Content-Type": []string{"application/json"},
-		},
-		Body:         marshal(c, user),
-		Username:     adminUsername,
-		Password:     adminPassword,
-		ExpectStatus: http.StatusOK,
-	})
 }
 
 func (s *usersSuite) getToken(c *gc.C, un string) *macaroon.Macaroon {

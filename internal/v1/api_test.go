@@ -3,7 +3,14 @@
 package v1_test
 
 import (
+	"bufio"
+	"bytes"
+	"fmt"
+	"io/ioutil"
 	"net/http"
+	"net/http/httptest"
+	"net/url"
+	"strings"
 
 	"launchpad.net/lpad"
 
@@ -27,6 +34,7 @@ const (
 	version       = "v1"
 	adminUsername = "admin"
 	adminPassword = "password"
+	location      = "https://0.1.2.3/identity"
 )
 
 type apiSuite struct {
@@ -50,17 +58,12 @@ func (s *apiSuite) TearDownSuite(c *gc.C) {
 func (s *apiSuite) SetUpTest(c *gc.C) {
 	s.IsolatedMgoSuite.SetUpTest(c)
 
-	// Make sure that we don't invoke the real openid package's redirectURL
-	// function, which makes network calls.
-	s.PatchValue(v1.OpenidRedirectURL, fakeRedirectURL)
-
 	key, err := bakery.GenerateKey()
 	c.Assert(err, gc.IsNil)
 	s.srv, s.store = newServer(c, s.Session, key)
 	// Create Macaroon storage.
 	ms, err := mgostorage.New(s.store.DB.Macaroons())
 	c.Assert(err, gc.IsNil)
-
 	// Create the bakery Service.
 	svc, err := bakery.NewService(bakery.NewServiceParams{
 		Store: ms,
@@ -81,7 +84,7 @@ func (s *apiSuite) TearDownTest(c *gc.C) {
 
 func newServer(c *gc.C, session *mgo.Session, key *bakery.KeyPair) (http.Handler, *store.Store) {
 	db := session.DB("testing")
-	store, err := store.New(db, lpad.Staging)
+	st, err := store.New(db, lpad.Staging)
 	c.Assert(err, gc.IsNil)
 	srv, err := server.New(
 		db,
@@ -89,13 +92,14 @@ func newServer(c *gc.C, session *mgo.Session, key *bakery.KeyPair) (http.Handler
 			AuthUsername: adminUsername,
 			AuthPassword: adminPassword,
 			Key:          key,
+			Location:     location,
 		},
 		map[string]server.NewAPIHandlerFunc{
 			version: v1.NewAPIHandler,
 		},
 	)
 	c.Assert(err, gc.IsNil)
-	return srv, store
+	return srv, st
 }
 
 func (s *apiSuite) assertMacaroon(c *gc.C, ms macaroon.Slice, check bakery.FirstPartyChecker) {
@@ -104,6 +108,7 @@ func (s *apiSuite) assertMacaroon(c *gc.C, ms macaroon.Slice, check bakery.First
 }
 
 func (s *apiSuite) createUser(c *gc.C, user *params.User) (uuid string) {
+	c.Logf("DefaultClient: %#v, DefaultTransport: %#v", http.DefaultClient, http.DefaultTransport)
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Handler: s.srv,
 		URL:     apiURL("u/" + string(user.Username)),
@@ -128,4 +133,40 @@ func (s *apiSuite) createUser(c *gc.C, user *params.User) (uuid string) {
 
 func apiURL(path string) string {
 	return "/" + version + "/" + path
+}
+
+// transport implements an http.RoundTripper that will intercept anly calls
+// destined to a location starting with prefix and serves them using srv. For
+// all other requests rt will be used.
+type transport struct {
+	prefix string
+	srv    http.Handler
+	rt     http.RoundTripper
+}
+
+func (t transport) RoundTrip(req *http.Request) (*http.Response, error) {
+	dest := req.URL.String()
+	if !strings.HasPrefix(dest, t.prefix) {
+		return t.rt.RoundTrip(req)
+	}
+	var buf bytes.Buffer
+	req.Write(&buf)
+	sreq, _ := http.ReadRequest(bufio.NewReader(&buf))
+	u, _ := url.Parse(t.prefix)
+	sreq.URL.Path = strings.TrimPrefix(sreq.URL.Path, u.Path)
+	sreq.RequestURI = strings.TrimPrefix(sreq.RequestURI, u.Path)
+	sreq.RemoteAddr = "127.0.0.1:1234"
+	rr := httptest.NewRecorder()
+	t.srv.ServeHTTP(rr, sreq)
+	return &http.Response{
+		Status:        fmt.Sprintf("%d Status", rr.Code),
+		StatusCode:    rr.Code,
+		Proto:         "HTTP/1.1",
+		ProtoMajor:    1,
+		ProtoMinor:    1,
+		Header:        rr.HeaderMap,
+		Body:          ioutil.NopCloser(rr.Body),
+		ContentLength: int64(rr.Body.Len()),
+		Request:       req,
+	}, nil
 }

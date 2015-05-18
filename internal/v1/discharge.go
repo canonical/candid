@@ -3,20 +3,17 @@
 package v1
 
 import (
-	"fmt"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/juju/httprequest"
-	"github.com/julienschmidt/httprouter"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v0/bakery"
 	"gopkg.in/macaroon-bakery.v0/bakery/checkers"
 	"gopkg.in/macaroon-bakery.v0/httpbakery"
 	"gopkg.in/macaroon.v1"
 
-	"github.com/CanonicalLtd/blues-identity/internal/mongodoc"
 	"github.com/CanonicalLtd/blues-identity/params"
 )
 
@@ -111,106 +108,14 @@ func (h *Handler) needLoginError(cavId, caveat string, why string) error {
 	if err != nil {
 		return errgo.Notef(err, "cannot make rendezvous")
 	}
-
-	// Could potentially bounce to a "choose login method" page
-	// here rather than going straight to a single chosen provider.
-	loginURL, err := h.provider.loginURL(h.idProviderBaseURL(), waitId)
-	if err != nil {
-		return errgo.Mask(err)
-	}
 	return &httpbakery.Error{
 		Message: why,
 		Code:    httpbakery.ErrInteractionRequired,
 		Info: &httpbakery.ErrorInfo{
-			VisitURL: loginURL,
-			WaitURL:  h.svc.Location() + "/v1/wait?waitid=" + waitId,
+			VisitURL: h.location + "/v1/login?waitid=" + waitId,
+			WaitURL:  h.location + "/v1/wait?waitid=" + waitId,
 		},
 	}
-}
-
-// loginCallbackHandler returns a handler which handles a callback
-// from the given id provider, calling idp.login to obtain information
-// on the request that was made.
-func (h *Handler) loginCallbackHandler(idp idProvider) httprouter.Handle {
-	return handleErrors(func(w http.ResponseWriter, p httprequest.Params) error {
-		return h.loginCallback(w, p.Request, idp)
-	})
-}
-
-// loginCallback is a generalised entry point for external identity providers.
-// It handles a callback request from an external identity provider
-// and calls idP.login to determine the user's information
-// from the callback request.
-func (h *Handler) loginCallback(w http.ResponseWriter, req *http.Request, idp idProvider) error {
-	req.ParseForm()
-	waitId := req.Form.Get("waitid")
-	if waitId == "" {
-		return errgo.New("wait id not found in callback")
-	}
-	m, info, err := h.loginCallback1(w, req, waitId, idp)
-	if err != nil {
-		_, bakeryErr := httpbakery.ErrorToResponse(err)
-		h.place.Done(waitId, &loginInfo{
-			Error: bakeryErr.(*httpbakery.Error),
-		})
-		return errgo.Notef(err, "login failed")
-	}
-	if err := h.place.Done(waitId, &loginInfo{
-		IdentityMacaroon: m,
-	}); err != nil {
-		return errgo.Notef(err, "cannot complete rendezvous")
-	}
-	fmt.Fprintf(w, "login successful as user %#v\n", info)
-	return nil
-}
-
-// loginCallback1 is the inner implementation of loginCallback.
-// It does everything except reply to the wait request.
-func (h *Handler) loginCallback1(
-	w http.ResponseWriter,
-	req *http.Request,
-	waitId string,
-	idp idProvider,
-) (*macaroon.Macaroon, *verifiedUserInfo, error) {
-	info, err := idp.verifyCallback(w, req)
-	if err != nil {
-		return nil, nil, errgo.Mask(err, errgo.Any)
-	}
-	if info.User == "" {
-		return nil, nil, errgo.New("no user found in openid callback")
-	}
-	if info.Nickname == "" {
-		return nil, nil, errgo.New("no nickname found in openid callback")
-	}
-	// Create the user information if necessary.
-	if err := h.store.UpsertIdentity(&mongodoc.Identity{
-		Username:   info.Nickname,
-		ExternalID: info.User,
-		Email:      info.Email,
-		FullName:   info.FullName,
-		Groups:     info.Groups,
-	}); err != nil {
-		return nil, nil, errgo.Mask(err)
-	}
-
-	// We provide the user with a macaroon that they can use later
-	// to prove to us that they have logged in. The macaroon is valid
-	// for any operation that that user is allowed to perform.
-
-	// TODO add expiry date and maybe more first party caveats to this.
-	m, err := h.svc.NewMacaroon("", nil, []checkers.Caveat{
-		checkers.DeclaredCaveat("username", info.Nickname),
-		httpbakery.SameClientIPAddrCaveat(req),
-	})
-	if err != nil {
-		return nil, nil, errgo.Notef(err, "cannot mint macaroon")
-	}
-	cookie, err := httpbakery.NewCookie(macaroon.Slice{m})
-	if err != nil {
-		return nil, nil, errgo.Notef(err, "cannot create cookie")
-	}
-	http.SetCookie(w, cookie)
-	return m, info, nil
 }
 
 type wait struct {

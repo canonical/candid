@@ -21,11 +21,12 @@ var logger = loggo.GetLogger("identity.internal.v1")
 
 // Handler handles the /v1 api requests. Handler implements http.Handler
 type Handler struct {
+	location string
 	r        *httprouter.Router
 	store    *store.Store
 	svc      *bakery.Service
 	place    *place
-	provider idProvider
+	provider *ussoProvider
 	auth     *server.Authorizer
 }
 
@@ -39,13 +40,14 @@ func NewAPIHandler(s *store.Store, auth *server.Authorizer, svc *bakery.Service)
 // New returns a new instance of the v1 API handler.
 func New(s *store.Store, auth *server.Authorizer, svc *bakery.Service) *Handler {
 	h := &Handler{
+		location: svc.Location(),
 		r:        httprouter.New(),
 		store:    s,
 		svc:      svc,
 		place:    &place{s.Place},
-		provider: newUSSOProvider(svc.Location()),
 		auth:     auth,
 	}
+	h.provider = newUSSOProvider(h, h.location+"/v1/idp/usso")
 	h.r.NotFound = notFound
 	h.r.MethodNotAllowed = methodNotAllowed
 	// Redirection does not work because the router does not know
@@ -64,10 +66,11 @@ func New(s *store.Store, auth *server.Authorizer, svc *bakery.Service) *Handler 
 	h.r.GET("/debug/status", handleJSON(h.serveDebugStatus))
 	h.r.Handler("GET", dischargePath+"/*path", mux)
 	h.r.Handler("POST", dischargePath+"/*path", mux)
-	h.r.GET("/idp/usso/callback", h.loginCallbackHandler(h.provider))
+	h.r.Handler("GET", "/idp/usso/*path", http.StripPrefix("/idp/usso", h.provider.handler()))
 	h.r.GET("/idps", handleJSON(h.serveIdentityProviders))
 	h.r.GET("/idps/:idp", handle(h.serveIdentityProvider))
 	h.r.PUT("/idps/:idp", h.adminRequired(handle(h.servePutIdentityProvider)))
+	h.r.GET("/login", handleErrors(h.login))
 	h.r.GET("/u", h.adminRequired(handle(h.serveQueryUsers)))
 	h.r.GET("/u/:username", h.adminRequired(handle(h.serveUser)))
 	h.r.PUT("/u/:username", h.adminRequired(handle(h.servePutUser)))
@@ -88,20 +91,10 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 var errNotImplemented = errgo.Newf("method not implemented")
 
-// idProvider implements the non-portable parts of an
-// external identity provider.
-type idProvider interface {
-	// verifyCallback handles the login callback from the authentication request.
-	// It returns the verified user info, if any.
-	verifyCallback(w http.ResponseWriter, req *http.Request) (*verifiedUserInfo, error)
-
-	// loginURL returns the URL to visit in order to
-	// login.
-	loginURL(baseURL, waitid string) (string, error)
-}
-
-func (h *Handler) idProviderBaseURL() string {
-	return h.svc.Location() + "/v1/idp/usso/callback"
+// requestURL calculates the originally requested URL for the
+// provided http.Request.
+func (h *Handler) requestURL(r *http.Request) string {
+	return h.location + r.RequestURI
 }
 
 func (h *Handler) adminRequired(f httprouter.Handle) httprouter.Handle {
