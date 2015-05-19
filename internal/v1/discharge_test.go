@@ -3,6 +3,7 @@
 package v1_test
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -21,6 +22,7 @@ import (
 	"gopkg.in/macaroon.v1"
 
 	"github.com/CanonicalLtd/blues-identity/internal/idtesting/mockusso"
+	"github.com/CanonicalLtd/blues-identity/internal/mongodoc"
 	"github.com/CanonicalLtd/blues-identity/params"
 )
 
@@ -284,7 +286,7 @@ func (s *dischargeSuite) TestAdminDischarge(c *gc.C) {
 		modifier: &requestModifier{
 			f: func(r *http.Request) {
 				r.SetBasicAuth(adminUsername, adminPassword)
-				r.URL.RawQuery += "&discharge-for-user=jbloggs2"
+				r.URL.RawQuery += "&discharge-for-user=jbloggs"
 			},
 		},
 		expectErr: `.*caveat not recognized`,
@@ -527,7 +529,7 @@ func oauthVisit(c *gc.C, client *oauth.Client, token *oauth.Credentials) func(*u
 		if err != nil {
 			return err
 		}
-		return errgo.New(perr.Message)
+		return &perr
 	}
 }
 
@@ -578,4 +580,103 @@ var goodToken = &oauth.Credentials{
 var badToken = &oauth.Credentials{
 	Token:  "bad-token",
 	Secret: "bad-secret2",
+}
+
+func (s *dischargeSuite) TestDischargeWithAgentLogin(c *gc.C) {
+	s.PatchValue(&http.DefaultTransport, transport{
+		prefix: location,
+		srv:    s.srv,
+		rt:     http.DefaultTransport,
+	})
+	keys, err := bakery.GenerateKey()
+	c.Assert(err, gc.IsNil)
+	uuid := s.createIdentity(c, &mongodoc.Identity{
+		Username: "test",
+		Email:    "test@example.com",
+		FullName: "Test User",
+		Groups: []string{
+			"test",
+		},
+		Owner: "admin",
+		PublicKeys: []mongodoc.PublicKey{{
+			Key: keys.Public.Key[:],
+		}},
+	})
+	// Create the service which will issue the third party caveat.
+	svc, err := bakery.NewService(bakery.NewServiceParams{
+		Locator: s.locator,
+	})
+	c.Assert(err, gc.IsNil)
+	m, err := svc.NewMacaroon("", nil, []checkers.Caveat{{
+		Location:  s.netSrv.URL + "/v1/discharger/",
+		Condition: "is-authenticated-user",
+	}})
+	c.Assert(err, gc.IsNil)
+	bakeryClient := httpbakery.NewClient()
+	bakeryClient.VisitWebPage = agentVisit(c, bakeryClient, "test", &keys.Public)
+	bakeryClient.Key = keys
+	ms, err := bakeryClient.DischargeAll(m)
+	c.Assert(err, gc.IsNil)
+	d := checkers.InferDeclared(ms)
+	err = svc.Check(ms, checkers.New(d, checkers.TimeBefore))
+	c.Assert(err, gc.IsNil)
+	c.Assert(d, jc.DeepEquals, checkers.Declared{
+		"uuid":     uuid,
+		"username": "test",
+	})
+}
+
+func agentVisit(c *gc.C, client *httpbakery.Client, username string, pk *bakery.PublicKey) func(u *url.URL) error {
+	return func(u *url.URL) error {
+		req, err := http.NewRequest("GET", u.String(), nil)
+		if err != nil {
+			return err
+		}
+		req.Header.Set("Accept", "application/json")
+		resp, err := client.Do(req)
+		if err != nil {
+			return err
+		}
+		defer resp.Body.Close()
+		var loginMethods params.LoginMethods
+		body, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			return err
+		}
+		err = json.Unmarshal(body, &loginMethods)
+		if err != nil {
+			return err
+		}
+		body, err = json.Marshal(params.AgentLoginRequest{
+			Username:  params.Username(username),
+			PublicKey: pk,
+		})
+		if err != nil {
+			return err
+		}
+		req, err = http.NewRequest("POST", loginMethods.Agent, nil)
+		req.Header.Set("Content-Type", "application/json")
+		if err != nil {
+			return err
+		}
+		resp, err = client.DoWithBody(req, bytes.NewReader(body))
+		if err != nil {
+			return err
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode == http.StatusOK {
+			return nil
+		}
+		c.Logf("Status: %s", resp.Status)
+		var perr params.Error
+		body, err = ioutil.ReadAll(resp.Body)
+		if err != nil {
+			return err
+		}
+		err = json.Unmarshal(body, &perr)
+		if err != nil {
+			return err
+		}
+		return &perr
+	}
 }

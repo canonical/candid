@@ -54,6 +54,7 @@ func New(s *store.Store, auth *server.Authorizer, svc *bakery.Service) *Handler 
 	// about the /v1 prefix. Disable the automatic redirection features.
 	h.r.RedirectTrailingSlash = false
 	h.r.RedirectFixedPath = false
+	h.r.POST("/agent", handle(h.agentLogin))
 	mux := http.NewServeMux()
 	const dischargePath = "/discharger"
 	httpbakery.AddDischargeHandler(mux, dischargePath, svc, h.checkThirdPartyCaveat)

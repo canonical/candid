@@ -108,7 +108,6 @@ func (s *apiSuite) assertMacaroon(c *gc.C, ms macaroon.Slice, check bakery.First
 }
 
 func (s *apiSuite) createUser(c *gc.C, user *params.User) (uuid string) {
-	c.Logf("DefaultClient: %#v, DefaultTransport: %#v", http.DefaultClient, http.DefaultTransport)
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Handler: s.srv,
 		URL:     apiURL("u/" + string(user.Username)),
@@ -129,6 +128,12 @@ func (s *apiSuite) createUser(c *gc.C, user *params.User) (uuid string) {
 	).Select(bson.D{{"baseurl", 1}}).One(&id)
 	c.Assert(err, gc.IsNil)
 	return id.UUID
+}
+
+func (s *apiSuite) createIdentity(c *gc.C, doc *mongodoc.Identity) (uuid string) {
+	err := s.store.UpsertIdentity(doc)
+	c.Assert(err, gc.IsNil)
+	return doc.UUID
 }
 
 func apiURL(path string) string {

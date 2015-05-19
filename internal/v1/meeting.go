@@ -21,7 +21,7 @@ type loginInfo struct {
 	// When a user logs in successfully, an identity
 	// macaroon is provided which grants them
 	// the right to perform operations as that user.
-	IdentityMacaroon *macaroon.Macaroon
+	IdentityMacaroon macaroon.Slice
 
 	// When a login request fails, the error is filled out appropriately.
 	Error *httpbakery.Error

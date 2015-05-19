@@ -28,11 +28,13 @@ func (h *Handler) login(w http.ResponseWriter, p httprequest.Params) error {
 	if err != nil {
 		return errgo.Notef(err, "cannot get oauth login URL")
 	}
+	agentURL := h.agentLoginURL(waitId)
 	// TODO should really be parsing the accept header properly here, but
 	// it's really complicated http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.1
 	// perhaps use http://godoc.org/bitbucket.org/ww/goautoneg for this.
 	if p.Request.Header.Get("Accept") == "application/json" {
 		err := httprequest.WriteJSON(w, http.StatusOK, params.LoginMethods{
+			Agent:          agentURL,
 			Interactive:    ussoOpenID,
 			UbuntuSSOOAuth: ussoOAuth,
 		})
@@ -45,11 +47,7 @@ func (h *Handler) login(w http.ResponseWriter, p httprequest.Params) error {
 	return nil
 }
 
-// loginSuccess is used by identity providers once they have determined that
-// the login completed successfully.
-func (h *Handler) loginSuccess(w http.ResponseWriter, r *http.Request, userID string) {
-	r.ParseForm()
-	waitId := r.Form.Get("waitid")
+func (h *Handler) loginID(w http.ResponseWriter, r *http.Request, userID string) {
 	// We provide the user with a macaroon that they can use later
 	// to prove to us that they have logged in. The macaroon is valid
 	// for any operation that that user is allowed to perform.
@@ -57,27 +55,34 @@ func (h *Handler) loginSuccess(w http.ResponseWriter, r *http.Request, userID st
 	// TODO add expiry date and maybe more first party caveats to this.
 	m, err := h.svc.NewMacaroon("", nil, []checkers.Caveat{
 		checkers.DeclaredCaveat("username", userID),
-		httpbakery.SameClientIPAddrCaveat(r),
 	})
 	if err != nil {
 		h.loginFailure(w, r, errgo.Notef(err, "cannot create macaroon"))
 		return
 	}
-	cookie, err := httpbakery.NewCookie(macaroon.Slice{m})
+	h.loginSuccess(w, r, macaroon.Slice{m}, "login successful as user %#v\n", userID)
+}
+
+// loginSuccess is used by identity providers once they have determined that
+// the login completed successfully.
+func (h *Handler) loginSuccess(w http.ResponseWriter, r *http.Request, ms macaroon.Slice, format string, a ...interface{}) {
+	cookie, err := httpbakery.NewCookie(ms)
 	if err != nil {
 		h.loginFailure(w, r, errgo.Notef(err, "cannot create cookie"))
 		return
 	}
 	http.SetCookie(w, cookie)
+	r.ParseForm()
+	waitId := r.Form.Get("waitid")
 	if waitId != "" {
 		if err := h.place.Done(waitId, &loginInfo{
-			IdentityMacaroon: m,
+			IdentityMacaroon: ms,
 		}); err != nil {
 			h.loginFailure(w, r, errgo.Notef(err, "cannot complete rendezvous"))
 			return
 		}
 	}
-	fmt.Fprintf(w, "login successful as user %#v\n", userID)
+	fmt.Fprintf(w, format, a...)
 }
 
 // loginFailure is used by identity providers once they have determined that
