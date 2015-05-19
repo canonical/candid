@@ -140,6 +140,7 @@ func (s *usersSuite) TestUser(c *gc.C) {
 			ExternalID: "http://example.com/jbloggs3",
 			Email:      "jbloggs3@example.com",
 			FullName:   "Joe Bloggs III",
+			GravatarID: "21e89fe03e3a3cc553933f99eb442d94",
 			IDPGroups: []string{
 				"test",
 			},

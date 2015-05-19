@@ -3,7 +3,9 @@
 package v1
 
 import (
+	"crypto/md5"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -60,6 +62,7 @@ func (h *Handler) serveUser(hdr http.Header, _ httprequest.Params, p *usernamePa
 		ExternalID: id.ExternalID,
 		FullName:   id.FullName,
 		Email:      id.Email,
+		GravatarID: id.GravatarID,
 		IDPGroups:  id.Groups,
 	}, nil
 }
@@ -73,10 +76,12 @@ func (h *Handler) servePutUser(_ http.ResponseWriter, _ httprequest.Params, u *p
 	if blacklistUsernames[u.Username] {
 		return errgo.WithCausef(nil, params.ErrForbidden, "username %q is reserved", u.Username)
 	}
+
 	doc := &mongodoc.Identity{
 		Username:   string(u.Username),
 		ExternalID: u.User.ExternalID,
 		Email:      u.User.Email,
+		GravatarID: gravatarHash(u.User.Email),
 		FullName:   u.User.FullName,
 		Groups:     u.User.IDPGroups,
 	}
@@ -87,6 +92,14 @@ func (h *Handler) servePutUser(_ http.ResponseWriter, _ httprequest.Params, u *p
 		return errgo.NoteMask(err, "cannot store identity", errgo.Is(params.ErrAlreadyExists))
 	}
 	return nil
+}
+
+// Calculate the gravatar hash based on the following specification :
+// https://en.gravatar.com/site/implement/hash
+func gravatarHash(s string) string {
+	hasher := md5.New()
+	hasher.Write([]byte(strings.ToLower(strings.TrimSpace(s))))
+	return fmt.Sprintf("%x", hasher.Sum(nil))
 }
 
 // serveUserGroups serves the /u/$username/idpgroups endpoint, and returns
