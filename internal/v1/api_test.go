@@ -5,6 +5,7 @@ package v1_test
 import (
 	"bufio"
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -17,7 +18,7 @@ import (
 	"github.com/juju/testing/httptesting"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/macaroon-bakery.v1/bakery"
-	"gopkg.in/macaroon-bakery.v1/bakery/mgostorage"
+	"gopkg.in/macaroon-bakery.v1/httpbakery"
 	"gopkg.in/macaroon.v1"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
@@ -61,12 +62,9 @@ func (s *apiSuite) SetUpTest(c *gc.C) {
 	key, err := bakery.GenerateKey()
 	c.Assert(err, gc.IsNil)
 	s.srv, s.store = newServer(c, s.Session, key)
-	// Create Macaroon storage.
-	ms, err := mgostorage.New(s.store.DB.Macaroons())
-	c.Assert(err, gc.IsNil)
 	// Create the bakery Service.
 	svc, err := bakery.NewService(bakery.NewServiceParams{
-		Store: ms,
+		Store: s.store.Macaroons,
 		Key:   key,
 	})
 	c.Assert(err, gc.IsNil)
@@ -174,4 +172,11 @@ func (t transport) RoundTrip(req *http.Request) (*http.Response, error) {
 		ContentLength: int64(rr.Body.Len()),
 		Request:       req,
 	}, nil
+}
+
+var DischargeRequiredBody httptesting.BodyAsserter = func(c *gc.C, body json.RawMessage) {
+	var e httpbakery.Error
+	err := json.Unmarshal(body, &e)
+	c.Assert(err, gc.IsNil)
+	c.Assert(e.Code, gc.Equals, httpbakery.ErrDischargeRequired)
 }

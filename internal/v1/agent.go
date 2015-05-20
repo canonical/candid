@@ -30,18 +30,20 @@ type agentLoginRequest struct {
 
 func (h *Handler) agentLogin(w http.ResponseWriter, p httprequest.Params, login *agentLoginRequest) {
 	for _, ms := range httpbakery.RequestMacaroons(p.Request) {
+		declared := checkers.InferDeclared(ms)
 		err := h.svc.Check(ms, checkers.New(
 			server.UserHasPublicKeyChecker{Store: h.store},
 			checkers.TimeBefore,
 			httpbakery.Checkers(p.Request),
-			checkers.InferDeclared(ms),
+			declared,
+			checkers.OperationChecker("discharge"),
 		))
 		if err == nil {
-			h.loginSuccess(w, p.Request, ms, "agent login complete")
+			h.loginSuccess(w, p.Request, declared["username"], ms, "agent login complete")
 			return
 		}
 		if _, ok := errgo.Cause(err).(*bakery.VerificationError); !ok {
-			h.loginFailure(w, p.Request, err)
+			h.loginFailure(w, p.Request, declared["username"], err)
 			return
 		}
 		logger.Infof("verification error: %s", err)
@@ -52,12 +54,12 @@ func (h *Handler) agentLogin(w http.ResponseWriter, p httprequest.Params, login 
 		server.UserHasPublicKeyCaveat(login.Username, login.PublicKey),
 	})
 	if err != nil {
-		h.loginFailure(w, p.Request, errgo.Notef(err, "cannot create macaroon"))
+		h.loginFailure(w, p.Request, string(login.Username), errgo.Notef(err, "cannot create macaroon"))
 		return
 	}
 	u, err := url.Parse(h.location)
 	if err != nil {
-		h.loginFailure(w, p.Request, errgo.Notef(err, "cannot parse location"))
+		h.loginFailure(w, p.Request, string(login.Username), errgo.Notef(err, "cannot parse location"))
 		return
 	}
 	httpbakery.WriteDischargeRequiredError(w, m, u.Path, nil)

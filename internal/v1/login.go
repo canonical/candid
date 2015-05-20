@@ -57,18 +57,19 @@ func (h *Handler) loginID(w http.ResponseWriter, r *http.Request, userID string)
 		checkers.DeclaredCaveat("username", userID),
 	})
 	if err != nil {
-		h.loginFailure(w, r, errgo.Notef(err, "cannot create macaroon"))
+		h.loginFailure(w, r, userID, errgo.Notef(err, "cannot create macaroon"))
 		return
 	}
-	h.loginSuccess(w, r, macaroon.Slice{m}, "login successful as user %#v\n", userID)
+	h.loginSuccess(w, r, userID, macaroon.Slice{m}, "login successful as user %#v\n", userID)
 }
 
 // loginSuccess is used by identity providers once they have determined that
 // the login completed successfully.
-func (h *Handler) loginSuccess(w http.ResponseWriter, r *http.Request, ms macaroon.Slice, format string, a ...interface{}) {
+func (h *Handler) loginSuccess(w http.ResponseWriter, r *http.Request, userID string, ms macaroon.Slice, format string, a ...interface{}) {
+	logger.Infof("successful login for user %s", userID)
 	cookie, err := httpbakery.NewCookie(ms)
 	if err != nil {
-		h.loginFailure(w, r, errgo.Notef(err, "cannot create cookie"))
+		h.loginFailure(w, r, userID, errgo.Notef(err, "cannot create cookie"))
 		return
 	}
 	http.SetCookie(w, cookie)
@@ -78,7 +79,7 @@ func (h *Handler) loginSuccess(w http.ResponseWriter, r *http.Request, ms macaro
 		if err := h.place.Done(waitId, &loginInfo{
 			IdentityMacaroon: ms,
 		}); err != nil {
-			h.loginFailure(w, r, errgo.Notef(err, "cannot complete rendezvous"))
+			h.loginFailure(w, r, userID, errgo.Notef(err, "cannot complete rendezvous"))
 			return
 		}
 	}
@@ -87,7 +88,8 @@ func (h *Handler) loginSuccess(w http.ResponseWriter, r *http.Request, ms macaro
 
 // loginFailure is used by identity providers once they have determined that
 // the login has failed.
-func (h *Handler) loginFailure(w http.ResponseWriter, r *http.Request, err error) {
+func (h *Handler) loginFailure(w http.ResponseWriter, r *http.Request, userID string, err error) {
+	logger.Infof("login failed for %s: %s", userID, err)
 	r.ParseForm()
 	waitId := r.Form.Get("waitid")
 	_, bakeryErr := httpbakery.ErrorToResponse(err)

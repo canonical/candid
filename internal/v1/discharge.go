@@ -45,7 +45,10 @@ func (h *Handler) checkThirdPartyCaveat(req *http.Request, cavId, cav string) ([
 		return nil, errgo.WithCausef(err, params.ErrUnauthorized, "")
 	} else {
 		// No admin credentials provided - look for an identity macaroon.
-		attrs, err := httpbakery.CheckRequest(h.svc, req, nil, server.UserHasPublicKeyChecker{Store: h.store, Identity: &identity})
+		attrs, err := httpbakery.CheckRequest(h.svc, req, nil, checkers.New(
+			server.UserHasPublicKeyChecker{Store: h.store, Identity: &identity},
+			checkers.OperationChecker("discharge"),
+		))
 		if err != nil {
 			return nil, h.needLoginError(cavId, cav, err.Error())
 		}

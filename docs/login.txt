@@ -93,7 +93,7 @@
          if methods.Agent == "" {
             return errors.New("agent login not supported")
          }
-         body, err := json.Marshal(params.AgentLoginReuqest{
+         body, err := json.Marshal(params.AgentLoginRequest{
             Username:  username,
             PublicKey: key.Public,
          })
