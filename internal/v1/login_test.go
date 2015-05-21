@@ -3,6 +3,7 @@
 package v1_test
 
 import (
+	"bytes"
 	"encoding/base64"
 	"encoding/json"
 	"io/ioutil"
@@ -12,9 +13,12 @@ import (
 
 	"github.com/garyburd/go-oauth/oauth"
 	gc "gopkg.in/check.v1"
+	"gopkg.in/macaroon-bakery.v1/bakery"
+	"gopkg.in/macaroon-bakery.v1/httpbakery"
 	"gopkg.in/macaroon.v1"
 
 	"github.com/CanonicalLtd/blues-identity/internal/idtesting/mockusso"
+	"github.com/CanonicalLtd/blues-identity/internal/mongodoc"
 	"github.com/CanonicalLtd/blues-identity/params"
 )
 
@@ -68,7 +72,7 @@ func (s *loginSuite) TestInteractiveLogin(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 	defer resp.Body.Close()
 	c.Assert(resp.StatusCode, gc.Equals, http.StatusOK)
-	s.assertCookie(c, resp, "test")
+	s.assertMacaroon(c, resp, "test")
 }
 
 func (s *loginSuite) TestOAuthLogin(c *gc.C) {
@@ -130,10 +134,59 @@ func (s *loginSuite) TestOAuthLogin(c *gc.C) {
 	)
 	c.Assert(err, gc.IsNil)
 	defer resp.Body.Close()
-	s.assertCookie(c, resp, "test")
+	s.assertMacaroon(c, resp, "test")
 }
 
-func (s *loginSuite) assertCookie(c *gc.C, resp *http.Response, userId string) {
+func (s *loginSuite) TestAgentLogin(c *gc.C) {
+	keys, err := bakery.GenerateKey()
+	c.Assert(err, gc.IsNil)
+	s.createIdentity(c, &mongodoc.Identity{
+		Username: "test",
+		Email:    "test@example.com",
+		FullName: "Test User",
+		Groups: []string{
+			"test",
+		},
+		Owner: "admin",
+		PublicKeys: []mongodoc.PublicKey{{
+			Key: keys.Public.Key[:],
+		}},
+	})
+	client := httpbakery.NewClient()
+	client.Client.Transport = transport{
+		prefix: location,
+		srv:    s.srv,
+		rt:     http.DefaultTransport,
+	}
+	client.Key = keys
+	req, err := http.NewRequest("GET", location+"/v1/login", nil)
+	c.Assert(err, gc.IsNil)
+	req.Header.Set("Accept", "application/json")
+	resp, err := client.Do(req)
+	c.Assert(err, gc.IsNil)
+	defer resp.Body.Close()
+	c.Assert(resp.StatusCode, gc.Equals, http.StatusOK)
+	c.Assert(resp.Header.Get("Content-Type"), gc.Equals, "application/json")
+	data, err := ioutil.ReadAll(resp.Body)
+	c.Assert(err, gc.IsNil)
+	var loginMethods params.LoginMethods
+	err = json.Unmarshal(data, &loginMethods)
+	c.Assert(err, gc.IsNil)
+	data, err = json.Marshal(params.AgentLoginRequest{
+		Username:  "test",
+		PublicKey: &keys.Public,
+	})
+	c.Assert(err, gc.IsNil)
+	req, err = http.NewRequest("POST", loginMethods.Agent, nil)
+	c.Assert(err, gc.IsNil)
+	req.Header.Set("Content-Type", "application/json")
+	resp, err = client.DoWithBody(req, bytes.NewReader(data))
+	c.Assert(err, gc.IsNil)
+	defer resp.Body.Close()
+	s.assertMacaroon(c, resp, "test")
+}
+
+func (s *loginSuite) assertMacaroon(c *gc.C, resp *http.Response, userId string) {
 	var ms macaroon.Slice
 	for _, cookie := range resp.Cookies() {
 		if strings.HasPrefix(cookie.Name, "macaroon-") {
@@ -144,7 +197,6 @@ func (s *loginSuite) assertCookie(c *gc.C, resp *http.Response, userId string) {
 			break
 		}
 	}
-	c.Assert(len(ms), gc.Equals, 1)
 	cavs := ms[0].Caveats()
 	var found bool
 	for _, cav := range cavs {

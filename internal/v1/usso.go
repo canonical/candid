@@ -113,7 +113,7 @@ func (p *ussoProvider) oauthLogin(w http.ResponseWriter, r *http.Request) {
 		p.h.loginFailure(w, r, errgo.Notef(err, "cannot get user details for %q", id))
 		return
 	}
-	p.h.loginSuccess(w, r, identity.Username)
+	p.h.loginID(w, r, identity.Username)
 }
 
 var consumerKeyRegexp = regexp.MustCompile(`oauth_consumer_key="([^"]*)"`)

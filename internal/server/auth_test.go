@@ -5,14 +5,36 @@ package server
 import (
 	"net/http"
 
+	"github.com/juju/testing"
 	gc "gopkg.in/check.v1"
+	"gopkg.in/macaroon-bakery.v1/bakery"
+	"gopkg.in/macaroon-bakery.v1/bakery/checkers"
+	"launchpad.net/lpad"
 
+	"github.com/CanonicalLtd/blues-identity/internal/mongodoc"
+	"github.com/CanonicalLtd/blues-identity/internal/store"
 	"github.com/CanonicalLtd/blues-identity/params"
 )
 
-type authSuite struct{}
+type authSuite struct {
+	testing.IsolatedMgoSuite
+	store *store.Store
+}
 
 var _ = gc.Suite(&authSuite{})
+
+func (s *authSuite) SetUpTest(c *gc.C) {
+	s.IsolatedMgoSuite.SetUpTest(c)
+	var err error
+	s.store, err = store.New(s.Session.DB("idm-test"), lpad.Production)
+	c.Assert(err, gc.IsNil)
+}
+
+func (s *authSuite) createIdentity(c *gc.C, doc *mongodoc.Identity) (uuid string) {
+	err := s.store.UpsertIdentity(doc)
+	c.Assert(err, gc.IsNil)
+	return doc.UUID
+}
 
 func (s *authSuite) TestCheckAdminCredentials(c *gc.C) {
 	auth := NewAuthorizer(
@@ -84,4 +106,56 @@ func (s *authSuite) TestCheckAdminCredentials(c *gc.C) {
 			c.Assert(obtained.Error(), gc.Equals, test.expectErrorMessage)
 		}
 	}
+}
+
+func (s *authSuite) TestUserHasPublicKey(c *gc.C) {
+	key, err := bakery.GenerateKey()
+	c.Assert(err, gc.IsNil)
+	s.createIdentity(c, &mongodoc.Identity{
+		Username: "test",
+		Owner:    "admin",
+		PublicKeys: []mongodoc.PublicKey{
+			{Key: key.Public.Key[:]},
+		},
+	})
+	cav := UserHasPublicKeyCaveat(params.Username("test"), &key.Public)
+	c.Assert(cav.Location, gc.Equals, "")
+	c.Assert(cav.Condition, gc.Matches, "user-has-public-key test .*")
+
+	var identity *mongodoc.Identity
+	check := UserHasPublicKeyChecker{
+		Store:    s.store,
+		Identity: &identity,
+	}
+	c.Assert(check.Condition(), gc.Equals, "user-has-public-key")
+	cond, arg, err := checkers.ParseCaveat(cav.Condition)
+	c.Assert(err, gc.IsNil)
+	err = check.Check(cond, arg)
+	c.Assert(err, gc.IsNil)
+	c.Assert(identity.Username, gc.Equals, "test")
+
+	// Unknown username
+	arg = "test2 " + key.Public.String()
+	err = check.Check(cond, arg)
+	c.Assert(err, gc.ErrorMatches, "public key not valid for user")
+
+	// Incorrect public key
+	arg = "test " + "A" + key.Public.String()[1:]
+	err = check.Check(cond, arg)
+	c.Assert(err, gc.ErrorMatches, "public key not valid for user")
+
+	// Invalid argument
+	arg = "test"
+	err = check.Check(cond, arg)
+	c.Assert(err, gc.ErrorMatches, "caveat badly formatted")
+
+	// Invalid username
+	arg = "= " + key.Public.String()
+	err = check.Check(cond, arg)
+	c.Assert(err, gc.ErrorMatches, `illegal username "="`)
+
+	// Invalid public key
+	arg = "test " + key.Public.String()[1:]
+	err = check.Check(cond, arg)
+	c.Assert(err, gc.ErrorMatches, `invalid public key ".*": .*`)
 }

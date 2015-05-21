@@ -56,7 +56,7 @@ func (p *openid2Provider) handleCallback(w http.ResponseWriter, r *http.Request)
 		p.h.loginFailure(w, r, err)
 		return
 	}
-	p.h.loginSuccess(w, r, openIdInfo["nick"])
+	p.h.loginID(w, r, openIdInfo["nick"])
 }
 
 func isComma(r rune) bool {

@@ -1,0 +1,185 @@
+                      Login Methods
+
+
+1. Introduction
+
+   IdM supports these following possible login methods:
+
+    * Interactive
+    * Agent
+    * UbuntuSSO OAuth
+
+   Interactive is used by default and does not require any special
+   handling by the client software, it does require interaction with
+   the user so is not suitable for all situations.
+
+   All of these login methods are initiated as part of the macaroon
+   handling and need to be handled in the VisitWebPage function
+   provided to httpbakery.Client.
+
+2. Interactive Login
+
+   Interactive login is the default. For the client to use interactive
+   login it needs to arrange for the user to visit the provided web
+   address.
+
+   Interactive login currently uses UbuntuSSO OpenID login. It is
+   anticipated this will be expanded in the future.
+
+3. Agent Login
+
+   Agents are users in the system that represents services rather than
+   people. Agents must have been pre-registered with the identity
+   manager.
+
+3.1 Login Method Discovery
+
+   To log in as an agent the client must first do a form of discovery
+   to determine whether agent log in is possible, and if so how. To do
+   this the client sends a GET request to the visit URL with an
+   Accept header set to application/json. On supported systems this
+   will return an object like the following:
+
+   {
+      "interactive": "https://...",
+      "agent": "https://...",
+      "usso_oauth": "https://..."
+   }
+
+   For agent login use the address specified in agent.
+
+3.2 Agent Login Request
+
+   To perform the agent login the client POSTs a JSON object like
+   the following to the specified agent URL:
+
+   {
+      "username": "...",
+      "public_key": "...",
+   }
+
+   username contains the username of the identity agent that is logging
+   in. public_key contains a base64 encoding of the public key that
+   will be used to authenticate the agent.
+
+   When identity discharges a third-party caveat for the agent, an
+   additional third-party caveat is added forcing the agent to prove
+   it has the private key associated with the public key. This part is
+   handled by httpbakery.
+
+3.3 Code Example
+
+   func AgentDo(req *http.Request, username string, key *bakery.KeyPair) (*http.Response, error) {
+      client = httpbakery.NewClient()
+      client.Key = key
+      client.VisitWebPage = func(u *url.URL) error {
+         req, err := http.NewRequest("GET", u.String(), nil)
+         if err != nil {
+            return err
+         }
+         resp, err := client.Do(req)
+         if err != nil {
+            return err
+         }
+         defer resp.Close()
+         body, err := ioutil.ReadAll(resp.Body)
+         if err != nil {
+            return err
+         }
+         var methods params.LoginMethods
+         if err := json.Unmarshal(body, &methods); err != nil {
+            return err
+         }
+         if methods.Agent == "" {
+            return errors.New("agent login not supported")
+         }
+         body, err := json.Marshal(params.AgentLoginReuqest{
+            Username:  username,
+            PublicKey: key.Public,
+         })
+         if err != nil {
+            return err
+         }
+         req, err = http.NewRequest("POST", methods.Agent, nil)
+         if err != nil {
+            return err
+         }
+         resp, err = client.DoWithBody(req, bytes.NewReader(body))
+         if err != nil {
+            return err
+         }
+         defer resp.Close()
+         if resp.StatusCode != http.StatusOK {
+            return errors.New("login failed")
+         }
+         return nil
+      }
+      return client.Do(req)
+   }
+
+4. UbuntuSSO OAuth Login
+
+   UbuntuSSO OAuth login provides a non-interactive method for user
+   logins. To use the oauth mechanism the client must have obtained an
+   oauth token from UbuntuSSO to use with this mechanism.
+
+   For the login to work the user must have previously logged in using
+   interactive login at least once.
+
+4.1. Login Method Discovery
+
+   Any client that wishes to use UbuntuSSO Oauth login must perform
+   login method discovery (see section 3.1). The URL to use is
+   "usso_oauth".
+
+4.2. UbuntuSSO Login Request
+
+   A client should then send a GET request to the "usso_oauth" URL
+   that has been signed using the oauth token as specified in RFC5849
+   [http://tools.ietf.org/html/rfc5849].
+
+4.3. Code Example
+
+   func OAuthDo(req *http.Request, tok oauth.Token) (*http.Response, error) {
+      client = httpbakery.NewClient()
+      client.VisitWebPage = func(u *url.URL) error {
+         req, err := http.NewRequest("GET", u.String(), nil)
+         if err != nil {
+            return err
+         }
+         resp, err := client.Do(req)
+         if err != nil {
+            return err
+         }
+         defer resp.Close()
+         body, err := ioutil.ReadAll(resp.Body)
+         if err != nil {
+            return err
+         }
+         var methods params.LoginMethods
+         if err := json.Unmarshal(body, &methods); err != nil {
+            return err
+         }
+         if methods.UbuntuSSOOAuth == "" {
+            return errors.New("UbuntuSSO OAuth login not supported")
+         }
+         req, err = http.NewRequest("GET", methods.UbuntuSSOOAuth, nil)
+         if err != nil {
+            return err
+         }
+         oauth.Sign(req, tok)
+         resp, err = client.Do(req, bytes.NewReader(body))
+         if err != nil {
+            return err
+         }
+         defer resp.Close()
+         if resp.StatusCode != http.StatusOK {
+            return errors.New("login failed")
+         }
+         return nil
+      }
+      return client.Do(req)
+   }
+
+   Note: The oauth handling in the above snippet is idealised and does
+   not represent any known library.

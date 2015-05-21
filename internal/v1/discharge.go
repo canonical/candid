@@ -12,8 +12,9 @@ import (
 	"gopkg.in/macaroon-bakery.v1/bakery"
 	"gopkg.in/macaroon-bakery.v1/bakery/checkers"
 	"gopkg.in/macaroon-bakery.v1/httpbakery"
-	"gopkg.in/macaroon.v1"
 
+	"github.com/CanonicalLtd/blues-identity/internal/mongodoc"
+	"github.com/CanonicalLtd/blues-identity/internal/server"
 	"github.com/CanonicalLtd/blues-identity/params"
 )
 
@@ -32,6 +33,7 @@ type verifiedUserInfo struct {
 func (h *Handler) checkThirdPartyCaveat(req *http.Request, cavId, cav string) ([]checkers.Caveat, error) {
 	err := h.auth.CheckAdminCredentials(req)
 	var username string
+	var identity *mongodoc.Identity
 	if err == nil {
 		// Admin access granted. Find out what user the client wants
 		// to discharge for.
@@ -43,11 +45,17 @@ func (h *Handler) checkThirdPartyCaveat(req *http.Request, cavId, cav string) ([
 		return nil, errgo.WithCausef(err, params.ErrUnauthorized, "")
 	} else {
 		// No admin credentials provided - look for an identity macaroon.
-		attrs, err := httpbakery.CheckRequest(h.svc, req, nil, checkers.New())
+		attrs, err := httpbakery.CheckRequest(h.svc, req, nil, server.UserHasPublicKeyChecker{Store: h.store, Identity: &identity})
 		if err != nil {
 			return nil, h.needLoginError(cavId, cav, err.Error())
 		}
 		username = attrs["username"]
+	}
+	if identity == nil || identity.Username != username {
+		identity, err = h.store.GetIdentity(params.Username(username))
+		if err != nil {
+			return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
+		}
 	}
 	cond, args, err := checkers.ParseCaveat(cav)
 	if err != nil {
@@ -55,9 +63,9 @@ func (h *Handler) checkThirdPartyCaveat(req *http.Request, cavId, cav string) ([
 	}
 	switch cond {
 	case "is-authenticated-user":
-		return h.checkAuthenticatedUser(username)
+		return h.checkAuthenticatedUser(identity)
 	case "is-member-of":
-		return h.checkMemberOfGroup(username, args)
+		return h.checkMemberOfGroup(identity, args)
 	default:
 		return nil, checkers.ErrCaveatNotRecognized
 	}
@@ -65,11 +73,7 @@ func (h *Handler) checkThirdPartyCaveat(req *http.Request, cavId, cav string) ([
 
 // checkAuthenticatedUser checks a third-party caveat for "is-authenticated-user". Currently the discharge
 // macaroon will only be created for users with admin credentials.
-func (h *Handler) checkAuthenticatedUser(username string) ([]checkers.Caveat, error) {
-	user, err := h.store.GetIdentity(params.Username(username))
-	if err != nil {
-		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
-	}
+func (h *Handler) checkAuthenticatedUser(user *mongodoc.Identity) ([]checkers.Caveat, error) {
 	return []checkers.Caveat{
 		checkers.DeclaredCaveat("uuid", user.UUID),
 		checkers.DeclaredCaveat("username", user.Username),
@@ -78,13 +82,8 @@ func (h *Handler) checkAuthenticatedUser(username string) ([]checkers.Caveat, er
 }
 
 // checkMemberOfGroup checks if user is member of any of the specified groups.
-func (h *Handler) checkMemberOfGroup(username, targetGroups string) ([]checkers.Caveat, error) {
+func (h *Handler) checkMemberOfGroup(user *mongodoc.Identity, targetGroups string) ([]checkers.Caveat, error) {
 	groups := strings.Fields(targetGroups)
-
-	user, err := h.store.GetIdentity(params.Username(username))
-	if err != nil {
-		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
-	}
 	for _, userGroup := range user.Groups {
 		for _, g := range groups {
 			if userGroup == g {
@@ -92,7 +91,7 @@ func (h *Handler) checkMemberOfGroup(username, targetGroups string) ([]checkers.
 			}
 		}
 	}
-	return nil, errgo.Notef(err, "user is not a member of required groups")
+	return nil, errgo.Newf("user is not a member of required groups")
 }
 
 // needLoginError returns an error suitable for returning
@@ -143,7 +142,7 @@ func (h *Handler) serveWait(header http.Header, p httprequest.Params, w *wait) (
 	// same discharge checking that they would have gone
 	// through even if they had gone through the web
 	// login process.
-	cookie, err := httpbakery.NewCookie(macaroon.Slice{login.IdentityMacaroon})
+	cookie, err := httpbakery.NewCookie(login.IdentityMacaroon)
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot make cookie")
 	}

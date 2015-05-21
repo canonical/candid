@@ -7,6 +7,7 @@ import (
 
 	"github.com/juju/names"
 	"gopkg.in/errgo.v1"
+	"gopkg.in/macaroon-bakery.v1/bakery"
 	"gopkg.in/macaroon.v1"
 )
 
@@ -65,6 +66,10 @@ type WaitResponse struct {
 // when called with "Accept: application/json". This enumerates
 // the available methods for the client to log in.
 type LoginMethods struct {
+	// Agent is the endpoint to connect to, if the client wishes to
+	// authenticate as an agent.
+	Agent string `json:"agent,omitempty"`
+
 	// Interactive is the endpoint to connect to, if the user can
 	// interact with the login process.
 	Interactive string `json:"interactive,omitempty"`
@@ -73,4 +78,14 @@ type LoginMethods struct {
 	// UbuntuSSO OAuth credentials, to if the client wishes to use
 	// oauth to log in to Identity Manager. Ubuntu SSO uses oauth 1.0.
 	UbuntuSSOOAuth string `json:"usso_oauth,omitempty"`
+}
+
+// AgentLoginRequest is POSTed to the agent login URL to log in as an
+// agent. Agents claim an identity along with a public key associated with
+// that identity. Any discharge macroons that are generated for an agent
+// will contain a third party caveat addressed to "local" that they will have
+// to discharge to prove that they hold the private key.
+type AgentLoginRequest struct {
+	Username  Username          `json:"username"`
+	PublicKey *bakery.PublicKey `json:"public_key"`
 }
