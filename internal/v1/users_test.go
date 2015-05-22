@@ -5,14 +5,17 @@ package v1_test
 import (
 	"encoding/json"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/testing/httptesting"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/macaroon-bakery.v1/bakery/checkers"
+	"gopkg.in/macaroon-bakery.v1/httpbakery"
 	"gopkg.in/macaroon.v1"
 	"gopkg.in/mgo.v2/bson"
 
@@ -288,11 +291,8 @@ func (s *usersSuite) TestUser(c *gc.C) {
 				"test",
 			},
 		}),
-		expectStatus: http.StatusUnauthorized,
-		expectBody: params.Error{
-			Code:    "no admin credentials provided",
-			Message: "no admin credentials provided",
-		},
+		expectStatus: http.StatusProxyAuthRequired,
+		expectBody:   DischargeRequiredBody,
 	}, {
 		about:  "bad username",
 		url:    apiURL("u/jbloggs{}"),
@@ -548,11 +548,8 @@ func (s *usersSuite) TestQueryUsers(c *gc.C) {
 				"test",
 			},
 		}),
-		expectStatus: http.StatusUnauthorized,
-		expectBody: params.Error{
-			Code:    "no admin credentials provided",
-			Message: "no admin credentials provided",
-		},
+		expectStatus: http.StatusProxyAuthRequired,
+		expectBody:   DischargeRequiredBody,
 	}}
 	for i, test := range tests {
 		c.Logf("%d. %s", i, test.about)
@@ -760,6 +757,116 @@ func (s *usersSuite) TestUserIDPGroups(c *gc.C) {
 			Password:     test.password,
 			ExpectStatus: test.expectStatus,
 			ExpectBody:   test.expectBody,
+		})
+	}
+}
+
+func (s *usersSuite) TestUserGroups(c *gc.C) {
+	s.createUser(c, &params.User{
+		Username:   "test",
+		ExternalID: "http://example.com/test",
+		Email:      "test@example.com",
+		FullName:   "Test User",
+		IDPGroups:  []string{},
+	})
+	s.createUser(c, &params.User{
+		Username:   "test2",
+		ExternalID: "http://example.com/test2",
+		Email:      "test2@example.com",
+		FullName:   "Test User II",
+		IDPGroups: []string{
+			"test",
+		},
+	})
+	s.createUser(c, &params.User{
+		Username:   "test3",
+		ExternalID: "http://example.com/test3",
+		Email:      "test3@example.com",
+		FullName:   "Test User III",
+		IDPGroups: []string{
+			"test",
+			"test2",
+		},
+	})
+	s.createUser(c, &params.User{
+		Username:   "grouplister",
+		ExternalID: "http://example.com/grouplister",
+		Email:      "grouplister@example.com",
+		FullName:   "Group Lister",
+		IDPGroups: []string{
+			"grouplist@idm",
+		},
+	})
+	tests := []struct {
+		about        string
+		url          string
+		username     string
+		password     string
+		expectStatus int
+		expectBody   interface{}
+	}{{
+		about:        "user without groups",
+		url:          apiURL("u/test/groups"),
+		username:     "test",
+		expectStatus: http.StatusOK,
+		expectBody:   []string{},
+	}, {
+		about:        "user with 1 group",
+		url:          apiURL("u/test2/groups"),
+		username:     "test2",
+		expectStatus: http.StatusOK,
+		expectBody:   []string{"test"},
+	}, {
+		about:        "user with 2 groups",
+		url:          apiURL("u/test3/groups"),
+		username:     "test3",
+		expectStatus: http.StatusOK,
+		expectBody:   []string{"test", "test2"},
+	}, {
+		about:        "acl user",
+		url:          apiURL("u/test2/groups"),
+		username:     "grouplister",
+		expectStatus: http.StatusOK,
+		expectBody:   []string{"test"},
+	}, {
+		about:        "admin credentials",
+		url:          apiURL("u/test4/groups"),
+		username:     adminUsername,
+		password:     adminPassword,
+		expectStatus: http.StatusNotFound,
+		expectBody: params.Error{
+			Code:    "not found",
+			Message: `user "test4" not found: not found`,
+		},
+	}, {
+		about:        "discharge required",
+		url:          apiURL("u/test/groups"),
+		expectStatus: http.StatusProxyAuthRequired,
+		expectBody:   DischargeRequiredBody,
+	}}
+	for i, test := range tests {
+		c.Logf("%d. %s", i, test.about)
+		var un string
+		var cookies []*http.Cookie
+		if test.password != "" {
+			un = test.username
+		} else if test.username != "" {
+			m, err := s.svc.NewMacaroon("", nil, []checkers.Caveat{
+				checkers.DeclaredCaveat("username", test.username),
+			})
+			c.Assert(err, gc.IsNil)
+			cookie, err := httpbakery.NewCookie(macaroon.Slice{m})
+			c.Assert(err, gc.IsNil)
+			cookies = append(cookies, cookie)
+		}
+		httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+			Handler:      s.srv,
+			URL:          test.url,
+			Username:     un,
+			Password:     test.password,
+			ExpectStatus: test.expectStatus,
+			ExpectBody:   test.expectBody,
+			Cookies:      cookies,
 		})
 	}
 }
@@ -986,4 +1093,54 @@ func (s *usersSuite) TestExtraInfo(c *gc.C) {
 			})
 		}
 	}
+}
+
+func (s *usersSuite) TestMultipleEndpointAccess(c *gc.C) {
+	s.createIdentity(c, &mongodoc.Identity{
+		Username: "jbloggs1",
+		Owner:    "test",
+		Groups:   []string{"g1", "g2"},
+	})
+	s.createIdentity(c, &mongodoc.Identity{
+		Username: "jbloggs2",
+		Owner:    "test",
+		Groups:   []string{"g3", "g4"},
+	})
+	client := httpbakery.NewClient()
+	client.Client.Transport = transport{
+		prefix: location,
+		srv:    s.srv,
+		rt:     http.DefaultTransport,
+	}
+	m, err := s.svc.NewMacaroon("", nil, []checkers.Caveat{
+		checkers.DeclaredCaveat("username", "jbloggs1"),
+	})
+	c.Assert(err, gc.IsNil)
+	cookie, err := httpbakery.NewCookie(macaroon.Slice{m})
+	c.Assert(err, gc.IsNil)
+	u, err := url.Parse(location)
+	c.Assert(err, gc.IsNil)
+	client.Client.Jar.SetCookies(u, []*http.Cookie{cookie})
+	req, err := http.NewRequest("GET", location+"/v1/u/jbloggs1/groups", nil)
+	c.Assert(err, gc.IsNil)
+	resp, err := client.Do(req)
+	c.Assert(err, gc.IsNil)
+	resp.Body.Close()
+	c.Assert(resp.StatusCode, gc.Equals, http.StatusOK)
+	body, err := ioutil.ReadAll(resp.Body)
+	c.Assert(err, gc.IsNil)
+	c.Assert(string(body), jc.JSONEquals, []string{"g1", "g2"})
+
+	req, err = http.NewRequest("GET", location+"/v1/u/jbloggs2/groups", nil)
+	c.Assert(err, gc.IsNil)
+	resp, err = client.Do(req)
+	c.Assert(err, gc.IsNil)
+	resp.Body.Close()
+	c.Assert(resp.StatusCode, gc.Equals, http.StatusForbidden)
+	body, err = ioutil.ReadAll(resp.Body)
+	c.Assert(err, gc.IsNil)
+	c.Assert(string(body), jc.JSONEquals, params.Error{
+		Code:    params.ErrForbidden,
+		Message: "user does not have correct permissions",
+	})
 }

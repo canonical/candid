@@ -11,7 +11,6 @@ import (
 	"github.com/juju/httprequest"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v1/bakery"
-	"gopkg.in/macaroon-bakery.v1/bakery/mgostorage"
 	"gopkg.in/mgo.v2"
 
 	"github.com/CanonicalLtd/blues-identity/internal/store"
@@ -34,24 +33,25 @@ func New(db *mgo.Database, p ServerParams, versions map[string]NewAPIHandlerFunc
 		return nil, errgo.Notef(err, "cannot make store")
 	}
 
-	// Create the Authorization.
-	auth := NewAuthorizer(p)
-
-	// Create Macaroon storage.
-	ms, err := mgostorage.New(store.DB.Macaroons())
-	if err != nil {
-		return nil, errgo.Notef(err, "cannot create macaroon store")
+	var publicKey *bakery.PublicKey
+	if p.Key != nil {
+		publicKey = &p.Key.Public
 	}
-
 	// Create the bakery Service.
 	svc, err := bakery.NewService(bakery.NewServiceParams{
 		Location: p.Location,
-		Store:    ms,
+		Store:    store.Macaroons,
 		Key:      p.Key,
+		Locator: bakery.PublicKeyLocatorMap{
+			p.Location + "/v1/discharger": publicKey,
+		},
 	})
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot create bakery service")
 	}
+
+	// Create the Authorization.
+	auth := NewAuthorizer(p, store, svc)
 
 	// Create the HTTP server.
 	mux := http.NewServeMux()

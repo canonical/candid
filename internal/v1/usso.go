@@ -103,14 +103,14 @@ func (p *ussoProvider) oauthLogin(w http.ResponseWriter, r *http.Request) {
 	reqURL := p.h.requestURL(r)
 	id, err := verifyOAuthSignature(reqURL, r)
 	if err != nil {
-		p.h.loginFailure(w, r, err)
+		p.h.loginFailure(w, r, "unknown user", err)
 		return
 	}
 	db := p.h.store.DB.Copy()
 	defer db.Close()
 	var identity mongodoc.Identity
 	if err := db.Identities().Find(bson.D{{"external_id", id}}).One(&identity); err != nil {
-		p.h.loginFailure(w, r, errgo.Notef(err, "cannot get user details for %q", id))
+		p.h.loginFailure(w, r, id, errgo.Notef(err, "cannot get user details for %q", id))
 		return
 	}
 	p.h.loginID(w, r, identity.Username)

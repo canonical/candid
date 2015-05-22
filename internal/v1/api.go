@@ -79,6 +79,7 @@ func New(s *store.Store, auth *server.Authorizer, svc *bakery.Service) *Handler 
 	h.r.PUT("/u/:username/extra-info", h.adminRequired(handle(h.serveUserPutExtraInfo)))
 	h.r.GET("/u/:username/extra-info/:item", h.adminRequired(handle(h.serveUserExtraInfoItem)))
 	h.r.PUT("/u/:username/extra-info/:item", h.adminRequired(handle(h.serveUserPutExtraInfoItem)))
+	h.r.GET("/u/:username/groups", h.aclProtectedWithParam(handle(h.serveUserGroups), "get-user-groups", "username", "admin@idm", "grouplist@idm"))
 	h.r.GET("/u/:username/idpgroups", h.adminRequired(handle(h.serveUserGroups)))
 	h.r.GET("/u/:username/macaroon", h.adminRequired(handle(h.serveUserToken)))
 	h.r.GET("/wait", handle(h.serveWait))
@@ -99,8 +100,28 @@ func (h *Handler) requestURL(r *http.Request) string {
 }
 
 func (h *Handler) adminRequired(f httprouter.Handle) httprouter.Handle {
+	return h.aclProtected(f, "admin", "admin@idm")
+}
+
+func (h *Handler) aclProtectedWithParam(f httprouter.Handle, op, pname string, acl ...string) httprouter.Handle {
 	return func(w http.ResponseWriter, req *http.Request, p httprouter.Params) {
-		if err := h.auth.CheckAdminCredentials(req); err != nil {
+		var racl []string
+		extra := p.ByName(pname)
+		if extra != "" {
+			racl = append(racl, extra)
+		}
+		racl = append(racl, acl...)
+		if err := h.auth.CheckACL(op, req, racl); err != nil {
+			writeError(w, err)
+			return
+		}
+		f(w, req, p)
+	}
+}
+
+func (h *Handler) aclProtected(f httprouter.Handle, op string, acl ...string) httprouter.Handle {
+	return func(w http.ResponseWriter, req *http.Request, p httprouter.Params) {
+		if err := h.auth.CheckACL(op, req, acl); err != nil {
 			writeError(w, err)
 			return
 		}
@@ -109,8 +130,12 @@ func (h *Handler) adminRequired(f httprouter.Handle) httprouter.Handle {
 }
 
 func (h *Handler) adminRequiredHandler(handler http.Handler) httprouter.Handle {
-	return func(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
-		if err := h.auth.CheckAdminCredentials(req); err != nil {
+	return h.aclProtectedHandler(handler, "admin", "admin@idm")
+}
+
+func (h *Handler) aclProtectedHandler(handler http.Handler, op string, acl ...string) httprouter.Handle {
+	return func(w http.ResponseWriter, req *http.Request, p httprouter.Params) {
+		if err := h.auth.CheckACL(op, req, acl); err != nil {
 			writeError(w, err)
 			return
 		}

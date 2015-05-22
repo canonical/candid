@@ -42,7 +42,7 @@ func (p *openid2Provider) handleCallback(w http.ResponseWriter, r *http.Request)
 	reqURL := p.h.requestURL(r)
 	openIdInfo, err := openid.Verify(reqURL, p.discoveryCache, p.nonceStore)
 	if err != nil {
-		p.h.loginFailure(w, r, err)
+		p.h.loginFailure(w, r, "", err)
 		return
 	}
 	err = p.h.store.UpsertIdentity(&mongodoc.Identity{
@@ -53,7 +53,7 @@ func (p *openid2Provider) handleCallback(w http.ResponseWriter, r *http.Request)
 		Groups:     strings.FieldsFunc(openIdInfo["teams"], isComma),
 	})
 	if err != nil {
-		p.h.loginFailure(w, r, err)
+		p.h.loginFailure(w, r, openIdInfo["nick"], err)
 		return
 	}
 	p.h.loginID(w, r, openIdInfo["nick"])
