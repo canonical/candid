@@ -18,6 +18,10 @@ var usernameUnmarshalTests = []struct {
 }{{
 	username: "user",
 }, {
+	username: "admin@idm",
+}, {
+	username: "agent@admin@idm",
+}, {
 	username:    "invalid username",
 	expectError: `illegal username "invalid username"`,
 }, {

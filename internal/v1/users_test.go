@@ -14,12 +14,14 @@ import (
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/testing/httptesting"
 	gc "gopkg.in/check.v1"
+	"gopkg.in/macaroon-bakery.v1/bakery"
 	"gopkg.in/macaroon-bakery.v1/bakery/checkers"
 	"gopkg.in/macaroon-bakery.v1/httpbakery"
 	"gopkg.in/macaroon.v1"
 	"gopkg.in/mgo.v2/bson"
 
 	"github.com/CanonicalLtd/blues-identity/internal/mongodoc"
+	"github.com/CanonicalLtd/blues-identity/internal/server"
 	"github.com/CanonicalLtd/blues-identity/params"
 )
 
@@ -30,6 +32,8 @@ type usersSuite struct {
 var _ = gc.Suite(&usersSuite{})
 
 func (s *usersSuite) TestUser(c *gc.C) {
+	key, err := bakery.GenerateKey()
+	c.Assert(err, gc.IsNil)
 	s.createUser(c, &params.User{
 		Username:   "jbloggs2",
 		ExternalID: "http://example.com/jbloggs2",
@@ -46,6 +50,16 @@ func (s *usersSuite) TestUser(c *gc.C) {
 		FullName:   "Joe Bloggs III",
 		IDPGroups: []string{
 			"test",
+		},
+	})
+	s.createUser(c, &params.User{
+		Username: "agent@" + server.AdminGroup,
+		IDPGroups: []string{
+			"test",
+		},
+		Owner: server.AdminGroup,
+		PublicKeys: []*bakery.PublicKey{
+			&key.Public,
 		},
 	})
 	tests := []struct {
@@ -351,22 +365,37 @@ func (s *usersSuite) TestUser(c *gc.C) {
 			Message: `not found: /u/jbloggs2/notthere`,
 		},
 	}, {
-		about:  "no external_id",
-		url:    apiURL("u/jbloggs8"),
+		about:  "put agent user",
+		url:    apiURL("u/agent2@" + server.AdminGroup),
 		method: "PUT",
 		body: marshal(c, params.User{
-			Email:    "jbloggs8@example.com",
-			FullName: "Joe Bloggs VIII",
 			IDPGroups: []string{
 				"test",
+			},
+			Owner: params.Username(server.AdminGroup),
+			PublicKeys: []*bakery.PublicKey{
+				&key.Public,
 			},
 		}),
 		username:     adminUsername,
 		password:     adminPassword,
-		expectStatus: http.StatusBadRequest,
-		expectBody: params.Error{
-			Code:    "bad request",
-			Message: `external_id not specified`,
+		expectStatus: http.StatusOK,
+	}, {
+		about:        "get agent user",
+		url:          apiURL("u/agent@" + server.AdminGroup),
+		method:       "GET",
+		username:     adminUsername,
+		password:     adminPassword,
+		expectStatus: http.StatusOK,
+		expectBody: params.User{
+			Username: "agent@" + server.AdminGroup,
+			IDPGroups: []string{
+				"test",
+			},
+			Owner: server.AdminGroup,
+			PublicKeys: []*bakery.PublicKey{
+				&key.Public,
+			},
 		},
 	}, {
 		about:  "reserved username",
@@ -386,6 +415,53 @@ func (s *usersSuite) TestUser(c *gc.C) {
 		expectBody: params.Error{
 			Code:    "forbidden",
 			Message: `username "everyone" is reserved`,
+		},
+	}, {
+		about:  "no external_id",
+		url:    apiURL("u/jbloggs8"),
+		method: "PUT",
+		body: marshal(c, params.User{
+			Email:    "jbloggs8@example.com",
+			FullName: "Joe Bloggs VIII",
+			IDPGroups: []string{
+				"test",
+			},
+		}),
+		username:     adminUsername,
+		password:     adminPassword,
+		expectStatus: http.StatusBadRequest,
+		expectBody: params.Error{
+			Code:    params.ErrBadRequest,
+			Message: `external_id not specified`,
+		},
+	}, {
+		about:  "agent no credentials",
+		url:    apiURL("u/agent@admin@idm"),
+		method: "PUT",
+		body: marshal(c, params.User{
+			Owner: params.Username("admin@idm"),
+			IDPGroups: []string{
+				"test",
+			},
+		}),
+		expectStatus: http.StatusProxyAuthRequired,
+		expectBody:   DischargeRequiredBody,
+	}, {
+		about:  "agent bad username",
+		url:    apiURL("u/agent@admin@idm@bad"),
+		method: "PUT",
+		body: marshal(c, params.User{
+			Owner: params.Username("admin@idm"),
+			IDPGroups: []string{
+				"test",
+			},
+		}),
+		username:     adminUsername,
+		password:     adminPassword,
+		expectStatus: http.StatusForbidden,
+		expectBody: params.Error{
+			Code:    params.ErrForbidden,
+			Message: `admin@idm cannot create user "agent@admin@idm@bad" (suffix must be "@admin@idm")`,
 		},
 	}}
 	for i, test := range tests {

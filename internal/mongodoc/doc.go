@@ -30,7 +30,7 @@ type Identity struct {
 	// FullName holds the full name of the user.
 	FullName string `bson:"fullname"`
 
-	// Owner holds the UUID of the owner of this user, if there is one.
+	// Owner holds the username of the owner of this user, if there is one.
 	Owner string `bson:",omitempty"`
 
 	// Groups holds a list of group names to which the user belongs.

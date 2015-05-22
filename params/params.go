@@ -3,6 +3,7 @@
 package params
 
 import (
+	"bytes"
 	"unicode/utf8"
 
 	"github.com/juju/names"
@@ -35,25 +36,28 @@ type Username string
 // UnmarshalText unmarshals a UserName checking it is valid. It
 // implements "encoding".TextUnmarshaler.
 func (u *Username) UnmarshalText(b []byte) error {
-	s := string(b)
 	if utf8.RuneCount(b) > 256 {
 		return errgo.New("username longer than 256 characters")
 	}
-	if !names.IsValidUserName(s) {
-		return errgo.Newf("illegal username %q", s)
+	for _, part := range bytes.Split(b, []byte("@")) {
+		if !names.IsValidUserName(string(part)) {
+			return errgo.Newf("illegal username %q", b)
+		}
 	}
-	*u = Username(s)
+	*u = Username(string(b))
 	return nil
 }
 
 // User represents a user in the system.
 type User struct {
-	Username   Username `json:"username,omitempty"`
-	ExternalID string   `json:"external_id"`
-	FullName   string   `json:"fullname"`
-	Email      string   `json:"email"`
-	GravatarID string   `json:"gravatar_id"`
-	IDPGroups  []string `json:"idpgroups"`
+	Username   Username            `json:"username,omitempty"`
+	ExternalID string              `json:"external_id"`
+	FullName   string              `json:"fullname"`
+	Email      string              `json:"email"`
+	GravatarID string              `json:"gravatar_id"`
+	IDPGroups  []string            `json:"idpgroups"`
+	Owner      Username            `json:"owner,omitempty"`
+	PublicKeys []*bakery.PublicKey `json:"public_keys"`
 }
 
 // WaitResponse holds the response from the wait endpoint.

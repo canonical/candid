@@ -54,7 +54,7 @@ func (h *Handler) checkThirdPartyCaveat(req *http.Request, cavId, cav string) ([
 		}
 		username = attrs["username"]
 	}
-	if identity == nil || identity.Username != username {
+	if identity == nil || string(identity.Username) != username {
 		identity, err = h.store.GetIdentity(params.Username(username))
 		if err != nil {
 			return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))

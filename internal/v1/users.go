@@ -12,17 +12,20 @@ import (
 
 	"github.com/juju/httprequest"
 	"gopkg.in/errgo.v1"
+	"gopkg.in/macaroon-bakery.v1/bakery"
 	"gopkg.in/macaroon-bakery.v1/bakery/checkers"
 	"gopkg.in/macaroon.v1"
 	"gopkg.in/mgo.v2/bson"
 
 	"github.com/CanonicalLtd/blues-identity/internal/mongodoc"
+	"github.com/CanonicalLtd/blues-identity/internal/server"
 	"github.com/CanonicalLtd/blues-identity/params"
 )
 
 var blacklistUsernames = map[params.Username]bool{
-	"admin":    true,
-	"everyone": true,
+	"admin":           true,
+	"everyone":        true,
+	server.AdminGroup: true,
 }
 
 type queryUsersParams struct {
@@ -57,6 +60,17 @@ func (h *Handler) serveUser(hdr http.Header, _ httprequest.Params, p *usernamePa
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
+	var publicKeys []*bakery.PublicKey
+	if len(id.PublicKeys) > 0 {
+		publicKeys = make([]*bakery.PublicKey, len(id.PublicKeys))
+		for i, key := range id.PublicKeys {
+			var pk bakery.PublicKey
+			if err := pk.UnmarshalBinary(key.Key); err != nil {
+				return nil, errgo.Notef(err, "cannot unmarshal public key from database")
+			}
+			publicKeys[i] = &pk
+		}
+	}
 	return &params.User{
 		Username:   params.Username(id.Username),
 		ExternalID: id.ExternalID,
@@ -64,6 +78,8 @@ func (h *Handler) serveUser(hdr http.Header, _ httprequest.Params, p *usernamePa
 		Email:      id.Email,
 		GravatarID: id.GravatarID,
 		IDPGroups:  id.Groups,
+		Owner:      params.Username(id.Owner),
+		PublicKeys: publicKeys,
 	}, nil
 }
 
@@ -72,19 +88,50 @@ type putUserParams struct {
 	User params.User `httprequest:",body"`
 }
 
-func (h *Handler) servePutUser(_ http.ResponseWriter, _ httprequest.Params, u *putUserParams) error {
+func (h *Handler) servePutUser(_ http.ResponseWriter, p httprequest.Params, u *putUserParams) error {
+	if u.User.Owner == "" {
+		// If there is no owner specified then it is an interactive user being created
+		// by storefront.
+		return h.upsertUser(p.Request, u)
+	}
+	return h.upsertAgent(p.Request, u)
+}
+
+func (h *Handler) upsertAgent(r *http.Request, u *putUserParams) error {
+	if u.User.Owner == "" {
+		return errgo.WithCausef(nil, params.ErrBadRequest, "owner not specified")
+	}
+	err := h.auth.CheckACL(opCreateAgent, r, []string{
+		server.AdminGroup,
+		"+create-agent@" + string(u.User.Owner),
+	})
+	if err != nil {
+		return errgo.Mask(err, errgo.Any)
+	}
+	if !strings.HasSuffix(string(u.Username), "@"+string(u.User.Owner)) {
+		return errgo.WithCausef(nil, params.ErrForbidden, `%s cannot create user %q (suffix must be "@%s")`, u.User.Owner, u.Username, u.User.Owner)
+	}
+	// TODO we will need a mechanism to revoke groups from all agents
+	// belonging to an owner if the owner loses the group.
+	if err := h.checkRequestHasAllGroups(r, u.User.IDPGroups); err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrForbidden))
+	}
+	doc := identityFromPutUserParams(u)
+	if err := h.store.UpsertIdentity(doc); err != nil {
+		return errgo.NoteMask(err, "cannot store identity", errgo.Is(params.ErrAlreadyExists))
+	}
+	return nil
+}
+
+func (h *Handler) upsertUser(r *http.Request, u *putUserParams) error {
+	if err := h.auth.CheckACL(opCreateUser, r, []string{server.AdminGroup}); err != nil {
+		return errgo.Mask(err, errgo.Any)
+	}
+
 	if blacklistUsernames[u.Username] {
 		return errgo.WithCausef(nil, params.ErrForbidden, "username %q is reserved", u.Username)
 	}
-
-	doc := &mongodoc.Identity{
-		Username:   string(u.Username),
-		ExternalID: u.User.ExternalID,
-		Email:      u.User.Email,
-		GravatarID: gravatarHash(u.User.Email),
-		FullName:   u.User.FullName,
-		Groups:     u.User.IDPGroups,
-	}
+	doc := identityFromPutUserParams(u)
 	if doc.ExternalID == "" {
 		return errgo.WithCausef(nil, params.ErrBadRequest, `external_id not specified`)
 	}
@@ -94,9 +141,46 @@ func (h *Handler) servePutUser(_ http.ResponseWriter, _ httprequest.Params, u *p
 	return nil
 }
 
+func identityFromPutUserParams(u *putUserParams) *mongodoc.Identity {
+	keys := make([]mongodoc.PublicKey, len(u.User.PublicKeys))
+	for i, pk := range u.User.PublicKeys {
+		keys[i].Key = pk.Key[:]
+	}
+	return &mongodoc.Identity{
+		Username:   string(u.Username),
+		ExternalID: u.User.ExternalID,
+		Email:      u.User.Email,
+		GravatarID: gravatarHash(u.User.Email),
+		FullName:   u.User.FullName,
+		Groups:     u.User.IDPGroups,
+		Owner:      string(u.User.Owner),
+		PublicKeys: keys,
+	}
+}
+
+func (h *Handler) checkRequestHasAllGroups(r *http.Request, groups []string) error {
+	requestGroups, err := h.auth.GroupsFromRequest(opCreateAgent, r)
+	if err != nil {
+		return errgo.Notef(err, "cannot check groups")
+	}
+Outer:
+	for _, group := range groups {
+		for _, g := range requestGroups {
+			if g == group || g == server.AdminGroup {
+				continue Outer
+			}
+		}
+		return errgo.WithCausef(err, params.ErrForbidden, "not a member of %q", group)
+	}
+	return nil
+}
+
 // Calculate the gravatar hash based on the following specification :
 // https://en.gravatar.com/site/implement/hash
 func gravatarHash(s string) string {
+	if s == "" {
+		return ""
+	}
 	hasher := md5.New()
 	hasher.Write([]byte(strings.ToLower(strings.TrimSpace(s))))
 	return fmt.Sprintf("%x", hasher.Sum(nil))
