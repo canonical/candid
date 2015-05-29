@@ -20,6 +20,8 @@ import (
 	"github.com/CanonicalLtd/blues-identity/params"
 )
 
+const AdminGroup = "admin@idm"
+
 var logger = loggo.GetLogger("identity.internal.server")
 
 // Authorizer provides authorization checks for http requests.
@@ -128,9 +130,9 @@ func (c UserHasPublicKeyChecker) Check(_, arg string) error {
 
 // CheckACL ensures that the logged in user is a member of a group
 // specified in the ACL.
-func (a *Authorizer) CheckACL(op string, req *http.Request, acl []string) error {
-	logger.Debugf("attemting to validate request for %q with acl %#v", op, acl)
-	groups, err := a.groupsFromRequest(op, req)
+func (a *Authorizer) CheckACL(c checkers.Checker, req *http.Request, acl []string) error {
+	logger.Debugf("attemting to validate request for with acl %#v", acl)
+	groups, err := a.GroupsFromRequest(c, req)
 	if err != nil {
 		return err
 	}
@@ -147,14 +149,14 @@ func (a *Authorizer) CheckACL(op string, req *http.Request, acl []string) error 
 	return errgo.WithCausef(nil, params.ErrForbidden, "user does not have correct permissions")
 }
 
-// groupsFromRequest gets a list of groups the user belongs to from the request.
+// GroupsFromRequest gets a list of groups the user belongs to from the request.
 // if the request has the correct Basic authentication credentials for the admin user
 // then it is in the group admin@idm.
-func (a *Authorizer) groupsFromRequest(op string, req *http.Request) ([]string, error) {
+func (a *Authorizer) GroupsFromRequest(c checkers.Checker, req *http.Request) ([]string, error) {
 	err := a.CheckAdminCredentials(req)
 	if err == nil {
 		logger.Debugf("admin credentials found.")
-		return []string{"admin@idm"}, nil
+		return []string{AdminGroup}, nil
 	}
 	if errgo.Cause(err) != params.ErrNoAdminCredsProvided {
 		logger.Debugf("invalid admin credentials supplied: %s", err)
@@ -162,19 +164,19 @@ func (a *Authorizer) groupsFromRequest(op string, req *http.Request) ([]string, 
 	}
 	var identity *mongodoc.Identity
 	attrs, verr := httpbakery.CheckRequest(a.svc, req, nil, checkers.New(
-		checkers.OperationChecker(op),
+		c,
 		UserHasPublicKeyChecker{Store: a.store, Identity: &identity},
 	))
 	if verr == nil {
 		logger.Debugf("macaroon found for user %q", attrs["username"])
-		if identity == nil || identity.Username != attrs["username"] {
+		if identity == nil || string(identity.Username) != attrs["username"] {
 			var err error
 			identity, err = a.store.GetIdentity(params.Username(attrs["username"]))
 			if err != nil {
 				return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 			}
 		}
-		return append(identity.Groups, identity.Username), nil
+		return append(identity.Groups, string(identity.Username)), nil
 	}
 	logger.Debugf("no identity found, requesting login")
 	m, err := a.svc.NewMacaroon(

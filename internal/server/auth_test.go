@@ -182,12 +182,13 @@ func (s *authSuite) TestUserHasPublicKey(c *gc.C) {
 
 func (s *authSuite) TestGroupsFromRequest(c *gc.C) {
 	auth := s.newAuthorizer(c, "test-admin", "open sesame")
+	testChecker := checkers.OperationChecker("test")
 
 	// Get the groups for the admin user
 	req, err := http.NewRequest("GET", "", nil)
 	c.Assert(err, gc.IsNil)
 	req.SetBasicAuth("test-admin", "open sesame")
-	groups, err := auth.groupsFromRequest("test", req)
+	groups, err := auth.GroupsFromRequest(testChecker, req)
 	c.Assert(err, gc.IsNil)
 	c.Assert(len(groups), gc.Equals, 1)
 	c.Assert(groups[0], gc.Equals, "admin@idm")
@@ -196,14 +197,14 @@ func (s *authSuite) TestGroupsFromRequest(c *gc.C) {
 	req, err = http.NewRequest("GET", "", nil)
 	c.Assert(err, gc.IsNil)
 	req.SetBasicAuth("test-admin", "open simsim")
-	groups, err = auth.groupsFromRequest("test", req)
+	groups, err = auth.GroupsFromRequest(testChecker, req)
 	c.Assert(len(groups), gc.Equals, 0)
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrUnauthorized)
 
 	// Request with no credentials (discharge required)
 	req, err = http.NewRequest("GET", "", nil)
 	c.Assert(err, gc.IsNil)
-	groups, err = auth.groupsFromRequest("test", req)
+	groups, err = auth.GroupsFromRequest(testChecker, req)
 	c.Assert(len(groups), gc.Equals, 0)
 	herr, ok := err.(*httpbakery.Error)
 	c.Assert(ok, gc.Equals, true, gc.Commentf("unexpected error %s", err))
@@ -230,7 +231,7 @@ func (s *authSuite) TestGroupsFromRequest(c *gc.C) {
 	cookie, err := httpbakery.NewCookie(macaroon.Slice{m})
 	c.Assert(err, gc.IsNil)
 	req.AddCookie(cookie)
-	groups, err = auth.groupsFromRequest("test", req)
+	groups, err = auth.GroupsFromRequest(testChecker, req)
 	c.Assert(len(groups), gc.Equals, 0)
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 
@@ -248,13 +249,14 @@ func (s *authSuite) TestGroupsFromRequest(c *gc.C) {
 	cookie, err = httpbakery.NewCookie(macaroon.Slice{m})
 	c.Assert(err, gc.IsNil)
 	req.AddCookie(cookie)
-	groups, err = auth.groupsFromRequest("test", req)
+	groups, err = auth.GroupsFromRequest(testChecker, req)
 	c.Assert(err, gc.IsNil)
 	sort.Strings(groups)
 	c.Assert(groups, jc.DeepEquals, []string{"test", "test-group1", "test-group2"})
 }
 
 func (s *authSuite) TestCheckACL(c *gc.C) {
+	testChecker := checkers.OperationChecker("test")
 	s.createIdentity(c, &mongodoc.Identity{
 		Username:   "test",
 		ExternalID: "https://example.com/test",
@@ -267,7 +269,7 @@ func (s *authSuite) TestCheckACL(c *gc.C) {
 	req, err := http.NewRequest("GET", "", nil)
 	c.Assert(err, gc.IsNil)
 	req.SetBasicAuth("test-admin", "open sesame")
-	err = auth.CheckACL("test", req, []string{"admin@idm"})
+	err = auth.CheckACL(testChecker, req, []string{"admin@idm"})
 	c.Assert(err, gc.IsNil)
 
 	// Normal ACL
@@ -279,11 +281,11 @@ func (s *authSuite) TestCheckACL(c *gc.C) {
 	cookie, err := httpbakery.NewCookie(macaroon.Slice{m})
 	c.Assert(err, gc.IsNil)
 	req.AddCookie(cookie)
-	err = auth.CheckACL("test", req, []string{"test-group3", "test-group1"})
+	err = auth.CheckACL(testChecker, req, []string{"test-group3", "test-group1"})
 	c.Assert(err, gc.IsNil)
 
 	// No match
-	err = auth.CheckACL("test", req, []string{"test-group3", "test-group4"})
+	err = auth.CheckACL(testChecker, req, []string{"test-group3", "test-group4"})
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrForbidden)
 
 	// error getting groups
@@ -295,6 +297,6 @@ func (s *authSuite) TestCheckACL(c *gc.C) {
 	cookie, err = httpbakery.NewCookie(macaroon.Slice{m})
 	c.Assert(err, gc.IsNil)
 	req.AddCookie(cookie)
-	err = auth.CheckACL("test", req, []string{"test-group3", "test-group1"})
+	err = auth.CheckACL(testChecker, req, []string{"test-group3", "test-group1"})
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 }

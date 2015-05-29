@@ -10,6 +10,7 @@ import (
 	"github.com/julienschmidt/httprouter"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v1/bakery"
+	"gopkg.in/macaroon-bakery.v1/bakery/checkers"
 	"gopkg.in/macaroon-bakery.v1/httpbakery"
 
 	"github.com/CanonicalLtd/blues-identity/internal/server"
@@ -18,6 +19,14 @@ import (
 )
 
 var logger = loggo.GetLogger("identity.internal.v1")
+
+const (
+	opAdmin         checkers.OperationChecker = "admin"
+	opCreateAgent   checkers.OperationChecker = "create-agent"
+	opCreateUser    checkers.OperationChecker = "create-user"
+	opGetUser       checkers.OperationChecker = "get-user"
+	opGetUserGroups checkers.OperationChecker = "get-user-groups"
+)
 
 // Handler handles the /v1 api requests. Handler implements http.Handler
 type Handler struct {
@@ -73,13 +82,13 @@ func New(s *store.Store, auth *server.Authorizer, svc *bakery.Service) *Handler 
 	h.r.PUT("/idps/:idp", h.adminRequired(handle(h.servePutIdentityProvider)))
 	h.r.GET("/login", handleErrors(h.login))
 	h.r.GET("/u", h.adminRequired(handle(h.serveQueryUsers)))
-	h.r.GET("/u/:username", h.adminRequired(handle(h.serveUser)))
-	h.r.PUT("/u/:username", h.adminRequired(handle(h.servePutUser)))
+	h.r.GET("/u/:username", h.aclProtected(handle(h.serveUser), opGetUser, usernameACLFromParams, "admin@idm"))
+	h.r.PUT("/u/:username", handle(h.servePutUser))
 	h.r.GET("/u/:username/extra-info", h.adminRequired(handle(h.serveUserExtraInfo)))
 	h.r.PUT("/u/:username/extra-info", h.adminRequired(handle(h.serveUserPutExtraInfo)))
 	h.r.GET("/u/:username/extra-info/:item", h.adminRequired(handle(h.serveUserExtraInfoItem)))
 	h.r.PUT("/u/:username/extra-info/:item", h.adminRequired(handle(h.serveUserPutExtraInfoItem)))
-	h.r.GET("/u/:username/groups", h.aclProtectedWithParam(handle(h.serveUserGroups), "get-user-groups", "username", "admin@idm", "grouplist@idm"))
+	h.r.GET("/u/:username/groups", h.aclProtected(handle(h.serveUserGroups), opGetUserGroups, usernameACLFromParams, "admin@idm", "grouplist@idm"))
 	h.r.GET("/u/:username/idpgroups", h.adminRequired(handle(h.serveUserGroups)))
 	h.r.GET("/u/:username/macaroon", h.adminRequired(handle(h.serveUserToken)))
 	h.r.GET("/wait", handle(h.serveWait))
@@ -100,27 +109,22 @@ func (h *Handler) requestURL(r *http.Request) string {
 }
 
 func (h *Handler) adminRequired(f httprouter.Handle) httprouter.Handle {
-	return h.aclProtected(f, "admin", "admin@idm")
+	return h.aclProtected(f, opAdmin, nil, "admin@idm")
 }
 
-func (h *Handler) aclProtectedWithParam(f httprouter.Handle, op, pname string, acl ...string) httprouter.Handle {
-	return func(w http.ResponseWriter, req *http.Request, p httprouter.Params) {
-		var racl []string
-		extra := p.ByName(pname)
-		if extra != "" {
-			racl = append(racl, extra)
-		}
-		racl = append(racl, acl...)
-		if err := h.auth.CheckACL(op, req, racl); err != nil {
-			writeError(w, err)
-			return
-		}
-		f(w, req, p)
-	}
-}
+type aclRequestFunc func(req *http.Request, p httprouter.Params) []string
 
-func (h *Handler) aclProtected(f httprouter.Handle, op string, acl ...string) httprouter.Handle {
+// aclProtected performs an acl check before calling f. The ACL check
+// tests if the request has credentials valid for operation op that
+// specify any of the groups in acl. If aclF is not nil it will be called
+// with the http.Request and the httprouter.Params and any returned
+// values will be appended to the acl.
+func (h *Handler) aclProtected(f httprouter.Handle, op checkers.OperationChecker, aclF aclRequestFunc, acl ...string) httprouter.Handle {
 	return func(w http.ResponseWriter, req *http.Request, p httprouter.Params) {
+		acl := acl[:]
+		if aclF != nil {
+			acl = append(acl, aclF(req, p)...)
+		}
 		if err := h.auth.CheckACL(op, req, acl); err != nil {
 			writeError(w, err)
 			return
@@ -130,17 +134,34 @@ func (h *Handler) aclProtected(f httprouter.Handle, op string, acl ...string) ht
 }
 
 func (h *Handler) adminRequiredHandler(handler http.Handler) httprouter.Handle {
-	return h.aclProtectedHandler(handler, "admin", "admin@idm")
+	return h.aclProtectedHandler(handler, opAdmin, nil, "admin@idm")
 }
 
-func (h *Handler) aclProtectedHandler(handler http.Handler, op string, acl ...string) httprouter.Handle {
+// aclProtectedHandler performs an acl check before invoking handler. The
+// ACL check tests if the request has credentials valid for operation op
+// that specify any of the groups in acl. If aclF is not nil it will be
+// called with the http.Request and the httprouter.Params and any
+// returned values will be appended to the acl.
+func (h *Handler) aclProtectedHandler(handler http.Handler, op checkers.OperationChecker, aclF aclRequestFunc, acl ...string) httprouter.Handle {
 	return func(w http.ResponseWriter, req *http.Request, p httprouter.Params) {
-		if err := h.auth.CheckACL(op, req, acl); err != nil {
+		racl := acl
+		if aclF != nil {
+			racl = append(racl, aclF(req, p)...)
+		}
+		if err := h.auth.CheckACL(op, req, racl); err != nil {
 			writeError(w, err)
 			return
 		}
 		handler.ServeHTTP(w, req)
 	}
+}
+
+func usernameACLFromParams(_ *http.Request, p httprouter.Params) []string {
+	u := p.ByName("username")
+	if u != "" {
+		return []string{u}
+	}
+	return nil
 }
 
 //notFound is the handler that is called when a handler cannot be found
