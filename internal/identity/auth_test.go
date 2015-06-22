@@ -1,6 +1,6 @@
 // Copyright 2014 Canonical Ltd.
 
-package server
+package identity_test
 
 import (
 	"net/http"
@@ -14,17 +14,15 @@ import (
 	"gopkg.in/macaroon-bakery.v1/bakery/checkers"
 	"gopkg.in/macaroon-bakery.v1/httpbakery"
 	"gopkg.in/macaroon.v1"
-	"launchpad.net/lpad"
 
+	"github.com/CanonicalLtd/blues-identity/internal/identity"
 	"github.com/CanonicalLtd/blues-identity/internal/mongodoc"
-	"github.com/CanonicalLtd/blues-identity/internal/store"
 	"github.com/CanonicalLtd/blues-identity/params"
 )
 
 type authSuite struct {
 	testing.IsolatedMgoSuite
-	store *store.Store
-	svc   *bakery.Service
+	pool *identity.Pool
 }
 
 var _ = gc.Suite(&authSuite{})
@@ -33,37 +31,32 @@ const identityLocation = "https://identity.test/id"
 
 func (s *authSuite) SetUpTest(c *gc.C) {
 	s.IsolatedMgoSuite.SetUpTest(c)
-	key, err := bakery.GenerateKey()
-	c.Assert(err, gc.IsNil)
-	s.store, err = store.New(s.Session.DB("idm-test"), lpad.Production)
-	c.Assert(err, gc.IsNil)
-	s.svc, err = bakery.NewService(bakery.NewServiceParams{
-		Location: identityLocation,
-		Store:    s.store.Macaroons,
-		Key:      key,
-		Locator: bakery.PublicKeyLocatorMap{
-			identityLocation + "/v1/discharger": &key.Public,
+	var err error
+	s.pool, err = identity.NewPool(
+		s.Session.DB("idm-test"),
+		identity.ServerParams{
+			AuthUsername: "test-admin",
+			AuthPassword: "open sesame",
+			Location:     identityLocation,
 		},
-	})
+	)
 	c.Assert(err, gc.IsNil)
 }
 
-func (s *authSuite) newAuthorizer(c *gc.C, username, password string) *Authorizer {
-	return NewAuthorizer(ServerParams{
-		AuthUsername: username,
-		AuthPassword: password,
-		Location:     identityLocation,
-	}, s.store, s.svc)
+func (s *authSuite) TearDownTest(c *gc.C) {
+	s.pool.Close()
+	s.IsolatedMgoSuite.TearDownTest(c)
 }
 
 func (s *authSuite) createIdentity(c *gc.C, doc *mongodoc.Identity) (uuid string) {
-	err := s.store.UpsertIdentity(doc)
+	store := s.pool.GetNoLimit()
+	defer s.pool.Put(store)
+	err := store.UpsertIdentity(doc)
 	c.Assert(err, gc.IsNil)
 	return doc.UUID
 }
 
 func (s *authSuite) TestCheckAdminCredentials(c *gc.C) {
-	auth := s.newAuthorizer(c, "test-admin", "open sesame")
 	tests := []struct {
 		about              string
 		header             http.Header
@@ -117,7 +110,9 @@ func (s *authSuite) TestCheckAdminCredentials(c *gc.C) {
 	}}
 	for i, test := range tests {
 		c.Logf("%d. %s", i, test.about)
-		obtained := auth.CheckAdminCredentials(&http.Request{
+		store := s.pool.GetNoLimit()
+		defer s.pool.Put(store)
+		obtained := store.CheckAdminCredentials(&http.Request{
 			Header: test.header,
 		})
 		if test.expectErrorMessage == "" {
@@ -138,21 +133,24 @@ func (s *authSuite) TestUserHasPublicKey(c *gc.C) {
 			{Key: key.Public.Key[:]},
 		},
 	})
-	cav := UserHasPublicKeyCaveat(params.Username("test"), &key.Public)
+	cav := identity.UserHasPublicKeyCaveat(params.Username("test"), &key.Public)
 	c.Assert(cav.Location, gc.Equals, "")
 	c.Assert(cav.Condition, gc.Matches, "user-has-public-key test .*")
 
-	var identity *mongodoc.Identity
-	check := UserHasPublicKeyChecker{
-		Store:    s.store,
-		Identity: &identity,
+	store := s.pool.GetNoLimit()
+	defer s.pool.Put(store)
+
+	var doc *mongodoc.Identity
+	check := identity.UserHasPublicKeyChecker{
+		Store:    store,
+		Identity: &doc,
 	}
 	c.Assert(check.Condition(), gc.Equals, "user-has-public-key")
 	cond, arg, err := checkers.ParseCaveat(cav.Condition)
 	c.Assert(err, gc.IsNil)
 	err = check.Check(cond, arg)
 	c.Assert(err, gc.IsNil)
-	c.Assert(identity.Username, gc.Equals, "test")
+	c.Assert(doc.Username, gc.Equals, "test")
 
 	// Unknown username
 	arg = "test2 " + key.Public.String()
@@ -181,14 +179,15 @@ func (s *authSuite) TestUserHasPublicKey(c *gc.C) {
 }
 
 func (s *authSuite) TestGroupsFromRequest(c *gc.C) {
-	auth := s.newAuthorizer(c, "test-admin", "open sesame")
 	testChecker := checkers.OperationChecker("test")
+	store := s.pool.GetNoLimit()
+	defer s.pool.Put(store)
 
 	// Get the groups for the admin user
 	req, err := http.NewRequest("GET", "", nil)
 	c.Assert(err, gc.IsNil)
 	req.SetBasicAuth("test-admin", "open sesame")
-	groups, err := auth.GroupsFromRequest(testChecker, req)
+	groups, err := store.GroupsFromRequest(testChecker, req)
 	c.Assert(err, gc.IsNil)
 	c.Assert(len(groups), gc.Equals, 1)
 	c.Assert(groups[0], gc.Equals, "admin@idm")
@@ -197,14 +196,14 @@ func (s *authSuite) TestGroupsFromRequest(c *gc.C) {
 	req, err = http.NewRequest("GET", "", nil)
 	c.Assert(err, gc.IsNil)
 	req.SetBasicAuth("test-admin", "open simsim")
-	groups, err = auth.GroupsFromRequest(testChecker, req)
+	groups, err = store.GroupsFromRequest(testChecker, req)
 	c.Assert(len(groups), gc.Equals, 0)
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrUnauthorized)
 
 	// Request with no credentials (discharge required)
 	req, err = http.NewRequest("GET", "", nil)
 	c.Assert(err, gc.IsNil)
-	groups, err = auth.GroupsFromRequest(testChecker, req)
+	groups, err = store.GroupsFromRequest(testChecker, req)
 	c.Assert(len(groups), gc.Equals, 0)
 	herr, ok := err.(*httpbakery.Error)
 	c.Assert(ok, gc.Equals, true, gc.Commentf("unexpected error %s", err))
@@ -222,7 +221,7 @@ func (s *authSuite) TestGroupsFromRequest(c *gc.C) {
 	c.Assert(foundThirdParty, gc.Equals, true)
 
 	// Non-existent identity
-	m, err := s.svc.NewMacaroon("", nil, []checkers.Caveat{
+	m, err := store.Service.NewMacaroon("", nil, []checkers.Caveat{
 		checkers.DeclaredCaveat("username", "test2"),
 	})
 	c.Assert(err, gc.IsNil)
@@ -231,7 +230,7 @@ func (s *authSuite) TestGroupsFromRequest(c *gc.C) {
 	cookie, err := httpbakery.NewCookie(macaroon.Slice{m})
 	c.Assert(err, gc.IsNil)
 	req.AddCookie(cookie)
-	groups, err = auth.GroupsFromRequest(testChecker, req)
+	groups, err = store.GroupsFromRequest(testChecker, req)
 	c.Assert(len(groups), gc.Equals, 0)
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 
@@ -241,7 +240,7 @@ func (s *authSuite) TestGroupsFromRequest(c *gc.C) {
 		ExternalID: "https://example.com/test",
 		Groups:     []string{"test-group1", "test-group2"},
 	})
-	m, err = s.svc.NewMacaroon("", nil, []checkers.Caveat{
+	m, err = store.Service.NewMacaroon("", nil, []checkers.Caveat{
 		checkers.DeclaredCaveat("username", "test"),
 	})
 	req, err = http.NewRequest("GET", "", nil)
@@ -249,7 +248,7 @@ func (s *authSuite) TestGroupsFromRequest(c *gc.C) {
 	cookie, err = httpbakery.NewCookie(macaroon.Slice{m})
 	c.Assert(err, gc.IsNil)
 	req.AddCookie(cookie)
-	groups, err = auth.GroupsFromRequest(testChecker, req)
+	groups, err = store.GroupsFromRequest(testChecker, req)
 	c.Assert(err, gc.IsNil)
 	sort.Strings(groups)
 	c.Assert(groups, jc.DeepEquals, []string{"test", "test-group1", "test-group2"})
@@ -263,40 +262,41 @@ func (s *authSuite) TestCheckACL(c *gc.C) {
 		Groups:     []string{"test-group1", "test-group2"},
 	})
 
-	auth := s.newAuthorizer(c, "test-admin", "open sesame")
+	store := s.pool.GetNoLimit()
+	defer s.pool.Put(store)
 
 	// Admin ACL
 	req, err := http.NewRequest("GET", "", nil)
 	c.Assert(err, gc.IsNil)
 	req.SetBasicAuth("test-admin", "open sesame")
-	err = auth.CheckACL(testChecker, req, []string{"admin@idm"})
+	err = store.CheckACL(testChecker, req, []string{"admin@idm"})
 	c.Assert(err, gc.IsNil)
 
 	// Normal ACL
 	req, err = http.NewRequest("GET", "", nil)
 	c.Assert(err, gc.IsNil)
-	m, err := s.svc.NewMacaroon("", nil, []checkers.Caveat{
+	m, err := store.Service.NewMacaroon("", nil, []checkers.Caveat{
 		checkers.DeclaredCaveat("username", "test"),
 	})
 	cookie, err := httpbakery.NewCookie(macaroon.Slice{m})
 	c.Assert(err, gc.IsNil)
 	req.AddCookie(cookie)
-	err = auth.CheckACL(testChecker, req, []string{"test-group3", "test-group1"})
+	err = store.CheckACL(testChecker, req, []string{"test-group3", "test-group1"})
 	c.Assert(err, gc.IsNil)
 
 	// No match
-	err = auth.CheckACL(testChecker, req, []string{"test-group3", "test-group4"})
+	err = store.CheckACL(testChecker, req, []string{"test-group3", "test-group4"})
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrForbidden)
 
 	// error getting groups
 	req, err = http.NewRequest("GET", "", nil)
 	c.Assert(err, gc.IsNil)
-	m, err = s.svc.NewMacaroon("", nil, []checkers.Caveat{
+	m, err = store.Service.NewMacaroon("", nil, []checkers.Caveat{
 		checkers.DeclaredCaveat("username", "test2"),
 	})
 	cookie, err = httpbakery.NewCookie(macaroon.Slice{m})
 	c.Assert(err, gc.IsNil)
 	req.AddCookie(cookie)
-	err = auth.CheckACL(testChecker, req, []string{"test-group3", "test-group1"})
+	err = store.CheckACL(testChecker, req, []string{"test-group3", "test-group1"})
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 }

@@ -14,6 +14,7 @@ import (
 
 	"github.com/garyburd/go-oauth/oauth"
 	jc "github.com/juju/testing/checkers"
+	"github.com/juju/testing/httptesting"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v1/bakery"
@@ -60,6 +61,8 @@ func (s *dischargeSuite) TearDownTest(c *gc.C) {
 }
 
 func (s *dischargeSuite) TestDischargeWhenLoggedIn(c *gc.C) {
+	store := s.pool.GetNoLimit()
+	defer s.pool.Put(store)
 	uuid := s.createUser(c, &params.User{
 		Username:   "test-user",
 		ExternalID: "http://example.com/test-user",
@@ -80,13 +83,7 @@ func (s *dischargeSuite) TestDischargeWhenLoggedIn(c *gc.C) {
 		Condition: "is-authenticated-user",
 	}})
 	c.Assert(err, gc.IsNil)
-	// Fake a copy of the bakery service to create login cookies.
-	idsvc, err := bakery.NewService(bakery.NewServiceParams{
-		Store: s.store.Macaroons,
-		Key:   s.keyPair,
-	})
-	c.Assert(err, gc.IsNil)
-	idm, err := idsvc.NewMacaroon("", nil, []checkers.Caveat{
+	idm, err := store.Service.NewMacaroon("", nil, []checkers.Caveat{
 		checkers.DeclaredCaveat("username", "test-user"),
 	})
 	c.Assert(err, gc.IsNil)
@@ -107,6 +104,8 @@ func (s *dischargeSuite) TestDischargeWhenLoggedIn(c *gc.C) {
 }
 
 func (s *dischargeSuite) TestDischargeMemberOf(c *gc.C) {
+	store := s.pool.GetNoLimit()
+	defer s.pool.Put(store)
 	s.createUser(c, &params.User{
 		Username:   "test-user",
 		ExternalID: "http://example.com/test-user",
@@ -180,13 +179,7 @@ func (s *dischargeSuite) TestDischargeMemberOf(c *gc.C) {
 		c.Logf("test: %q", test.about)
 		m, err := test.createMacaroon()
 		c.Assert(err, gc.IsNil)
-		// Fake a copy of the bakery service to create login cookies.
-		idsvc, err := bakery.NewService(bakery.NewServiceParams{
-			Store: s.store.Macaroons,
-			Key:   s.keyPair,
-		})
-		c.Assert(err, gc.IsNil)
-		idm, err := idsvc.NewMacaroon("", nil, []checkers.Caveat{
+		idm, err := store.Service.NewMacaroon("", nil, []checkers.Caveat{
 			checkers.DeclaredCaveat("username", "test-user"),
 		})
 		c.Assert(err, gc.IsNil)
@@ -623,6 +616,17 @@ func (s *dischargeSuite) TestDischargeWithAgentLogin(c *gc.C) {
 	c.Assert(d, jc.DeepEquals, checkers.Declared{
 		"uuid":     uuid,
 		"username": "test",
+	})
+}
+
+func (s *dischargeSuite) TestPublicKey(c *gc.C) {
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Handler:      s.srv,
+		URL:          apiURL("/discharger/publickey"),
+		ExpectStatus: http.StatusOK,
+		ExpectBody: map[string]*bakery.PublicKey{
+			"PublicKey": &s.keyPair.Public,
+		},
 	})
 }
 

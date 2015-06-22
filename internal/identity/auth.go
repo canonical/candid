@@ -1,6 +1,6 @@
 // Copyright 2014 Canonical Ltd.
 
-package server
+package identity
 
 import (
 	"bytes"
@@ -8,7 +8,6 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/juju/loggo"
 	"github.com/juju/utils"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v1/bakery"
@@ -16,40 +15,20 @@ import (
 	"gopkg.in/macaroon-bakery.v1/httpbakery"
 
 	"github.com/CanonicalLtd/blues-identity/internal/mongodoc"
-	"github.com/CanonicalLtd/blues-identity/internal/store"
 	"github.com/CanonicalLtd/blues-identity/params"
 )
 
-const AdminGroup = "admin@idm"
-
-var logger = loggo.GetLogger("identity.internal.server")
-
-// Authorizer provides authorization checks for http requests.
-type Authorizer struct {
-	username string
-	password string
-	svc      *bakery.Service
-	location string
-	store    *store.Store
-}
-
-// NewAuthorizer creates a new Authorizer using the supplied credentials.
-func NewAuthorizer(params ServerParams, store *store.Store, svc *bakery.Service) *Authorizer {
-	return &Authorizer{
-		username: params.AuthUsername,
-		password: params.AuthPassword,
-		svc:      svc,
-		location: params.Location,
-		store:    store,
-	}
-}
+const (
+	AdminGroup     = "admin@idm"
+	GroupListGroup = "grouplist@idm"
+)
 
 // CheckAdminCredentials checks if the request has credentials that match the
 // configured administration credentials for the server. If the credentials match
 // nil will be reurned, otherwise the error will describe the failure.
 //
 // If there are no credentials in the request, it returns params.ErrNoAdminCredsProvided.
-func (a Authorizer) CheckAdminCredentials(req *http.Request) error {
+func (s *Store) CheckAdminCredentials(req *http.Request) error {
 	if _, ok := req.Header["Authorization"]; !ok {
 		return params.ErrNoAdminCredsProvided
 	}
@@ -57,10 +36,10 @@ func (a Authorizer) CheckAdminCredentials(req *http.Request) error {
 	if err != nil {
 		return errgo.WithCausef(err, params.ErrUnauthorized, "")
 	}
-	if u != a.username {
+	if u != s.pool.params.AuthUsername {
 		return errgo.WithCausef(nil, params.ErrUnauthorized, "invalid credentials")
 	}
-	if p != a.password {
+	if p != s.pool.params.AuthPassword {
 		return errgo.WithCausef(nil, params.ErrUnauthorized, "invalid credentials")
 	}
 	return nil
@@ -78,7 +57,7 @@ func UserHasPublicKeyCaveat(user params.Username, pk *bakery.PublicKey) checkers
 // caveat.
 type UserHasPublicKeyChecker struct {
 	// Store is used to lookup the specified user id.
-	Store *store.Store
+	Store *Store
 
 	// Identity can be used to save the retrieved identity for
 	// later processing. If Identity is not nil then the retrieved
@@ -130,9 +109,9 @@ func (c UserHasPublicKeyChecker) Check(_, arg string) error {
 
 // CheckACL ensures that the logged in user is a member of a group
 // specified in the ACL.
-func (a *Authorizer) CheckACL(c checkers.Checker, req *http.Request, acl []string) error {
+func (s *Store) CheckACL(c checkers.Checker, req *http.Request, acl []string) error {
 	logger.Debugf("attemting to validate request for with acl %#v", acl)
-	groups, err := a.GroupsFromRequest(c, req)
+	groups, err := s.GroupsFromRequest(c, req)
 	if err != nil {
 		return err
 	}
@@ -152,8 +131,8 @@ func (a *Authorizer) CheckACL(c checkers.Checker, req *http.Request, acl []strin
 // GroupsFromRequest gets a list of groups the user belongs to from the request.
 // if the request has the correct Basic authentication credentials for the admin user
 // then it is in the group admin@idm.
-func (a *Authorizer) GroupsFromRequest(c checkers.Checker, req *http.Request) ([]string, error) {
-	err := a.CheckAdminCredentials(req)
+func (s *Store) GroupsFromRequest(c checkers.Checker, req *http.Request) ([]string, error) {
+	err := s.CheckAdminCredentials(req)
 	if err == nil {
 		logger.Debugf("admin credentials found.")
 		return []string{AdminGroup}, nil
@@ -163,15 +142,15 @@ func (a *Authorizer) GroupsFromRequest(c checkers.Checker, req *http.Request) ([
 		return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
 	var identity *mongodoc.Identity
-	attrs, verr := httpbakery.CheckRequest(a.svc, req, nil, checkers.New(
+	attrs, verr := httpbakery.CheckRequest(s.Service, req, nil, checkers.New(
 		c,
-		UserHasPublicKeyChecker{Store: a.store, Identity: &identity},
+		UserHasPublicKeyChecker{Store: s, Identity: &identity},
 	))
 	if verr == nil {
 		logger.Debugf("macaroon found for user %q", attrs["username"])
 		if identity == nil || string(identity.Username) != attrs["username"] {
 			var err error
-			identity, err = a.store.GetIdentity(params.Username(attrs["username"]))
+			identity, err = s.GetIdentity(params.Username(attrs["username"]))
 			if err != nil {
 				return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 			}
@@ -179,14 +158,14 @@ func (a *Authorizer) GroupsFromRequest(c checkers.Checker, req *http.Request) ([
 		return append(identity.Groups, string(identity.Username)), nil
 	}
 	logger.Debugf("no identity found, requesting login")
-	m, err := a.svc.NewMacaroon(
+	m, err := s.Service.NewMacaroon(
 		"",
 		nil,
 		[]checkers.Caveat{
 			checkers.DenyCaveat("discharge"),
 			checkers.NeedDeclaredCaveat(
 				checkers.Caveat{
-					Location:  a.location + "/v1/discharger",
+					Location:  s.pool.params.Location + "/v1/discharger",
 					Condition: "is-authenticated-user",
 				},
 				"username"),
@@ -196,7 +175,7 @@ func (a *Authorizer) GroupsFromRequest(c checkers.Checker, req *http.Request) ([
 		return nil, errgo.Notef(err, "cannot create macaroon")
 	}
 	path := "/"
-	if u, err := url.Parse(a.location); err == nil {
+	if u, err := url.Parse(s.pool.params.Location); err == nil {
 		path = u.Path
 	}
 	return nil, httpbakery.NewDischargeRequiredError(m, path, verr)

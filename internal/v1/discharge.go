@@ -12,9 +12,10 @@ import (
 	"gopkg.in/macaroon-bakery.v1/bakery"
 	"gopkg.in/macaroon-bakery.v1/bakery/checkers"
 	"gopkg.in/macaroon-bakery.v1/httpbakery"
+	"gopkg.in/macaroon.v1"
 
+	"github.com/CanonicalLtd/blues-identity/internal/identity"
 	"github.com/CanonicalLtd/blues-identity/internal/mongodoc"
-	"github.com/CanonicalLtd/blues-identity/internal/server"
 	"github.com/CanonicalLtd/blues-identity/params"
 )
 
@@ -30,10 +31,10 @@ type verifiedUserInfo struct {
 
 // checkThirdPartyCaveat checks the given caveat. This function is called by the httpbakery
 // discharge logic. See httpbakery.AddDischargeHandler for futher details.
-func (h *Handler) checkThirdPartyCaveat(req *http.Request, cavId, cav string) ([]checkers.Caveat, error) {
-	err := h.auth.CheckAdminCredentials(req)
+func (h *handler) checkThirdPartyCaveat(req *http.Request, cavId, cav string) ([]checkers.Caveat, error) {
+	err := h.store.CheckAdminCredentials(req)
 	var username string
-	var identity *mongodoc.Identity
+	var doc *mongodoc.Identity
 	if err == nil {
 		// Admin access granted. Find out what user the client wants
 		// to discharge for.
@@ -45,8 +46,8 @@ func (h *Handler) checkThirdPartyCaveat(req *http.Request, cavId, cav string) ([
 		return nil, errgo.WithCausef(err, params.ErrUnauthorized, "")
 	} else {
 		// No admin credentials provided - look for an identity macaroon.
-		attrs, err := httpbakery.CheckRequest(h.svc, req, nil, checkers.New(
-			server.UserHasPublicKeyChecker{Store: h.store, Identity: &identity},
+		attrs, err := httpbakery.CheckRequest(h.store.Service, req, nil, checkers.New(
+			identity.UserHasPublicKeyChecker{Store: h.store, Identity: &doc},
 			checkers.OperationChecker("discharge"),
 		))
 		if err != nil {
@@ -54,8 +55,8 @@ func (h *Handler) checkThirdPartyCaveat(req *http.Request, cavId, cav string) ([
 		}
 		username = attrs["username"]
 	}
-	if identity == nil || string(identity.Username) != username {
-		identity, err = h.store.GetIdentity(params.Username(username))
+	if doc == nil || string(doc.Username) != username {
+		doc, err = h.store.GetIdentity(params.Username(username))
 		if err != nil {
 			return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 		}
@@ -66,9 +67,9 @@ func (h *Handler) checkThirdPartyCaveat(req *http.Request, cavId, cav string) ([
 	}
 	switch cond {
 	case "is-authenticated-user":
-		return h.checkAuthenticatedUser(identity)
+		return h.checkAuthenticatedUser(doc)
 	case "is-member-of":
-		return h.checkMemberOfGroup(identity, args)
+		return h.checkMemberOfGroup(doc, args)
 	default:
 		return nil, checkers.ErrCaveatNotRecognized
 	}
@@ -76,7 +77,7 @@ func (h *Handler) checkThirdPartyCaveat(req *http.Request, cavId, cav string) ([
 
 // checkAuthenticatedUser checks a third-party caveat for "is-authenticated-user". Currently the discharge
 // macaroon will only be created for users with admin credentials.
-func (h *Handler) checkAuthenticatedUser(user *mongodoc.Identity) ([]checkers.Caveat, error) {
+func (h *handler) checkAuthenticatedUser(user *mongodoc.Identity) ([]checkers.Caveat, error) {
 	return []checkers.Caveat{
 		checkers.DeclaredCaveat("uuid", user.UUID),
 		checkers.DeclaredCaveat("username", user.Username),
@@ -85,7 +86,7 @@ func (h *Handler) checkAuthenticatedUser(user *mongodoc.Identity) ([]checkers.Ca
 }
 
 // checkMemberOfGroup checks if user is member of any of the specified groups.
-func (h *Handler) checkMemberOfGroup(user *mongodoc.Identity, targetGroups string) ([]checkers.Caveat, error) {
+func (h *handler) checkMemberOfGroup(user *mongodoc.Identity, targetGroups string) ([]checkers.Caveat, error) {
 	groups := strings.Fields(targetGroups)
 	for _, userGroup := range user.Groups {
 		for _, g := range groups {
@@ -100,7 +101,7 @@ func (h *Handler) checkMemberOfGroup(user *mongodoc.Identity, targetGroups strin
 // needLoginError returns an error suitable for returning
 // from a discharge request that can only be satisfied
 // if the user logs in.
-func (h *Handler) needLoginError(cavId, caveat string, why string) error {
+func (h *handler) needLoginError(cavId, caveat string, why string) error {
 	// TODO(rog) If the user is already logged in (username != ""),
 	// we should perhaps just return an error here.
 	waitId, err := h.place.NewRendezvous(&thirdPartyCaveatInfo{
@@ -121,12 +122,13 @@ func (h *Handler) needLoginError(cavId, caveat string, why string) error {
 }
 
 type wait struct {
-	WaitID string `httprequest:"waitid,form"`
+	httprequest.Route `httprequest:"GET /wait"`
+	WaitID            string `httprequest:"waitid,form"`
 }
 
 // serveWait serves an HTTP endpoint that waits until a macaroon
 // has been discharged, and returns the discharge macaroon.
-func (h *Handler) serveWait(header http.Header, p httprequest.Params, w *wait) (*params.WaitResponse, error) {
+func (h *handler) ServeWait(p httprequest.Params, w *wait) (*params.WaitResponse, error) {
 	if w.WaitID == "" {
 		return nil, errgo.WithCausef(nil, params.ErrBadRequest, "wait id parameter not found")
 	}
@@ -149,11 +151,11 @@ func (h *Handler) serveWait(header http.Header, p httprequest.Params, w *wait) (
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot make cookie")
 	}
-	p.AddCookie(cookie)
+	p.Request.AddCookie(cookie)
 	checker := bakery.ThirdPartyCheckerFunc(func(cavId, cav string) ([]checkers.Caveat, error) {
 		return h.checkThirdPartyCaveat(p.Request, cavId, cav)
 	})
-	m, err := h.svc.Discharge(checker, caveat.CaveatId)
+	m, err := h.store.Service.Discharge(checker, caveat.CaveatId)
 	if err != nil {
 		return nil, errgo.NoteMask(err, "cannot discharge", errgo.Any)
 	}
@@ -167,9 +169,45 @@ func (h *Handler) serveWait(header http.Header, p httprequest.Params, w *wait) (
 	// X-Requested-With header, return the identity cookie only when
 	// it's not present (i.e. when /wait is not called from an AJAX
 	// request).
-	header.Add("Set-Cookie", cookie.String())
+	p.Response.Header().Add("Set-Cookie", cookie.String())
 
 	return &params.WaitResponse{
 		Macaroon: m,
 	}, nil
+}
+
+type dischargeRequest struct {
+	httprequest.Route `httprequest:"POST /discharger/discharge"`
+	ID                string `httprequest:"id,form"`
+}
+
+type dischargeResponse struct {
+	Macaroon *macaroon.Macaroon `json:",omitempty"`
+}
+
+func (h *handler) ServeDischarge(p httprequest.Params, r *dischargeRequest) (*dischargeResponse, error) {
+	m, err := h.store.Service.Discharge(
+		bakery.ThirdPartyCheckerFunc(
+			func(cavId, cav string) ([]checkers.Caveat, error) {
+				return h.checkThirdPartyCaveat(p.Request, cavId, cav)
+			},
+		),
+		r.ID,
+	)
+	if err != nil {
+		return nil, errgo.NoteMask(err, "cannot discharge", errgo.Any)
+	}
+	return &dischargeResponse{m}, nil
+}
+
+type publickeyRequest struct {
+	httprequest.Route `httprequest:"GET /discharger/publickey"`
+}
+
+type publickeyResponse struct {
+	PublicKey *bakery.PublicKey
+}
+
+func (h *handler) ServePublickey(r *publickeyRequest) (*publickeyResponse, error) {
+	return &publickeyResponse{PublicKey: h.store.Service.PublicKey()}, nil
 }

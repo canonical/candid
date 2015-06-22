@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"path"
 	"testing"
+	"time"
 
 	jujutesting "github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"
@@ -34,6 +35,8 @@ auth-password: mypasswd
 private-key: 8PjzjakvIlh3BVFKe8axinRDutF6EDIfjtuf4+JaNow=
 public-key: CIdWcEUN+0OZnKW9KwruRQnQDY/qqzVdD30CijwiWCk=
 location: http://foo.com:1234
+max-mgo-sessions: 10
+request-timeout: 500ms
 `
 
 func (s *configSuite) readConfig(c *gc.C, content string) (*config.Config, error) {
@@ -50,13 +53,15 @@ func (s *configSuite) TestRead(c *gc.C) {
 	conf, err := s.readConfig(c, testConfig)
 	c.Assert(err, gc.IsNil)
 	c.Assert(conf, jc.DeepEquals, &config.Config{
-		MongoAddr:    "localhost:23456",
-		APIAddr:      "1.2.3.4:5678",
-		AuthUsername: "myuser",
-		AuthPassword: "mypasswd",
-		PrivateKey:   "8PjzjakvIlh3BVFKe8axinRDutF6EDIfjtuf4+JaNow=",
-		PublicKey:    "CIdWcEUN+0OZnKW9KwruRQnQDY/qqzVdD30CijwiWCk=",
-		Location:     "http://foo.com:1234",
+		MongoAddr:      "localhost:23456",
+		APIAddr:        "1.2.3.4:5678",
+		AuthUsername:   "myuser",
+		AuthPassword:   "mypasswd",
+		PrivateKey:     "8PjzjakvIlh3BVFKe8axinRDutF6EDIfjtuf4+JaNow=",
+		PublicKey:      "CIdWcEUN+0OZnKW9KwruRQnQDY/qqzVdD30CijwiWCk=",
+		Location:       "http://foo.com:1234",
+		MaxMgoSessions: 10,
+		RequestTimeout: config.DurationString{Duration: 500 * time.Millisecond},
 	})
 }
 
@@ -68,12 +73,12 @@ func (s *configSuite) TestReadErrorNotFound(c *gc.C) {
 
 func (s *configSuite) TestReadErrorEmpty(c *gc.C) {
 	cfg, err := s.readConfig(c, "")
-	c.Assert(err, gc.ErrorMatches, "missing fields mongo-addr, api-addr, auth-username, auth-password, private-key, public-key, location in config file")
+	c.Assert(err, gc.ErrorMatches, "missing fields mongo-addr, api-addr, auth-username, auth-password, private-key, public-key, location, max-mgo-sessions in config file")
 	c.Assert(cfg, gc.IsNil)
 }
 
 func (s *configSuite) TestReadErrorInvalidYAML(c *gc.C) {
 	cfg, err := s.readConfig(c, ":")
-	c.Assert(err, gc.ErrorMatches, "cannot parse .*: YAML error: did not find expected key")
+	c.Assert(err, gc.ErrorMatches, "cannot parse .*: yaml: did not find expected key")
 	c.Assert(cfg, gc.IsNil)
 }

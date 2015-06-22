@@ -20,8 +20,8 @@ import (
 	"gopkg.in/macaroon.v1"
 	"gopkg.in/mgo.v2/bson"
 
+	"github.com/CanonicalLtd/blues-identity/internal/identity"
 	"github.com/CanonicalLtd/blues-identity/internal/mongodoc"
-	"github.com/CanonicalLtd/blues-identity/internal/server"
 	"github.com/CanonicalLtd/blues-identity/params"
 )
 
@@ -53,11 +53,11 @@ func (s *usersSuite) TestUser(c *gc.C) {
 		},
 	})
 	s.createUser(c, &params.User{
-		Username: "agent@" + server.AdminGroup,
+		Username: "agent@" + identity.AdminGroup,
 		IDPGroups: []string{
 			"test",
 		},
-		Owner: server.AdminGroup,
+		Owner: identity.AdminGroup,
 		PublicKeys: []*bakery.PublicKey{
 			&key.Public,
 		},
@@ -366,13 +366,13 @@ func (s *usersSuite) TestUser(c *gc.C) {
 		},
 	}, {
 		about:  "put agent user",
-		url:    apiURL("u/agent2@" + server.AdminGroup),
+		url:    apiURL("u/agent2@" + identity.AdminGroup),
 		method: "PUT",
 		body: marshal(c, params.User{
 			IDPGroups: []string{
 				"test",
 			},
-			Owner: params.Username(server.AdminGroup),
+			Owner: params.Username(identity.AdminGroup),
 			PublicKeys: []*bakery.PublicKey{
 				&key.Public,
 			},
@@ -382,17 +382,17 @@ func (s *usersSuite) TestUser(c *gc.C) {
 		expectStatus: http.StatusOK,
 	}, {
 		about:        "get agent user",
-		url:          apiURL("u/agent@" + server.AdminGroup),
+		url:          apiURL("u/agent@" + identity.AdminGroup),
 		method:       "GET",
 		username:     adminUsername,
 		password:     adminPassword,
 		expectStatus: http.StatusOK,
 		expectBody: params.User{
-			Username: "agent@" + server.AdminGroup,
+			Username: "agent@" + identity.AdminGroup,
 			IDPGroups: []string{
 				"test",
 			},
-			Owner: server.AdminGroup,
+			Owner: identity.AdminGroup,
 			PublicKeys: []*bakery.PublicKey{
 				&key.Public,
 			},
@@ -503,8 +503,10 @@ func (s *usersSuite) TestCreateUserWritesToDatabase(c *gc.C) {
 		Password:     adminPassword,
 		ExpectStatus: http.StatusOK,
 	})
+	store := s.pool.GetNoLimit()
+	defer s.pool.Put(store)
 	var doc mongodoc.Identity
-	err := s.store.DB.Identities().Find(nil).One(&doc)
+	err := store.DB.Identities().Find(nil).One(&doc)
 	c.Assert(err, gc.IsNil)
 	c.Assert(doc.Username, gc.Equals, "jbloggs")
 	c.Assert(doc.ExternalID, gc.Equals, "http://example.com/jbloggs")
@@ -514,6 +516,8 @@ func (s *usersSuite) TestCreateUserWritesToDatabase(c *gc.C) {
 }
 
 func (s *usersSuite) TestQueryUsers(c *gc.C) {
+	store := s.pool.GetNoLimit()
+	defer s.pool.Put(store)
 	s.createUser(c, &params.User{
 		Username:   "jbloggs2",
 		ExternalID: "http://example.com/jbloggs2",
@@ -838,6 +842,8 @@ func (s *usersSuite) TestUserIDPGroups(c *gc.C) {
 }
 
 func (s *usersSuite) TestUserGroups(c *gc.C) {
+	store := s.pool.GetNoLimit()
+	defer s.pool.Put(store)
 	s.createUser(c, &params.User{
 		Username:   "test",
 		ExternalID: "http://example.com/test",
@@ -870,7 +876,7 @@ func (s *usersSuite) TestUserGroups(c *gc.C) {
 		Email:      "grouplister@example.com",
 		FullName:   "Group Lister",
 		IDPGroups: []string{
-			"grouplist@idm",
+			identity.GroupListGroup,
 		},
 	})
 	tests := []struct {
@@ -927,7 +933,7 @@ func (s *usersSuite) TestUserGroups(c *gc.C) {
 		if test.password != "" {
 			un = test.username
 		} else if test.username != "" {
-			m, err := s.svc.NewMacaroon("", nil, []checkers.Caveat{
+			m, err := store.Service.NewMacaroon("", nil, []checkers.Caveat{
 				checkers.DeclaredCaveat("username", test.username),
 			})
 			c.Assert(err, gc.IsNil)
@@ -1117,6 +1123,8 @@ var extraInfoTests = []struct {
 }}
 
 func (s *usersSuite) TestExtraInfo(c *gc.C) {
+	store := s.pool.GetNoLimit()
+	defer s.pool.Put(store)
 	s.createUser(c, &params.User{
 		Username:   "jbloggs",
 		ExternalID: "http://example.com/jbloggs",
@@ -1128,14 +1136,14 @@ func (s *usersSuite) TestExtraInfo(c *gc.C) {
 	for i, test := range extraInfoTests {
 		c.Logf("%d. %s", i, test.about)
 		// Reset the stored extra-info for jbloggs
-		err := s.store.UpdateIdentity("jbloggs", bson.D{{"$set", bson.D{{"extrainfo",
+		err := store.UpdateIdentity("jbloggs", bson.D{{"$set", bson.D{{"extrainfo",
 			map[string]json.RawMessage{
 				"item1": json.RawMessage(`1`),
 				"item2": json.RawMessage(`"two"`),
 			},
 		}}}})
 		// Delete any stored extra-info for jbloggs3
-		err = s.store.UpdateIdentity("jbloggs3", bson.D{{"$unset", bson.D{{"extrainfo", ""}}}})
+		err = store.UpdateIdentity("jbloggs3", bson.D{{"$unset", bson.D{{"extrainfo", ""}}}})
 		c.Assert(err, gc.IsNil)
 		url := "u/" + test.user + "/extra-info"
 		if test.item != "" {
@@ -1172,6 +1180,8 @@ func (s *usersSuite) TestExtraInfo(c *gc.C) {
 }
 
 func (s *usersSuite) TestMultipleEndpointAccess(c *gc.C) {
+	store := s.pool.GetNoLimit()
+	defer s.pool.Put(store)
 	s.createIdentity(c, &mongodoc.Identity{
 		Username: "jbloggs1",
 		Owner:    "test",
@@ -1188,7 +1198,7 @@ func (s *usersSuite) TestMultipleEndpointAccess(c *gc.C) {
 		srv:    s.srv,
 		rt:     http.DefaultTransport,
 	}
-	m, err := s.svc.NewMacaroon("", nil, []checkers.Caveat{
+	m, err := store.Service.NewMacaroon("", nil, []checkers.Caveat{
 		checkers.DeclaredCaveat("username", "jbloggs1"),
 	})
 	c.Assert(err, gc.IsNil)

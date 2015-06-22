@@ -160,12 +160,14 @@ func (s *idpsSuite) TestPutIDPS(c *gc.C) {
 }
 
 func (s *idpsSuite) TestGetIDPS(c *gc.C) {
+	store := s.pool.GetNoLimit()
+	defer s.pool.Put(store)
 	provider1 := &mongodoc.IdentityProvider{
 		Name:     "provider1",
 		Protocol: params.ProtocolOpenID20,
 		LoginURL: "https://login.example.com",
 	}
-	err := s.store.SetIdentityProvider(provider1)
+	err := store.SetIdentityProvider(provider1)
 	c.Assert(err, gc.Equals, nil)
 	tests := []struct {
 		about    string
@@ -205,13 +207,15 @@ func (s *idpsSuite) TestGetIDPS(c *gc.C) {
 }
 
 func (s *idpsSuite) TestListIDPS(c *gc.C) {
+	store := s.pool.GetNoLimit()
+	defer s.pool.Put(store)
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Handler:    s.srv,
 		Method:     "GET",
 		URL:        fmt.Sprintf("/%s/idps", version),
 		ExpectBody: []string{},
 	})
-	err := s.store.SetIdentityProvider(
+	err := store.SetIdentityProvider(
 		&mongodoc.IdentityProvider{
 			Name:     "idp1",
 			Protocol: params.ProtocolOpenID20,
@@ -225,7 +229,7 @@ func (s *idpsSuite) TestListIDPS(c *gc.C) {
 		URL:        fmt.Sprintf("/%s/idps", version),
 		ExpectBody: []string{"idp1"},
 	})
-	err = s.store.SetIdentityProvider(
+	err = store.SetIdentityProvider(
 		&mongodoc.IdentityProvider{
 			Name:     "idp2",
 			Protocol: params.ProtocolOpenID20,

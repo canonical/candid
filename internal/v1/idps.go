@@ -3,8 +3,6 @@
 package v1
 
 import (
-	"net/http"
-
 	"github.com/juju/httprequest"
 	"gopkg.in/errgo.v1"
 
@@ -12,17 +10,22 @@ import (
 	"github.com/CanonicalLtd/blues-identity/params"
 )
 
-type identityProvider struct {
-	Name string `httprequest:"idp,path"`
+type identityProvidersRequest struct {
+	httprequest.Route `httprequest:"GET /idps"`
 }
 
 // serveIdentityProvider serves the /idps endpints. See http://tinyurl.com/oanmhy5 for
 // details.
-func (h *Handler) serveIdentityProviders(hdr http.Header, p httprequest.Params) (interface{}, error) {
+func (h *handler) ServeIdentityProviders(*identityProvidersRequest) (interface{}, error) {
 	return h.store.IdentityProviderNames()
 }
 
-func (h *Handler) serveIdentityProvider(_ http.Header, _ httprequest.Params, i *identityProvider) (*params.IdentityProvider, error) {
+type identityProviderRequest struct {
+	httprequest.Route `httprequest:"GET /idps/:idp"`
+	Name              string `httprequest:"idp,path"`
+}
+
+func (h *handler) ServeIdentityProvider(p httprequest.Params, i *identityProviderRequest) (*params.IdentityProvider, error) {
 	doc, err := h.store.IdentityProvider(i.Name)
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
@@ -40,17 +43,21 @@ func (h *Handler) serveIdentityProvider(_ http.Header, _ httprequest.Params, i *
 	return &idp, nil
 }
 
-type setIdentityProviderParams struct {
+type setIdentityProviderRequest struct {
+	httprequest.Route        `httprequest:"PUT /idps/:idp"`
 	*params.IdentityProvider `httprequest:",body"`
-	Name                     string `httprequest:"idp,path"`
+	Name                     params.Username `httprequest:"idp,path"`
 }
 
-func (h *Handler) servePutIdentityProvider(_ http.ResponseWriter, _ httprequest.Params, i *setIdentityProviderParams) error {
+func (h *handler) ServePutIdentityProvider(p httprequest.Params, i *setIdentityProviderRequest) error {
+	if err := h.checkAdmin(p.Request); err != nil {
+		return errgo.Mask(err, errgo.Any)
+	}
 	var doc mongodoc.IdentityProvider
 	if i.Name == "" {
 		return errgo.WithCausef(nil, params.ErrBadRequest, "no name for identity provider")
 	}
-	doc.Name = i.Name
+	doc.Name = string(i.Name)
 	switch i.Protocol {
 	case params.ProtocolOpenID20:
 		doc.Protocol = params.ProtocolOpenID20

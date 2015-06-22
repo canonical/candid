@@ -3,7 +3,6 @@
 package v1
 
 import (
-	"net/http"
 	"net/url"
 
 	"github.com/juju/httprequest"
@@ -12,11 +11,11 @@ import (
 	"gopkg.in/macaroon-bakery.v1/bakery/checkers"
 	"gopkg.in/macaroon-bakery.v1/httpbakery"
 
-	"github.com/CanonicalLtd/blues-identity/internal/server"
+	"github.com/CanonicalLtd/blues-identity/internal/identity"
 	"github.com/CanonicalLtd/blues-identity/params"
 )
 
-func (h *Handler) agentLoginURL(waitid string) string {
+func (h *handler) agentLoginURL(waitid string) string {
 	url := h.location + "/v1/agent"
 	if waitid != "" {
 		url += "?waitid=" + waitid
@@ -25,42 +24,43 @@ func (h *Handler) agentLoginURL(waitid string) string {
 }
 
 type agentLoginRequest struct {
+	httprequest.Route        `httprequest:"POST /agent"`
 	params.AgentLoginRequest `httprequest:",body"`
 }
 
-func (h *Handler) agentLogin(w http.ResponseWriter, p httprequest.Params, login *agentLoginRequest) {
+func (h *handler) AgentLogin(p httprequest.Params, login *agentLoginRequest) {
 	for _, ms := range httpbakery.RequestMacaroons(p.Request) {
 		declared := checkers.InferDeclared(ms)
-		err := h.svc.Check(ms, checkers.New(
-			server.UserHasPublicKeyChecker{Store: h.store},
+		err := h.store.Service.Check(ms, checkers.New(
+			identity.UserHasPublicKeyChecker{Store: h.store},
 			checkers.TimeBefore,
 			httpbakery.Checkers(p.Request),
 			declared,
 			checkers.OperationChecker("discharge"),
 		))
 		if err == nil {
-			h.loginSuccess(w, p.Request, declared["username"], ms, "agent login complete")
+			h.loginSuccess(p.Response, p.Request, declared["username"], ms, "agent login complete")
 			return
 		}
 		if _, ok := errgo.Cause(err).(*bakery.VerificationError); !ok {
-			h.loginFailure(w, p.Request, declared["username"], err)
+			h.loginFailure(p.Response, p.Request, declared["username"], err)
 			return
 		}
 		logger.Infof("verification error: %s", err)
 	}
-	m, err := h.svc.NewMacaroon("", nil, []checkers.Caveat{
+	m, err := h.store.Service.NewMacaroon("", nil, []checkers.Caveat{
 		checkers.DeclaredCaveat("username", string(login.Username)),
 		bakery.LocalThirdPartyCaveat(login.PublicKey),
-		server.UserHasPublicKeyCaveat(login.Username, login.PublicKey),
+		identity.UserHasPublicKeyCaveat(login.Username, login.PublicKey),
 	})
 	if err != nil {
-		h.loginFailure(w, p.Request, string(login.Username), errgo.Notef(err, "cannot create macaroon"))
+		h.loginFailure(p.Response, p.Request, string(login.Username), errgo.Notef(err, "cannot create macaroon"))
 		return
 	}
 	u, err := url.Parse(h.location)
 	if err != nil {
-		h.loginFailure(w, p.Request, string(login.Username), errgo.Notef(err, "cannot parse location"))
+		h.loginFailure(p.Response, p.Request, string(login.Username), errgo.Notef(err, "cannot parse location"))
 		return
 	}
-	httpbakery.WriteDischargeRequiredError(w, m, u.Path, nil)
+	httpbakery.WriteDischargeRequiredError(p.Response, m, u.Path, nil)
 }

@@ -11,7 +11,6 @@ import (
 	gc "gopkg.in/check.v1"
 
 	"github.com/CanonicalLtd/blues-identity"
-	"github.com/CanonicalLtd/blues-identity/internal/idtesting"
 	"github.com/CanonicalLtd/blues-identity/params"
 )
 
@@ -20,7 +19,7 @@ func TestPackage(t *testing.T) {
 }
 
 type serverSuite struct {
-	idtesting.IsolatedMgoSuite
+	jujutesting.IsolatedMgoSuite
 }
 
 var _ = gc.Suite(&serverSuite{})
@@ -47,8 +46,11 @@ func (s *serverSuite) TestVersions(c *gc.C) {
 }
 
 func (s *serverSuite) TestNewServerWithVersions(c *gc.C) {
-	h, err := identity.NewServer(s.Session.DB("foo"), identity.ServerParams{}, identity.V1)
+	h, err := identity.NewServer(s.Session.DB("foo"),
+		identity.ServerParams{MaxMgoSessions: 300},
+		identity.V1)
 	c.Assert(err, gc.IsNil)
+	defer h.Close()
 
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Handler:      h,

@@ -15,13 +15,8 @@ import (
 	"gopkg.in/mgo.v2/bson"
 
 	"github.com/CanonicalLtd/blues-identity/internal/mongodoc"
+	"github.com/juju/httprequest"
 )
-
-type ussoProvider struct {
-	*openid2Provider
-	location string
-	h        *Handler
-}
 
 const (
 	ussoRealm = "" // TODO Doesn't work if this is non-empty; why? [A: http://openid.net/specs/openid-authentication-2_0.html#realms]
@@ -34,24 +29,16 @@ const (
 // This list needs to contain any private teams that the system needs to know about.
 const openIdRequestedTeams = "blues-development,charm-beta"
 
-func newUSSOProvider(h *Handler, location string) *ussoProvider {
-	return &ussoProvider{
-		openid2Provider: newOpenID2Provider(h, location+"/callback", ussoURL, ussoRealm),
-		location:        location,
-		h:               h,
-	}
-}
-
-func (p *ussoProvider) oauthURL(waitid string) (string, error) {
-	loginURL := p.location + "/oauth"
+func (h *handler) ussoOAuthURL(waitid string) (string, error) {
+	loginURL := h.location + "/v1/idp/usso/oauth"
 	if waitid != "" {
 		loginURL += "?waitid=" + waitid
 	}
 	return loginURL, nil
 }
 
-func (p *ussoProvider) openIDURL(waitId string) (string, error) {
-	loginURL, err := p.openid2Provider.openIDURL(waitId)
+func (h *handler) ussoOpenIDURL(waitID string) (string, error) {
+	loginURL, err := h.openIDURL("/v1/idp/usso/callback", waitID, ussoURL, ussoRealm)
 	if err != nil {
 		return "", errgo.Mask(err)
 	}
@@ -92,28 +79,32 @@ func (qu *qURL) String() string {
 	return u.String()
 }
 
-func (p *ussoProvider) handler() http.Handler {
-	mux := http.NewServeMux()
-	mux.Handle("/callback", http.StripPrefix("/callback", p.openid2Provider.handler()))
-	mux.Handle("/oauth", http.StripPrefix("/oauth", http.HandlerFunc(p.oauthLogin)))
-	return mux
+type ussoCallbackRequest struct {
+	httprequest.Route `httprequest:"GET /idp/usso/callback"`
 }
 
-func (p *ussoProvider) oauthLogin(w http.ResponseWriter, r *http.Request) {
-	reqURL := p.h.requestURL(r)
-	id, err := verifyOAuthSignature(reqURL, r)
+func (h *handler) ServeUSSOCallback(p httprequest.Params, _ *ussoCallbackRequest) {
+	h.handleOpenIDCallback(p)
+}
+
+type ussoOAuthRequest struct {
+	httprequest.Route `httprequest:"GET /idp/usso/oauth"`
+	WaitID            string `httprequest:"waitid,form"`
+}
+
+func (h *handler) ServeOAuthLogin(p httprequest.Params, r *ussoOAuthRequest) {
+	reqURL := h.requestURL(p.Request)
+	id, err := verifyOAuthSignature(reqURL, p.Request)
 	if err != nil {
-		p.h.loginFailure(w, r, "unknown user", err)
+		h.loginFailure(p.Response, p.Request, "unknown user", err)
 		return
 	}
-	db := p.h.store.DB.Copy()
-	defer db.Close()
 	var identity mongodoc.Identity
-	if err := db.Identities().Find(bson.D{{"external_id", id}}).One(&identity); err != nil {
-		p.h.loginFailure(w, r, id, errgo.Notef(err, "cannot get user details for %q", id))
+	if err := h.store.DB.Identities().Find(bson.D{{"external_id", id}}).One(&identity); err != nil {
+		h.loginFailure(p.Response, p.Request, id, errgo.Notef(err, "cannot get user details for %q", id))
 		return
 	}
-	p.h.loginID(w, r, identity.Username)
+	h.loginID(p.Response, p.Request, identity.Username)
 }
 
 var consumerKeyRegexp = regexp.MustCompile(`oauth_consumer_key="([^"]*)"`)
@@ -122,7 +113,6 @@ var consumerKeyRegexp = regexp.MustCompile(`oauth_consumer_key="([^"]*)"`)
 // signed.
 func verifyOAuthSignature(requestURL string, req *http.Request) (string, error) {
 	req.ParseForm()
-	logger.Infof("RequestURL: %q", requestURL)
 	u, err := url.Parse(requestURL)
 	if err != nil {
 		return "", errgo.Notef(err, "cannot parse request URL")
