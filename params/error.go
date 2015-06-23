@@ -26,6 +26,7 @@ const (
 	ErrAlreadyExists        ErrorCode = "already exists"
 	ErrNoAdminCredsProvided ErrorCode = "no admin credentials provided"
 	ErrMethodNotAllowed     ErrorCode = "method not allowed"
+	ErrServiceUnavailable   ErrorCode = "service unavailable"
 )
 
 // Error represents an error - it is returned for any response that fails.

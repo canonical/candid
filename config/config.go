@@ -8,21 +8,24 @@ import (
 	"io/ioutil"
 	"os"
 	"strings"
+	"time"
 
 	"gopkg.in/errgo.v1"
-	"gopkg.in/yaml.v1"
+	"gopkg.in/yaml.v2"
 )
 
 // Config holds the configuration parameters for the identity service.
 type Config struct {
-	MongoAddr    string `yaml:"mongo-addr"`
-	APIAddr      string `yaml:"api-addr"`
-	AuthUsername string `yaml:"auth-username"`
-	AuthPassword string `yaml:"auth-password"`
-	PublicKey    string `yaml:"public-key"`
-	PrivateKey   string `yaml:"private-key"`
-	Location     string `yaml:"location"`
-	AccessLog    string `yaml:"access-log"`
+	MongoAddr      string         `yaml:"mongo-addr"`
+	APIAddr        string         `yaml:"api-addr"`
+	AuthUsername   string         `yaml:"auth-username"`
+	AuthPassword   string         `yaml:"auth-password"`
+	PublicKey      string         `yaml:"public-key"`
+	PrivateKey     string         `yaml:"private-key"`
+	Location       string         `yaml:"location"`
+	AccessLog      string         `yaml:"access-log"`
+	MaxMgoSessions int            `yaml:"max-mgo-sessions"`
+	RequestTimeout DurationString `yaml:"request-timeout"`
 }
 
 func (c *Config) validate() error {
@@ -52,6 +55,9 @@ func (c *Config) validate() error {
 		// TODO check it's a valid URL
 		missing = append(missing, "location")
 	}
+	if c.MaxMgoSessions == 0 {
+		missing = append(missing, "max-mgo-sessions")
+	}
 	if len(missing) != 0 {
 		return errgo.Newf("missing fields %s in config file", strings.Join(missing, ", "))
 	}
@@ -78,4 +84,19 @@ func Read(path string) (*Config, error) {
 		return nil, errgo.Mask(err)
 	}
 	return &conf, nil
+}
+
+// DurationString holds a duration that marshals and
+// unmarshals as a friendly string.
+type DurationString struct {
+	time.Duration
+}
+
+func (dp *DurationString) UnmarshalText(data []byte) error {
+	d, err := time.ParseDuration(string(data))
+	if err != nil {
+		return errgo.Mask(err)
+	}
+	dp.Duration = d
+	return nil
 }

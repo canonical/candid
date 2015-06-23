@@ -1,6 +1,6 @@
 // Copyright 2014 Canonical Ltd.
 
-package server
+package identity_test
 
 import (
 	"testing"

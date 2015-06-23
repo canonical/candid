@@ -39,6 +39,8 @@ func errToResp(err error) (int, interface{}) {
 		status = http.StatusUnauthorized
 	case params.ErrMethodNotAllowed:
 		status = http.StatusMethodNotAllowed
+	case params.ErrServiceUnavailable:
+		status = http.StatusServiceUnavailable
 	}
 	return status, errorBody
 }

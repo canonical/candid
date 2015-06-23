@@ -1,45 +1,46 @@
 // Copyright 2014 Canonical Ltd.
 
-package store_test
+package identity_test
 
 import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"time"
 
+	"github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/mgo.v2/bson"
 	"launchpad.net/lpad"
 
-	"github.com/CanonicalLtd/blues-identity/internal/idtesting"
+	"github.com/CanonicalLtd/blues-identity/internal/identity"
 	"github.com/CanonicalLtd/blues-identity/internal/mongodoc"
-	"github.com/CanonicalLtd/blues-identity/internal/store"
 	"github.com/CanonicalLtd/blues-identity/params"
 )
 
 type storeSuite struct {
-	idtesting.IsolatedMgoSuite
-	launchpad *httptest.Server
+	testing.IsolatedMgoSuite
+	pool *identity.Pool
 }
 
 var _ = gc.Suite(&storeSuite{})
 
-func (s *storeSuite) SetUpSuite(c *gc.C) {
-	s.IsolatedMgoSuite.SetUpSuite(c)
-	s.launchpad = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("null"))
-	}))
+func (s *storeSuite) SetUpTest(c *gc.C) {
+	s.IsolatedMgoSuite.SetUpTest(c)
+	var err error
+	s.pool, err = identity.NewPool(s.Session.DB("store-tests"), identity.ServerParams{})
+	c.Assert(err, gc.IsNil)
 }
 
-func (s *storeSuite) TearDownSuite(c *gc.C) {
-	s.launchpad.Close()
-	s.IsolatedMgoSuite.TearDownSuite(c)
+func (s *storeSuite) TearDownTest(c *gc.C) {
+	s.pool.Close()
+	s.IsolatedMgoSuite.TearDownTest(c)
 }
 
 func (s *storeSuite) TestNew(c *gc.C) {
-	db := s.Session.DB("testing")
+	db := s.Session.DB("store-tests")
 
 	// Add an identity to the identities collection using mgo directly.
 	err := db.C("identities").Insert(&mongodoc.Identity{
@@ -54,8 +55,8 @@ func (s *storeSuite) TestNew(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 
 	// Set up a new store.
-	store, err := store.New(db, lpad.APIBase(s.launchpad.URL))
-	c.Assert(err, gc.IsNil)
+	store := s.pool.GetNoLimit()
+	defer s.pool.Put(store)
 
 	// Retrieve the identity using the store object.
 	var doc mongodoc.Identity
@@ -202,11 +203,11 @@ var upsertIdentityTests = []struct {
 }}
 
 func (s *storeSuite) TestUpsertIdentity(c *gc.C) {
-	store, err := store.New(s.Session.DB("testing"), lpad.APIBase(s.launchpad.URL))
-	c.Assert(err, gc.IsNil)
+	store := s.pool.GetNoLimit()
+	defer s.pool.Put(store)
 
 	// Add existing interactive user.
-	err = store.UpsertIdentity(&mongodoc.Identity{
+	err := store.UpsertIdentity(&mongodoc.Identity{
 		Username:   "existing",
 		ExternalID: "http://example.com/existing",
 		Email:      "existing@example.com",
@@ -246,8 +247,8 @@ func (s *storeSuite) TestUpsertIdentity(c *gc.C) {
 }
 
 func (s *storeSuite) TestCollections(c *gc.C) {
-	store, err := store.New(s.Session.DB("testing"), lpad.APIBase(s.launchpad.URL))
-	c.Assert(err, gc.IsNil)
+	store := s.pool.GetNoLimit()
+	defer s.pool.Put(store)
 	colls := store.DB.Collections()
 	names, err := store.DB.CollectionNames()
 	c.Assert(err, gc.IsNil)
@@ -288,11 +289,11 @@ func (s *storeSuite) TestCollections(c *gc.C) {
 }
 
 func (s *storeSuite) TestGetIdentity(c *gc.C) {
-	store, err := store.New(s.Session.DB("testing"), lpad.APIBase(s.launchpad.URL))
-	c.Assert(err, gc.IsNil)
+	store := s.pool.GetNoLimit()
+	defer s.pool.Put(store)
 
 	// Add an identity to the store.
-	err = store.UpsertIdentity(&mongodoc.Identity{
+	err := store.UpsertIdentity(&mongodoc.Identity{
 		Username:   "test",
 		ExternalID: "http://example.com/test",
 		Email:      "test@example.com",
@@ -319,11 +320,11 @@ func (s *storeSuite) TestGetIdentity(c *gc.C) {
 }
 
 func (s *storeSuite) TestUpdateIdentity(c *gc.C) {
-	store, err := store.New(s.Session.DB("testing"), lpad.APIBase(s.launchpad.URL))
-	c.Assert(err, gc.IsNil)
+	store := s.pool.GetNoLimit()
+	defer s.pool.Put(store)
 
 	// Add an identity to the store.
-	err = store.UpsertIdentity(&mongodoc.Identity{
+	err := store.UpsertIdentity(&mongodoc.Identity{
 		Username:   "test",
 		ExternalID: "http://example.com/test",
 		Email:      "test@example.com",
@@ -364,8 +365,16 @@ func (s *storeSuite) TestRetrieveLaunchpadGroups(c *gc.C) {
 		}
 	}))
 	defer lp.Close()
-	store, err := store.New(s.Session.DB("testing"), lpad.APIBase(lp.URL))
+	pool, err := identity.NewPool(
+		s.Session.DB("store-launchpad-tests"),
+		identity.ServerParams{
+			Launchpad: lpad.APIBase(lp.URL),
+		},
+	)
 	c.Assert(err, gc.IsNil)
+	defer pool.Close()
+	store := pool.GetNoLimit()
+	defer pool.Put(store)
 
 	// Add an identity to the store.
 	err = store.UpsertIdentity(&mongodoc.Identity{
@@ -387,4 +396,61 @@ func (s *storeSuite) TestRetrieveLaunchpadGroups(c *gc.C) {
 	c.Assert(id.Email, gc.Equals, "test@example.com")
 	c.Assert(id.FullName, gc.Equals, "Test User")
 	c.Assert(id.Groups, gc.DeepEquals, []string{"test", "test1", "test2"})
+}
+
+func (s *storeSuite) TestGetStoreFromPool(c *gc.C) {
+	p, err := identity.NewPool(s.Session.DB("store-launchpad-tests"),
+		identity.ServerParams{
+			MaxMgoSessions: 2,
+		},
+	)
+	c.Assert(err, gc.IsNil)
+	defer p.Close()
+	s1, err := p.Get()
+	c.Assert(err, gc.IsNil)
+	s2, err := p.Get()
+	c.Assert(err, gc.IsNil)
+	defer p.Put(s2)
+	p.Put(s1)
+	s3, err := p.Get()
+	c.Assert(err, gc.IsNil)
+	defer p.Put(s3)
+	c.Assert(s3.DB.Database.Session, gc.Equals, s1.DB.Database.Session)
+}
+
+func (s *storeSuite) TestGetStoreFromPoolLimit(c *gc.C) {
+	p, err := identity.NewPool(s.Session.DB("store-launchpad-tests"),
+		identity.ServerParams{
+			MaxMgoSessions: 1,
+			RequestTimeout: 100 * time.Millisecond,
+		},
+	)
+	c.Assert(err, gc.IsNil)
+	defer p.Close()
+	s1, err := p.Get()
+	c.Assert(err, gc.IsNil)
+	defer p.Put(s1)
+	_, err = p.Get()
+	c.Assert(err, gc.ErrorMatches, "too many mongo sessions in use: pool limit exceeded")
+}
+
+func (s *storeSuite) TestGetStoreFromPoolClosedBeforeTimeout(c *gc.C) {
+	p, err := identity.NewPool(s.Session.DB("store-launchpad-tests"),
+		identity.ServerParams{
+			MaxMgoSessions: 1,
+			RequestTimeout: time.Second,
+		},
+	)
+	c.Assert(err, gc.IsNil)
+	defer p.Close()
+	s1, err := p.Get()
+	c.Assert(err, gc.IsNil)
+	go func() {
+		time.Sleep(500 * time.Millisecond)
+		p.Put(s1)
+	}()
+	s2, err := p.Get()
+	c.Assert(err, gc.IsNil)
+	defer p.Put(s2)
+	c.Assert(s2.DB.Database.Session, gc.Equals, s1.DB.Database.Session)
 }

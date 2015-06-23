@@ -1,27 +1,26 @@
 // Copyright 2014 Canonical Ltd.
 
-package server
+package identity_test
 
 import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/juju/testing"
 	"github.com/juju/testing/httptesting"
 	gc "gopkg.in/check.v1"
-	"gopkg.in/macaroon-bakery.v1/bakery"
 
-	"github.com/CanonicalLtd/blues-identity/internal/idtesting"
-	"github.com/CanonicalLtd/blues-identity/internal/store"
+	"github.com/CanonicalLtd/blues-identity/internal/identity"
 )
 
 type serverSuite struct {
-	idtesting.IsolatedMgoSuite
+	testing.IsolatedMgoSuite
 }
 
 var _ = gc.Suite(&serverSuite{})
 
 func (s *serverSuite) TestNewServerWithNoVersions(c *gc.C) {
-	h, err := New(s.Session.DB("foo"), ServerParams{}, nil)
+	h, err := identity.New(s.Session.DB("foo"), identity.ServerParams{}, nil)
 	c.Assert(err, gc.ErrorMatches, `identity server must serve at least one version of the API`)
 	c.Assert(h, gc.IsNil)
 }
@@ -33,8 +32,8 @@ type versionResponse struct {
 
 func (s *serverSuite) TestNewServerWithVersions(c *gc.C) {
 	db := s.Session.DB("foo")
-	serveVersion := func(vers string) NewAPIHandlerFunc {
-		return func(*store.Store, *Authorizer, *bakery.Service) http.Handler {
+	serveVersion := func(vers string) identity.NewAPIHandlerFunc {
+		return func(*identity.Pool, identity.ServerParams) http.Handler {
 			return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 				w.Header().Set("Content-Type", "application/json")
 				response := versionResponse{
@@ -48,7 +47,7 @@ func (s *serverSuite) TestNewServerWithVersions(c *gc.C) {
 		}
 	}
 
-	h, err := New(db, ServerParams{}, map[string]NewAPIHandlerFunc{
+	h, err := identity.New(db, identity.ServerParams{}, map[string]identity.NewAPIHandlerFunc{
 		"version1": serveVersion("version1"),
 	})
 	c.Assert(err, gc.IsNil)
@@ -56,7 +55,7 @@ func (s *serverSuite) TestNewServerWithVersions(c *gc.C) {
 	assertDoesNotServeVersion(c, h, "version2")
 	assertDoesNotServeVersion(c, h, "version3")
 
-	h, err = New(db, ServerParams{}, map[string]NewAPIHandlerFunc{
+	h, err = identity.New(db, identity.ServerParams{}, map[string]identity.NewAPIHandlerFunc{
 		"version1": serveVersion("version1"),
 		"version2": serveVersion("version2"),
 	})
@@ -65,7 +64,7 @@ func (s *serverSuite) TestNewServerWithVersions(c *gc.C) {
 	assertServesVersion(c, h, "version2")
 	assertDoesNotServeVersion(c, h, "version3")
 
-	h, err = New(db, ServerParams{}, map[string]NewAPIHandlerFunc{
+	h, err = identity.New(db, identity.ServerParams{}, map[string]identity.NewAPIHandlerFunc{
 		"version1": serveVersion("version1"),
 		"version2": serveVersion("version2"),
 		"version3": serveVersion("version3"),

@@ -30,13 +30,14 @@ func (s *jsonSuite) SetUpTest(c *gc.C) {
 
 func (s *jsonSuite) TestHandleErrors(c *gc.C) {
 	for httpErr, paramsErr := range map[int]params.ErrorCode{
-		http.StatusNotFound:     params.ErrNotFound,
-		http.StatusForbidden:    params.ErrForbidden,
-		http.StatusBadRequest:   params.ErrBadRequest,
-		http.StatusUnauthorized: params.ErrUnauthorized,
+		http.StatusNotFound:           params.ErrNotFound,
+		http.StatusForbidden:          params.ErrForbidden,
+		http.StatusBadRequest:         params.ErrBadRequest,
+		http.StatusUnauthorized:       params.ErrUnauthorized,
+		http.StatusServiceUnavailable: params.ErrServiceUnavailable,
 	} {
 		mux := httprouter.New()
-		mux.Handle("GET", "/error/", v1.HandleErrors(func(http.ResponseWriter, httprequest.Params) error {
+		mux.Handle("GET", "/error/", v1.HandleErrors(func(httprequest.Params) error {
 			return errgo.WithCausef(nil, paramsErr, "bad wolf")
 		}))
 		httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
@@ -52,7 +53,7 @@ func (s *jsonSuite) TestHandleErrors(c *gc.C) {
 }
 
 func (s *jsonSuite) TestHandleErrorsInternalServerError(c *gc.C) {
-	s.mux.Handle("GET", "/error/", v1.HandleErrors(func(http.ResponseWriter, httprequest.Params) error {
+	s.mux.Handle("GET", "/error/", v1.HandleErrors(func(httprequest.Params) error {
 		return errgo.New("bad wolf")
 	}))
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
@@ -66,7 +67,7 @@ func (s *jsonSuite) TestHandleErrorsInternalServerError(c *gc.C) {
 }
 
 func (s *jsonSuite) TestHandleErrorsSuccess(c *gc.C) {
-	s.mux.Handle("GET", "/valid/", v1.HandleErrors(func(http.ResponseWriter, httprequest.Params) error {
+	s.mux.Handle("GET", "/valid/", v1.HandleErrors(func(httprequest.Params) error {
 		return nil
 	}))
 
@@ -79,10 +80,10 @@ func (s *jsonSuite) TestHandleErrorsSuccess(c *gc.C) {
 
 func (s *jsonSuite) TestHandleJSON(c *gc.C) {
 	// Set up server paths.
-	s.mux.Handle("GET", "/bad-request/", v1.HandleJSON(func(http.Header, httprequest.Params) (interface{}, error) {
+	s.mux.Handle("GET", "/bad-request/", v1.HandleJSON(func(httprequest.Params) (interface{}, error) {
 		return nil, errgo.WithCausef(nil, params.ErrBadRequest, "bad wolf")
 	}))
-	s.mux.Handle("GET", "/valid/", v1.HandleJSON(func(http.Header, httprequest.Params) (interface{}, error) {
+	s.mux.Handle("GET", "/valid/", v1.HandleJSON(func(httprequest.Params) (interface{}, error) {
 		return "success", nil
 	}))
 

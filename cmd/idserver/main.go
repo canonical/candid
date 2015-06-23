@@ -9,6 +9,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"launchpad.net/lpad"
+
 	"github.com/gorilla/handlers"
 	"github.com/juju/loggo"
 	"gopkg.in/errgo.v1"
@@ -71,19 +73,26 @@ func serve(confPath string) error {
 	if err := keypair.Public.UnmarshalText([]byte(conf.PublicKey)); err != nil {
 		return errgo.Notef(err, "cannot unmarshal public key")
 	}
-	server, err := identity.NewServer(
+	srv, err := identity.NewServer(
 		db,
 		identity.ServerParams{
-			AuthUsername: conf.AuthUsername,
-			AuthPassword: conf.AuthPassword,
-			Key:          &keypair,
-			Location:     conf.Location,
+			AuthUsername:   conf.AuthUsername,
+			AuthPassword:   conf.AuthPassword,
+			Key:            &keypair,
+			Location:       conf.Location,
+			Launchpad:      lpad.Production,
+			MaxMgoSessions: conf.MaxMgoSessions,
+			RequestTimeout: conf.RequestTimeout.Duration,
 		},
 		identity.V1,
 	)
 	if err != nil {
 		return errgo.Notef(err, "cannot create new server at %q", conf.APIAddr)
 	}
+	defer srv.Close()
+	// Cast the Server to an http.Handler so that it can be
+	// optionally wrapped by the logging handler below.
+	var server http.Handler = srv
 
 	if conf.AccessLog != "" {
 		accesslog := &lumberjack.Logger{
