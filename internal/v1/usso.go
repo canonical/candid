@@ -19,7 +19,6 @@ import (
 )
 
 const (
-	ussoRealm = "" // TODO Doesn't work if this is non-empty; why? [A: http://openid.net/specs/openid-authentication-2_0.html#realms]
 	ussoURL   = "https://login.ubuntu.com"
 )
 
@@ -38,7 +37,8 @@ func (h *handler) ussoOAuthURL(waitid string) (string, error) {
 }
 
 func (h *handler) ussoOpenIDURL(waitID string) (string, error) {
-	loginURL, err := h.openIDURL("/v1/idp/usso/callback", waitID, ussoURL, ussoRealm)
+	realmURL := h.location + "/v1/idp/usso/callback"
+	loginURL, err := h.openIDURL("/v1/idp/usso/callback", waitID, ussoURL, realmURL)
 	if err != nil {
 		return "", errgo.Mask(err)
 	}
