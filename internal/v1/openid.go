@@ -12,8 +12,8 @@ import (
 	"github.com/CanonicalLtd/blues-identity/internal/mongodoc"
 )
 
-func (h *handler) openIDURL(path, waitid, claimedID, realm string) (string, error) {
-	callback := h.location + path
+func (h *dischargeHandler) openIDURL(path, waitid, claimedID, realm string) (string, error) {
+	callback := h.serviceURL(path)
 	if waitid != "" {
 		callback += "?waitid=" + waitid
 	}
@@ -24,9 +24,9 @@ func (h *handler) openIDURL(path, waitid, claimedID, realm string) (string, erro
 	return loginURL, nil
 }
 
-func (h *handler) handleOpenIDCallback(p httprequest.Params) {
-	reqURL := h.requestURL(p.Request)
-	openIdInfo, err := openid.Verify(reqURL, h.discoveryCache, h.nonceStore)
+func (h *dischargeHandler) handleOpenIDCallback(p httprequest.Params) {
+	reqURL := h.requestURL()
+	openIdInfo, err := openid.Verify(reqURL, h.h.discoveryCache, h.h.nonceStore)
 	if err != nil {
 		h.loginFailure(p.Response, p.Request, "", err)
 		return

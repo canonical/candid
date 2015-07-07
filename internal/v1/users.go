@@ -28,15 +28,10 @@ var blacklistUsernames = map[params.Username]bool{
 	identity.AdminGroup: true,
 }
 
-type queryUsersRequest struct {
-	httprequest.Route `httprequest:"GET /u" bson:",omitempty"`
-	ExternalID        string `httprequest:"external_id,form" bson:"external_id,omitempty"`
-}
-
-// ServeQueryUsers serves the /u endpoint. See http://tinyurl.com/lu3mmr9 for
+// QueryUsers serves the /u endpoint. See http://tinyurl.com/lu3mmr9 for
 // details.
-func (h *handler) ServeQueryUsers(p httprequest.Params, r *queryUsersRequest) ([]string, error) {
-	if err := h.checkAdmin(p.Request); err != nil {
+func (h *apiHandler) QueryUsers(p httprequest.Params, r *params.QueryUsersRequest) ([]string, error) {
+	if err := h.checkAdmin(); err != nil {
 		return nil, errgo.Mask(err, errgo.Any)
 	}
 	usernames := make([]string, 0, 1)
@@ -51,18 +46,9 @@ func (h *handler) ServeQueryUsers(p httprequest.Params, r *queryUsersRequest) ([
 	return usernames, nil
 }
 
-type usernameParam struct {
-	Username params.Username `httprequest:"username,path"`
-}
-
-type userRequest struct {
-	httprequest.Route `httprequest:"GET /u/:username"`
-	usernameParam
-}
-
-//serveUser serves the /u/$username endpoint. See http://tinyurl.com/lrdjwmw for
-// details.
-func (h *handler) ServeUser(p httprequest.Params, r *userRequest) (*params.User, error) {
+// User serves the /u/$username endpoint. See http://tinyurl.com/lrdjwmw
+// for details.
+func (h *apiHandler) User(p httprequest.Params, r *params.UserRequest) (*params.User, error) {
 	acl := []string{identity.AdminGroup, string(r.Username)}
 	if err := h.store.CheckACL(opGetUser, p.Request, acl); err != nil {
 		return nil, errgo.Mask(err, errgo.Any)
@@ -94,13 +80,7 @@ func (h *handler) ServeUser(p httprequest.Params, r *userRequest) (*params.User,
 	}, nil
 }
 
-type putUserRequest struct {
-	httprequest.Route `httprequest:"PUT /u/:username"`
-	usernameParam
-	User params.User `httprequest:",body"`
-}
-
-func (h *handler) ServePutUser(p httprequest.Params, u *putUserRequest) error {
+func (h *apiHandler) SetUser(p httprequest.Params, u *params.SetUserRequest) error {
 	if u.User.Owner == "" {
 		// If there is no owner specified then it is an interactive user being created
 		// by storefront.
@@ -109,7 +89,7 @@ func (h *handler) ServePutUser(p httprequest.Params, u *putUserRequest) error {
 	return h.upsertAgent(p.Request, u)
 }
 
-func (h *handler) upsertAgent(r *http.Request, u *putUserRequest) error {
+func (h *handler) upsertAgent(r *http.Request, u *params.SetUserRequest) error {
 	if u.User.Owner == "" {
 		return errgo.WithCausef(nil, params.ErrBadRequest, "owner not specified")
 	}
@@ -128,14 +108,14 @@ func (h *handler) upsertAgent(r *http.Request, u *putUserRequest) error {
 	if err := h.checkRequestHasAllGroups(r, u.User.IDPGroups); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrForbidden))
 	}
-	doc := identityFromPutUserParams(u)
+	doc := identityFromSetUserParams(u)
 	if err := h.store.UpsertIdentity(doc); err != nil {
 		return errgo.NoteMask(err, "cannot store identity", errgo.Is(params.ErrAlreadyExists))
 	}
 	return nil
 }
 
-func (h *handler) upsertUser(r *http.Request, u *putUserRequest) error {
+func (h *apiHandler) upsertUser(r *http.Request, u *params.SetUserRequest) error {
 	if err := h.store.CheckACL(opCreateUser, r, []string{identity.AdminGroup}); err != nil {
 		return errgo.Mask(err, errgo.Any)
 	}
@@ -143,7 +123,7 @@ func (h *handler) upsertUser(r *http.Request, u *putUserRequest) error {
 	if blacklistUsernames[u.Username] {
 		return errgo.WithCausef(nil, params.ErrForbidden, "username %q is reserved", u.Username)
 	}
-	doc := identityFromPutUserParams(u)
+	doc := identityFromSetUserParams(u)
 	if doc.ExternalID == "" {
 		return errgo.WithCausef(nil, params.ErrBadRequest, `external_id not specified`)
 	}
@@ -153,7 +133,7 @@ func (h *handler) upsertUser(r *http.Request, u *putUserRequest) error {
 	return nil
 }
 
-func identityFromPutUserParams(u *putUserRequest) *mongodoc.Identity {
+func identityFromSetUserParams(u *params.SetUserRequest) *mongodoc.Identity {
 	keys := make([]mongodoc.PublicKey, len(u.User.PublicKeys))
 	for i, pk := range u.User.PublicKeys {
 		keys[i].Key = pk.Key[:]
@@ -198,14 +178,9 @@ func gravatarHash(s string) string {
 	return fmt.Sprintf("%x", hasher.Sum(nil))
 }
 
-type userGroupsRequest struct {
-	httprequest.Route `httprequest:"GET /u/:username/groups"`
-	usernameParam
-}
-
 // serveUserGroups serves the /u/$username/groups endpoint, and returns
 // the list of groups associated with the user.
-func (h *handler) ServeUserGroups(p httprequest.Params, r *userGroupsRequest) ([]string, error) {
+func (h *apiHandler) UserGroups(p httprequest.Params, r *params.UserGroupsRequest) ([]string, error) {
 	// Administrators, users with GroupList permissions and the user
 	// themselves can list their groups.
 	if err := h.store.CheckACL(
@@ -222,16 +197,11 @@ func (h *handler) ServeUserGroups(p httprequest.Params, r *userGroupsRequest) ([
 	return id.Groups, nil
 }
 
-type userIDPGroupsRequest struct {
-	httprequest.Route `httprequest:"GET /u/:username/idpgroups"`
-	usernameParam
-}
-
-// ServeUserGroups serves the /u/$username/idpgroups endpoint, and returns
+// UserIDPGroups serves the /u/$username/idpgroups endpoint, and returns
 // the list of groups associated with the user. This endpoint should no longer be used
 // and is maintained for backwards compatibility purposes only.
-func (h *handler) ServeUserIDPGroups(p httprequest.Params, r *userIDPGroupsRequest) ([]string, error) {
-	if err := h.checkAdmin(p.Request); err != nil {
+func (h *apiHandler) UserIDPGroups(p httprequest.Params, r *params.UserIDPGroupsRequest) ([]string, error) {
+	if err := h.checkAdmin(); err != nil {
 		return nil, errgo.Mask(err, errgo.Any)
 	}
 	id, err := h.store.GetIdentity(r.Username)
@@ -241,15 +211,10 @@ func (h *handler) ServeUserIDPGroups(p httprequest.Params, r *userIDPGroupsReque
 	return id.Groups, nil
 }
 
-type userTokenRequest struct {
-	httprequest.Route `httprequest:"GET /u/:username/macaroon"`
-	usernameParam
-}
-
-// ServerUserToken serves a token, in the form of a macaroon, identifying
-// the user. This token can only be generated by an afministrator.
-func (h *handler) ServeUserToken(p httprequest.Params, r *userTokenRequest) (*macaroon.Macaroon, error) {
-	if err := h.checkAdmin(p.Request); err != nil {
+// UserToken serves a token, in the form of a macaroon, identifying
+// the user. This token can only be generated by an administrator.
+func (h *apiHandler) UserToken(p httprequest.Params, r *params.UserTokenRequest) (*macaroon.Macaroon, error) {
+	if err := h.checkAdmin(); err != nil {
 		return nil, errgo.Mask(err, errgo.Any)
 	}
 	id, err := h.store.GetIdentity(r.Username)
@@ -267,12 +232,7 @@ func (h *handler) ServeUserToken(p httprequest.Params, r *userTokenRequest) (*ma
 	return m, nil
 }
 
-type verifyTokenRequest struct {
-	httprequest.Route `httprequest:"POST /verify"`
-	Macaroons         macaroon.Slice `httprequest:",body"`
-}
-
-func (h *handler) ServeVerifyToken(r *verifyTokenRequest) (map[string]string, error) {
+func (h *apiHandler) VerifyToken(r *params.VerifyTokenRequest) (map[string]string, error) {
 	d := checkers.InferDeclared(r.Macaroons)
 	err := h.store.Service.Check(r.Macaroons, checkers.New(
 		checkers.TimeBefore,
@@ -284,22 +244,17 @@ func (h *handler) ServeVerifyToken(r *verifyTokenRequest) (map[string]string, er
 	return d, nil
 }
 
-type userExtraInfoRequest struct {
-	httprequest.Route `httprequest:"GET /u/:username/extra-info"`
-	usernameParam
-}
-
-//ServeUserExtraInfo serves the /u/:username/extra-info endpoint, see
-//http://tinyurl.com/mxo24yy for details.
-func (h *handler) ServeUserExtraInfo(p httprequest.Params, r *userExtraInfoRequest) (map[string]*json.RawMessage, error) {
-	if err := h.checkAdmin(p.Request); err != nil {
+// UserExtraInfo serves the /v1/u/:username/extra-info endpoint, see
+// http://tinyurl.com/mxo24yy for details.
+func (h *apiHandler) UserExtraInfo(p httprequest.Params, r *params.UserExtraInfoRequest) (map[string]interface{}, error) {
+	if err := h.checkAdmin(); err != nil {
 		return nil, errgo.Mask(err, errgo.Any)
 	}
 	id, err := h.store.GetIdentity(r.Username)
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
-	res := make(map[string]*json.RawMessage, len(id.ExtraInfo))
+	res := make(map[string]interface{}, len(id.ExtraInfo))
 	for k, v := range id.ExtraInfo {
 		jmsg := json.RawMessage(v)
 		res[k] = &jmsg
@@ -307,16 +262,10 @@ func (h *handler) ServeUserExtraInfo(p httprequest.Params, r *userExtraInfoReque
 	return res, nil
 }
 
-type userPutExtraInfoRequest struct {
-	httprequest.Route `httprequest:"PUT /u/:username/extra-info"`
-	usernameParam
-	ExtraInfo map[string]json.RawMessage `httprequest:",body"`
-}
-
-// ServeUserPutExtraInfo serves the /u/:username/extra-info endpoint, see
+// SetUserExtraInfo serves the /v1/u/:username/extra-info endpoint, see
 // http://tinyurl.com/mqpynlw for details.
-func (h *handler) ServeUserPutExtraInfo(p httprequest.Params, r *userPutExtraInfoRequest) error {
-	if err := h.checkAdmin(p.Request); err != nil {
+func (h *apiHandler) SetUserExtraInfo(p httprequest.Params, r *params.SetUserExtraInfoRequest) error {
+	if err := h.checkAdmin(); err != nil {
 		return errgo.Mask(err, errgo.Any)
 	}
 	ei := make(bson.D, 0, len(r.ExtraInfo))
@@ -324,7 +273,12 @@ func (h *handler) ServeUserPutExtraInfo(p httprequest.Params, r *userPutExtraInf
 		if err := checkExtraInfoKey(k); err != nil {
 			return errgo.Mask(err, errgo.Is(params.ErrBadRequest))
 		}
-		ei = append(ei, bson.DocElem{"extrainfo." + k, v})
+		buf, err := json.Marshal(v)
+		if err != nil {
+			// This should not be possible as it was only just unmarshalled.
+			panic(err)
+		}
+		ei = append(ei, bson.DocElem{"extrainfo." + k, buf})
 	}
 	err := h.store.UpdateIdentity(r.Username, bson.D{{"$set", ei}})
 	if err != nil {
@@ -333,16 +287,10 @@ func (h *handler) ServeUserPutExtraInfo(p httprequest.Params, r *userPutExtraInf
 	return nil
 }
 
-type userExtraInfoItemRequest struct {
-	httprequest.Route `httprequest:"GET /u/:username/extra-info/:item"`
-	usernameParam
-	Item string `httprequest:"item,path"`
-}
-
-// ServeUserExtraInfoItem serves the /u/:username/extra-info/:item
+// UserExtraInfoItem serves the /u/:username/extra-info/:item
 // endpoint, see http://tinyurl.com/mjuu7dt for details.
-func (h *handler) ServeUserExtraInfoItem(p httprequest.Params, r *userExtraInfoItemRequest) (*json.RawMessage, error) {
-	if err := h.checkAdmin(p.Request); err != nil {
+func (h *apiHandler) UserExtraInfoItem(p httprequest.Params, r *params.UserExtraInfoItemRequest) (interface{}, error) {
+	if err := h.checkAdmin(); err != nil {
 		return nil, errgo.Mask(err, errgo.Any)
 	}
 	id, err := h.store.GetIdentity(r.Username)
@@ -353,24 +301,22 @@ func (h *handler) ServeUserExtraInfoItem(p httprequest.Params, r *userExtraInfoI
 	return &res, nil
 }
 
-type userPutExtraInfoItemRequest struct {
-	httprequest.Route `httprequest:"PUT /u/:username/extra-info/:item"`
-	usernameParam
-	Item string          `httprequest:"item,path"`
-	Data json.RawMessage `httprequest:",body"`
-}
-
 // ServeUserPutExtraInfoItem serves the /u/:username/extra-info/:item
 // endpoint, see http://tinyurl.com/l5dc4r4 for details.
-func (h *handler) ServeUserPutExtraInfoItem(p httprequest.Params, r *userPutExtraInfoItemRequest) error {
-	if err := h.checkAdmin(p.Request); err != nil {
+func (h *apiHandler) SetUserExtraInfoItem(p httprequest.Params, r *params.SetUserExtraInfoItemRequest) error {
+	if err := h.checkAdmin(); err != nil {
 		return errgo.Mask(err, errgo.Any)
 	}
 	if err := checkExtraInfoKey(r.Item); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrBadRequest))
 	}
-	err := h.store.UpdateIdentity(r.Username, bson.D{{"$set", bson.D{
-		{"extrainfo." + r.Item, r.Data},
+	buf, err := json.Marshal(r.Data)
+	if err != nil {
+		// This should not be possible as it was only just unmarshalled.
+		panic(err)
+	}
+	err = h.store.UpdateIdentity(r.Username, bson.D{{"$set", bson.D{
+		{"extrainfo." + r.Item, buf},
 	}}})
 	if err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrNotFound))

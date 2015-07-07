@@ -3,11 +3,11 @@
 package identity
 
 import (
-	"fmt"
 	"net/http"
 	"time"
 
 	"github.com/juju/httprequest"
+	"github.com/julienschmidt/httprouter"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v1/bakery"
 	"gopkg.in/mgo.v2"
@@ -16,8 +16,9 @@ import (
 	"github.com/CanonicalLtd/blues-identity/params"
 )
 
-// NewAPIHandlerFunc is a function that returns a new API handler.
-type NewAPIHandlerFunc func(*Pool, ServerParams) http.Handler
+// NewAPIHandlerFunc is a function that returns set of httprequest
+// handlers that uses the given Store pool and server params.
+type NewAPIHandlerFunc func(*Pool, ServerParams) ([]httprequest.Handler, error)
 
 // New returns a handler that serves the given identity API versions using the
 // db to store identity data. The key of the versions map is the version name.
@@ -33,36 +34,43 @@ func New(db *mgo.Database, sp ServerParams, versions map[string]NewAPIHandlerFun
 	}
 	// Create the HTTP server.
 	srv := &Server{
-		ServeMux: http.NewServeMux(),
-		p:        pool,
+		router: httprouter.New(),
+		pool:   pool,
 	}
-	srv.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		httprequest.WriteJSON(w, http.StatusNotFound, params.Error{
-			Code:    params.ErrNotFound,
-			Message: fmt.Sprintf("%q not found", req.URL.Path),
-		})
-	}))
-	for vers, newAPI := range versions {
-		handle(srv.ServeMux, "/"+vers, newAPI(pool, sp))
+	// Disable the automatic rerouting in order to maintain
+	// compatibility. It might be worthwhile relaxing this in the
+	// future.
+	srv.router.RedirectTrailingSlash = false
+	srv.router.RedirectFixedPath = false
+	srv.router.NotFound = notFound
+	srv.router.MethodNotAllowed = methodNotAllowed
+	for name, newAPI := range versions {
+		handlers, err := newAPI(pool, sp)
+		if err != nil {
+			return nil, errgo.Notef(err, "cannot create API %s", name)
+		}
+		for _, h := range handlers {
+			srv.router.Handle(h.Method, h.Path, h.Handle)
+		}
 	}
 	return srv, nil
 }
 
 // Server serves the identity endpoints.
 type Server struct {
-	*http.ServeMux
-	p *Pool
+	router *httprouter.Router
+	pool   *Pool
+}
+
+// ServeHTTP implements http.Handler.
+func (srv *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	srv.router.ServeHTTP(w, req)
 }
 
 // Close  closes any resources held by this Handler.
 func (s *Server) Close() {
 	logger.Debugf("Closing Server")
-	s.p.Close()
-}
-
-func handle(mux *http.ServeMux, path string, handler http.Handler) {
-	handler = http.StripPrefix(path, handler)
-	mux.Handle(path+"/", handler)
+	s.pool.Close()
 }
 
 // ServerParams contains configuration parameters for a server.
@@ -91,4 +99,17 @@ type ServerParams struct {
 	// RequestTimeout holds the time to wait for a request to be able
 	// to start.
 	RequestTimeout time.Duration
+}
+
+//notFound is the handler that is called when a handler cannot be found
+//for the requested endpoint.
+func notFound(w http.ResponseWriter, req *http.Request) {
+	ErrorMapper.WriteError(w, errgo.WithCausef(nil, params.ErrNotFound, "not found: %s", req.URL.Path))
+}
+
+//methodNotAllowed is the handler that is called when a handler cannot
+//be found for the requested endpoint with the request method, but
+//there is a handler avaiable using a different method.
+func methodNotAllowed(w http.ResponseWriter, req *http.Request) {
+	ErrorMapper.WriteError(w, errgo.WithCausef(nil, params.ErrMethodNotAllowed, "%s not allowed for %s", req.Method, req.URL.Path))
 }

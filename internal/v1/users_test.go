@@ -182,7 +182,7 @@ func (s *usersSuite) TestUser(c *gc.C) {
 		expectStatus: http.StatusNotFound,
 		expectBody: params.Error{
 			Code:    params.ErrNotFound,
-			Message: `not found: /u/`,
+			Message: `not found: /v1/u/`,
 		},
 	}, {
 		about:    "unsupported method",
@@ -202,7 +202,7 @@ func (s *usersSuite) TestUser(c *gc.C) {
 		expectStatus: http.StatusMethodNotAllowed,
 		expectBody: params.Error{
 			Code:    params.ErrMethodNotAllowed,
-			Message: "POST not allowed for /u/jbloggs",
+			Message: "POST not allowed for /v1/u/jbloggs",
 		},
 	}, {
 		about:    "put no userid",
@@ -222,7 +222,7 @@ func (s *usersSuite) TestUser(c *gc.C) {
 		expectStatus: http.StatusNotFound,
 		expectBody: params.Error{
 			Code:    "not found",
-			Message: "not found: /u/",
+			Message: "not found: /v1/u/",
 		},
 	}, {
 		about:    "put userid mismatch",
@@ -362,7 +362,7 @@ func (s *usersSuite) TestUser(c *gc.C) {
 		expectStatus: http.StatusNotFound,
 		expectBody: params.Error{
 			Code:    "not found",
-			Message: `not found: /u/jbloggs2/notthere`,
+			Message: `not found: /v1/u/jbloggs2/notthere`,
 		},
 	}, {
 		about:  "put agent user",
@@ -573,7 +573,7 @@ func (s *usersSuite) TestQueryUsers(c *gc.C) {
 		expectStatus: http.StatusMethodNotAllowed,
 		expectBody: params.Error{
 			Code:    params.ErrMethodNotAllowed,
-			Message: "DELETE not allowed for /u",
+			Message: "DELETE not allowed for /v1/u",
 		},
 	}, {
 		about:    "incorrect username",

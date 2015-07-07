@@ -1,6 +1,6 @@
 // Copyright 2014 Canonical Ltd.
 
-package v1
+package identity
 
 import (
 	"net/http"
@@ -13,11 +13,8 @@ import (
 )
 
 var (
-	errorMapper  = httprequest.ErrorMapper(errToResp)
-	handle       = errorMapper.Handle
-	handleErrors = errorMapper.HandleErrors
-	handleJSON   = errorMapper.HandleJSON
-	writeError   = errorMapper.WriteError
+	ErrorMapper = httprequest.ErrorMapper(errToResp)
+	WriteError  = ErrorMapper.WriteError
 )
 
 func errToResp(err error) (int, interface{}) {

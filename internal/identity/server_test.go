@@ -6,8 +6,10 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/juju/httprequest"
 	"github.com/juju/testing"
 	"github.com/juju/testing/httptesting"
+	"github.com/julienschmidt/httprouter"
 	gc "gopkg.in/check.v1"
 
 	"github.com/CanonicalLtd/blues-identity/internal/identity"
@@ -33,17 +35,21 @@ type versionResponse struct {
 func (s *serverSuite) TestNewServerWithVersions(c *gc.C) {
 	db := s.Session.DB("foo")
 	serveVersion := func(vers string) identity.NewAPIHandlerFunc {
-		return func(*identity.Pool, identity.ServerParams) http.Handler {
-			return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-				w.Header().Set("Content-Type", "application/json")
-				response := versionResponse{
-					Version: vers,
-					Path:    req.URL.Path,
-				}
-				enc := json.NewEncoder(w)
-				err := enc.Encode(response)
-				c.Assert(err, gc.IsNil)
-			})
+		return func(*identity.Pool, identity.ServerParams) ([]httprequest.Handler, error) {
+			return []httprequest.Handler{{
+				Method: "GET",
+				Path:   "/" + vers + "/*path",
+				Handle: func(w http.ResponseWriter, req *http.Request, p httprouter.Params) {
+					w.Header().Set("Content-Type", "application/json")
+					response := versionResponse{
+						Version: vers,
+						Path:    req.URL.Path,
+					}
+					enc := json.NewEncoder(w)
+					err := enc.Encode(response)
+					c.Assert(err, gc.IsNil)
+				},
+			}}, nil
 		}
 	}
 
@@ -85,7 +91,7 @@ func assertServesVersion(c *gc.C, h http.Handler, vers string) {
 		URL:     path + "/some/path",
 		ExpectBody: versionResponse{
 			Version: vers,
-			Path:    "/some/path",
+			Path:    "/" + vers + "/some/path",
 		},
 	})
 }
