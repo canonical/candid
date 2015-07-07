@@ -11,7 +11,7 @@ import (
 	gc "gopkg.in/check.v1"
 
 	"github.com/CanonicalLtd/blues-identity"
-	"github.com/CanonicalLtd/blues-identity/params"
+	"github.com/CanonicalLtd/blues-identity/version"
 )
 
 func TestPackage(t *testing.T) {
@@ -54,11 +54,9 @@ func (s *serverSuite) TestNewServerWithVersions(c *gc.C) {
 
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Handler:      h,
-		URL:          "/v1/debug",
-		ExpectStatus: http.StatusInternalServerError,
-		ExpectBody: params.Error{
-			Message: "method not implemented",
-		},
+		URL:          "/debug/info",
+		ExpectStatus: http.StatusOK,
+		ExpectBody:   version.VersionInfo,
 	})
 	assertDoesNotServeVersion(c, h, "v0")
 }

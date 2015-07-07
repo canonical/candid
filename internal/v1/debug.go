@@ -7,24 +7,19 @@ import (
 	"github.com/juju/httprequest"
 	"github.com/juju/utils/debugstatus"
 
+	"github.com/CanonicalLtd/blues-identity/internal/identity"
 	"github.com/CanonicalLtd/blues-identity/version"
 )
 
-type debugRequest struct {
-	httprequest.Route `httprequest:"GET /debug"`
-}
-
-// GET /debug
-func (h *handler) ServeDebug(*debugRequest) error {
-	return errNotImplemented
-}
-
+// debugStatusRequest documents the /v1/debug/status endpoint. As
+// it contains no request information there is no need to ever create
+// one.
 type debugStatusRequest struct {
-	httprequest.Route `httprequest:"GET /debug/status"`
+	httprequest.Route `httprequest:"GET /v1/debug/status"`
 }
 
 // GET /debug/status
-func (h *handler) ServeDebugStatus(*debugStatusRequest) (map[string]debugstatus.CheckResult, error) {
+func (h *debugHandler) DebugStatus(*debugStatusRequest) (map[string]debugstatus.CheckResult, error) {
 	return debugstatus.Check(
 		debugstatus.ServerStartTime,
 		debugstatus.Connection(h.store.DB.Session),
@@ -32,37 +27,45 @@ func (h *handler) ServeDebugStatus(*debugStatusRequest) (map[string]debugstatus.
 	), nil
 }
 
+// debugInfoRequest documents the /debug/info endpoint. As
+// it contains no request information there is no need to ever create
+// one.
 type debugInfoRequest struct {
 	httprequest.Route `httprequest:"GET /debug/info"`
 }
 
 // GET /debug/info .
-func (h *handler) ServeDebugInfo(*debugInfoRequest) (version.Version, error) {
+func (h *debugHandler) ServeDebugInfo(*debugInfoRequest) (version.Version, error) {
 	return version.VersionInfo, nil
 }
 
+// debugPprofRequest documents the /debug/pprof endpoint. As
+// it contains no request information there is no need to ever create
+// one.
 type debugPprofRequest struct {
 	httprequest.Route `httprequest:"GET /debug/pprof/"`
 }
 
 // GET /debug/pprof/
-func (h *handler) ServeDebugPprof(p httprequest.Params, _ *debugPprofRequest) {
-	if err := h.checkAdmin(p.Request); err != nil {
-		writeError(p.Response, err)
+func (h *debugHandler) ServeDebugPprof(p httprequest.Params, _ *debugPprofRequest) {
+	if err := h.checkAdmin(); err != nil {
+		identity.WriteError(p.Response, err)
 		return
 	}
-	pprof.IndexAtRoot("/debug/pprof/").ServeHTTP(p.Response, p.Request)
+	pprof.IndexAtRoot(h.serviceURL("/debug/pprof/")).ServeHTTP(p.Response, p.Request)
 }
 
+// DebugPprofHandlerRequest is a request to the specified /debug/pprof
+// handler.
 type debugPprofHandlerRequest struct {
 	httprequest.Route `httprequest:"GET /debug/pprof/:name"`
 	Name              string `httprequest:"name,path"`
 }
 
 // GET /debug/pprof/:handler
-func (h *handler) ServeDebugPprofHandler(p httprequest.Params, r *debugPprofHandlerRequest) {
-	if err := h.checkAdmin(p.Request); err != nil {
-		writeError(p.Response, err)
+func (h *debugHandler) ServeDebugPprofHandler(p httprequest.Params, r *debugPprofHandlerRequest) {
+	if err := h.checkAdmin(); err != nil {
+		identity.WriteError(p.Response, err)
 		return
 	}
 	switch r.Name {

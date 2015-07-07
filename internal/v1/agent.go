@@ -15,20 +15,27 @@ import (
 	"github.com/CanonicalLtd/blues-identity/params"
 )
 
-func (h *handler) agentLoginURL(waitid string) string {
-	url := h.location + "/v1/agent"
+func (h *dischargeHandler) agentLoginURL(waitid string) string {
+	url := h.serviceURL("/v1/agent")
 	if waitid != "" {
 		url += "?waitid=" + waitid
 	}
 	return url
 }
 
+// agentLoginRequest is a request to perform an agent login. Agents
+// claim an identity along with a public key associated with that
+// identity. Any discharge macroons that are generated for an agent will
+// contain a third party caveat addressed to "local" that they will have
+// to discharge to prove that they hold the private key.
 type agentLoginRequest struct {
-	httprequest.Route        `httprequest:"POST /agent"`
-	params.AgentLoginRequest `httprequest:",body"`
+	httprequest.Route `httprequest:"POST /v1/agent"`
+	WaitID            string `httprequest:"waitid,form"`
+	params.AgentLogin `httprequest:",body"`
 }
 
-func (h *handler) AgentLogin(p httprequest.Params, login *agentLoginRequest) {
+// AgentLogin is used to attempt to log in using agent credentials.
+func (h *dischargeHandler) AgentLogin(p httprequest.Params, login *agentLoginRequest) {
 	for _, ms := range httpbakery.RequestMacaroons(p.Request) {
 		declared := checkers.InferDeclared(ms)
 		err := h.store.Service.Check(ms, checkers.New(
@@ -57,7 +64,7 @@ func (h *handler) AgentLogin(p httprequest.Params, login *agentLoginRequest) {
 		h.loginFailure(p.Response, p.Request, string(login.Username), errgo.Notef(err, "cannot create macaroon"))
 		return
 	}
-	u, err := url.Parse(h.location)
+	u, err := url.Parse(h.h.location)
 	if err != nil {
 		h.loginFailure(p.Response, p.Request, string(login.Username), errgo.Notef(err, "cannot parse location"))
 		return

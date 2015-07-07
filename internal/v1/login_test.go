@@ -172,10 +172,10 @@ func (s *loginSuite) TestAgentLogin(c *gc.C) {
 	var loginMethods params.LoginMethods
 	err = json.Unmarshal(data, &loginMethods)
 	c.Assert(err, gc.IsNil)
-	data, err = json.Marshal(params.AgentLoginRequest{
-		Username:  "test",
-		PublicKey: &keys.Public,
-	})
+	var p params.AgentLogin
+	p.Username = "test"
+	p.PublicKey = &keys.Public
+	data, err = json.Marshal(p)
 	c.Assert(err, gc.IsNil)
 	req, err = http.NewRequest("POST", loginMethods.Agent, nil)
 	c.Assert(err, gc.IsNil)
@@ -197,6 +197,7 @@ func (s *loginSuite) assertMacaroon(c *gc.C, resp *http.Response, userId string)
 			break
 		}
 	}
+	c.Assert(ms, gc.Not(gc.HasLen), 0)
 	cavs := ms[0].Caveats()
 	var found bool
 	for _, cav := range cavs {

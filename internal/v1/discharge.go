@@ -29,9 +29,10 @@ type verifiedUserInfo struct {
 	Groups   []string
 }
 
-// checkThirdPartyCaveat checks the given caveat. This function is called by the httpbakery
-// discharge logic. See httpbakery.AddDischargeHandler for futher details.
-func (h *handler) checkThirdPartyCaveat(req *http.Request, cavId, cav string) ([]checkers.Caveat, error) {
+// checkThirdPartyCaveat checks the given caveat. This function is called
+// by the httpbakery discharge logic. See httpbakery.AddDischargeHandler
+// for futher details.
+func (h *dischargeHandler) checkThirdPartyCaveat(req *http.Request, cavId, cav string) ([]checkers.Caveat, error) {
 	err := h.store.CheckAdminCredentials(req)
 	var username string
 	var doc *mongodoc.Identity
@@ -77,7 +78,7 @@ func (h *handler) checkThirdPartyCaveat(req *http.Request, cavId, cav string) ([
 
 // checkAuthenticatedUser checks a third-party caveat for "is-authenticated-user". Currently the discharge
 // macaroon will only be created for users with admin credentials.
-func (h *handler) checkAuthenticatedUser(user *mongodoc.Identity) ([]checkers.Caveat, error) {
+func (h *dischargeHandler) checkAuthenticatedUser(user *mongodoc.Identity) ([]checkers.Caveat, error) {
 	return []checkers.Caveat{
 		checkers.DeclaredCaveat("uuid", user.UUID),
 		checkers.DeclaredCaveat("username", user.Username),
@@ -86,7 +87,7 @@ func (h *handler) checkAuthenticatedUser(user *mongodoc.Identity) ([]checkers.Ca
 }
 
 // checkMemberOfGroup checks if user is member of any of the specified groups.
-func (h *handler) checkMemberOfGroup(user *mongodoc.Identity, targetGroups string) ([]checkers.Caveat, error) {
+func (h *dischargeHandler) checkMemberOfGroup(user *mongodoc.Identity, targetGroups string) ([]checkers.Caveat, error) {
 	groups := strings.Fields(targetGroups)
 	for _, userGroup := range user.Groups {
 		for _, g := range groups {
@@ -101,7 +102,7 @@ func (h *handler) checkMemberOfGroup(user *mongodoc.Identity, targetGroups strin
 // needLoginError returns an error suitable for returning
 // from a discharge request that can only be satisfied
 // if the user logs in.
-func (h *handler) needLoginError(cavId, caveat string, why string) error {
+func (h *dischargeHandler) needLoginError(cavId, caveat string, why string) error {
 	// TODO(rog) If the user is already logged in (username != ""),
 	// we should perhaps just return an error here.
 	waitId, err := h.place.NewRendezvous(&thirdPartyCaveatInfo{
@@ -115,20 +116,31 @@ func (h *handler) needLoginError(cavId, caveat string, why string) error {
 		Message: why,
 		Code:    httpbakery.ErrInteractionRequired,
 		Info: &httpbakery.ErrorInfo{
-			VisitURL: h.location + "/v1/login?waitid=" + waitId,
-			WaitURL:  h.location + "/v1/wait?waitid=" + waitId,
+			VisitURL: h.serviceURL("/v1/login?waitid=" + waitId),
+			WaitURL:  h.serviceURL("/v1/wait?waitid=" + waitId),
 		},
 	}
 }
 
-type wait struct {
-	httprequest.Route `httprequest:"GET /wait"`
+// waitRequest is the request sent to the server to wait for logins to
+// complete. Discharging caveats will normally be handled by the bakery
+// it would be unusual to use this type directly in client software.
+type waitRequest struct {
+	httprequest.Route `httprequest:"GET /v1/wait"`
 	WaitID            string `httprequest:"waitid,form"`
+}
+
+// waitResponse holds the response from the wait endpoint. Discharging
+// caveats will normally be handled by the bakery it would be unusual to
+// use this type directly in client software.
+type waitResponse struct {
+	// Macaroon holds the acquired discharge macaroon.
+	Macaroon *macaroon.Macaroon
 }
 
 // serveWait serves an HTTP endpoint that waits until a macaroon
 // has been discharged, and returns the discharge macaroon.
-func (h *handler) ServeWait(p httprequest.Params, w *wait) (*params.WaitResponse, error) {
+func (h *dischargeHandler) Wait(p httprequest.Params, w *waitRequest) (*waitResponse, error) {
 	if w.WaitID == "" {
 		return nil, errgo.WithCausef(nil, params.ErrBadRequest, "wait id parameter not found")
 	}
@@ -171,21 +183,28 @@ func (h *handler) ServeWait(p httprequest.Params, w *wait) (*params.WaitResponse
 	// request).
 	p.Response.Header().Add("Set-Cookie", cookie.String())
 
-	return &params.WaitResponse{
+	return &waitResponse{
 		Macaroon: m,
 	}, nil
 }
 
+// dischargeRequest is a request to create a macaroon that discharges the
+// supplied third-party caveat. Discharging caveats will normally be
+// handled by the bakery it would be unusual to use this type directly in
+// client software.
 type dischargeRequest struct {
-	httprequest.Route `httprequest:"POST /discharger/discharge"`
+	httprequest.Route `httprequest:"POST /v1/discharger/discharge"`
 	ID                string `httprequest:"id,form"`
 }
 
+// dischargeResponse contains macaroon that discharges a third-party
+// caveat. Discharging caveats will normally be handled by the bakery it
+// would be unusual to use this type directly in client software.
 type dischargeResponse struct {
 	Macaroon *macaroon.Macaroon `json:",omitempty"`
 }
 
-func (h *handler) ServeDischarge(p httprequest.Params, r *dischargeRequest) (*dischargeResponse, error) {
+func (h *dischargeHandler) Discharge(p httprequest.Params, r *dischargeRequest) (*dischargeResponse, error) {
 	m, err := h.store.Service.Discharge(
 		bakery.ThirdPartyCheckerFunc(
 			func(cavId, cav string) ([]checkers.Caveat, error) {
@@ -200,14 +219,6 @@ func (h *handler) ServeDischarge(p httprequest.Params, r *dischargeRequest) (*di
 	return &dischargeResponse{m}, nil
 }
 
-type publickeyRequest struct {
-	httprequest.Route `httprequest:"GET /discharger/publickey"`
-}
-
-type publickeyResponse struct {
-	PublicKey *bakery.PublicKey
-}
-
-func (h *handler) ServePublickey(r *publickeyRequest) (*publickeyResponse, error) {
-	return &publickeyResponse{PublicKey: h.store.Service.PublicKey()}, nil
+func (h *apiHandler) PublicKey(*params.PublicKeyRequest) (*params.PublicKeyResponse, error) {
+	return &params.PublicKeyResponse{PublicKey: h.store.Service.PublicKey()}, nil
 }

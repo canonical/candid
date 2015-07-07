@@ -622,7 +622,7 @@ func (s *dischargeSuite) TestDischargeWithAgentLogin(c *gc.C) {
 func (s *dischargeSuite) TestPublicKey(c *gc.C) {
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Handler:      s.srv,
-		URL:          apiURL("/discharger/publickey"),
+		URL:          apiURL("discharger/publickey"),
 		ExpectStatus: http.StatusOK,
 		ExpectBody: map[string]*bakery.PublicKey{
 			"PublicKey": &s.keyPair.Public,
@@ -651,10 +651,10 @@ func agentVisit(c *gc.C, client *httpbakery.Client, username string, pk *bakery.
 		if err != nil {
 			return err
 		}
-		body, err = json.Marshal(params.AgentLoginRequest{
-			Username:  params.Username(username),
-			PublicKey: pk,
-		})
+		var p params.AgentLogin
+		p.Username = params.Username(username)
+		p.PublicKey = pk
+		body, err = json.Marshal(p)
 		if err != nil {
 			return err
 		}

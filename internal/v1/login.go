@@ -12,16 +12,18 @@ import (
 	"gopkg.in/macaroon-bakery.v1/httpbakery"
 	"gopkg.in/macaroon.v1"
 
+	"github.com/CanonicalLtd/blues-identity/internal/identity"
 	"github.com/CanonicalLtd/blues-identity/params"
 )
 
+// loginRequest is a request to start a login to the identity manager.
 type loginRequest struct {
-	httprequest.Route `httprequest:"GET /login"`
+	httprequest.Route `httprequest:"GET /v1/login"`
 	WaitID            string `httprequest:"waitid,form"`
 }
 
 // login handles the GET /v1/login endpoint that is used to log in to IdM.
-func (h *handler) Login(p httprequest.Params, lr *loginRequest) error {
+func (h *dischargeHandler) Login(p httprequest.Params, lr *loginRequest) error {
 	ussoOpenID, err := h.ussoOpenIDURL(lr.WaitID)
 	if err != nil {
 		return errgo.Notef(err, "cannot get openid login URL")
@@ -49,7 +51,7 @@ func (h *handler) Login(p httprequest.Params, lr *loginRequest) error {
 	return nil
 }
 
-func (h *handler) loginID(w http.ResponseWriter, r *http.Request, userID string) {
+func (h *dischargeHandler) loginID(w http.ResponseWriter, r *http.Request, userID string) {
 	// We provide the user with a macaroon that they can use later
 	// to prove to us that they have logged in. The macaroon is valid
 	// for any operation that that user is allowed to perform.
@@ -67,7 +69,7 @@ func (h *handler) loginID(w http.ResponseWriter, r *http.Request, userID string)
 
 // loginSuccess is used by identity providers once they have determined that
 // the login completed successfully.
-func (h *handler) loginSuccess(w http.ResponseWriter, r *http.Request, userID string, ms macaroon.Slice, format string, a ...interface{}) {
+func (h *dischargeHandler) loginSuccess(w http.ResponseWriter, r *http.Request, userID string, ms macaroon.Slice, format string, a ...interface{}) {
 	logger.Infof("successful login for user %s", userID)
 	cookie, err := httpbakery.NewCookie(ms)
 	if err != nil {
@@ -85,12 +87,13 @@ func (h *handler) loginSuccess(w http.ResponseWriter, r *http.Request, userID st
 			return
 		}
 	}
+	logger.Debugf("login complete for user %s", userID)
 	fmt.Fprintf(w, format, a...)
 }
 
 // loginFailure is used by identity providers once they have determined that
 // the login has failed.
-func (h *handler) loginFailure(w http.ResponseWriter, r *http.Request, userID string, err error) {
+func (h *dischargeHandler) loginFailure(w http.ResponseWriter, r *http.Request, userID string, err error) {
 	logger.Infof("login failed for %s: %s", userID, err)
 	r.ParseForm()
 	waitId := r.Form.Get("waitid")
@@ -100,5 +103,5 @@ func (h *handler) loginFailure(w http.ResponseWriter, r *http.Request, userID st
 			Error: bakeryErr.(*httpbakery.Error),
 		})
 	}
-	writeError(w, err)
+	identity.WriteError(w, err)
 }

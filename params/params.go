@@ -6,34 +6,17 @@ import (
 	"bytes"
 	"unicode/utf8"
 
+	"github.com/juju/httprequest"
 	"github.com/juju/names"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v1/bakery"
 	"gopkg.in/macaroon.v1"
 )
 
-const (
-	ProtocolOpenID20 = "openid20"
-
-	// OpenID2.0 settings.
-	// See http://openid.net/specs/openid-authentication-2_0.html for details.
-	OpenID20AssociationHandle = "openid.assoc_handle"
-	OpenID20LoginURL          = "openid.login_url"
-	OpenID20Namespace         = "openid.ns"
-	OpenID20ReturnTo          = "openid.return_to"
-)
-
-// IdentityProvider represents a registered identity provider in the system.
-type IdentityProvider struct {
-	Name     string                 `json:"name"`
-	Protocol string                 `json:"protocol"`
-	Settings map[string]interface{} `json:"settings"`
-}
-
 // Username represents the name of a user.
 type Username string
 
-// UnmarshalText unmarshals a UserName checking it is valid. It
+// UnmarshalText unmarshals a Username checking it is valid. It
 // implements "encoding".TextUnmarshaler.
 func (u *Username) UnmarshalText(b []byte) error {
 	if utf8.RuneCount(b) > 256 {
@@ -48,25 +31,26 @@ func (u *Username) UnmarshalText(b []byte) error {
 	return nil
 }
 
-// User represents a user in the system.
-type User struct {
-	Username   Username            `json:"username,omitempty"`
-	ExternalID string              `json:"external_id"`
-	FullName   string              `json:"fullname"`
-	Email      string              `json:"email"`
-	GravatarID string              `json:"gravatar_id"`
-	IDPGroups  []string            `json:"idpgroups"`
-	Owner      Username            `json:"owner,omitempty"`
-	PublicKeys []*bakery.PublicKey `json:"public_keys"`
+// AgentLogin contains the claimed identity the agent is attempting to
+// use to log in.
+type AgentLogin struct {
+	Username  Username          `json:"username"`
+	PublicKey *bakery.PublicKey `json:"public_key"`
 }
 
-// WaitResponse holds the response from the wait endpoint.
-type WaitResponse struct {
-	// Macaroon holds the acquired discharge macaroon.
-	Macaroon *macaroon.Macaroon
+// PublicKeyRequest documents the /v1/discharger/publickey endpoint. As
+// it contains no request information there is no need to ever create
+// one.
+type PublicKeyRequest struct {
+	httprequest.Route `httprequest:"GET /v1/discharger/publickey"`
 }
 
-// LoginMethods holds the response from the login endpoint
+// PublicKeyResponse is the response to a PublicKeyRequest.
+type PublicKeyResponse struct {
+	PublicKey *bakery.PublicKey
+}
+
+// LoginMethods holds the response from the /v1/login endpoint
 // when called with "Accept: application/json". This enumerates
 // the available methods for the client to log in.
 type LoginMethods struct {
@@ -84,12 +68,92 @@ type LoginMethods struct {
 	UbuntuSSOOAuth string `json:"usso_oauth,omitempty"`
 }
 
-// AgentLoginRequest is POSTed to the agent login URL to log in as an
-// agent. Agents claim an identity along with a public key associated with
-// that identity. Any discharge macroons that are generated for an agent
-// will contain a third party caveat addressed to "local" that they will have
-// to discharge to prove that they hold the private key.
-type AgentLoginRequest struct {
-	Username  Username          `json:"username"`
-	PublicKey *bakery.PublicKey `json:"public_key"`
+// QueryUsersRequest is a request to query the users in the system.
+type QueryUsersRequest struct {
+	httprequest.Route `httprequest:"GET /v1/u" bson:",omitempty"`
+	ExternalID        string `httprequest:"external_id,form" bson:"external_id,omitempty"`
+}
+
+// UserRequest is a request for the user details of the named user.
+type UserRequest struct {
+	httprequest.Route `httprequest:"GET /v1/u/:username"`
+	Username          Username `httprequest:"username,path"`
+}
+
+// User represents a user in the system.
+type User struct {
+	Username   Username            `json:"username,omitempty"`
+	ExternalID string              `json:"external_id"`
+	FullName   string              `json:"fullname"`
+	Email      string              `json:"email"`
+	GravatarID string              `json:"gravatar_id"`
+	IDPGroups  []string            `json:"idpgroups"`
+	Owner      Username            `json:"owner,omitempty"`
+	PublicKeys []*bakery.PublicKey `json:"public_keys"`
+}
+
+// SetUserRequest is request to set the details of a user.
+type SetUserRequest struct {
+	httprequest.Route `httprequest:"PUT /v1/u/:username"`
+	Username          Username `httprequest:"username,path"`
+	User              `httprequest:",body"`
+}
+
+// UserGroupsRequest is a request for the list of groups associated
+// with the specified user.
+type UserGroupsRequest struct {
+	httprequest.Route `httprequest:"GET /v1/u/:username/groups"`
+	Username          Username `httprequest:"username,path"`
+}
+
+// UserIDPGroupsRequest defines the deprecated path for
+// UserGroupsRequest. It should no longer be used.
+type UserIDPGroupsRequest struct {
+	httprequest.Route `httprequest:"GET /v1/u/:username/idpgroups"`
+	UserGroupsRequest
+}
+
+// UserTokenRequest is a request for a new token to represent the user.
+type UserTokenRequest struct {
+	httprequest.Route `httprequest:"GET /v1/u/:username/macaroon"`
+	Username          Username `httprequest:"username,path"`
+}
+
+// VerifyTokenRequest is a request to verify that the provided
+// macaroon.Slice is valid and represents a user from identity.
+type VerifyTokenRequest struct {
+	httprequest.Route `httprequest:"POST /v1/verify"`
+	Macaroons         macaroon.Slice `httprequest:",body"`
+}
+
+// UserExtraInfoRequest is a request for the arbitrary extra information
+// stored about the user.
+type UserExtraInfoRequest struct {
+	httprequest.Route `httprequest:"GET /v1/u/:username/extra-info"`
+	Username          Username `httprequest:"username,path"`
+}
+
+// SetUserExtraInfoRequest is a request to updated the arbitrary extra
+// information stored about the user.
+type SetUserExtraInfoRequest struct {
+	httprequest.Route `httprequest:"PUT /v1/u/:username/extra-info"`
+	Username          Username               `httprequest:"username,path"`
+	ExtraInfo         map[string]interface{} `httprequest:",body"`
+}
+
+// UserExtraInfoItemRequest is a request for a single element of the
+// arbitrary extra information stored about the user.
+type UserExtraInfoItemRequest struct {
+	httprequest.Route `httprequest:"GET /v1/u/:username/extra-info/:item"`
+	Username          Username `httprequest:"username,path"`
+	Item              string   `httprequest:"item,path"`
+}
+
+// SetUserExtraInfoItemRequest is a request to update a single element of
+// the arbitrary extra information stored about the user.
+type SetUserExtraInfoItemRequest struct {
+	httprequest.Route `httprequest:"PUT /v1/u/:username/extra-info/:item"`
+	Username          Username    `httprequest:"username,path"`
+	Item              string      `httprequest:"item,path"`
+	Data              interface{} `httprequest:",body"`
 }

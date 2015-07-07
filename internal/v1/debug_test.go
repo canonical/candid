@@ -65,20 +65,9 @@ func (s *debugSuite) TestServeDebugStatus(c *gc.C) {
 func (s *debugSuite) TestServeDebugInfo(c *gc.C) {
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Handler:      s.srv,
-		URL:          apiURL("debug/info"),
+		URL:          "/debug/info",
 		ExpectStatus: http.StatusOK,
 		ExpectBody:   buildver.VersionInfo,
-	})
-}
-
-func (s *debugSuite) TestServeDebug(c *gc.C) {
-	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
-		Handler:      s.srv,
-		URL:          apiURL("debug"),
-		ExpectStatus: http.StatusInternalServerError,
-		ExpectBody: params.Error{
-			Message: "method not implemented",
-		},
 	})
 }
 
@@ -91,13 +80,13 @@ var debugPprofTests = []struct {
 	expectBody   interface{}
 }{{
 	about:        "get debug/pprof/",
-	url:          apiURL("debug/pprof/"),
+	url:          "/debug/pprof/",
 	username:     adminUsername,
 	password:     adminPassword,
 	expectStatus: http.StatusOK,
 }, {
 	about:        "get debug/pprof/ invalid username",
-	url:          apiURL("debug/pprof/"),
+	url:          "/debug/pprof/",
 	username:     adminUsername + "bad",
 	password:     adminPassword,
 	expectStatus: http.StatusUnauthorized,
@@ -107,36 +96,36 @@ var debugPprofTests = []struct {
 	},
 }, {
 	about:        "get debug/pprof/ no credentials",
-	url:          apiURL("debug/pprof/"),
+	url:          "/debug/pprof/",
 	expectStatus: http.StatusProxyAuthRequired,
 	expectBody:   DischargeRequiredBody,
 }, {
 	about:        "get debug/pprof/cmdline",
-	url:          apiURL("debug/pprof/cmdline"),
+	url:          "/debug/pprof/cmdline",
 	username:     adminUsername,
 	password:     adminPassword,
 	expectStatus: http.StatusOK,
 }, {
 	about:        "get debug/pprof/profile",
-	url:          apiURL("debug/pprof/profile"),
+	url:          "/debug/pprof/profile",
 	username:     adminUsername,
 	password:     adminPassword,
 	expectStatus: http.StatusOK,
 }, {
 	about:        "get debug/pprof/symbol",
-	url:          apiURL("debug/pprof/symbol"),
+	url:          "/debug/pprof/symbol",
 	username:     adminUsername,
 	password:     adminPassword,
 	expectStatus: http.StatusOK,
 }, {
 	about:        "get debug/pprof/goroutine",
-	url:          apiURL("debug/pprof/goroutine"),
+	url:          "/debug/pprof/goroutine",
 	username:     adminUsername,
 	password:     adminPassword,
 	expectStatus: http.StatusOK,
 }, {
 	about:        "get debug/pprof/cmdline bad credentials",
-	url:          apiURL("debug/pprof/cmdline"),
+	url:          "/debug/pprof/cmdline",
 	username:     adminUsername + "bad",
 	password:     adminPassword,
 	expectStatus: http.StatusUnauthorized,
@@ -146,7 +135,7 @@ var debugPprofTests = []struct {
 	},
 }, {
 	about:        "get debug/pprof/cmdline no credentials",
-	url:          apiURL("debug/pprof/cmdline"),
+	url:          "/debug/pprof/cmdline",
 	expectStatus: http.StatusProxyAuthRequired,
 	expectBody:   DischargeRequiredBody,
 }}

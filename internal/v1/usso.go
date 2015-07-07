@@ -19,7 +19,7 @@ import (
 )
 
 const (
-	ussoURL   = "https://login.ubuntu.com"
+	ussoURL = "https://login.ubuntu.com"
 )
 
 // TODO It should not be necessary to know all the possible
@@ -28,16 +28,16 @@ const (
 // This list needs to contain any private teams that the system needs to know about.
 const openIdRequestedTeams = "blues-development,charm-beta"
 
-func (h *handler) ussoOAuthURL(waitid string) (string, error) {
-	loginURL := h.location + "/v1/idp/usso/oauth"
+func (h *dischargeHandler) ussoOAuthURL(waitid string) (string, error) {
+	loginURL := h.serviceURL("/v1/idp/usso/oauth")
 	if waitid != "" {
 		loginURL += "?waitid=" + waitid
 	}
 	return loginURL, nil
 }
 
-func (h *handler) ussoOpenIDURL(waitID string) (string, error) {
-	realmURL := h.location + "/v1/idp/usso/callback"
+func (h *dischargeHandler) ussoOpenIDURL(waitID string) (string, error) {
+	realmURL := h.serviceURL("/v1/idp/usso/callback")
 	loginURL, err := h.openIDURL("/v1/idp/usso/callback", waitID, ussoURL, realmURL)
 	if err != nil {
 		return "", errgo.Mask(err)
@@ -79,21 +79,27 @@ func (qu *qURL) String() string {
 	return u.String()
 }
 
+// ussoCallbackRequest documents the /v1/idp/usso/callback endpoint. This
+// is used by the UbuntuSSO login sequence to indicate it has completed.
+// Client code should not need to use this type.
 type ussoCallbackRequest struct {
-	httprequest.Route `httprequest:"GET /idp/usso/callback"`
+	httprequest.Route `httprequest:"GET /v1/idp/usso/callback"`
 }
 
-func (h *handler) ServeUSSOCallback(p httprequest.Params, _ *ussoCallbackRequest) {
+func (h *dischargeHandler) USSOCallback(p httprequest.Params, _ *ussoCallbackRequest) {
 	h.handleOpenIDCallback(p)
 }
 
+// ussoOAuthRequest is a request to log in using oauth tokens. A request
+// to the /v1/idp/usso/oauth endpoint should be signed using a previously
+// aquired OAuth token.
 type ussoOAuthRequest struct {
-	httprequest.Route `httprequest:"GET /idp/usso/oauth"`
+	httprequest.Route `httprequest:"GET /v1/idp/usso/oauth"`
 	WaitID            string `httprequest:"waitid,form"`
 }
 
-func (h *handler) ServeOAuthLogin(p httprequest.Params, r *ussoOAuthRequest) {
-	reqURL := h.requestURL(p.Request)
+func (h *dischargeHandler) USSOOAuthLogin(p httprequest.Params, _ *ussoOAuthRequest) {
+	reqURL := h.requestURL()
 	id, err := verifyOAuthSignature(reqURL, p.Request)
 	if err != nil {
 		h.loginFailure(p.Response, p.Request, "unknown user", err)

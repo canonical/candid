@@ -182,3 +182,11 @@ var DischargeRequiredBody httptesting.BodyAsserter = func(c *gc.C, body json.Raw
 	c.Assert(err, gc.IsNil)
 	c.Assert(e.Code, gc.Equals, httpbakery.ErrDischargeRequired)
 }
+
+// marshal converts a value into a bytes.Reader containing the json
+// encoding of that value.
+func marshal(c *gc.C, v interface{}) *bytes.Reader {
+	b, err := json.Marshal(v)
+	c.Assert(err, gc.Equals, nil)
+	return bytes.NewReader(b)
+}
