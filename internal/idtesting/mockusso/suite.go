@@ -18,7 +18,7 @@ type Suite struct {
 }
 
 func (s *Suite) SetUpSuite(c *gc.C) {
-	s.MockUSSO = New()
+	s.MockUSSO = New("https://login.ubuntu.com")
 	s.server = httptest.NewServer(s.MockUSSO)
 	rt := roundTripper{
 		c:   c,
