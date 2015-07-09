@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 
 	"github.com/garyburd/go-oauth/oauth"
@@ -73,6 +74,54 @@ func (s *loginSuite) TestInteractiveLogin(c *gc.C) {
 	defer resp.Body.Close()
 	c.Assert(resp.StatusCode, gc.Equals, http.StatusOK)
 	s.assertMacaroon(c, resp, "test")
+}
+
+func (s *loginSuite) TestInteractiveLoginFromDifferentProvider(c *gc.C) {
+	mockUSSO := mockusso.New("https://login.badplace.com")
+	s.PatchValue(&http.DefaultTransport, transport{
+		prefix: "https://login.badplace.com",
+		srv:    mockUSSO,
+		rt:     http.DefaultTransport,
+	})
+	mockUSSO.AddUser(&mockusso.User{
+		ID:       "test",
+		NickName: "test",
+		FullName: "Test User",
+		Email:    "test@example.com",
+		Groups:   []string{"test1", "test2"},
+	})
+	mockUSSO.SetLoginUser("test")
+	client := &http.Client{
+		Transport: transport{
+			prefix: location,
+			srv:    s.srv,
+			rt:     http.DefaultTransport,
+		},
+	}
+	v := url.Values{}
+	v.Set("openid.ns", "http://specs.openid.net/auth/2.0")
+	v.Set("openid.mode", "checkid_setup")
+	v.Set("openid.claimed_id", "https://login.badplace.com")
+	v.Set("openid.identity", "http://specs.openid.net/auth/2.0/identifier_select")
+	v.Set("openid.return_to", location+"/v1/idp/usso/callback")
+	v.Set("openid.realm", location+"/v1/idp/usso/callback")
+	u := &url.URL{
+		Scheme:   "https",
+		Host:     "login.badplace.com",
+		Path:     "/+openid",
+		RawQuery: v.Encode(),
+	}
+	resp, err := client.Get(u.String())
+	c.Assert(err, gc.IsNil)
+	defer resp.Body.Close()
+	c.Assert(resp.StatusCode, gc.Equals, http.StatusForbidden)
+	body, err := ioutil.ReadAll(resp.Body)
+	c.Assert(err, gc.IsNil)
+	var perr params.Error
+	err = json.Unmarshal(body, &perr)
+	c.Assert(err, gc.IsNil)
+	c.Assert(perr.Code, gc.Equals, params.ErrForbidden)
+	c.Assert(&perr, gc.ErrorMatches, `.*rejecting login from https://login\.badplace\.com/\+openid`)
 }
 
 func (s *loginSuite) TestOAuthLogin(c *gc.C) {

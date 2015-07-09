@@ -34,12 +34,14 @@ type Handler struct {
 	openidUser string
 	users      map[string]*User
 	router     *httprouter.Router
+	location   string
 }
 
-func New() *Handler {
+func New(location string) *Handler {
 	h := &Handler{
-		users:  map[string]*User{},
-		router: httprouter.New(),
+		users:    map[string]*User{},
+		router:   httprouter.New(),
+		location: location,
 	}
 	openidHandler := &openid2.Handler{
 		Login: h,
@@ -67,9 +69,9 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) Login(_ http.ResponseWriter, _ *http.Request, lr *openid2.LoginRequest) (*openid2.LoginResponse, error) {
 	u := h.users[h.openidUser]
 	return &openid2.LoginResponse{
-		Identity:   "https://login.ubuntu.com/+id/" + h.openidUser,
-		ClaimedID:  "https://login.ubuntu.com/+id/" + h.openidUser,
-		OPEndpoint: "https://login.ubuntu.com/+openid",
+		Identity:   h.location + "/+id/" + h.openidUser,
+		ClaimedID:  h.location + "/+id/" + h.openidUser,
+		OPEndpoint: h.location + "/+openid",
 		Extensions: []openid2.Extension{{
 			Namespace: "http://openid.net/extensions/sreg/1.1",
 			Prefix:    "sreg",
@@ -106,7 +108,7 @@ func (h *Handler) SetLoginUser(user string) {
 
 func (h *Handler) root(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	w.Header().Set("Content-Type", "text/html")
-	w.Header().Set("X-Xrds-Location", "https://login.ubuntu.com/+xrds")
+	w.Header().Set("X-Xrds-Location", h.location+"+xrds")
 	content := `<html><head><title>Mock UbuntuSSO</title></head><body></body><html>`
 	w.Header().Set("Content-Length", fmt.Sprint(len(content)))
 	if r.Method == "HEAD" {
@@ -127,7 +129,7 @@ func (h *Handler) xrds(w http.ResponseWriter, r *http.Request, _ httprouter.Para
       <Type>http://openid.net/srv/ax/1.0</Type>
       <Type>http://openid.net/extensions/sreg/1.1</Type>
       <Type>http://ns.launchpad.net/2007/openid-teams</Type>
-      <URI>https://login.ubuntu.com/+openid</URI>
+      <URI>` + h.location + `/+openid</URI>
     </Service>
   </XRD>
 </xrds:XRDS>`))
@@ -136,7 +138,7 @@ func (h *Handler) xrds(w http.ResponseWriter, r *http.Request, _ httprouter.Para
 func (h *Handler) id(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 	id := p.ByName("id")
 	w.Header().Set("Content-Type", "text/html")
-	w.Header().Set("X-Xrds-Location", fmt.Sprintf("https://login.ubuntu.com/+id/%s/+xrds", id))
+	w.Header().Set("X-Xrds-Location", fmt.Sprintf("%s/+id/%s/+xrds", h.location, id))
 	content := fmt.Sprintf(`<html><head><title>Mock UbuntuSSO</title></head><body><p>%s</p></body><html>`, id)
 	w.Header().Set("Content-Length", fmt.Sprint(len(content)))
 	if r.Method == "HEAD" {
@@ -155,8 +157,8 @@ func (h *Handler) xrdsid(w http.ResponseWriter, r *http.Request, p httprouter.Pa
   <XRD>
     <Service priority="0">
       <Type>http://specs.openid.net/auth/2.0/signon</Type>
-      <URI>https://login.ubuntu.com/+openid</URI>
-      <LocalID>https://login.ubuntu.com/+id/%s</LocalID>
+      <URI>`+h.location+`/+openid</URI>
+      <LocalID>`+h.location+`+id/%s</LocalID>
     </Service>
   </XRD>
 </xrds:XRDS>

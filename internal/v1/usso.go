@@ -11,11 +11,12 @@ import (
 	"net/url"
 	"regexp"
 
+	"github.com/juju/httprequest"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/mgo.v2/bson"
 
 	"github.com/CanonicalLtd/blues-identity/internal/mongodoc"
-	"github.com/juju/httprequest"
+	"github.com/CanonicalLtd/blues-identity/params"
 )
 
 const (
@@ -84,9 +85,22 @@ func (qu *qURL) String() string {
 // Client code should not need to use this type.
 type ussoCallbackRequest struct {
 	httprequest.Route `httprequest:"GET /v1/idp/usso/callback"`
+	OPEndpoint        string `httprequest:"openid.op_endpoint,form"`
 }
 
-func (h *dischargeHandler) USSOCallback(p httprequest.Params, _ *ussoCallbackRequest) {
+func (h *dischargeHandler) USSOCallback(p httprequest.Params, r *ussoCallbackRequest) {
+	// Only trust responses that claim to come from Ubuntu SSO
+	// handleOpenIDCallback will check that it actually does come
+	// from where it claims to.
+	if r.OPEndpoint != ussoURL+"/+openid" {
+		h.loginFailure(
+			p.Response,
+			p.Request,
+			"",
+			errgo.WithCausef(nil, params.ErrForbidden, "rejecting login from %s", r.OPEndpoint),
+		)
+		return
+	}
 	h.handleOpenIDCallback(p)
 }
 
