@@ -3,6 +3,7 @@
 package v1
 
 import (
+	"net/http"
 	"net/url"
 
 	"github.com/juju/httprequest"
@@ -46,7 +47,9 @@ func (h *dischargeHandler) AgentLogin(p httprequest.Params, login *agentLoginReq
 			checkers.OperationChecker("discharge"),
 		))
 		if err == nil {
-			h.loginSuccess(p.Response, p.Request, declared["username"], ms, "agent login complete")
+			if h.loginSuccess(p.Response, p.Request, declared["username"], ms) {
+				httprequest.WriteJSON(p.Response, http.StatusOK, login.AgentLogin)
+			}
 			return
 		}
 		if _, ok := errgo.Cause(err).(*bakery.VerificationError); !ok {

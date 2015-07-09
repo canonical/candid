@@ -64,17 +64,19 @@ func (h *dischargeHandler) loginID(w http.ResponseWriter, r *http.Request, userI
 		h.loginFailure(w, r, userID, errgo.Notef(err, "cannot create macaroon"))
 		return
 	}
-	h.loginSuccess(w, r, userID, macaroon.Slice{m}, "login successful as user %#v\n", userID)
+	if h.loginSuccess(w, r, userID, macaroon.Slice{m}) {
+		fmt.Fprintf(w, "login successful as user %#v\n", userID)
+	}
 }
 
 // loginSuccess is used by identity providers once they have determined that
 // the login completed successfully.
-func (h *dischargeHandler) loginSuccess(w http.ResponseWriter, r *http.Request, userID string, ms macaroon.Slice, format string, a ...interface{}) {
+func (h *dischargeHandler) loginSuccess(w http.ResponseWriter, r *http.Request, userID string, ms macaroon.Slice) bool {
 	logger.Infof("successful login for user %s", userID)
 	cookie, err := httpbakery.NewCookie(ms)
 	if err != nil {
 		h.loginFailure(w, r, userID, errgo.Notef(err, "cannot create cookie"))
-		return
+		return false
 	}
 	http.SetCookie(w, cookie)
 	r.ParseForm()
@@ -84,11 +86,11 @@ func (h *dischargeHandler) loginSuccess(w http.ResponseWriter, r *http.Request, 
 			IdentityMacaroon: ms,
 		}); err != nil {
 			h.loginFailure(w, r, userID, errgo.Notef(err, "cannot complete rendezvous"))
-			return
+			return false
 		}
 	}
 	logger.Debugf("login complete for user %s", userID)
-	fmt.Fprintf(w, format, a...)
+	return true
 }
 
 // loginFailure is used by identity providers once they have determined that
