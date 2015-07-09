@@ -2,4 +2,7 @@
 
 package v1
 
-var GravatarHash = gravatarHash
+var (
+	GravatarHash            = gravatarHash
+	GetAgentLoginFromCookie = getAgentLoginFromCookie
+)

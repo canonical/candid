@@ -242,6 +242,47 @@ func (s *loginSuite) TestAgentLogin(c *gc.C) {
 	s.assertMacaroon(c, resp, "test")
 }
 
+func (s *loginSuite) TestCookieBasedAgentLogin(c *gc.C) {
+	keys, err := bakery.GenerateKey()
+	c.Assert(err, gc.IsNil)
+	s.createIdentity(c, &mongodoc.Identity{
+		Username: "test",
+		Email:    "test@example.com",
+		FullName: "Test User",
+		Groups: []string{
+			"test",
+		},
+		Owner: "admin",
+		PublicKeys: []mongodoc.PublicKey{{
+			Key: keys.Public.Key[:],
+		}},
+	})
+	client := httpbakery.NewClient()
+	client.Client.Transport = transport{
+		prefix: location,
+		srv:    s.srv,
+		rt:     http.DefaultTransport,
+	}
+	client.Key = keys
+	var p params.AgentLogin
+	p.Username = "test"
+	p.PublicKey = &keys.Public
+	data, err := json.Marshal(p)
+	c.Assert(err, gc.IsNil)
+	u, err := url.Parse(location + "/v1/login")
+	c.Assert(err, gc.IsNil)
+	client.Jar.SetCookies(u, []*http.Cookie{{
+		Name:  "agent-login",
+		Value: base64.StdEncoding.EncodeToString(data),
+	}})
+	req, err := http.NewRequest("GET", location+"/v1/login", nil)
+	c.Assert(err, gc.IsNil)
+	resp, err := client.Do(req)
+	c.Assert(err, gc.IsNil)
+	defer resp.Body.Close()
+	s.assertMacaroon(c, resp, "test")
+}
+
 func (s *loginSuite) assertMacaroon(c *gc.C, resp *http.Response, userId string) {
 	var ms macaroon.Slice
 	for _, cookie := range resp.Cookies() {

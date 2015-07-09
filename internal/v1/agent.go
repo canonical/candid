@@ -3,6 +3,8 @@
 package v1
 
 import (
+	"encoding/base64"
+	"encoding/json"
 	"net/http"
 	"net/url"
 
@@ -73,4 +75,26 @@ func (h *dischargeHandler) AgentLogin(p httprequest.Params, login *agentLoginReq
 		return
 	}
 	httpbakery.WriteDischargeRequiredError(p.Response, m, u.Path, nil)
+}
+
+// getAgentLoginFromCookie finds a cookie in the request that contains
+// the login credentials for an agent login and extracts the login
+// parameters from the cookie.
+func getAgentLoginFromCookie(r *http.Request) (params.AgentLogin, error) {
+	c, err := r.Cookie("agent-login")
+	if err != nil {
+		return params.AgentLogin{}, errgo.Mask(err)
+	}
+	b, err := base64.StdEncoding.DecodeString(c.Value)
+	if err != nil {
+		return params.AgentLogin{}, errgo.Notef(err, "cannot decode cookie value")
+	}
+	var al params.AgentLogin
+	if err := json.Unmarshal(b, &al); err != nil {
+		return params.AgentLogin{}, errgo.Notef(err, "cannot unmarshal agent login")
+	}
+	if al.PublicKey == nil {
+		return params.AgentLogin{}, errgo.Newf("agent login has no public key")
+	}
+	return al, nil
 }
