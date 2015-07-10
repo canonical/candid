@@ -47,7 +47,18 @@ func (h *dischargeHandler) Login(p httprequest.Params, lr *loginRequest) error {
 		}
 		return nil
 	}
-	http.Redirect(p.Response, p.Request, ussoOpenID, http.StatusFound)
+	al, err := getAgentLoginFromCookie(p.Request)
+	if err != nil {
+		logger.Debugf("cannot perform agent login: %s", err)
+		// Use the normal interactive login method.
+		http.Redirect(p.Response, p.Request, ussoOpenID, http.StatusFound)
+		return nil
+	}
+	// We have some agent credentials, attempt an agent login.
+	h.AgentLogin(p, &agentLoginRequest{
+		WaitID:     lr.WaitID,
+		AgentLogin: al,
+	})
 	return nil
 }
 
