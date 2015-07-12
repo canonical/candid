@@ -5,7 +5,7 @@ package v1
 import (
 	"github.com/juju/httprequest"
 	"github.com/juju/loggo"
-	"github.com/kushaldas/openid.go/src/openid"
+	"github.com/yohcop/openid-go"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v1/bakery/checkers"
 

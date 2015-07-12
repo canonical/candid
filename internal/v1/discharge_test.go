@@ -320,6 +320,8 @@ func (s *dischargeSuite) TestAdminDischarge(c *gc.C) {
 }
 
 func (s *dischargeSuite) TestDischargeWithOpenID(c *gc.C) {
+	store := s.pool.GetNoLimit()
+	defer s.pool.Put(store)
 	s.MockUSSO.AddUser(&mockusso.User{
 		ID:       "test",
 		NickName: "test",
@@ -351,6 +353,16 @@ func (s *dischargeSuite) TestDischargeWithOpenID(c *gc.C) {
 		checkers.TimeBefore,
 	))
 	c.Assert(err, gc.IsNil)
+	id, err := store.GetIdentity(params.Username("test"))
+	c.Assert(err, gc.IsNil)
+	id.UUID = ""
+	c.Assert(id, jc.DeepEquals, &mongodoc.Identity{
+		ExternalID: "https://login.ubuntu.com/+id/test",
+		Username:   "test",
+		FullName:   "Test User",
+		Email:      "test@example.com",
+		Groups:     []string{"test1", "test2"},
+	})
 }
 
 func (s *dischargeSuite) doVisit(c *gc.C) func(*url.URL) error {
