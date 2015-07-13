@@ -1,4 +1,3 @@
-code.google.com/p/go.net	hg	937a34c9de13c766c814510f76bca091dee06028	239
 github.com/garyburd/go-oauth	git	3131beb69b81ff119923bdefbf029318f1f53794	2015-03-29T16:01:46Z
 github.com/gorilla/handlers	git	a24b39a6a2c8a7af2fe664dd4573205c99904035	2015-04-12T18:40:04Z
 github.com/juju/errors	git	4567a5e69fd3130ca0d89f69478e7ac025b67452	2015-03-27T19:24:31Z
@@ -9,9 +8,9 @@ github.com/juju/names	git	a6a253b0a94cc79e99a68d284b970ffce2a11ecd	2015-07-09T13
 github.com/juju/testing	git	f521911d9a79aeb62c051fe18e689796369c5564	2015-05-29T04:40:43Z
 github.com/juju/utils	git	f24fcb37d33e6d8fa7f51442aad41b7b83b06f5d	2015-07-01T15:20:54Z
 github.com/julienschmidt/httprouter	git	8c199fb6259ffc1af525cc3ad52ee60ba8359669	2015-04-21T17:00:07Z
-github.com/kushaldas/openid.go	git	c705925b332c8a68b7821aa3d340ecf4f302bca3	2013-09-17T09:51:43Z
 github.com/mhilton/openid	git	7922a4e937d8433528e1cbc30ed742f1573bc9fb	2015-05-11T10:32:07Z
 github.com/pborman/uuid	git	ca53cad383cad2479bbba7f7a1a05797ec1386e4	2015-06-03T21:40:16Z
+github.com/yohcop/openid-go	git	b713de07e36d93e87850bddbf76f3a8ad89b9d2f	2015-03-03T07:51:34Z
 golang.org/x/crypto	git	1e856cbfdf9bc25eefca75f83f25d55e35ae72e0	2015-06-08T19:52:49Z
 golang.org/x/net	git	38f3db3860bb1812858610029b0d8188517d8b74	2015-06-22T06:16:26Z
 gopkg.in/check.v1	git	8d49746f13e4c654088c52685541fcf4cbc8fa59	2015-06-10T23:30:30Z

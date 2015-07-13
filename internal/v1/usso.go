@@ -5,13 +5,16 @@ package v1
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"mime"
 	"net/http"
 	"net/url"
 	"regexp"
+	"strings"
 
 	"github.com/juju/httprequest"
+	"github.com/yohcop/openid-go"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/mgo.v2/bson"
 
@@ -38,46 +41,21 @@ func (h *dischargeHandler) ussoOAuthURL(waitid string) (string, error) {
 }
 
 func (h *dischargeHandler) ussoOpenIDURL(waitID string) (string, error) {
-	realmURL := h.serviceURL("/v1/idp/usso/callback")
-	loginURL, err := h.openIDURL("/v1/idp/usso/callback", waitID, ussoURL, realmURL)
+	realm := h.serviceURL("/v1/idp/usso/callback")
+	callback := realm
+	if waitID != "" {
+		callback += "?waitid=" + waitID
+	}
+	u, err := openid.RedirectURL(ussoURL, callback, realm)
 	if err != nil {
 		return "", errgo.Mask(err)
 	}
-	u, err := parseQURL(loginURL)
-	if err != nil {
-		return "", errgo.Mask(err)
-	}
-	u.Query.Set("openid.lp.query_membership", openIdRequestedTeams)
-	return u.String(), nil
-}
-
-// qURL holds a URL and its parsed query values.
-type qURL struct {
-	*url.URL
-	Query url.Values
-}
-
-func parseQURL(s string) (*qURL, error) {
-	u, err := url.Parse(s)
-	if err != nil {
-		return nil, errgo.Mask(err)
-	}
-	qu := &qURL{
-		URL: u,
-	}
-	q, err := url.ParseQuery(u.RawQuery)
-	if err != nil {
-		return nil, errgo.Mask(err)
-	}
-	qu.Query = q
-	qu.URL.RawQuery = ""
-	return qu, nil
-}
-
-func (qu *qURL) String() string {
-	u := *qu.URL
-	u.RawQuery = qu.Query.Encode()
-	return u.String()
+	ext := url.Values{}
+	ext.Set("openid.ns.sreg", "http://openid.net/extensions/sreg/1.1")
+	ext.Set("openid.sreg.required", "email,fullname,nickname")
+	ext.Set("openid.ns.lp", "http://ns.launchpad.net/2007/openid-teams")
+	ext.Set("openid.lp.query_membership", openIdRequestedTeams)
+	return fmt.Sprintf("%s&%s", u, ext.Encode()), nil
 }
 
 // ussoCallbackRequest documents the /v1/idp/usso/callback endpoint. This
@@ -86,22 +64,61 @@ func (qu *qURL) String() string {
 type ussoCallbackRequest struct {
 	httprequest.Route `httprequest:"GET /v1/idp/usso/callback"`
 	OPEndpoint        string `httprequest:"openid.op_endpoint,form"`
+	ExternalID        string `httprequest:"openid.claimed_id,form"`
+	Signed            string `httprequest:"openid.signed,form"`
+	Email             string `httprequest:"openid.sreg.email,form"`
+	Fullname          string `httprequest:"openid.sreg.fullname,form"`
+	Nickname          string `httprequest:"openid.sreg.nickname,form"`
+	Groups            string `httprequest:"openid.lp.is_member,form"`
 }
 
 func (h *dischargeHandler) USSOCallback(p httprequest.Params, r *ussoCallbackRequest) {
-	// Only trust responses that claim to come from Ubuntu SSO
-	// handleOpenIDCallback will check that it actually does come
-	// from where it claims to.
+	_, err := openid.Verify(h.requestURL(), h.h.discoveryCache, h.h.nonceStore)
+	if err != nil {
+		h.loginFailure(p.Response, p.Request, r.Nickname, err)
+		return
+	}
 	if r.OPEndpoint != ussoURL+"/+openid" {
 		h.loginFailure(
 			p.Response,
 			p.Request,
-			"",
+			r.Nickname,
 			errgo.WithCausef(nil, params.ErrForbidden, "rejecting login from %s", r.OPEndpoint),
 		)
 		return
 	}
-	h.handleOpenIDCallback(p)
+	signed := make(map[string]bool)
+	for _, f := range strings.Split(r.Signed, ",") {
+		signed[f] = true
+	}
+	if r.Email == "" || !signed["sreg.email"] {
+		h.loginFailure(p.Response, p.Request, r.Nickname, errgo.New("sreg.email not specified"))
+		return
+	}
+	if r.Fullname == "" || !signed["sreg.fullname"] {
+		h.loginFailure(p.Response, p.Request, r.Nickname, errgo.New("sreg.fullname not specified"))
+		return
+	}
+	if r.Nickname == "" || !signed["sreg.nickname"] {
+		h.loginFailure(p.Response, p.Request, r.Nickname, errgo.New("sreg.nickname not specified"))
+		return
+	}
+	var groups []string
+	if r.Groups != "" && signed["lp.is_member"] {
+		groups = strings.Split(r.Groups, ",")
+	}
+	err = h.store.UpsertIdentity(&mongodoc.Identity{
+		Username:   r.Nickname,
+		ExternalID: r.ExternalID,
+		Email:      r.Email,
+		FullName:   r.Fullname,
+		Groups:     groups,
+	})
+	if err != nil {
+		h.loginFailure(p.Response, p.Request, r.Nickname, err)
+		return
+	}
+	h.loginID(p.Response, p.Request, r.Nickname)
 }
 
 // ussoOAuthRequest is a request to log in using oauth tokens. A request
