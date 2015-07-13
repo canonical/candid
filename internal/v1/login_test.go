@@ -13,7 +13,6 @@ import (
 	"strings"
 
 	"github.com/garyburd/go-oauth/oauth"
-	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/macaroon-bakery.v1/bakery"
 	"gopkg.in/macaroon-bakery.v1/httpbakery"
@@ -235,10 +234,10 @@ func (s *loginSuite) TestAgentLogin(c *gc.C) {
 	defer resp.Body.Close()
 	data, err = ioutil.ReadAll(resp.Body)
 	c.Assert(err, gc.IsNil)
-	var al params.AgentLogin
+	var al params.AgentLoginResponse
 	err = json.Unmarshal(data, &al)
 	c.Assert(err, gc.IsNil)
-	c.Assert(al, jc.DeepEquals, p)
+	c.Assert(al.AgentLogin, gc.Equals, true)
 	s.assertMacaroon(c, resp, "test")
 }
 

@@ -50,7 +50,11 @@ func (h *dischargeHandler) AgentLogin(p httprequest.Params, login *agentLoginReq
 		))
 		if err == nil {
 			if h.loginSuccess(p.Response, p.Request, declared["username"], ms) {
-				httprequest.WriteJSON(p.Response, http.StatusOK, login.AgentLogin)
+				httprequest.WriteJSON(p.Response, http.StatusOK,
+					params.AgentLoginResponse{
+						AgentLogin: true,
+					},
+				)
 			}
 			return
 		}
