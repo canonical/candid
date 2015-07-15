@@ -31,10 +31,11 @@ type User struct {
 // Ubuntu SSO. It is designed to closely match the responses provided by
 // Ubuntu SSO providing openid login and oauth verification.
 type Handler struct {
-	openidUser string
-	users      map[string]*User
-	router     *httprouter.Router
-	location   string
+	openidUser        string
+	users             map[string]*User
+	router            *httprouter.Router
+	location          string
+	excludeExtensions bool
 }
 
 func New(location string) *Handler {
@@ -66,13 +67,12 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	h.router.ServeHTTP(w, r)
 }
 
+// Login handles OpenID login requests.
 func (h *Handler) Login(_ http.ResponseWriter, _ *http.Request, lr *openid2.LoginRequest) (*openid2.LoginResponse, error) {
 	u := h.users[h.openidUser]
-	return &openid2.LoginResponse{
-		Identity:   h.location + "/+id/" + h.openidUser,
-		ClaimedID:  h.location + "/+id/" + h.openidUser,
-		OPEndpoint: h.location + "/+openid",
-		Extensions: []openid2.Extension{{
+	var extensions []openid2.Extension
+	if !h.excludeExtensions {
+		extensions = []openid2.Extension{{
 			Namespace: "http://openid.net/extensions/sreg/1.1",
 			Prefix:    "sreg",
 			Params: map[string]string{
@@ -86,24 +86,42 @@ func (h *Handler) Login(_ http.ResponseWriter, _ *http.Request, lr *openid2.Logi
 			Params: map[string]string{
 				"is_member": strings.Join(u.Groups, ","),
 			},
-		}},
+		}}
+	}
+	return &openid2.LoginResponse{
+		Identity:   h.location + "/+id/" + h.openidUser,
+		ClaimedID:  h.location + "/+id/" + h.openidUser,
+		OPEndpoint: h.location + "/+openid",
+		Extensions: extensions,
 	}, nil
 }
 
+// AddUser adds u to the handles user database.
 func (h *Handler) AddUser(u *User) {
 	h.users[u.ID] = u
 }
 
+// Reset sets all of the state in the Handler back to the default. This
+// should be called between tests.
 func (h *Handler) Reset() {
 	h.users = map[string]*User{}
 	h.openidUser = ""
+	h.excludeExtensions = false
 }
 
+// SetLoginUser sets the user that is logged in when an OpenID request is
+// recieved.
 func (h *Handler) SetLoginUser(user string) {
 	if _, ok := h.users[user]; !ok {
 		panic("no such user: " + user)
 	}
 	h.openidUser = user
+}
+
+// ExcludeExtensions prevents an OpenID login response from including any
+// extensions.
+func (h *Handler) ExcludeExtensions() {
+	h.excludeExtensions = true
 }
 
 func (h *Handler) root(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
