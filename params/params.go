@@ -38,6 +38,11 @@ type AgentLogin struct {
 	PublicKey *bakery.PublicKey `json:"public_key"`
 }
 
+// AgentLoginResponse contains the response to an agent login attempt.
+type AgentLoginResponse struct {
+	AgentLogin bool `json:"agent_login"`
+}
+
 // PublicKeyRequest documents the /v1/discharger/publickey endpoint. As
 // it contains no request information there is no need to ever create
 // one.
