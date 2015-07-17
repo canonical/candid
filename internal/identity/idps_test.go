@@ -3,9 +3,8 @@
 package identity_test
 
 import (
-	gc "gopkg.in/check.v1"
-
 	"github.com/juju/testing"
+	gc "gopkg.in/check.v1"
 
 	"github.com/CanonicalLtd/blues-identity/internal/identity"
 	"github.com/CanonicalLtd/blues-identity/internal/mongodoc"

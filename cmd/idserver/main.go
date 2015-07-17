@@ -9,14 +9,13 @@ import (
 	"os"
 	"path/filepath"
 
-	"launchpad.net/lpad"
-
 	"github.com/gorilla/handlers"
 	"github.com/juju/loggo"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v1/bakery"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/natefinch/lumberjack.v2"
+	"launchpad.net/lpad"
 
 	"github.com/CanonicalLtd/blues-identity"
 	"github.com/CanonicalLtd/blues-identity/config"

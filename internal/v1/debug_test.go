@@ -107,7 +107,7 @@ var debugPprofTests = []struct {
 	expectStatus: http.StatusOK,
 }, {
 	about:        "get debug/pprof/profile",
-	url:          "/debug/pprof/profile",
+	url:          "/debug/pprof/profile?seconds=1",
 	username:     adminUsername,
 	password:     adminPassword,
 	expectStatus: http.StatusOK,
