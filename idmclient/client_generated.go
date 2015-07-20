@@ -5,9 +5,10 @@
 package idmclient
 
 import (
-	"github.com/CanonicalLtd/blues-identity/params"
 	"github.com/juju/httprequest"
 	"gopkg.in/macaroon.v1"
+
+	"github.com/CanonicalLtd/blues-identity/params"
 )
 
 type client struct {

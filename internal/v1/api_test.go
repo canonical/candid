@@ -13,8 +13,6 @@ import (
 	"net/url"
 	"strings"
 
-	"launchpad.net/lpad"
-
 	"github.com/juju/testing"
 	"github.com/juju/testing/httptesting"
 	gc "gopkg.in/check.v1"
@@ -23,6 +21,7 @@ import (
 	"gopkg.in/macaroon.v1"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
+	"launchpad.net/lpad"
 
 	"github.com/CanonicalLtd/blues-identity/internal/identity"
 	"github.com/CanonicalLtd/blues-identity/internal/mongodoc"
