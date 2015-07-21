@@ -73,7 +73,7 @@ type ussoCallbackRequest struct {
 }
 
 func (h *dischargeHandler) USSOCallback(p httprequest.Params, r *ussoCallbackRequest) {
-	_, err := openid.Verify(h.requestURL(), h.h.discoveryCache, h.h.nonceStore)
+	id, err := openid.Verify(h.requestURL(), h.h.discoveryCache, h.h.nonceStore)
 	if err != nil {
 		h.loginFailure(p.Response, p.Request, r.Nickname, err)
 		return
@@ -87,38 +87,68 @@ func (h *dischargeHandler) USSOCallback(p httprequest.Params, r *ussoCallbackReq
 		)
 		return
 	}
-	signed := make(map[string]bool)
-	for _, f := range strings.Split(r.Signed, ",") {
-		signed[f] = true
-	}
-	if r.Email == "" || !signed["sreg.email"] {
-		h.loginFailure(p.Response, p.Request, r.Nickname, errgo.New("sreg.email not specified"))
+	identity, err := identityFromCallback(r)
+	// If identityFromCallback returns an error it is because the
+	// OpenID simple registration fields (see
+	// http://openid.net/specs/openid-simple-registration-extension-1_1-01.html)
+	// were not filled out in the callback. This means that a new
+	// identity cannot be created. It is still possible to log the
+	// user in if the identity already exists.
+	if err != nil {
+		logger.Warningf("cannot create user: %s", err)
+		var identity mongodoc.Identity
+		if err := h.store.DB.Identities().Find(bson.D{{"external_id", id}}).One(&identity); err != nil {
+			h.loginFailure(
+				p.Response,
+				p.Request,
+				r.Nickname,
+				errgo.WithCausef(
+					err,
+					params.ErrForbidden,
+					"cannot get user details for %q",
+					id,
+				),
+			)
+			return
+		}
+		h.loginID(p.Response, p.Request, identity.Username)
 		return
 	}
-	if r.Fullname == "" || !signed["sreg.fullname"] {
-		h.loginFailure(p.Response, p.Request, r.Nickname, errgo.New("sreg.fullname not specified"))
-		return
-	}
-	if r.Nickname == "" || !signed["sreg.nickname"] {
-		h.loginFailure(p.Response, p.Request, r.Nickname, errgo.New("sreg.nickname not specified"))
-		return
-	}
-	var groups []string
-	if r.Groups != "" && signed["lp.is_member"] {
-		groups = strings.Split(r.Groups, ",")
-	}
-	err = h.store.UpsertIdentity(&mongodoc.Identity{
-		Username:   r.Nickname,
-		ExternalID: r.ExternalID,
-		Email:      r.Email,
-		FullName:   r.Fullname,
-		Groups:     groups,
-	})
+	err = h.store.UpsertIdentity(identity)
 	if err != nil {
 		h.loginFailure(p.Response, p.Request, r.Nickname, err)
 		return
 	}
 	h.loginID(p.Response, p.Request, r.Nickname)
+}
+
+// identityFromCallback creates a new identity document from the callback
+// parameters.
+func identityFromCallback(r *ussoCallbackRequest) (*mongodoc.Identity, error) {
+	signed := make(map[string]bool)
+	for _, f := range strings.Split(r.Signed, ",") {
+		signed[f] = true
+	}
+	if r.Email == "" || !signed["sreg.email"] {
+		return nil, errgo.New("sreg.email not specified")
+	}
+	if r.Fullname == "" || !signed["sreg.fullname"] {
+		return nil, errgo.New("sreg.fullname not specified")
+	}
+	if r.Nickname == "" || !signed["sreg.nickname"] {
+		return nil, errgo.New("sreg.nickname not specified")
+	}
+	var groups []string
+	if r.Groups != "" && signed["lp.is_member"] {
+		groups = strings.Split(r.Groups, ",")
+	}
+	return &mongodoc.Identity{
+		Username:   r.Nickname,
+		ExternalID: r.ExternalID,
+		Email:      r.Email,
+		FullName:   r.Fullname,
+		Groups:     groups,
+	}, nil
 }
 
 // ussoOAuthRequest is a request to log in using oauth tokens. A request

@@ -124,6 +124,62 @@ func (s *loginSuite) TestInteractiveLoginFromDifferentProvider(c *gc.C) {
 	c.Assert(&perr, gc.ErrorMatches, `.*rejecting login from https://login\.badplace\.com/\+openid`)
 }
 
+func (s *loginSuite) TestInteractiveLoginNoExtensions(c *gc.C) {
+	s.createUser(c, &params.User{
+		Username:   "test",
+		ExternalID: "https://login.ubuntu.com/+id/test",
+		Email:      "test@example.com",
+		FullName:   "Test User",
+		IDPGroups: []string{
+			"test",
+		},
+	})
+	s.MockUSSO.AddUser(&mockusso.User{
+		ID:       "test",
+		NickName: "test",
+		FullName: "Test User",
+		Email:    "test@example.com",
+		Groups:   []string{"test1", "test2"},
+	})
+	s.MockUSSO.SetLoginUser("test")
+	s.MockUSSO.ExcludeExtensions()
+	client := &http.Client{
+		Transport: transport{
+			prefix: location,
+			srv:    s.srv,
+			rt:     http.DefaultTransport,
+		},
+	}
+	resp, err := client.Get(location + "/v1/login")
+	c.Assert(err, gc.IsNil)
+	defer resp.Body.Close()
+	c.Assert(resp.StatusCode, gc.Equals, http.StatusOK)
+	s.assertMacaroon(c, resp, "test")
+}
+
+func (s *loginSuite) TestInteractiveLoginNoExtensionsUnknownUser(c *gc.C) {
+	s.MockUSSO.AddUser(&mockusso.User{
+		ID:       "test",
+		NickName: "test",
+		FullName: "Test User",
+		Email:    "test@example.com",
+		Groups:   []string{"test1", "test2"},
+	})
+	s.MockUSSO.SetLoginUser("test")
+	s.MockUSSO.ExcludeExtensions()
+	client := &http.Client{
+		Transport: transport{
+			prefix: location,
+			srv:    s.srv,
+			rt:     http.DefaultTransport,
+		},
+	}
+	resp, err := client.Get(location + "/v1/login")
+	c.Assert(err, gc.IsNil)
+	defer resp.Body.Close()
+	c.Assert(resp.StatusCode, gc.Equals, http.StatusForbidden)
+}
+
 func (s *loginSuite) TestOAuthLogin(c *gc.C) {
 	s.createUser(c, &params.User{
 		Username:   "test",
