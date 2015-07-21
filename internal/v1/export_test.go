@@ -3,6 +3,5 @@
 package v1
 
 var (
-	GravatarHash            = gravatarHash
-	GetAgentLoginFromCookie = getAgentLoginFromCookie
+	GravatarHash = gravatarHash
 )

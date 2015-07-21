@@ -10,6 +10,7 @@ import (
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v1/bakery/checkers"
 	"gopkg.in/macaroon-bakery.v1/httpbakery"
+	"gopkg.in/macaroon-bakery.v1/httpbakery/agent"
 	"gopkg.in/macaroon.v1"
 
 	"github.com/CanonicalLtd/blues-identity/internal/identity"
@@ -33,6 +34,21 @@ func (h *dischargeHandler) Login(p httprequest.Params, lr *loginRequest) error {
 		return errgo.Notef(err, "cannot get oauth login URL")
 	}
 	agentURL := h.agentLoginURL(lr.WaitID)
+	user, key, err := agent.LoginCookie(p.Request)
+	if err == nil {
+		// We have some agent credentials, attempt an agent login.
+		h.AgentLogin(p, &agentLoginRequest{
+			WaitID: lr.WaitID,
+			AgentLogin: params.AgentLogin{
+				Username:  params.Username(user),
+				PublicKey: key,
+			},
+		})
+		return nil
+	}
+	if err != nil && errgo.Cause(err) != agent.ErrNoAgentLoginCookie {
+		return errgo.Notef(err, "bad agent-login cookie")
+	}
 	// TODO should really be parsing the accept header properly here, but
 	// it's really complicated http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.1
 	// perhaps use http://godoc.org/bitbucket.org/ww/goautoneg for this.
@@ -47,18 +63,8 @@ func (h *dischargeHandler) Login(p httprequest.Params, lr *loginRequest) error {
 		}
 		return nil
 	}
-	al, err := getAgentLoginFromCookie(p.Request)
-	if err != nil {
-		logger.Debugf("cannot perform agent login: %s", err)
-		// Use the normal interactive login method.
-		http.Redirect(p.Response, p.Request, ussoOpenID, http.StatusFound)
-		return nil
-	}
-	// We have some agent credentials, attempt an agent login.
-	h.AgentLogin(p, &agentLoginRequest{
-		WaitID:     lr.WaitID,
-		AgentLogin: al,
-	})
+	// Use the normal interactive login method.
+	http.Redirect(p.Response, p.Request, ussoOpenID, http.StatusFound)
 	return nil
 }
 
