@@ -3,10 +3,14 @@
 package idmclient_test
 
 import (
+	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"time"
 
+	"github.com/CanonicalLtd/usso"
+	"github.com/juju/httprequest"
 	"github.com/juju/testing"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
@@ -171,4 +175,139 @@ func (s *clientSuite) adminClient() *idmclient.Client {
 		AuthUsername: "admin",
 		AuthPassword: "password",
 	})
+}
+
+var ubuntuSSOOAuthVisitWebPageTests = []struct {
+	about       string
+	tok         *usso.SSOData
+	hnd         http.Handler
+	expectError string
+}{{
+	about: "sucessful login",
+	hnd: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/oauth" {
+			auth := r.Header.Get("Authorization")
+			if strings.HasPrefix(auth, "OAuth") {
+				w.Write([]byte(auth))
+				return
+			}
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		accept := r.Header.Get("Accept")
+		if accept != "application/json" {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		u := url.URL{
+			Scheme: "http",
+			Host:   r.Host,
+			Path:   "/oauth",
+		}
+		httprequest.WriteJSON(w, http.StatusOK, map[string]string{"usso_oauth": u.String()})
+	}),
+	tok: &usso.SSOData{
+		ConsumerKey:    "ck",
+		ConsumerSecret: "cs",
+		Realm:          "API",
+		TokenKey:       "tk",
+		TokenName:      "tn",
+		TokenSecret:    "ts",
+	},
+}, {
+	about: "not supported",
+	hnd: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		accept := r.Header.Get("Accept")
+		if accept != "application/json" {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		httprequest.WriteJSON(w, http.StatusOK, map[string]string{})
+	}),
+	tok: &usso.SSOData{
+		ConsumerKey:    "ck",
+		ConsumerSecret: "cs",
+		Realm:          "API",
+		TokenKey:       "tk",
+		TokenName:      "tn",
+		TokenSecret:    "ts",
+	},
+	expectError: "Ubuntu SSO OAuth login not supported",
+}, {
+	about: "error",
+	hnd: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		httprequest.WriteJSON(w, http.StatusInternalServerError, httpbakery.Error{
+			Message: "error",
+		})
+	}),
+	tok: &usso.SSOData{
+		ConsumerKey:    "ck",
+		ConsumerSecret: "cs",
+		Realm:          "API",
+		TokenKey:       "tk",
+		TokenName:      "tn",
+		TokenSecret:    "ts",
+	},
+	expectError: "error",
+}, {
+	about: "oauth error",
+	hnd: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/oauth" {
+			auth := r.Header.Get("Authorization")
+			if strings.HasPrefix(auth, "OAuth") {
+				httprequest.WriteJSON(
+					w,
+					http.StatusInternalServerError,
+					&httpbakery.Error{
+						Message: "error",
+					},
+				)
+			}
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		accept := r.Header.Get("Accept")
+		if accept != "application/json" {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		u := url.URL{
+			Scheme: "http",
+			Host:   r.Host,
+			Path:   "/oauth",
+		}
+		httprequest.WriteJSON(w, http.StatusOK, map[string]string{"usso_oauth": u.String()})
+	}),
+	tok: &usso.SSOData{
+		ConsumerKey:    "ck",
+		ConsumerSecret: "cs",
+		Realm:          "API",
+		TokenKey:       "tk",
+		TokenName:      "tn",
+		TokenSecret:    "ts",
+	},
+	expectError: "error",
+}}
+
+func (s *clientSuite) TestUbuntuSSOOAuthVisitWebPage(c *gc.C) {
+	var hnd http.Handler
+	srv := httptest.NewServer(http.HandlerFunc(
+		func(w http.ResponseWriter, r *http.Request) {
+			hnd.ServeHTTP(w, r)
+		},
+	))
+	defer srv.Close()
+	for i, test := range ubuntuSSOOAuthVisitWebPageTests {
+		c.Logf("%d. %s", i, test.about)
+		hnd = test.hnd
+		vwp := idmclient.UbuntuSSOOAuthVisitWebPage(http.DefaultClient, test.tok)
+		u, err := url.Parse(srv.URL)
+		c.Assert(err, gc.IsNil)
+		err = vwp(u)
+		if test.expectError != "" {
+			c.Assert(err, gc.ErrorMatches, test.expectError)
+			continue
+		}
+		c.Assert(err, gc.IsNil)
+	}
 }
