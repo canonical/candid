@@ -1,7 +1,8 @@
 # Identity service
 
 The identity service provides the ability to manage, create, remove and change
-Juju users and Juju environments.
+Juju users and Juju environments. It is designed as a proxy to the external 
+identity providers.
 
 ## Installation
 
