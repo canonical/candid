@@ -1,6 +1,6 @@
 // Copyright 2014 Canonical Ltd.
 
-package identity
+package store
 
 import (
 	"gopkg.in/errgo.v1"

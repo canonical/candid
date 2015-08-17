@@ -1,6 +1,6 @@
 // Copyright 2014 Canonical Ltd.
 
-package identity_test
+package store_test
 
 import (
 	"net/http"
@@ -15,14 +15,14 @@ import (
 	"gopkg.in/macaroon-bakery.v1/httpbakery"
 	"gopkg.in/macaroon.v1"
 
-	"github.com/CanonicalLtd/blues-identity/internal/identity"
 	"github.com/CanonicalLtd/blues-identity/internal/mongodoc"
+	"github.com/CanonicalLtd/blues-identity/internal/store"
 	"github.com/CanonicalLtd/blues-identity/params"
 )
 
 type authSuite struct {
 	testing.IsolatedMgoSuite
-	pool *identity.Pool
+	pool *store.Pool
 }
 
 var _ = gc.Suite(&authSuite{})
@@ -32,9 +32,9 @@ const identityLocation = "https://identity.test/id"
 func (s *authSuite) SetUpTest(c *gc.C) {
 	s.IsolatedMgoSuite.SetUpTest(c)
 	var err error
-	s.pool, err = identity.NewPool(
+	s.pool, err = store.NewPool(
 		s.Session.DB("idm-test"),
-		identity.ServerParams{
+		store.StoreParams{
 			AuthUsername: "test-admin",
 			AuthPassword: "open sesame",
 			Location:     identityLocation,
@@ -133,16 +133,16 @@ func (s *authSuite) TestUserHasPublicKey(c *gc.C) {
 			{Key: key.Public.Key[:]},
 		},
 	})
-	cav := identity.UserHasPublicKeyCaveat(params.Username("test"), &key.Public)
+	cav := store.UserHasPublicKeyCaveat(params.Username("test"), &key.Public)
 	c.Assert(cav.Location, gc.Equals, "")
 	c.Assert(cav.Condition, gc.Matches, "user-has-public-key test .*")
 
-	store := s.pool.GetNoLimit()
-	defer s.pool.Put(store)
+	st := s.pool.GetNoLimit()
+	defer s.pool.Put(st)
 
 	var doc *mongodoc.Identity
-	check := identity.UserHasPublicKeyChecker{
-		Store:    store,
+	check := store.UserHasPublicKeyChecker{
+		Store:    st,
 		Identity: &doc,
 	}
 	c.Assert(check.Condition(), gc.Equals, "user-has-public-key")

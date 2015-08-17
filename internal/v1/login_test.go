@@ -33,6 +33,11 @@ var _ = gc.Suite(&loginSuite{})
 
 func (s *loginSuite) SetUpSuite(c *gc.C) {
 	s.Suite.SetUpSuite(c)
+	s.apiSuite.idps = []string{
+		"usso",
+		"usso_oauth",
+		"agent",
+	}
 	s.apiSuite.SetUpSuite(c)
 }
 

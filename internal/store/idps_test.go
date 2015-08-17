@@ -1,18 +1,18 @@
 // Copyright 2014 Canonical Ltd.
 
-package identity_test
+package store_test
 
 import (
 	"github.com/juju/testing"
 	gc "gopkg.in/check.v1"
 
-	"github.com/CanonicalLtd/blues-identity/internal/identity"
 	"github.com/CanonicalLtd/blues-identity/internal/mongodoc"
+	"github.com/CanonicalLtd/blues-identity/internal/store"
 )
 
 type idpsSuite struct {
 	testing.IsolatedMgoSuite
-	pool *identity.Pool
+	pool *store.Pool
 }
 
 var _ = gc.Suite(&idpsSuite{})
@@ -20,7 +20,7 @@ var _ = gc.Suite(&idpsSuite{})
 func (s *idpsSuite) SetUpTest(c *gc.C) {
 	s.IsolatedMgoSuite.SetUpTest(c)
 	var err error
-	s.pool, err = identity.NewPool(s.Session.DB("idps-tests"), identity.ServerParams{})
+	s.pool, err = store.NewPool(s.Session.DB("idps-tests"), store.StoreParams{})
 	c.Assert(err, gc.IsNil)
 }
 

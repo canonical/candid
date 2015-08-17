@@ -20,8 +20,8 @@ import (
 	"gopkg.in/macaroon.v1"
 	"gopkg.in/mgo.v2/bson"
 
-	"github.com/CanonicalLtd/blues-identity/internal/identity"
 	"github.com/CanonicalLtd/blues-identity/internal/mongodoc"
+	"github.com/CanonicalLtd/blues-identity/internal/store"
 	"github.com/CanonicalLtd/blues-identity/params"
 )
 
@@ -53,11 +53,11 @@ func (s *usersSuite) TestUser(c *gc.C) {
 		},
 	})
 	s.createUser(c, &params.User{
-		Username: "agent@" + identity.AdminGroup,
+		Username: "agent@" + store.AdminGroup,
 		IDPGroups: []string{
 			"test",
 		},
-		Owner: identity.AdminGroup,
+		Owner: store.AdminGroup,
 		PublicKeys: []*bakery.PublicKey{
 			&key.Public,
 		},
@@ -366,13 +366,13 @@ func (s *usersSuite) TestUser(c *gc.C) {
 		},
 	}, {
 		about:  "put agent user",
-		url:    apiURL("u/agent2@" + identity.AdminGroup),
+		url:    apiURL("u/agent2@" + store.AdminGroup),
 		method: "PUT",
 		body: marshal(c, params.User{
 			IDPGroups: []string{
 				"test",
 			},
-			Owner: params.Username(identity.AdminGroup),
+			Owner: params.Username(store.AdminGroup),
 			PublicKeys: []*bakery.PublicKey{
 				&key.Public,
 			},
@@ -382,17 +382,17 @@ func (s *usersSuite) TestUser(c *gc.C) {
 		expectStatus: http.StatusOK,
 	}, {
 		about:        "get agent user",
-		url:          apiURL("u/agent@" + identity.AdminGroup),
+		url:          apiURL("u/agent@" + store.AdminGroup),
 		method:       "GET",
 		username:     adminUsername,
 		password:     adminPassword,
 		expectStatus: http.StatusOK,
 		expectBody: params.User{
-			Username: "agent@" + identity.AdminGroup,
+			Username: "agent@" + store.AdminGroup,
 			IDPGroups: []string{
 				"test",
 			},
-			Owner: identity.AdminGroup,
+			Owner: store.AdminGroup,
 			PublicKeys: []*bakery.PublicKey{
 				&key.Public,
 			},
@@ -842,8 +842,8 @@ func (s *usersSuite) TestUserIDPGroups(c *gc.C) {
 }
 
 func (s *usersSuite) TestUserGroups(c *gc.C) {
-	store := s.pool.GetNoLimit()
-	defer s.pool.Put(store)
+	st := s.pool.GetNoLimit()
+	defer s.pool.Put(st)
 	s.createUser(c, &params.User{
 		Username:   "test",
 		ExternalID: "http://example.com/test",
@@ -876,7 +876,7 @@ func (s *usersSuite) TestUserGroups(c *gc.C) {
 		Email:      "grouplister@example.com",
 		FullName:   "Group Lister",
 		IDPGroups: []string{
-			identity.GroupListGroup,
+			store.GroupListGroup,
 		},
 	})
 	tests := []struct {
@@ -933,7 +933,7 @@ func (s *usersSuite) TestUserGroups(c *gc.C) {
 		if test.password != "" {
 			un = test.username
 		} else if test.username != "" {
-			m, err := store.Service.NewMacaroon("", nil, []checkers.Caveat{
+			m, err := st.Service.NewMacaroon("", nil, []checkers.Caveat{
 				checkers.DeclaredCaveat("username", test.username),
 			})
 			c.Assert(err, gc.IsNil)

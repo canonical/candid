@@ -20,7 +20,7 @@ import (
 
 	"github.com/CanonicalLtd/blues-identity"
 	"github.com/CanonicalLtd/blues-identity/idmclient"
-	internalIdentity "github.com/CanonicalLtd/blues-identity/internal/identity"
+	"github.com/CanonicalLtd/blues-identity/internal/store"
 	"github.com/CanonicalLtd/blues-identity/params"
 )
 
@@ -49,6 +49,12 @@ func (s *clientSuite) SetUpTest(c *gc.C) {
 			AuthUsername:   "admin",
 			Location:       "http://" + s.server.Listener.Addr().String(),
 			AuthPassword:   "password",
+			IdentityProviders: []struct {
+				Type   string
+				Config interface{}
+			}{{
+				Type: "agent",
+			}},
 		},
 		identity.V1,
 	)
@@ -74,7 +80,7 @@ func (s *clientSuite) TestClient(c *gc.C) {
 }
 
 func (s *clientSuite) TestClientWithBasicAuth(c *gc.C) {
-	s.addUser(c, "alice", internalIdentity.GroupListGroup)
+	s.addUser(c, "alice", store.GroupListGroup)
 	client := s.userClient(c, "alice")
 	groups, err := client.UserGroups(&params.UserGroupsRequest{
 		Username: "bob",
@@ -84,7 +90,7 @@ func (s *clientSuite) TestClientWithBasicAuth(c *gc.C) {
 }
 
 func (s *clientSuite) TestPermChecker(c *gc.C) {
-	s.addUser(c, "alice", internalIdentity.GroupListGroup)
+	s.addUser(c, "alice", store.GroupListGroup)
 	client := s.userClient(c, "alice")
 
 	pc := idmclient.NewPermChecker(client, time.Hour)

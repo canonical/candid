@@ -17,15 +17,15 @@ import (
 	"gopkg.in/macaroon.v1"
 	"gopkg.in/mgo.v2/bson"
 
-	"github.com/CanonicalLtd/blues-identity/internal/identity"
 	"github.com/CanonicalLtd/blues-identity/internal/mongodoc"
+	"github.com/CanonicalLtd/blues-identity/internal/store"
 	"github.com/CanonicalLtd/blues-identity/params"
 )
 
 var blacklistUsernames = map[params.Username]bool{
-	"admin":             true,
-	"everyone":          true,
-	identity.AdminGroup: true,
+	"admin":          true,
+	"everyone":       true,
+	store.AdminGroup: true,
 }
 
 // QueryUsers serves the /u endpoint. See http://tinyurl.com/lu3mmr9 for
@@ -49,7 +49,7 @@ func (h *apiHandler) QueryUsers(p httprequest.Params, r *params.QueryUsersReques
 // User serves the /u/$username endpoint. See http://tinyurl.com/lrdjwmw
 // for details.
 func (h *apiHandler) User(p httprequest.Params, r *params.UserRequest) (*params.User, error) {
-	acl := []string{identity.AdminGroup, string(r.Username)}
+	acl := []string{store.AdminGroup, string(r.Username)}
 	if err := h.store.CheckACL(opGetUser, p.Request, acl); err != nil {
 		return nil, errgo.Mask(err, errgo.Any)
 	}
@@ -94,7 +94,7 @@ func (h *handler) upsertAgent(r *http.Request, u *params.SetUserRequest) error {
 		return errgo.WithCausef(nil, params.ErrBadRequest, "owner not specified")
 	}
 	err := h.store.CheckACL(opCreateAgent, r, []string{
-		identity.AdminGroup,
+		store.AdminGroup,
 		"+create-agent@" + string(u.User.Owner),
 	})
 	if err != nil {
@@ -116,7 +116,7 @@ func (h *handler) upsertAgent(r *http.Request, u *params.SetUserRequest) error {
 }
 
 func (h *apiHandler) upsertUser(r *http.Request, u *params.SetUserRequest) error {
-	if err := h.store.CheckACL(opCreateUser, r, []string{identity.AdminGroup}); err != nil {
+	if err := h.store.CheckACL(opCreateUser, r, []string{store.AdminGroup}); err != nil {
 		return errgo.Mask(err, errgo.Any)
 	}
 
@@ -158,7 +158,7 @@ func (h *handler) checkRequestHasAllGroups(r *http.Request, groups []string) err
 Outer:
 	for _, group := range groups {
 		for _, g := range requestGroups {
-			if g == group || g == identity.AdminGroup {
+			if g == group || g == store.AdminGroup {
 				continue Outer
 			}
 		}
@@ -186,7 +186,7 @@ func (h *apiHandler) UserGroups(p httprequest.Params, r *params.UserGroupsReques
 	if err := h.store.CheckACL(
 		opGetUserGroups,
 		p.Request,
-		[]string{identity.AdminGroup, identity.GroupListGroup, string(r.Username)},
+		[]string{store.AdminGroup, store.GroupListGroup, string(r.Username)},
 	); err != nil {
 		return nil, errgo.Mask(err, errgo.Any)
 	}

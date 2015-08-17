@@ -13,6 +13,7 @@ import (
 	gc "gopkg.in/check.v1"
 
 	"github.com/CanonicalLtd/blues-identity/internal/identity"
+	"github.com/CanonicalLtd/blues-identity/internal/store"
 )
 
 type serverSuite struct {
@@ -35,7 +36,7 @@ type versionResponse struct {
 func (s *serverSuite) TestNewServerWithVersions(c *gc.C) {
 	db := s.Session.DB("foo")
 	serveVersion := func(vers string) identity.NewAPIHandlerFunc {
-		return func(*identity.Pool, identity.ServerParams) ([]httprequest.Handler, error) {
+		return func(*store.Pool, identity.ServerParams, []identity.IdentityProvider) ([]httprequest.Handler, error) {
 			return []httprequest.Handler{{
 				Method: "GET",
 				Path:   "/" + vers + "/*path",
