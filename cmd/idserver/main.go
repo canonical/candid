@@ -19,6 +19,7 @@ import (
 
 	"github.com/CanonicalLtd/blues-identity"
 	"github.com/CanonicalLtd/blues-identity/config"
+	"github.com/CanonicalLtd/blues-identity/idp"
 )
 
 var (
@@ -72,27 +73,20 @@ func serve(confPath string) error {
 	if err := keypair.Public.UnmarshalText([]byte(conf.PublicKey)); err != nil {
 		return errgo.Notef(err, "cannot unmarshal public key")
 	}
+	if len(conf.IdentityProviders) == 0 {
+		conf.IdentityProviders = defaultIDPs
+	}
 	srv, err := identity.NewServer(
 		db,
 		identity.ServerParams{
-			AuthUsername:   conf.AuthUsername,
-			AuthPassword:   conf.AuthPassword,
-			Key:            &keypair,
-			Location:       conf.Location,
-			Launchpad:      lpad.Production,
-			MaxMgoSessions: conf.MaxMgoSessions,
-			RequestTimeout: conf.RequestTimeout.Duration,
-			// TODO (mhilton) make these configurable
-			IdentityProviders: []struct {
-				Type   string
-				Config interface{}
-			}{{
-				Type: "usso",
-			}, {
-				Type: "usso_oauth",
-			}, {
-				Type: "agent",
-			}},
+			AuthUsername:      conf.AuthUsername,
+			AuthPassword:      conf.AuthPassword,
+			Key:               &keypair,
+			Location:          conf.Location,
+			Launchpad:         lpad.Production,
+			MaxMgoSessions:    conf.MaxMgoSessions,
+			RequestTimeout:    conf.RequestTimeout.Duration,
+			IdentityProviders: conf.IdentityProviders,
 		},
 		identity.V1,
 	)
@@ -116,4 +110,10 @@ func serve(confPath string) error {
 
 	logger.Infof("starting the identity server")
 	return http.ListenAndServe(conf.APIAddr, server)
+}
+
+var defaultIDPs = []idp.IdentityProvider{
+	idp.UbuntuSSOIdentityProvider,
+	idp.UbuntuSSOOAuthIdentityProvider,
+	idp.AgentIdentityProvider,
 }

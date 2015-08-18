@@ -13,6 +13,7 @@ import (
 	gc "gopkg.in/check.v1"
 
 	"github.com/CanonicalLtd/blues-identity/config"
+	"github.com/CanonicalLtd/blues-identity/idp"
 )
 
 func TestPackage(t *testing.T) {
@@ -37,6 +38,11 @@ public-key: CIdWcEUN+0OZnKW9KwruRQnQDY/qqzVdD30CijwiWCk=
 location: http://foo.com:1234
 max-mgo-sessions: 10
 request-timeout: 500ms
+identity-providers:
+ - type: usso
+ - type: keystone
+   name: ks1
+   url: http://example.com/keystone
 `
 
 func (s *configSuite) readConfig(c *gc.C, content string) (*config.Config, error) {
@@ -62,6 +68,13 @@ func (s *configSuite) TestRead(c *gc.C) {
 		Location:       "http://foo.com:1234",
 		MaxMgoSessions: 10,
 		RequestTimeout: config.DurationString{Duration: 500 * time.Millisecond},
+		IdentityProviders: []idp.IdentityProvider{
+			idp.UbuntuSSOIdentityProvider,
+			idp.KeystoneIdentityProvider(&idp.KeystoneParams{
+				Name: "ks1",
+				URL:  "http://example.com/keystone",
+			}),
+		},
 	})
 }
 

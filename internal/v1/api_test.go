@@ -23,6 +23,7 @@ import (
 	"gopkg.in/mgo.v2/bson"
 	"launchpad.net/lpad"
 
+	"github.com/CanonicalLtd/blues-identity/idp"
 	"github.com/CanonicalLtd/blues-identity/internal/identity"
 	"github.com/CanonicalLtd/blues-identity/internal/mongodoc"
 	"github.com/CanonicalLtd/blues-identity/internal/store"
@@ -42,7 +43,7 @@ type apiSuite struct {
 	srv     *identity.Server
 	pool    *store.Pool
 	keyPair *bakery.KeyPair
-	idps    []string
+	idps    []idp.IdentityProvider
 }
 
 var _ = gc.Suite(&apiSuite{})
@@ -74,7 +75,7 @@ func fakeRedirectURL(_, _, _ string) (string, error) {
 	return "http://0.1.2.3/nowhere", nil
 }
 
-func newServer(c *gc.C, session *mgo.Session, key *bakery.KeyPair, idps []string) (*identity.Server, *store.Pool) {
+func newServer(c *gc.C, session *mgo.Session, key *bakery.KeyPair, idps []idp.IdentityProvider) (*identity.Server, *store.Pool) {
 	db := session.DB("testing")
 	sp := identity.ServerParams{
 		AuthUsername:      adminUsername,
@@ -83,16 +84,7 @@ func newServer(c *gc.C, session *mgo.Session, key *bakery.KeyPair, idps []string
 		Location:          location,
 		MaxMgoSessions:    50,
 		Launchpad:         lpad.Production,
-	}
-	for _, idp := range idps {
-		sp.IdentityProviders = append(sp.IdentityProviders, 
-			struct{
-				Type string 
-				Config interface{}
-			}{
-				Type: idp,
-			},
-		)
+		IdentityProviders: idps,
 	}
 	pool, err := store.NewPool(db, store.StoreParams{
 		AuthUsername:   sp.AuthUsername,

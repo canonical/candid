@@ -5,7 +5,8 @@ package identity
 import (
 	"gopkg.in/errgo.v1"
 
-	"github.com/CanonicalLtd/blues-identity/internal/idp"
+	"github.com/CanonicalLtd/blues-identity/idp"
+	intidp "github.com/CanonicalLtd/blues-identity/internal/idp"
 )
 
 // IdentityProvider is the interface that is satisfied by all identity providers.
@@ -23,22 +24,24 @@ type IdentityProvider interface {
 	Interactive() bool
 
 	// URL provides the URL to use to begin a log-in to the identity provider.
-	URL(c idp.Context, waitid string) (string, error)
+	URL(c intidp.Context, waitid string) (string, error)
 
 	// Handle handles any requests sent to the identity provider's endpoints.
-	Handle(c idp.Context)
+	Handle(c intidp.Context)
 }
 
 // newIDP creates a new IdentityProvider from the provided specification.
-func newIDP(t string, sp ServerParams, config interface{}) (IdentityProvider, error) {
-	switch t {
-	case "usso":
-		return idp.NewUSSOIdentityProvider(), nil
-	case "usso_oauth":
-		return &idp.USSOOAuthIdentityProvider{}, nil
-	case "agent":
-		return idp.NewAgentIdentityProvider(sp.Location)
+func newIDP(sp ServerParams, p idp.IdentityProvider) (IdentityProvider, error) {
+	switch p.Type {
+	case idp.UbuntuSSO:
+		return intidp.NewUSSOIdentityProvider(), nil
+	case idp.UbuntuSSOOAuth:
+		return &intidp.USSOOAuthIdentityProvider{}, nil
+	case idp.Agent:
+		return intidp.NewAgentIdentityProvider(sp.Location)
+	case idp.Keystone:
+		return intidp.NewKeystoneIdentityProvider(p.Config.(*idp.KeystoneParams)), nil
 	default:
-		return nil, errgo.Newf("unknown provider type %q", t)
+		return nil, errgo.Newf("unknown provider type %q", p.Type)
 	}
 }
