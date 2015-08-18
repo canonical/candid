@@ -14,6 +14,7 @@ import (
 	"gopkg.in/mgo.v2"
 	"launchpad.net/lpad"
 
+	"github.com/CanonicalLtd/blues-identity/idp"
 	"github.com/CanonicalLtd/blues-identity/internal/store"
 	"github.com/CanonicalLtd/blues-identity/params"
 )
@@ -49,7 +50,7 @@ func New(db *mgo.Database, sp ServerParams, versions map[string]NewAPIHandlerFun
 	idps := make([]IdentityProvider, len(sp.IdentityProviders))
 	for i, idp := range sp.IdentityProviders {
 		var err error
-		idps[i], err = newIDP(idp.Type, sp, idp.Config)
+		idps[i], err = newIDP(sp, idp)
 		if err != nil {
 			return nil, errgo.Notef(err, "cannot make identity provider")
 		}
@@ -125,10 +126,7 @@ type ServerParams struct {
 
 	// IdentityProviders contains the set of identity providers that
 	// should be initialised by the service.
-	IdentityProviders []struct{
-		Type string
-		Config interface{}
-	}
+	IdentityProviders []idp.IdentityProvider
 }
 
 //notFound is the handler that is called when a handler cannot be found

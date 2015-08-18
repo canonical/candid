@@ -18,6 +18,7 @@ import (
 	"gopkg.in/macaroon-bakery.v1/httpbakery"
 	"gopkg.in/macaroon.v1"
 
+	"github.com/CanonicalLtd/blues-identity/idp"
 	"github.com/CanonicalLtd/blues-identity/internal/idtesting/mockusso"
 	"github.com/CanonicalLtd/blues-identity/internal/mongodoc"
 	"github.com/CanonicalLtd/blues-identity/params"
@@ -33,10 +34,10 @@ var _ = gc.Suite(&loginSuite{})
 
 func (s *loginSuite) SetUpSuite(c *gc.C) {
 	s.Suite.SetUpSuite(c)
-	s.apiSuite.idps = []string{
-		"usso",
-		"usso_oauth",
-		"agent",
+	s.apiSuite.idps = []idp.IdentityProvider{
+		idp.UbuntuSSOIdentityProvider,
+		idp.UbuntuSSOOAuthIdentityProvider,
+		idp.AgentIdentityProvider,
 	}
 	s.apiSuite.SetUpSuite(c)
 }
