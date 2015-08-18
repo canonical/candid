@@ -61,6 +61,13 @@ type ServerParams struct {
 	// RequestTimeout holds the time to wait for a request to be able
 	// to start.
 	RequestTimeout time.Duration
+
+	// IdentityProviders contains the set of identity providers that
+	// should be initialised by the service.
+	IdentityProviders []struct{
+		Type string
+		Config interface{}
+	}
 }
 
 // NewServer returns a new handler that handles identity service requests and

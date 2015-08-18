@@ -82,6 +82,17 @@ func serve(confPath string) error {
 			Launchpad:      lpad.Production,
 			MaxMgoSessions: conf.MaxMgoSessions,
 			RequestTimeout: conf.RequestTimeout.Duration,
+			// TODO (mhilton) make these configurable
+			IdentityProviders: []struct {
+				Type   string
+				Config interface{}
+			}{{
+				Type: "usso",
+			}, {
+				Type: "usso_oauth",
+			}, {
+				Type: "agent",
+			}},
 		},
 		identity.V1,
 	)

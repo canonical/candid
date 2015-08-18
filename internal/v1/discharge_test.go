@@ -38,6 +38,11 @@ var _ = gc.Suite(&dischargeSuite{})
 
 func (s *dischargeSuite) SetUpSuite(c *gc.C) {
 	s.Suite.SetUpSuite(c)
+	s.apiSuite.idps = []string{
+		"usso",
+		"usso_oauth",
+		"agent",
+	}
 	s.apiSuite.SetUpSuite(c)
 }
 
