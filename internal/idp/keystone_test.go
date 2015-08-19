@@ -8,6 +8,8 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/juju/httprequest"
+	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/goose.v1/testing/httpsuite"
 	"gopkg.in/goose.v1/testservices/identityservice"
@@ -38,11 +40,39 @@ func (s *keystoneSuite) SetUpTest(c *gc.C) {
 		Domain:      "openstack",
 		URL:         s.Server.URL,
 	})
+	s.Mux.Handle("/tenants", http.HandlerFunc(s.handleTenants))
 }
 
 func (s *keystoneSuite) TearDownTest(c *gc.C) {
 	s.HTTPSuite.TearDownTest(c)
 	s.idpSuite.TearDownTest(c)
+}
+
+type tenant struct {
+	Description string `json:"description"`
+	Enabled     bool   `json:"enabled"`
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+}
+
+type tenantsResponse struct {
+	Tenants []tenant `json:"tenants"`
+}
+
+func (s *keystoneSuite) handleTenants(w http.ResponseWriter, r *http.Request) {
+	token := r.Header.Get("X-Auth-Token")
+	_, err := s.service.FindUser(token)
+	if err != nil {
+		w.WriteHeader(http.StatusUnauthorized)
+	}
+	httprequest.WriteJSON(w, http.StatusOK, tenantsResponse{
+		Tenants: []tenant{{
+			Description: "test_project description",
+			Enabled:     true,
+			ID:          "test_project_id",
+			Name:        "test_project",
+		}},
+	})
 }
 
 func (s *keystoneSuite) TestName(c *gc.C) {
@@ -104,7 +134,7 @@ func (s *keystoneSuite) TestHandleResponse(c *gc.C) {
 		requestURL: "https://idp.test/login?waitid=1",
 		success:    true,
 	}
-	userInfo := s.service.AddUser("testuser", "testpass", "")
+	userInfo := s.service.AddUser("testuser", "testpass", "test_project")
 	v := url.Values{
 		"username": []string{"testuser"},
 		"password": []string{"testpass"},
@@ -121,6 +151,7 @@ func (s *keystoneSuite) TestHandleResponse(c *gc.C) {
 	identity, err := s.store.GetIdentity(params.Username("testuser@openstack"))
 	c.Assert(err, gc.IsNil)
 	c.Assert(identity.ExternalID, gc.Equals, userInfo.Id+"@openstack")
+	c.Assert(identity.Groups, jc.DeepEquals, []string{"test_project@openstack"})
 	c.Assert(rr.Body.String(), gc.Equals, "login successful as user testuser@openstack\n")
 }
 

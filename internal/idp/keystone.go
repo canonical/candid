@@ -7,6 +7,7 @@ import (
 
 	"github.com/juju/httprequest"
 	"gopkg.in/errgo.v1"
+	goosehttp "gopkg.in/goose.v1/http"
 	"gopkg.in/goose.v1/identity"
 
 	"github.com/CanonicalLtd/blues-identity/idp"
@@ -97,6 +98,10 @@ func (idp *KeystoneIdentityProvider) doLogin(c Context, p httprequest.Params) {
 		c.LoginFailure(errgo.WithCausef(err, params.ErrUnauthorized, "cannot log in"))
 		return
 	}
+	groups, err := getKeystoneTenants(&idp.params, ad.Token)
+	if err != nil {
+		c.LoginFailure(errgo.Mask(err))
+	}
 	externalID := ad.UserId
 	if idp.params.Domain != "" {
 		name += "@" + idp.params.Domain
@@ -105,10 +110,43 @@ func (idp *KeystoneIdentityProvider) doLogin(c Context, p httprequest.Params) {
 	identity := mongodoc.Identity{
 		Username:   name,
 		ExternalID: externalID,
+		Groups:     groups,
 	}
 	if err := c.Store().UpsertIdentity(&identity); err != nil {
 		c.LoginFailure(errgo.Notef(err, "cannot update identity"))
 		return
 	}
 	loginIdentity(c, &identity)
+}
+
+// getKeystoneTenants connects to keystone using token and lists tenants
+// associated with the token.
+func getKeystoneTenants(params *idp.KeystoneParams, token string) ([]string, error) {
+	var tenantResponse struct {
+		Tenants []struct {
+			Name string `json:"name"`
+		} `json:"tenants"`
+	}
+	c := goosehttp.New()
+	err := c.JsonRequest(
+		"GET",
+		params.URL+"/tenants",
+		token,
+		&goosehttp.RequestData{
+			RespValue: &tenantResponse,
+		},
+		nil,
+	)
+	if err != nil {
+		return nil, errgo.Notef(err, "cannot get tenants")
+	}
+	groups := make([]string, len(tenantResponse.Tenants))
+	for i, t := range tenantResponse.Tenants {
+		name := t.Name
+		if params.Domain != "" {
+			name += "@" + params.Domain
+		}
+		groups[i] = name
+	}
+	return groups, nil
 }
