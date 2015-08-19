@@ -8,12 +8,9 @@ import (
 
 	"github.com/juju/httprequest"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v1/bakery/checkers"
-	"gopkg.in/macaroon-bakery.v1/httpbakery"
+	"gopkg.in/macaroon-bakery.v1/bakery"
 	"gopkg.in/macaroon-bakery.v1/httpbakery/agent"
-	"gopkg.in/macaroon.v1"
 
-	"github.com/CanonicalLtd/blues-identity/internal/identity"
 	"github.com/CanonicalLtd/blues-identity/params"
 )
 
@@ -25,25 +22,8 @@ type loginRequest struct {
 
 // login handles the GET /v1/login endpoint that is used to log in to IdM.
 func (h *dischargeHandler) Login(p httprequest.Params, lr *loginRequest) error {
-	ussoOpenID, err := h.ussoOpenIDURL(lr.WaitID)
-	if err != nil {
-		return errgo.Notef(err, "cannot get openid login URL")
-	}
-	ussoOAuth, err := h.ussoOAuthURL(lr.WaitID)
-	if err != nil {
-		return errgo.Notef(err, "cannot get oauth login URL")
-	}
-	agentURL := h.agentLoginURL(lr.WaitID)
 	user, key, err := agent.LoginCookie(p.Request)
-	if err == nil {
-		// We have some agent credentials, attempt an agent login.
-		h.AgentLogin(p, &agentLoginRequest{
-			WaitID: lr.WaitID,
-			AgentLogin: params.AgentLogin{
-				Username:  params.Username(user),
-				PublicKey: key,
-			},
-		})
+	if err == nil && h.agentLogin(user, key) {
 		return nil
 	}
 	if err != nil && errgo.Cause(err) != agent.ErrNoAgentLoginCookie {
@@ -53,74 +33,67 @@ func (h *dischargeHandler) Login(p httprequest.Params, lr *loginRequest) error {
 	// it's really complicated http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.1
 	// perhaps use http://godoc.org/bitbucket.org/ww/goautoneg for this.
 	if p.Request.Header.Get("Accept") == "application/json" {
-		err := httprequest.WriteJSON(p.Response, http.StatusOK, params.LoginMethods{
-			Agent:          agentURL,
-			Interactive:    ussoOpenID,
-			UbuntuSSOOAuth: ussoOAuth,
-		})
+		methods := make(map[string]string)
+		for _, idp := range h.h.idps {
+			ctxt := idpHandler{
+				h:     h.h,
+				store: h.store,
+				idp:   idp,
+			}
+			var err error
+			methods[idp.Name()], err = idp.URL(ctxt, lr.WaitID)
+			if err != nil {
+				return errgo.NoteMask(err, fmt.Sprintf("cannot get URL for %q", idp.Name()), errgo.Any)
+			}
+		}
+		err := httprequest.WriteJSON(p.Response, http.StatusOK, methods)
 		if err != nil {
 			return errgo.Notef(err, "cannot write login methods")
 		}
 		return nil
 	}
 	// Use the normal interactive login method.
-	http.Redirect(p.Response, p.Request, ussoOpenID, http.StatusFound)
-	return nil
-}
-
-func (h *dischargeHandler) loginID(w http.ResponseWriter, r *http.Request, userID string) {
-	// We provide the user with a macaroon that they can use later
-	// to prove to us that they have logged in. The macaroon is valid
-	// for any operation that that user is allowed to perform.
-
-	// TODO add expiry date and maybe more first party caveats to this.
-	m, err := h.store.Service.NewMacaroon("", nil, []checkers.Caveat{
-		checkers.DeclaredCaveat("username", userID),
-	})
-	if err != nil {
-		h.loginFailure(w, r, userID, errgo.Notef(err, "cannot create macaroon"))
-		return
-	}
-	if h.loginSuccess(w, r, userID, macaroon.Slice{m}) {
-		fmt.Fprintf(w, "login successful as user %#v\n", userID)
-	}
-}
-
-// loginSuccess is used by identity providers once they have determined that
-// the login completed successfully.
-func (h *dischargeHandler) loginSuccess(w http.ResponseWriter, r *http.Request, userID string, ms macaroon.Slice) bool {
-	logger.Infof("successful login for user %s", userID)
-	cookie, err := httpbakery.NewCookie(ms)
-	if err != nil {
-		h.loginFailure(w, r, userID, errgo.Notef(err, "cannot create cookie"))
-		return false
-	}
-	http.SetCookie(w, cookie)
-	r.ParseForm()
-	waitId := r.Form.Get("waitid")
-	if waitId != "" {
-		if err := h.place.Done(waitId, &loginInfo{
-			IdentityMacaroon: ms,
-		}); err != nil {
-			h.loginFailure(w, r, userID, errgo.Notef(err, "cannot complete rendezvous"))
-			return false
+	for _, idp := range h.h.idps {
+		if idp.Interactive() {
+			ctxt := idpHandler{
+				h:     h.h,
+				store: h.store,
+				idp:   idp,
+			}
+			url, err := idp.URL(ctxt, lr.WaitID)
+			if err != nil {
+				return errgo.NoteMask(err, fmt.Sprintf("cannot get URL for %q", idp.Name()), errgo.Any)
+			}
+			http.Redirect(p.Response, p.Request, url, http.StatusFound)
+			return nil
 		}
 	}
-	logger.Debugf("login complete for user %s", userID)
-	return true
+	return errgo.Newf("no interactive login methods found")
 }
 
-// loginFailure is used by identity providers once they have determined that
-// the login has failed.
-func (h *dischargeHandler) loginFailure(w http.ResponseWriter, r *http.Request, userID string, err error) {
-	logger.Infof("login failed for %s: %s", userID, err)
-	r.ParseForm()
-	waitId := r.Form.Get("waitid")
-	_, bakeryErr := httpbakery.ErrorToResponse(err)
-	if waitId != "" {
-		h.place.Done(waitId, &loginInfo{
-			Error: bakeryErr.(*httpbakery.Error),
-		})
+// agentLogin provides a shortcut to log in to the agent identity
+// provider if an appropriate cookie has been provided in the login
+// request. The return value indicates if an agent identity provider was
+// found and therefore the login attempted.
+func (h *dischargeHandler) agentLogin(user string, key *bakery.PublicKey) bool {
+	for _, idp := range h.h.idps {
+		if idp.Name() != "agent" {
+			continue
+		}
+		ctxt := idpHandler{
+			h:      h.h,
+			store:  h.store,
+			idp:    idp,
+			place:  h.place,
+			params: h.params,
+			agentLogin: params.AgentLogin{
+				Username:  params.Username(user),
+				PublicKey: key,
+			},
+		}
+		idp.Handle(ctxt)
+		return true
 	}
-	identity.WriteError(w, err)
+	logger.Warningf("agent cookie found, but agent identity provider not configured")
+	return false
 }

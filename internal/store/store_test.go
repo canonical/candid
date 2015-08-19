@@ -1,6 +1,6 @@
 // Copyright 2014 Canonical Ltd.
 
-package identity_test
+package store_test
 
 import (
 	"fmt"
@@ -15,14 +15,14 @@ import (
 	"gopkg.in/mgo.v2/bson"
 	"launchpad.net/lpad"
 
-	"github.com/CanonicalLtd/blues-identity/internal/identity"
 	"github.com/CanonicalLtd/blues-identity/internal/mongodoc"
+	"github.com/CanonicalLtd/blues-identity/internal/store"
 	"github.com/CanonicalLtd/blues-identity/params"
 )
 
 type storeSuite struct {
 	testing.IsolatedMgoSuite
-	pool *identity.Pool
+	pool *store.Pool
 }
 
 var _ = gc.Suite(&storeSuite{})
@@ -30,7 +30,7 @@ var _ = gc.Suite(&storeSuite{})
 func (s *storeSuite) SetUpTest(c *gc.C) {
 	s.IsolatedMgoSuite.SetUpTest(c)
 	var err error
-	s.pool, err = identity.NewPool(s.Session.DB("store-tests"), identity.ServerParams{})
+	s.pool, err = store.NewPool(s.Session.DB("store-tests"), store.StoreParams{})
 	c.Assert(err, gc.IsNil)
 }
 
@@ -365,9 +365,9 @@ func (s *storeSuite) TestRetrieveLaunchpadGroups(c *gc.C) {
 		}
 	}))
 	defer lp.Close()
-	pool, err := identity.NewPool(
+	pool, err := store.NewPool(
 		s.Session.DB("store-launchpad-tests"),
-		identity.ServerParams{
+		store.StoreParams{
 			Launchpad: lpad.APIBase(lp.URL),
 		},
 	)
@@ -399,8 +399,8 @@ func (s *storeSuite) TestRetrieveLaunchpadGroups(c *gc.C) {
 }
 
 func (s *storeSuite) TestGetStoreFromPool(c *gc.C) {
-	p, err := identity.NewPool(s.Session.DB("store-launchpad-tests"),
-		identity.ServerParams{
+	p, err := store.NewPool(s.Session.DB("store-launchpad-tests"),
+		store.StoreParams{
 			MaxMgoSessions: 2,
 		},
 	)
@@ -419,8 +419,8 @@ func (s *storeSuite) TestGetStoreFromPool(c *gc.C) {
 }
 
 func (s *storeSuite) TestGetStoreFromPoolLimit(c *gc.C) {
-	p, err := identity.NewPool(s.Session.DB("store-launchpad-tests"),
-		identity.ServerParams{
+	p, err := store.NewPool(s.Session.DB("store-launchpad-tests"),
+		store.StoreParams{
 			MaxMgoSessions: 1,
 			RequestTimeout: 100 * time.Millisecond,
 		},
@@ -435,8 +435,8 @@ func (s *storeSuite) TestGetStoreFromPoolLimit(c *gc.C) {
 }
 
 func (s *storeSuite) TestGetStoreFromPoolClosedBeforeTimeout(c *gc.C) {
-	p, err := identity.NewPool(s.Session.DB("store-launchpad-tests"),
-		identity.ServerParams{
+	p, err := store.NewPool(s.Session.DB("store-launchpad-tests"),
+		store.StoreParams{
 			MaxMgoSessions: 1,
 			RequestTimeout: time.Second,
 		},

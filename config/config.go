@@ -12,20 +12,23 @@ import (
 
 	"gopkg.in/errgo.v1"
 	"gopkg.in/yaml.v2"
+
+	"github.com/CanonicalLtd/blues-identity/idp"
 )
 
 // Config holds the configuration parameters for the identity service.
 type Config struct {
-	MongoAddr      string         `yaml:"mongo-addr"`
-	APIAddr        string         `yaml:"api-addr"`
-	AuthUsername   string         `yaml:"auth-username"`
-	AuthPassword   string         `yaml:"auth-password"`
-	PublicKey      string         `yaml:"public-key"`
-	PrivateKey     string         `yaml:"private-key"`
-	Location       string         `yaml:"location"`
-	AccessLog      string         `yaml:"access-log"`
-	MaxMgoSessions int            `yaml:"max-mgo-sessions"`
-	RequestTimeout DurationString `yaml:"request-timeout"`
+	MongoAddr         string                 `yaml:"mongo-addr"`
+	APIAddr           string                 `yaml:"api-addr"`
+	AuthUsername      string                 `yaml:"auth-username"`
+	AuthPassword      string                 `yaml:"auth-password"`
+	PublicKey         string                 `yaml:"public-key"`
+	PrivateKey        string                 `yaml:"private-key"`
+	Location          string                 `yaml:"location"`
+	AccessLog         string                 `yaml:"access-log"`
+	MaxMgoSessions    int                    `yaml:"max-mgo-sessions"`
+	RequestTimeout    DurationString         `yaml:"request-timeout"`
+	IdentityProviders []idp.IdentityProvider `yaml:"identity-providers"`
 }
 
 func (c *Config) validate() error {

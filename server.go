@@ -12,6 +12,7 @@ import (
 	"gopkg.in/mgo.v2"
 	"launchpad.net/lpad"
 
+	"github.com/CanonicalLtd/blues-identity/idp"
 	"github.com/CanonicalLtd/blues-identity/internal/identity"
 	"github.com/CanonicalLtd/blues-identity/internal/v1"
 )
@@ -61,6 +62,10 @@ type ServerParams struct {
 	// RequestTimeout holds the time to wait for a request to be able
 	// to start.
 	RequestTimeout time.Duration
+
+	// IdentityProviders contains the set of identity providers that
+	// should be initialised by the service.
+	IdentityProviders []idp.IdentityProvider
 }
 
 // NewServer returns a new handler that handles identity service requests and

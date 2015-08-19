@@ -23,8 +23,10 @@ import (
 	"gopkg.in/mgo.v2/bson"
 	"launchpad.net/lpad"
 
+	"github.com/CanonicalLtd/blues-identity/idp"
 	"github.com/CanonicalLtd/blues-identity/internal/identity"
 	"github.com/CanonicalLtd/blues-identity/internal/mongodoc"
+	"github.com/CanonicalLtd/blues-identity/internal/store"
 	"github.com/CanonicalLtd/blues-identity/internal/v1"
 	"github.com/CanonicalLtd/blues-identity/params"
 )
@@ -39,8 +41,9 @@ const (
 type apiSuite struct {
 	testing.IsolatedMgoSuite
 	srv     *identity.Server
-	pool    *identity.Pool
+	pool    *store.Pool
 	keyPair *bakery.KeyPair
+	idps    []idp.IdentityProvider
 }
 
 var _ = gc.Suite(&apiSuite{})
@@ -58,7 +61,7 @@ func (s *apiSuite) SetUpTest(c *gc.C) {
 
 	key, err := bakery.GenerateKey()
 	c.Assert(err, gc.IsNil)
-	s.srv, s.pool = newServer(c, s.Session, key)
+	s.srv, s.pool = newServer(c, s.Session, key, s.idps)
 	s.keyPair = key
 }
 
@@ -72,17 +75,25 @@ func fakeRedirectURL(_, _, _ string) (string, error) {
 	return "http://0.1.2.3/nowhere", nil
 }
 
-func newServer(c *gc.C, session *mgo.Session, key *bakery.KeyPair) (*identity.Server, *identity.Pool) {
+func newServer(c *gc.C, session *mgo.Session, key *bakery.KeyPair, idps []idp.IdentityProvider) (*identity.Server, *store.Pool) {
 	db := session.DB("testing")
 	sp := identity.ServerParams{
-		AuthUsername:   adminUsername,
-		AuthPassword:   adminPassword,
-		Key:            key,
-		Location:       location,
-		MaxMgoSessions: 50,
-		Launchpad:      lpad.Production,
+		AuthUsername:      adminUsername,
+		AuthPassword:      adminPassword,
+		Key:               key,
+		Location:          location,
+		MaxMgoSessions:    50,
+		Launchpad:         lpad.Production,
+		IdentityProviders: idps,
 	}
-	pool, err := identity.NewPool(db, sp)
+	pool, err := store.NewPool(db, store.StoreParams{
+		AuthUsername:   sp.AuthUsername,
+		AuthPassword:   sp.AuthPassword,
+		Key:            sp.Key,
+		Location:       sp.Location,
+		MaxMgoSessions: sp.MaxMgoSessions,
+		Launchpad:      sp.Launchpad,
+	})
 	c.Assert(err, gc.IsNil)
 	srv, err := identity.New(
 		db,

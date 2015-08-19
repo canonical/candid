@@ -14,8 +14,8 @@ import (
 	"gopkg.in/macaroon-bakery.v1/httpbakery"
 	"gopkg.in/macaroon.v1"
 
-	"github.com/CanonicalLtd/blues-identity/internal/identity"
 	"github.com/CanonicalLtd/blues-identity/internal/mongodoc"
+	"github.com/CanonicalLtd/blues-identity/internal/store"
 	"github.com/CanonicalLtd/blues-identity/params"
 )
 
@@ -48,7 +48,7 @@ func (h *dischargeHandler) checkThirdPartyCaveat(req *http.Request, cavId, cav s
 	} else {
 		// No admin credentials provided - look for an identity macaroon.
 		attrs, err := httpbakery.CheckRequest(h.store.Service, req, nil, checkers.New(
-			identity.UserHasPublicKeyChecker{Store: h.store, Identity: &doc},
+			store.UserHasPublicKeyChecker{Store: h.store, Identity: &doc},
 			checkers.OperationChecker("discharge"),
 		))
 		if err != nil {

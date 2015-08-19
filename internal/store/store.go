@@ -1,9 +1,10 @@
 // Copyright 2014 Canonical Ltd.
 
-package identity
+package store
 
 import (
 	"strings"
+	"time"
 
 	"github.com/juju/loggo"
 	"github.com/pborman/uuid"
@@ -23,6 +24,34 @@ import (
 var logger = loggo.GetLogger("identity.internal.store")
 var IdentityNamespace = uuid.Parse("685c2eaa-9721-11e4-b717-a7bf1a250a86")
 
+// StoreParams contains configuration parameters for a store.
+type StoreParams struct {
+	// AuthUsername holds the username for admin login.
+	AuthUsername string
+
+	// AuthPassword holds the password for admin login.
+	AuthPassword string
+
+	// Key holds the keypair to use with the bakery service.
+	Key *bakery.KeyPair
+
+	// Location holds a URL representing the externally accessible
+	// base URL of the service, without a trailing slash.
+	Location string
+
+	// Launchpad holds the address of the launchpad server to use to
+	// get group information.
+	Launchpad lpad.APIBase
+
+	// MaxMgoSession holds the maximum number of concurrent mgo
+	// sessions.
+	MaxMgoSessions int
+
+	// RequestTimeout holds the time to wait for a request to be able
+	// to start.
+	RequestTimeout time.Duration
+}
+
 // Pool provides a pool of *Store objects.
 type Pool struct {
 	pool *limitpool.Pool
@@ -30,12 +59,12 @@ type Pool struct {
 	// are created.
 	Place *meeting.Place
 
-	params ServerParams
+	params StoreParams
 	db     *mgo.Database
 }
 
 // NewPool creates a new Pool. The pool will be sized at sp.MaxMgoSessions.
-func NewPool(db *mgo.Database, sp ServerParams) (*Pool, error) {
+func NewPool(db *mgo.Database, sp StoreParams) (*Pool, error) {
 	p := &Pool{
 		db:     db,
 		Place:  meeting.New(),
