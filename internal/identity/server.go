@@ -88,6 +88,7 @@ type Server struct {
 
 // ServeHTTP implements http.Handler.
 func (srv *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
 	srv.router.ServeHTTP(w, req)
 }
 
