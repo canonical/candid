@@ -224,7 +224,7 @@ func (h *handler) checkRequest(req *http.Request) error {
 	if err != nil {
 		panic(err)
 	}
-	return httpbakery.NewDischargeRequiredError(m, "", err)
+	return httpbakery.NewDischargeRequiredErrorForRequest(m, "", err, req)
 }
 
 type loginRequest struct {
