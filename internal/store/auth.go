@@ -178,5 +178,5 @@ func (s *Store) GroupsFromRequest(c checkers.Checker, req *http.Request) ([]stri
 	if u, err := url.Parse(s.pool.params.Location); err == nil {
 		path = u.Path
 	}
-	return nil, httpbakery.NewDischargeRequiredError(m, path, verr)
+	return nil, httpbakery.NewDischargeRequiredErrorForRequest(m, path, verr, req)
 }

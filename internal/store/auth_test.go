@@ -300,3 +300,18 @@ func (s *authSuite) TestCheckACL(c *gc.C) {
 	err = store.CheckACL(testChecker, req, []string{"test-group3", "test-group1"})
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 }
+
+
+func (s *authSuite) TestMacaroonRequired(c *gc.C) {
+	testChecker := checkers.OperationChecker("test")
+	store := s.pool.GetNoLimit()
+	defer s.pool.Put(store)
+
+	// Get the groups for the admin user
+	req, err := http.NewRequest("GET", "", nil)
+	c.Assert(err, gc.IsNil)
+	_, err = store.GroupsFromRequest(testChecker, req)
+	bakeryError, ok := err.(*httpbakery.Error)
+	c.Assert(ok, gc.Equals, true)
+	c.Assert(bakeryError.Code.Error(), gc.Equals, "macaroon discharge required")
+}

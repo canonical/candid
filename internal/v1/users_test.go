@@ -67,6 +67,7 @@ func (s *usersSuite) TestUser(c *gc.C) {
 		url          string
 		method       string
 		body         io.Reader
+		header       http.Header
 		username     string
 		password     string
 		expectStatus int
@@ -308,6 +309,22 @@ func (s *usersSuite) TestUser(c *gc.C) {
 		expectStatus: http.StatusProxyAuthRequired,
 		expectBody:   DischargeRequiredBody,
 	}, {
+		about:  "no credentials and new bakery protocol",
+		url:    apiURL("u/jbloggs2"),
+		method: "PUT",
+		body: marshal(c, params.User{
+			Username:   "jbloggs",
+			ExternalID: "http://example.com/jbloggs",
+			Email:      "jbloggs@example.com",
+			FullName:   "Joe Bloggs",
+			IDPGroups: []string{
+				"test",
+			},
+		}),
+		header: map[string][]string{"Bakery-Protocol-Version": []string{"1"}},
+		expectStatus: http.StatusUnauthorized,
+		expectBody:   DischargeRequiredBody,
+	}, {
 		about:  "bad username",
 		url:    apiURL("u/jbloggs{}"),
 		method: "PUT",
@@ -466,13 +483,17 @@ func (s *usersSuite) TestUser(c *gc.C) {
 	}}
 	for i, test := range tests {
 		c.Logf("%d. %s", i, test.about)
+		httpHeader := http.Header{
+			"Content-Type": []string{"application/json"},
+		}
+		for key, value := range test.header {
+			httpHeader[key] = value;
+		}
 		httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 			Handler: s.srv,
 			URL:     test.url,
 			Method:  test.method,
-			Header: http.Header{
-				"Content-Type": []string{"application/json"},
-			},
+			Header:  httpHeader,
 			Body:         test.body,
 			Username:     test.username,
 			Password:     test.password,
