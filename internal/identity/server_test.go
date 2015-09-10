@@ -82,6 +82,38 @@ func (s *serverSuite) TestNewServerWithVersions(c *gc.C) {
 	assertServesVersion(c, h, "version3")
 }
 
+func (s *serverSuite) TestServerHasAccessControlAllowOrigin(c *gc.C) {
+	db := s.Session.DB("foo")
+	impl := map[string]identity.NewAPIHandlerFunc{
+		"a": func(*store.Pool, identity.ServerParams, []identity.IdentityProvider) ([]httprequest.Handler, error) {
+			return []httprequest.Handler{{
+				Method: "GET",
+				Path:   "/",
+				Handle: func(w http.ResponseWriter, req *http.Request, p httprouter.Params) {
+				},
+			}}, nil
+		},
+	}
+
+	h, err := identity.New(db, identity.ServerParams{}, impl)
+	c.Assert(err, gc.IsNil)
+	rec := httptesting.DoRequest(c, httptesting.DoRequestParams{
+		Handler: h,
+		URL:     "/a/",
+	})
+	c.Assert(rec.Code, gc.Equals, http.StatusNotFound)
+	c.Assert(rec.HeaderMap["Access-Control-Allow-Origin"][0], gc.Equals, "*")
+	c.Assert(len(rec.HeaderMap["Access-Control-Allow-Origin"]), gc.Equals, 1)
+
+	rec = httptesting.DoRequest(c, httptesting.DoRequestParams{
+		Handler: h,
+		URL:     "/a/",
+		Method:  "OPTIONS",
+	})
+	c.Assert(rec.Code, gc.Equals, http.StatusNotFound)
+	c.Assert(rec.HeaderMap["Access-Control-Allow-Origin"][0], gc.Equals, "*")
+}
+
 func assertServesVersion(c *gc.C, h http.Handler, vers string) {
 	path := vers
 	if path != "" {
