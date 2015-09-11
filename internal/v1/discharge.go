@@ -193,7 +193,7 @@ func (h *dischargeHandler) Wait(p httprequest.Params, w *waitRequest) (*waitResp
 // handled by the bakery it would be unusual to use this type directly in
 // client software.
 type dischargeRequest struct {
-	httprequest.Route `httprequest:"POST /v1/discharger/discharge"`
+	httprequest.Route `httprequest:"POST /discharge"`
 	ID                string `httprequest:"id,form"`
 }
 
@@ -219,6 +219,28 @@ func (h *dischargeHandler) Discharge(p httprequest.Params, r *dischargeRequest) 
 	return &dischargeResponse{m}, nil
 }
 
-func (h *apiHandler) PublicKey(*params.PublicKeyRequest) (*params.PublicKeyResponse, error) {
+type legacyDischargeRequest struct {
+	httprequest.Route `httprequest:"POST /v1/discharger/discharge"`
+	dischargeRequest
+}
+
+// LegacyDischarge is the same as Discharge but served at the old
+// location (/v1/discharger/discharge).
+func (h *dischargeHandler) LegacyDischarge(p httprequest.Params, r *legacyDischargeRequest) (*dischargeResponse, error) {
+	return h.Discharge(p, &r.dischargeRequest)
+}
+
+func (h *dischargeHandler) PublicKey(*params.PublicKeyRequest) (*params.PublicKeyResponse, error) {
 	return &params.PublicKeyResponse{PublicKey: h.store.Service.PublicKey()}, nil
+}
+
+type legacyPublicKeyRequest struct {
+	httprequest.Route `httprequest:"GET /v1/discharger/publickey"`
+	params.PublicKeyRequest
+}
+
+// LegacyPublicKey is the same as PublicKey but served at the old
+// location (/v1/discharger/publickey).
+func (h *dischargeHandler) LegacyPublicKey(p *legacyPublicKeyRequest) (*params.PublicKeyResponse, error) {
+	return h.PublicKey(&p.PublicKeyRequest)
 }
