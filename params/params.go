@@ -71,6 +71,12 @@ type LoginMethods struct {
 	// UbuntuSSO OAuth credentials, to if the client wishes to use
 	// oauth to log in to Identity Manager. Ubuntu SSO uses oauth 1.0.
 	UbuntuSSOOAuth string `json:"usso_oauth,omitempty"`
+
+	// Form is the endpoint to GET a schema for a login form which
+	// can be presented to the user in an interactive manner. The
+	// schema will be returned as an environschema.Fields object. The
+	// completed form should be POSTed back to the same endpoint.
+	Form string `json:"form,omitempty"`
 }
 
 // QueryUsersRequest is a request to query the users in the system.

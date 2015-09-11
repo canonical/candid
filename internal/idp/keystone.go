@@ -4,26 +4,32 @@ package idp
 
 import (
 	"html/template"
+	"net/http"
 
 	"github.com/juju/httprequest"
 	"gopkg.in/errgo.v1"
 	goosehttp "gopkg.in/goose.v1/http"
-	"gopkg.in/goose.v1/identity"
+	gooseidentity "gopkg.in/goose.v1/identity"
+	"gopkg.in/juju/environschema.v1"
 
 	"github.com/CanonicalLtd/blues-identity/idp"
 	"github.com/CanonicalLtd/blues-identity/internal/mongodoc"
 	"github.com/CanonicalLtd/blues-identity/params"
 )
 
+// KeystoneIdentityProvider is an identity provider that uses a
+// configured keystone instance to authenticate against.
 type KeystoneIdentityProvider struct {
 	params idp.KeystoneParams
-	auth   identity.Authenticator
+	auth   gooseidentity.Authenticator
 }
 
+// NewKeystoneIdentityProvider creates a KeystoneIdentityProvider with
+// the given configuration.
 func NewKeystoneIdentityProvider(p *idp.KeystoneParams) *KeystoneIdentityProvider {
 	idp := KeystoneIdentityProvider{
 		params: *p,
-		auth:   identity.NewAuthenticator(identity.AuthUserPass, nil),
+		auth:   gooseidentity.NewAuthenticator(gooseidentity.AuthUserPass, nil),
 	}
 	if idp.params.Description == "" {
 		idp.params.Description = idp.params.Name
@@ -55,7 +61,7 @@ func (idp *KeystoneIdentityProvider) Handle(c Context) {
 	p := c.Params()
 	p.Request.ParseForm()
 	if p.Request.Form.Get("username") != "" {
-		idp.doLogin(c, p)
+		idp.doLogin(c, p.Request.Form.Get("username"), p.Request.Form.Get("password"))
 		return
 	}
 	url := c.IDPURL("/login")
@@ -87,12 +93,11 @@ const loginPage = `<!doctype html>
 </html>
 `
 
-func (idp *KeystoneIdentityProvider) doLogin(c Context, p httprequest.Params) {
-	name := p.Request.Form.Get("username")
-	ad, err := idp.auth.Auth(&identity.Credentials{
+func (idp *KeystoneIdentityProvider) doLogin(c Context, username, password string) {
+	ad, err := idp.auth.Auth(&gooseidentity.Credentials{
 		URL:     idp.params.URL + "/tokens",
-		User:    name,
-		Secrets: p.Request.Form.Get("password"),
+		User:    username,
+		Secrets: password,
 	})
 	if err != nil {
 		c.LoginFailure(errgo.WithCausef(err, params.ErrUnauthorized, "cannot log in"))
@@ -104,11 +109,11 @@ func (idp *KeystoneIdentityProvider) doLogin(c Context, p httprequest.Params) {
 	}
 	externalID := ad.UserId
 	if idp.params.Domain != "" {
-		name += "@" + idp.params.Domain
+		username += "@" + idp.params.Domain
 		externalID += "@" + idp.params.Domain
 	}
 	identity := mongodoc.Identity{
-		Username:   name,
+		Username:   username,
 		ExternalID: externalID,
 		Groups:     groups,
 	}
@@ -149,4 +154,69 @@ func getKeystoneTenants(params *idp.KeystoneParams, token string) ([]string, err
 		groups[i] = name
 	}
 	return groups, nil
+}
+
+// KeystoneUserpassIdentityProvider is an IdentityProvider with identical
+// behaviour to the KeystoneIdentityProvider except that it is not
+// interactive.
+type KeystoneUserpassIdentityProvider struct {
+	KeystoneIdentityProvider
+}
+
+// NewKeystoneUserpassIdentityProvider creates a
+// KeystoneUserpassIdentityProvider with the given configuration.
+func NewKeystoneUserpassIdentityProvider(p *idp.KeystoneParams) *KeystoneUserpassIdentityProvider {
+	return &KeystoneUserpassIdentityProvider{
+		KeystoneIdentityProvider: *NewKeystoneIdentityProvider(p),
+	}
+}
+
+func (*KeystoneUserpassIdentityProvider) Interactive() bool {
+	return false
+}
+
+func (idp *KeystoneUserpassIdentityProvider) Handle(c Context) {
+	p := c.Params()
+	if p.Request.Method != "POST" {
+		httprequest.WriteJSON(p.Response, http.StatusOK, keystoneSchemaResponse)
+		return
+	}
+	var req keystoneLoginRequest
+	if err := httprequest.Unmarshal(p, &req); err != nil {
+		c.LoginFailure(errgo.WithCausef(err, params.ErrBadRequest, "cannot unmarshal login request"))
+		return
+	}
+	idp.doLogin(c, req.Username, req.Password)
+}
+
+var keystoneSchemaResponse = struct {
+	Schema environschema.Fields `json:"schema"`
+}{
+	Schema: environschema.Fields{
+		"username": environschema.Attr{
+			Type:      environschema.Tstring,
+			Mandatory: true,
+			EnvVars:   gooseidentity.CredEnvUser,
+		},
+		"password": environschema.Attr{
+			Type:      environschema.Tstring,
+			Mandatory: true,
+			Secret:    true,
+			EnvVars:   gooseidentity.CredEnvSecrets,
+		},
+	},
+}
+
+// keystoneLogin contains the data corresponding to the entries specified
+// in keystoneSchemaResponse. A client will POST a response compatible
+// with this type after receiving and processing the schema above.
+type keystoneLogin struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
+
+// keystoneLoginRequest defines the login request in a form that is
+// compatible with httprequest.Unmarshal.
+type keystoneLoginRequest struct {
+	keystoneLogin `httprequest:",body"`
 }

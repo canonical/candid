@@ -97,6 +97,19 @@ name: ks1
 domain: openstack
 description: Keystone Login`,
 	expectError: "cannot unmarshal keystone configuration: url not specified",
+}, {
+	about: "keystone_userpass",
+	data: `type: keystone_userpass
+name: ks1
+domain: openstack
+description: Keystone Userpass Login
+url: https://example.com/keystone`,
+	expectValue: idp.KeystoneUserpassIdentityProvider(&idp.KeystoneParams{
+		Name:        "ks1",
+		Domain:      "openstack",
+		Description: "Keystone Userpass Login",
+		URL:         "https://example.com/keystone",
+	}),
 }}
 
 func (s *idpSuite) TestIdentityProviderUnmarshalYAML(c *gc.C) {

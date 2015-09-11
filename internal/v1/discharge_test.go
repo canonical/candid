@@ -13,10 +13,14 @@ import (
 	"net/url"
 
 	"github.com/garyburd/go-oauth/oauth"
+	"github.com/juju/httprequest"
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/testing/httptesting"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
+	"gopkg.in/goose.v1/testing/httpsuite"
+	"gopkg.in/goose.v1/testservices/identityservice"
+	"gopkg.in/juju/environschema.v1"
 	"gopkg.in/macaroon-bakery.v1/bakery"
 	"gopkg.in/macaroon-bakery.v1/bakery/checkers"
 	"gopkg.in/macaroon-bakery.v1/httpbakery"
@@ -31,29 +35,42 @@ import (
 type dischargeSuite struct {
 	apiSuite
 	mockusso.Suite
-	locator *bakery.PublicKeyRing
-	netSrv  *httptest.Server
+	httpsuite.HTTPSuite
+	locator  *bakery.PublicKeyRing
+	netSrv   *httptest.Server
+	keystone *identityservice.UserPass
 }
 
 var _ = gc.Suite(&dischargeSuite{})
 
 func (s *dischargeSuite) SetUpSuite(c *gc.C) {
 	s.Suite.SetUpSuite(c)
-	s.apiSuite.idps = []idp.IdentityProvider{
-		idp.UbuntuSSOIdentityProvider,
-		idp.UbuntuSSOOAuthIdentityProvider,
-		idp.AgentIdentityProvider,
-	}
+	s.HTTPSuite.SetUpSuite(c)
 	s.apiSuite.SetUpSuite(c)
 }
 
 func (s *dischargeSuite) TearDownSuite(c *gc.C) {
+	s.HTTPSuite.TearDownSuite(c)
 	s.Suite.TearDownSuite(c)
 	s.apiSuite.TearDownSuite(c)
 }
 
 func (s *dischargeSuite) SetUpTest(c *gc.C) {
 	s.Suite.SetUpTest(c)
+	s.HTTPSuite.SetUpTest(c)
+	s.keystone = identityservice.NewUserPass()
+	s.keystone.SetupHTTP(s.Mux)
+	s.apiSuite.idps = []idp.IdentityProvider{
+		idp.UbuntuSSOIdentityProvider,
+		idp.UbuntuSSOOAuthIdentityProvider,
+		idp.AgentIdentityProvider,
+		idp.KeystoneUserpassIdentityProvider(
+			&idp.KeystoneParams{
+				Name: "form",
+				URL:  s.Server.URL,
+			},
+		),
+	}
 	s.apiSuite.SetUpTest(c)
 	s.locator = bakery.NewPublicKeyRing()
 	s.netSrv = httptest.NewServer(s.srv)
@@ -62,6 +79,7 @@ func (s *dischargeSuite) SetUpTest(c *gc.C) {
 
 func (s *dischargeSuite) TearDownTest(c *gc.C) {
 	s.netSrv.Close()
+	s.HTTPSuite.TearDownTest(c)
 	s.apiSuite.TearDownTest(c)
 	s.Suite.TearDownTest(c)
 }
@@ -700,5 +718,121 @@ func agentVisit(c *gc.C, client *httpbakery.Client, username string, pk *bakery.
 			return err
 		}
 		return &perr
+	}
+}
+
+func (s *dischargeSuite) TestKeystoneSchema(c *gc.C) {
+	s.Mux.Handle("/tenants", http.HandlerFunc(s.handleTenants))
+	s.PatchValue(&http.DefaultTransport, transport{
+		prefix: location,
+		srv:    s.srv,
+		rt:     http.DefaultTransport,
+	})
+	userInfo := s.keystone.AddUser("ksuser", "kspass", "test_project")
+	uuid := s.createIdentity(c, &mongodoc.Identity{
+		Username:   "ksuser",
+		ExternalID: userInfo.Id,
+	})
+	// Create the service which will issue the third party caveat.
+	svc, err := bakery.NewService(bakery.NewServiceParams{
+		Locator: s.locator,
+	})
+	c.Assert(err, gc.IsNil)
+	m, err := svc.NewMacaroon("", nil, []checkers.Caveat{{
+		Location:  s.netSrv.URL + "/v1/discharger/",
+		Condition: "is-authenticated-user",
+	}})
+	c.Assert(err, gc.IsNil)
+	bakeryClient := httpbakery.NewClient()
+	bakeryClient.VisitWebPage = keystoneVisit(c, bakeryClient, "ksuser", "kspass")
+	ms, err := bakeryClient.DischargeAll(m)
+	c.Assert(err, gc.IsNil)
+	d := checkers.InferDeclared(ms)
+	err = svc.Check(ms, checkers.New(d, checkers.TimeBefore))
+	c.Assert(err, gc.IsNil)
+	c.Assert(d, jc.DeepEquals, checkers.Declared{
+		"uuid":     uuid,
+		"username": "ksuser",
+	})
+}
+
+type tenant struct {
+	Description string `json:"description"`
+	Enabled     bool   `json:"enabled"`
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+}
+
+type tenantsResponse struct {
+	Tenants []tenant `json:"tenants"`
+}
+
+func (s *dischargeSuite) handleTenants(w http.ResponseWriter, r *http.Request) {
+	token := r.Header.Get("X-Auth-Token")
+	_, err := s.keystone.FindUser(token)
+	if err != nil {
+		w.WriteHeader(http.StatusUnauthorized)
+	}
+	httprequest.WriteJSON(w, http.StatusOK, tenantsResponse{
+		Tenants: []tenant{{
+			Description: "test_project description",
+			Enabled:     true,
+			ID:          "test_project_id",
+			Name:        "test_project",
+		}},
+	})
+}
+
+func keystoneVisit(c *gc.C, doer *httpbakery.Client, username, password string) func(u *url.URL) error {
+	client := httprequest.Client{
+		Doer: doer,
+	}
+	return func(u *url.URL) error {
+		client.BaseURL = u.String()
+		req, err := http.NewRequest("GET", "", nil)
+		if err != nil {
+			return errgo.Notef(err, "cannot create request")
+		}
+		req.Header.Set("Accept", "application/json")
+		var loginMethods params.LoginMethods
+		if err := client.Do(req, nil, &loginMethods); err != nil {
+			return errgo.Notef(err, "error getting login methods")
+		}
+		if loginMethods.Form == "" {
+			return errgo.Newf("form login not supported")
+		}
+		client.BaseURL = loginMethods.Form
+		var schemaResponse struct {
+			Schema environschema.Fields `json:"schema"`
+		}
+		if err := client.Get("", &schemaResponse); err != nil {
+			return errgo.Notef(err, "cannot get schema")
+		}
+		if _, ok := schemaResponse.Schema["username"]; !ok {
+			return errgo.Notef(err, "schema has no username")
+		}
+		if _, ok := schemaResponse.Schema["password"]; !ok {
+			return errgo.Notef(err, "schema has no password")
+		}
+		formResponse := struct {
+			Username string `json:"username"`
+			Password string `json:"password"`
+		}{
+			Username: username,
+			Password: password,
+		}
+		body, err := json.Marshal(formResponse)
+		if err != nil {
+			panic(err)
+		}
+		req, err = http.NewRequest("POST", "", nil)
+		if err != nil {
+			return errgo.Notef(err, "cannot create request")
+		}
+		req.Header.Set("Content-Type", "application/json")
+		if err := client.Do(req, bytes.NewReader(body), nil); err != nil {
+			return errgo.Notef(err, "cannot log in")
+		}
+		return nil
 	}
 }
