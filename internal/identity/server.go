@@ -91,6 +91,9 @@ func (srv *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Access-Control-Allow-Headers", "Bakery-Protocol-Version, Macaroons, X-Requested-With")
 	w.Header().Set("Access-Control-Cache-Max-Age", "600")
+	if req.Method == "OPTIONS" {
+		return
+	}
 	srv.router.ServeHTTP(w, req)
 }
 

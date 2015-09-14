@@ -85,10 +85,10 @@ func (s *serverSuite) TestNewServerWithVersions(c *gc.C) {
 func (s *serverSuite) TestServerHasAccessControlAllowHeaders(c *gc.C) {
 	db := s.Session.DB("foo")
 	impl := map[string]identity.NewAPIHandlerFunc{
-		"a": func(*store.Pool, identity.ServerParams, []identity.IdentityProvider) ([]httprequest.Handler, error) {
+		"/a": func(*store.Pool, identity.ServerParams, []identity.IdentityProvider) ([]httprequest.Handler, error) {
 			return []httprequest.Handler{{
 				Method: "GET",
-				Path:   "/",
+				Path:   "/a",
 				Handle: func(w http.ResponseWriter, req *http.Request, p httprouter.Params) {
 				},
 			}}, nil
@@ -99,9 +99,9 @@ func (s *serverSuite) TestServerHasAccessControlAllowHeaders(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 	rec := httptesting.DoRequest(c, httptesting.DoRequestParams{
 		Handler: h,
-		URL:     "/a/",
+		URL:     "/a",
 	})
-	c.Assert(rec.Code, gc.Equals, http.StatusNotFound)
+	c.Assert(rec.Code, gc.Equals, http.StatusOK)
 	c.Assert(len(rec.HeaderMap["Access-Control-Allow-Origin"]), gc.Equals, 1)
 	c.Assert(rec.HeaderMap["Access-Control-Allow-Origin"][0], gc.Equals, "*")
 	c.Assert(len(rec.HeaderMap["Access-Control-Allow-Headers"]), gc.Equals, 1)
@@ -117,7 +117,7 @@ func (s *serverSuite) TestServerHasAccessControlAllowHeaders(c *gc.C) {
 		Method:  "OPTIONS",
 		Header:  http.Header{"Origin": []string{"MyHost"}},
 	})
-	c.Assert(rec.Code, gc.Equals, http.StatusNotFound)
+	c.Assert(rec.Code, gc.Equals, http.StatusOK)
 	c.Assert(len(rec.HeaderMap["Access-Control-Allow-Origin"]), gc.Equals, 1)
 	c.Assert(rec.HeaderMap["Access-Control-Allow-Origin"][0], gc.Equals, "*")
 }
