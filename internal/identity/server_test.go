@@ -82,7 +82,7 @@ func (s *serverSuite) TestNewServerWithVersions(c *gc.C) {
 	assertServesVersion(c, h, "version3")
 }
 
-func (s *serverSuite) TestServerHasAccessControlAllowOrigin(c *gc.C) {
+func (s *serverSuite) TestServerHasAccessControlAllowHeaders(c *gc.C) {
 	db := s.Session.DB("foo")
 	impl := map[string]identity.NewAPIHandlerFunc{
 		"a": func(*store.Pool, identity.ServerParams, []identity.IdentityProvider) ([]httprequest.Handler, error) {
@@ -102,15 +102,23 @@ func (s *serverSuite) TestServerHasAccessControlAllowOrigin(c *gc.C) {
 		URL:     "/a/",
 	})
 	c.Assert(rec.Code, gc.Equals, http.StatusNotFound)
-	c.Assert(rec.HeaderMap["Access-Control-Allow-Origin"][0], gc.Equals, "*")
 	c.Assert(len(rec.HeaderMap["Access-Control-Allow-Origin"]), gc.Equals, 1)
+	c.Assert(rec.HeaderMap["Access-Control-Allow-Origin"][0], gc.Equals, "*")
+	c.Assert(len(rec.HeaderMap["Access-Control-Allow-Headers"]), gc.Equals, 1)
+	c.Assert(rec.HeaderMap["Access-Control-Allow-Headers"][0], gc.Equals, "Bakery-Protocol-Version, Macaroons, X-Requested-With")
+	c.Assert(len(rec.HeaderMap["Access-Control-Allow-Origin"]), gc.Equals, 1)
+	c.Assert(rec.HeaderMap["Access-Control-Allow-Origin"][0], gc.Equals, "*")
+	c.Assert(len(rec.HeaderMap["Access-Control-Cache-Max-Age"]), gc.Equals, 1)
+	c.Assert(rec.HeaderMap["Access-Control-Cache-Max-Age"][0], gc.Equals, "600")
 
 	rec = httptesting.DoRequest(c, httptesting.DoRequestParams{
 		Handler: h,
 		URL:     "/a/",
 		Method:  "OPTIONS",
+		Header:  http.Header{"Origin": []string{"MyHost"}},
 	})
 	c.Assert(rec.Code, gc.Equals, http.StatusNotFound)
+	c.Assert(len(rec.HeaderMap["Access-Control-Allow-Origin"]), gc.Equals, 1)
 	c.Assert(rec.HeaderMap["Access-Control-Allow-Origin"][0], gc.Equals, "*")
 }
 
