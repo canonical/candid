@@ -14,41 +14,6 @@ type idpSuite struct{}
 
 var _ = gc.Suite(&idpSuite{})
 
-var typeUnmarshalTextTests = []struct {
-	data        string
-	expectType  idp.Type
-	expectError string
-}{{
-	data:       "usso",
-	expectType: idp.UbuntuSSO,
-}, {
-	data:       "usso_oauth",
-	expectType: idp.UbuntuSSOOAuth,
-}, {
-	data:       "agent",
-	expectType: idp.Agent,
-}, {
-	data:       "keystone",
-	expectType: idp.Keystone,
-}, {
-	data:        "no-such-type",
-	expectError: `unrecognised type "no-such-type"`,
-}}
-
-func (s *idpSuite) TestTypeUnmarshalText(c *gc.C) {
-	for i, test := range typeUnmarshalTextTests {
-		c.Logf("%d %s", i, test.data)
-		var t idp.Type
-		err := t.UnmarshalText([]byte(test.data))
-		if test.expectError != "" {
-			c.Assert(err, gc.ErrorMatches, test.expectError)
-			continue
-		}
-		c.Assert(err, gc.IsNil)
-		c.Assert(t, gc.Equals, test.expectType)
-	}
-}
-
 var identityProviderUnmarshalYAMLTests = []struct {
 	about       string
 	data        string
@@ -69,7 +34,7 @@ var identityProviderUnmarshalYAMLTests = []struct {
 }, {
 	about:       "bad type",
 	data:        "type: no-such-type",
-	expectError: `cannot unmarshal identity provider type: unrecognised type "no-such-type"`,
+	expectError: `unrecognised identity provider type "no-such-type"`,
 }, {
 	about: "keystone",
 	data: `type: keystone
