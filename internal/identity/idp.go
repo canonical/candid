@@ -28,7 +28,7 @@ type IdentityProvider interface {
 
 	// Handle handles any requests sent to the identity provider's
 	// endpoints.
-	// 
+	//
 	// The endpoints for the identity provider are currently created
 	// at /v1/idp/{{.Name}}/ although the identity provider should
 	// not rely on that being the case. Definitive URLs can be obrain

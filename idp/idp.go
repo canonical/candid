@@ -2,59 +2,19 @@
 
 package idp
 
-import (
-	"fmt"
-
-	"gopkg.in/errgo.v1"
-)
-
-// Type represents the type of identity provider.
-type Type int
+import "gopkg.in/errgo.v1"
 
 const (
-	UbuntuSSO Type = iota
-	UbuntuSSOOAuth
-	Agent
-	Keystone
-	KeystoneUserpass
+	UbuntuSSO        = "usso"
+	UbuntuSSOOAuth   = "usso_oauth"
+	Agent            = "agent"
+	Keystone         = "keystone"
+	KeystoneUserpass = "keystone_userpass"
 )
-
-var typeNames = map[string]Type{
-	"usso":              UbuntuSSO,
-	"usso_oauth":        UbuntuSSOOAuth,
-	"agent":             Agent,
-	"keystone":          Keystone,
-	"keystone_userpass": KeystoneUserpass,
-}
-
-func (t *Type) UnmarshalText(text []byte) error {
-	if tp, ok := typeNames[string(text)]; ok {
-		*t = tp
-		return nil
-	}
-	return errgo.Newf("unrecognised type %q", string(text))
-}
-
-func (t Type) String() string {
-	switch t {
-	case UbuntuSSO:
-		return "usso"
-	case UbuntuSSOOAuth:
-		return "usso_oauth"
-	case Agent:
-		return "agent"
-	case Keystone:
-		return "keystone"
-	case KeystoneUserpass:
-		return "keystone_userpass"
-	default:
-		return fmt.Sprintf("Type(%d)", t)
-	}
-}
 
 // IdentityProvider describes the configuration of an Identity provider.
 type IdentityProvider struct {
-	Type   Type
+	Type   string
 	Config interface{}
 }
 
@@ -63,7 +23,7 @@ type IdentityProvider struct {
 // yaml.Unmarshaler.
 func (idp *IdentityProvider) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	var t struct {
-		Type Type
+		Type string
 	}
 	if err := unmarshal(&t); err != nil {
 		return errgo.Notef(err, "cannot unmarshal identity provider type")
@@ -82,7 +42,7 @@ func (idp *IdentityProvider) UnmarshalYAML(unmarshal func(interface{}) error) er
 			return errgo.Notef(err, "cannot unmarshal keystone configuration")
 		}
 	default:
-		panic("unreachable")
+		return errgo.Newf("unrecognised identity provider type %q", t.Type)
 	}
 	return nil
 }
@@ -90,7 +50,7 @@ func (idp *IdentityProvider) UnmarshalYAML(unmarshal func(interface{}) error) er
 // unmarshalKeystone unmarshals the configuration provided unmarshal.
 // unmarshal is expected to behave in the way described in
 // yaml.Unmarshaler.
-func unmarshalKeystone(t Type, unmarshal func(interface{}) error) (IdentityProvider, error) {
+func unmarshalKeystone(t string, unmarshal func(interface{}) error) (IdentityProvider, error) {
 	var p KeystoneParams
 	if err := unmarshal(&p); err != nil {
 		return IdentityProvider{}, errgo.Mask(err)
@@ -145,7 +105,7 @@ func KeystoneUserpassIdentityProvider(p *KeystoneParams) IdentityProvider {
 
 // newKeystoneIdentityProvider creates a new identity provider using a
 // keystone service with the specified type.
-func newKeystoneIdentityProvider(t Type, p *KeystoneParams) IdentityProvider {
+func newKeystoneIdentityProvider(t string, p *KeystoneParams) IdentityProvider {
 	return IdentityProvider{
 		Type:   t,
 		Config: p,

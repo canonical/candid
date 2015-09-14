@@ -43,9 +43,9 @@ var newIDPTests = []struct {
 }, {
 	about: "not found",
 	idp: idp.IdentityProvider{
-		Type: idp.Type(-1),
+		Type: "unknown type",
 	},
-	expectError: `unknown provider type "Type\(-1\)"`,
+	expectError: `unknown provider type "unknown type"`,
 }}
 
 func (s *idpSuite) TestNewIDP(c *gc.C) {
