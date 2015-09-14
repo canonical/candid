@@ -43,11 +43,11 @@ type AgentLoginResponse struct {
 	AgentLogin bool `json:"agent_login"`
 }
 
-// PublicKeyRequest documents the /v1/discharger/publickey endpoint. As
+// PublicKeyRequest documents the /publickey endpoint. As
 // it contains no request information there is no need to ever create
 // one.
 type PublicKeyRequest struct {
-	httprequest.Route `httprequest:"GET /v1/discharger/publickey"`
+	httprequest.Route `httprequest:"GET /publickey"`
 }
 
 // PublicKeyResponse is the response to a PublicKeyRequest.

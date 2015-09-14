@@ -103,7 +103,7 @@ func (s *dischargeSuite) TestDischargeWhenLoggedIn(c *gc.C) {
 	})
 	c.Assert(err, gc.IsNil)
 	m, err := svc.NewMacaroon("", nil, []checkers.Caveat{{
-		Location:  s.netSrv.URL + "/v1/discharger/",
+		Location:  s.netSrv.URL,
 		Condition: "is-authenticated-user",
 	}})
 	c.Assert(err, gc.IsNil)
@@ -155,7 +155,7 @@ func (s *dischargeSuite) TestDischargeMemberOf(c *gc.C) {
 		about: "test membership in single group - matches",
 		createMacaroon: func() (*macaroon.Macaroon, error) {
 			return svc.NewMacaroon("", nil, []checkers.Caveat{{
-				Location:  s.netSrv.URL + "/v1/discharger/",
+				Location:  s.netSrv.URL,
 				Condition: "is-member-of test",
 			}})
 		},
@@ -164,7 +164,7 @@ func (s *dischargeSuite) TestDischargeMemberOf(c *gc.C) {
 		about: "test membership in a set of groups",
 		createMacaroon: func() (*macaroon.Macaroon, error) {
 			return svc.NewMacaroon("", nil, []checkers.Caveat{{
-				Location:  s.netSrv.URL + "/v1/discharger/",
+				Location:  s.netSrv.URL,
 				Condition: "is-member-of test test2",
 			}})
 		},
@@ -173,7 +173,7 @@ func (s *dischargeSuite) TestDischargeMemberOf(c *gc.C) {
 		about: "test membership in single group - no match",
 		createMacaroon: func() (*macaroon.Macaroon, error) {
 			return svc.NewMacaroon("", nil, []checkers.Caveat{{
-				Location:  s.netSrv.URL + "/v1/discharger/",
+				Location:  s.netSrv.URL,
 				Condition: "is-member-of test1",
 			}})
 		},
@@ -182,7 +182,7 @@ func (s *dischargeSuite) TestDischargeMemberOf(c *gc.C) {
 		about: "test membership in a set of groups - one group matches",
 		createMacaroon: func() (*macaroon.Macaroon, error) {
 			return svc.NewMacaroon("", nil, []checkers.Caveat{{
-				Location:  s.netSrv.URL + "/v1/discharger/",
+				Location:  s.netSrv.URL,
 				Condition: "is-member-of test test3 test4",
 			}})
 		},
@@ -191,7 +191,7 @@ func (s *dischargeSuite) TestDischargeMemberOf(c *gc.C) {
 		about: "test membership in a set of groups fail - no match",
 		createMacaroon: func() (*macaroon.Macaroon, error) {
 			return svc.NewMacaroon("", nil, []checkers.Caveat{{
-				Location:  s.netSrv.URL + "/v1/discharger/",
+				Location:  s.netSrv.URL,
 				Condition: "is-member-of test1 test3",
 			}})
 		},
@@ -247,7 +247,7 @@ func (s *dischargeSuite) TestAdminDischarge(c *gc.C) {
 	}{{
 		about: "discharge macaroon",
 		m: newMacaroon(c, svc, []checkers.Caveat{{
-			Location:  s.netSrv.URL + "/v1/discharger/",
+			Location:  s.netSrv.URL,
 			Condition: "is-authenticated-user",
 		}}),
 		modifier: &requestModifier{
@@ -260,7 +260,7 @@ func (s *dischargeSuite) TestAdminDischarge(c *gc.C) {
 	}, {
 		about: "no discharge user",
 		m: newMacaroon(c, svc, []checkers.Caveat{{
-			Location:  s.netSrv.URL + "/v1/discharger/",
+			Location:  s.netSrv.URL,
 			Condition: "is-authenticated-user",
 		}}),
 		modifier: &requestModifier{
@@ -272,7 +272,7 @@ func (s *dischargeSuite) TestAdminDischarge(c *gc.C) {
 	}, {
 		about: "no authentication",
 		m: newMacaroon(c, svc, []checkers.Caveat{{
-			Location:  s.netSrv.URL + "/v1/discharger/",
+			Location:  s.netSrv.URL,
 			Condition: "is-authenticated-user",
 		}}),
 		modifier: &requestModifier{
@@ -284,7 +284,7 @@ func (s *dischargeSuite) TestAdminDischarge(c *gc.C) {
 	}, {
 		about: "unsupported user",
 		m: newMacaroon(c, svc, []checkers.Caveat{{
-			Location:  s.netSrv.URL + "/v1/discharger/",
+			Location:  s.netSrv.URL,
 			Condition: "is-authenticated-user",
 		}}),
 		modifier: &requestModifier{
@@ -297,7 +297,7 @@ func (s *dischargeSuite) TestAdminDischarge(c *gc.C) {
 	}, {
 		about: "unsupported condition",
 		m: newMacaroon(c, svc, []checkers.Caveat{{
-			Location:  s.netSrv.URL + "/v1/discharger/",
+			Location:  s.netSrv.URL,
 			Condition: "is-authenticated-group",
 		}}),
 		modifier: &requestModifier{
@@ -310,7 +310,7 @@ func (s *dischargeSuite) TestAdminDischarge(c *gc.C) {
 	}, {
 		about: "bad credentials",
 		m: newMacaroon(c, svc, []checkers.Caveat{{
-			Location:  s.netSrv.URL + "/v1/discharger/",
+			Location:  s.netSrv.URL,
 			Condition: "is-authenticated-user",
 		}}),
 		modifier: &requestModifier{
@@ -366,7 +366,7 @@ func (s *dischargeSuite) TestDischargeWithOpenID(c *gc.C) {
 	}
 	client.VisitWebPage = s.doVisit(c)
 	m := newMacaroon(c, svc, []checkers.Caveat{{
-		Location:  s.netSrv.URL + "/v1/discharger/",
+		Location:  s.netSrv.URL,
 		Condition: "is-authenticated-user",
 	}})
 	ms, err := client.DischargeAll(m)
@@ -446,7 +446,7 @@ func (s *dischargeSuite) TestDischargeWithOAuth(c *gc.C) {
 	})
 	c.Assert(err, gc.IsNil)
 	m, err := svc.NewMacaroon("", nil, []checkers.Caveat{{
-		Location:  s.netSrv.URL + "/v1/discharger/",
+		Location:  s.netSrv.URL,
 		Condition: "is-authenticated-user",
 	}})
 	c.Assert(err, gc.IsNil)
@@ -496,14 +496,14 @@ func (s *dischargeSuite) TestDischargeWithOAuthBadToken(c *gc.C) {
 	})
 	c.Assert(err, gc.IsNil)
 	m, err := svc.NewMacaroon("", nil, []checkers.Caveat{{
-		Location:  s.netSrv.URL + "/v1/discharger/",
+		Location:  s.netSrv.URL,
 		Condition: "is-authenticated-user",
 	}})
 	c.Assert(err, gc.IsNil)
 	bakeryClient := httpbakery.NewClient()
 	bakeryClient.VisitWebPage = oauthVisit(c, client, badToken)
 	_, err = bakeryClient.DischargeAll(m)
-	c.Assert(err, gc.ErrorMatches, `cannot get discharge from ".*/v1/discharger/": cannot start interactive session: invalid OAuth credentials`)
+	c.Assert(err, gc.ErrorMatches, `cannot get discharge from ".*": cannot start interactive session: invalid OAuth credentials`)
 }
 
 func noVisit(*url.URL) error {
@@ -637,7 +637,7 @@ func (s *dischargeSuite) TestDischargeWithAgentLogin(c *gc.C) {
 	})
 	c.Assert(err, gc.IsNil)
 	m, err := svc.NewMacaroon("", nil, []checkers.Caveat{{
-		Location:  s.netSrv.URL + "/v1/discharger/",
+		Location:  s.netSrv.URL,
 		Condition: "is-authenticated-user",
 	}})
 	c.Assert(err, gc.IsNil)
@@ -655,10 +655,56 @@ func (s *dischargeSuite) TestDischargeWithAgentLogin(c *gc.C) {
 	})
 }
 
-func (s *dischargeSuite) TestPublicKey(c *gc.C) {
+func (s *dischargeSuite) TestDischargeLegacyLocation(c *gc.C) {
+	s.createUser(c, &params.User{
+		Username:   "jbloggs",
+		ExternalID: "http://example.com/jbloggs",
+		Email:      "jbloggs@example.com",
+		FullName:   "Joe Bloggs",
+		IDPGroups: []string{
+			"test",
+		},
+	})
+	svc, err := bakery.NewService(bakery.NewServiceParams{
+		Locator: s.locator,
+	})
+	c.Assert(err, gc.IsNil)
+	client := httpbakery.NewClient()
+	client.Client.Transport = &requestModifier{
+		f: func(r *http.Request) {
+			r.SetBasicAuth(adminUsername, adminPassword)
+			r.URL.RawQuery += "&discharge-for-user=jbloggs"
+		},
+		transport: client.Client.Transport,
+	}
+	ms, err := client.DischargeAll(newMacaroon(c, svc, []checkers.Caveat{{
+		Location:  s.netSrv.URL + "/v1/discharger",
+		Condition: "is-authenticated-user",
+	}}))
+	c.Assert(err, gc.IsNil)
+	d := checkers.InferDeclared(ms)
+	err = svc.Check(ms, checkers.New(
+		d,
+		checkers.TimeBefore,
+	))
+	c.Assert(err, gc.IsNil)
+}
+
+func (s *dischargeSuite) TestPublicKeyLegacyLocation(c *gc.C) {
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Handler:      s.srv,
 		URL:          apiURL("discharger/publickey"),
+		ExpectStatus: http.StatusOK,
+		ExpectBody: map[string]*bakery.PublicKey{
+			"PublicKey": &s.keyPair.Public,
+		},
+	})
+}
+
+func (s *dischargeSuite) TestPublicKey(c *gc.C) {
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Handler:      s.srv,
+		URL:          "/publickey",
 		ExpectStatus: http.StatusOK,
 		ExpectBody: map[string]*bakery.PublicKey{
 			"PublicKey": &s.keyPair.Public,
