@@ -26,7 +26,14 @@ type IdentityProvider interface {
 	// URL provides the URL to use to begin a log-in to the identity provider.
 	URL(c intidp.Context, waitid string) (string, error)
 
-	// Handle handles any requests sent to the identity provider's endpoints.
+	// Handle handles any requests sent to the identity provider's
+	// endpoints.
+	// 
+	// The endpoints for the identity provider are currently created
+	// at /v1/idp/{{.Name}}/ although the identity provider should
+	// not rely on that being the case. Definitive URLs can be obrain
+	// from c.IDPURL(). The provider specific path can be obtained
+	// from c.Params().PathVar.Get("path").
 	Handle(c intidp.Context)
 }
 
@@ -41,6 +48,8 @@ func newIDP(sp ServerParams, p idp.IdentityProvider) (IdentityProvider, error) {
 		return intidp.NewAgentIdentityProvider(sp.Location)
 	case idp.Keystone:
 		return intidp.NewKeystoneIdentityProvider(p.Config.(*idp.KeystoneParams)), nil
+	case idp.KeystoneUserpass:
+		return intidp.NewKeystoneUserpassIdentityProvider(p.Config.(*idp.KeystoneParams)), nil
 	default:
 		return nil, errgo.Newf("unknown provider type %q", p.Type)
 	}

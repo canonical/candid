@@ -321,7 +321,7 @@ func (s *usersSuite) TestUser(c *gc.C) {
 				"test",
 			},
 		}),
-		header: map[string][]string{"Bakery-Protocol-Version": []string{"1"}},
+		header:       map[string][]string{"Bakery-Protocol-Version": {"1"}},
 		expectStatus: http.StatusUnauthorized,
 		expectBody:   DischargeRequiredBody,
 	}, {
@@ -487,13 +487,13 @@ func (s *usersSuite) TestUser(c *gc.C) {
 			"Content-Type": []string{"application/json"},
 		}
 		for key, value := range test.header {
-			httpHeader[key] = value;
+			httpHeader[key] = value
 		}
 		httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
-			Handler: s.srv,
-			URL:     test.url,
-			Method:  test.method,
-			Header:  httpHeader,
+			Handler:      s.srv,
+			URL:          test.url,
+			Method:       test.method,
+			Header:       httpHeader,
 			Body:         test.body,
 			Username:     test.username,
 			Password:     test.password,
