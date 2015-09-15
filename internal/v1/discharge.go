@@ -52,7 +52,7 @@ func (h *dischargeHandler) checkThirdPartyCaveat(req *http.Request, cavId, cav s
 			checkers.OperationChecker("discharge"),
 		))
 		if err != nil {
-			return nil, h.needLoginError(cavId, cav, err.Error())
+			return nil, h.needLoginError(cavId, cav, err)
 		}
 		username = attrs["username"]
 	}
@@ -102,7 +102,7 @@ func (h *dischargeHandler) checkMemberOfGroup(user *mongodoc.Identity, targetGro
 // needLoginError returns an error suitable for returning
 // from a discharge request that can only be satisfied
 // if the user logs in.
-func (h *dischargeHandler) needLoginError(cavId, caveat string, why string) error {
+func (h *dischargeHandler) needLoginError(cavId, caveat string, why error) error {
 	// TODO(rog) If the user is already logged in (username != ""),
 	// we should perhaps just return an error here.
 	waitId, err := h.place.NewRendezvous(&thirdPartyCaveatInfo{
@@ -112,14 +112,9 @@ func (h *dischargeHandler) needLoginError(cavId, caveat string, why string) erro
 	if err != nil {
 		return errgo.Notef(err, "cannot make rendezvous")
 	}
-	return &httpbakery.Error{
-		Message: why,
-		Code:    httpbakery.ErrInteractionRequired,
-		Info: &httpbakery.ErrorInfo{
-			VisitURL: h.serviceURL("/v1/login?waitid=" + waitId),
-			WaitURL:  h.serviceURL("/v1/wait?waitid=" + waitId),
-		},
-	}
+	visitURL := h.serviceURL("/v1/login?waitid=" + waitId)
+	waitURL := h.serviceURL("/v1/wait?waitid=" + waitId)
+	return httpbakery.NewInteractionRequiredError(visitURL, waitURL, why, h.params.Request)
 }
 
 // waitRequest is the request sent to the server to wait for logins to
