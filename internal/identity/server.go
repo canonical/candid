@@ -67,7 +67,10 @@ func New(db *mgo.Database, sp ServerParams, versions map[string]NewAPIHandlerFun
 	srv.router.RedirectTrailingSlash = false
 	srv.router.RedirectFixedPath = false
 	srv.router.NotFound = notFound
-	srv.router.MethodNotAllowed = methodNotAllowed
+	srv.router.MethodNotAllowed = srv.methodNotAllowed
+
+	srv.router.Handle("OPTIONS", "/*path", srv.options)
+
 	for name, newAPI := range versions {
 		handlers, err := newAPI(pool, sp, idps)
 		if err != nil {
@@ -141,6 +144,21 @@ func notFound(w http.ResponseWriter, req *http.Request) {
 //methodNotAllowed is the handler that is called when a handler cannot
 //be found for the requested endpoint with the request method, but
 //there is a handler avaiable using a different method.
-func methodNotAllowed(w http.ResponseWriter, req *http.Request) {
-	ErrorMapper.WriteError(w, errgo.WithCausef(nil, params.ErrMethodNotAllowed, "%s not allowed for %s", req.Method, req.URL.Path))
+func (s *Server) methodNotAllowed(w http.ResponseWriter, req *http.Request) {
+	// Check that the match method is not OPTIONS
+	for _, method := range []string{"GET", "POST", "PUT", "DELETE", "HEAD", "PATCH"} {
+		if method == req.Method {
+			continue
+		}
+		if h, _, _ := s.router.Lookup(method, req.URL.Path); h != nil {
+			ErrorMapper.WriteError(w, errgo.WithCausef(nil, params.ErrMethodNotAllowed, "%s not allowed for %s", req.Method, req.URL.Path))
+			return
+		}
+	}
+	notFound(w, req)
+}
+
+// options handles every OPTIONS request and always succeeds.
+func (s *Server) options(http.ResponseWriter, *http.Request, httprouter.Params) {
+	return
 }
