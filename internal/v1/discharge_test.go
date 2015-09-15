@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 
 	"github.com/garyburd/go-oauth/oauth"
 	"github.com/juju/httprequest"
@@ -125,6 +126,61 @@ func (s *dischargeSuite) TestDischargeWhenLoggedIn(c *gc.C) {
 		"uuid":     uuid,
 		"username": "test-user",
 	})
+}
+
+// This test is not sending the bakery protocol version so it will use the default
+// one and return a 407.
+func (s *dischargeSuite) TestDischargeStatusProxyAuthRequiredResponse(c *gc.C) {
+	// Create the service which will issue the third party caveat.
+	svc, err := bakery.NewService(bakery.NewServiceParams{
+		Locator: s.locator,
+	})
+	c.Assert(err, gc.IsNil)
+	m, err := svc.NewMacaroon("", nil, []checkers.Caveat{{
+		Location:  s.netSrv.URL,
+		Condition: "is-authenticated-user",
+	}})
+
+	cav := m.Caveats()[0]
+	resp, err := http.PostForm(s.netSrv.URL+"/discharge", url.Values{
+		"id":       {cav.Id},
+		"location": {cav.Location},
+	})
+	c.Assert(err, gc.IsNil)
+	defer resp.Body.Close()
+
+	c.Assert(resp.StatusCode, gc.Equals, http.StatusProxyAuthRequired)
+}
+
+// This test is using the bakery protocol version at value 1 to be able to return a 401
+// instead of a 407
+func (s *dischargeSuite) TestDischargeStatusUnauthorizedResponse(c *gc.C) {
+	// Create the service which will issue the third party caveat.
+	svc, err := bakery.NewService(bakery.NewServiceParams{
+		Locator: s.locator,
+	})
+	c.Assert(err, gc.IsNil)
+	m, err := svc.NewMacaroon("", nil, []checkers.Caveat{{
+		Location:  s.netSrv.URL,
+		Condition: "is-authenticated-user",
+	}})
+
+	cav := m.Caveats()[0]
+	values := url.Values{
+		"id":       {cav.Id},
+		"location": {cav.Location},
+	}
+
+	req, err := http.NewRequest("POST", s.netSrv.URL+"/discharge", strings.NewReader(values.Encode()))
+	c.Assert(err, gc.IsNil)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Bakery-Protocol-Version", "1")
+	resp, err := http.DefaultClient.Do(req)
+	c.Assert(err, gc.IsNil)
+	defer resp.Body.Close()
+
+	c.Assert(resp.StatusCode, gc.Equals, http.StatusUnauthorized)
+	c.Assert(resp.Header.Get("WWW-Authenticate"), gc.Equals, "Macaroon")
 }
 
 func (s *dischargeSuite) TestDischargeMemberOf(c *gc.C) {
