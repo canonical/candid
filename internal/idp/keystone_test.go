@@ -16,6 +16,7 @@ import (
 	gc "gopkg.in/check.v1"
 	"gopkg.in/goose.v1/testing/httpsuite"
 	"gopkg.in/goose.v1/testservices/identityservice"
+	"gopkg.in/macaroon-bakery.v1/httpbakery/form"
 
 	extidp "github.com/CanonicalLtd/blues-identity/idp"
 	"github.com/CanonicalLtd/blues-identity/internal/idp"
@@ -300,11 +301,13 @@ func (s *keystoneUserpassSuite) TestHandleResponse(c *gc.C) {
 		success:    true,
 	}
 	userInfo := s.service.AddUser("testuser", "testpass", "test_project")
-	login := idp.KeystoneLogin{
-		Username: "testuser",
-		Password: "testpass",
+	login := map[string]interface{}{
+		"username": "testuser",
+		"password": "testpass",
 	}
-	body, err := json.Marshal(login)
+	body, err := json.Marshal(form.LoginBody{
+		Form: login,
+	})
 	c.Assert(err, gc.IsNil)
 	tc.params.Request, err = http.NewRequest("POST", tc.requestURL, bytes.NewReader(body))
 	c.Assert(err, gc.IsNil)
@@ -335,5 +338,28 @@ func (s *keystoneUserpassSuite) TestHandleBadRequest(c *gc.C) {
 	tc.params.Response = rr
 	s.idp.Handle(tc)
 	c.Assert(tc.err, gc.ErrorMatches, `cannot unmarshal login request: cannot unmarshal into field: cannot unmarshal request body: unexpected end of JSON input`)
+	c.Assert(tc.macaroon, gc.IsNil)
+}
+
+func (s *keystoneUserpassSuite) TestHandleNoUsername(c *gc.C) {
+	tc := &testContext{
+		store:      s.store,
+		requestURL: "https://idp.test/login?waitid=1",
+	}
+	s.service.AddUser("testuser", "testpass", "")
+	login := map[string]interface{}{
+		"password": "testpass",
+	}
+	body, err := json.Marshal(form.LoginBody{
+		Form: login,
+	})
+	c.Assert(err, gc.IsNil)
+	tc.params.Request, err = http.NewRequest("POST", tc.requestURL, bytes.NewReader(body))
+	c.Assert(err, gc.IsNil)
+	tc.params.Request.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+	tc.params.Response = rr
+	s.idp.Handle(tc)
+	c.Assert(tc.err, gc.ErrorMatches, `cannot validate form: username: expected string, got nothing`)
 	c.Assert(tc.macaroon, gc.IsNil)
 }

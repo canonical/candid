@@ -7,10 +7,12 @@ import (
 	"net/http"
 
 	"github.com/juju/httprequest"
+	"github.com/juju/schema"
 	"gopkg.in/errgo.v1"
 	goosehttp "gopkg.in/goose.v1/http"
 	gooseidentity "gopkg.in/goose.v1/identity"
 	"gopkg.in/juju/environschema.v1"
+	"gopkg.in/macaroon-bakery.v1/httpbakery/form"
 
 	"github.com/CanonicalLtd/blues-identity/idp"
 	"github.com/CanonicalLtd/blues-identity/internal/mongodoc"
@@ -181,42 +183,44 @@ func (idp *KeystoneUserpassIdentityProvider) Handle(c Context) {
 		httprequest.WriteJSON(p.Response, http.StatusOK, keystoneSchemaResponse)
 		return
 	}
-	var req keystoneLoginRequest
-	if err := httprequest.Unmarshal(p, &req); err != nil {
+	var lr form.LoginRequest
+	if err := httprequest.Unmarshal(p, &lr); err != nil {
 		c.LoginFailure(errgo.WithCausef(err, params.ErrBadRequest, "cannot unmarshal login request"))
 		return
 	}
-	idp.doLogin(c, req.Username, req.Password)
+	form, err := keystoneFieldsChecker.Coerce(lr.Body.Form, nil)
+	if err != nil {
+		c.LoginFailure(errgo.Notef(err, "cannot validate form"))
+		return
+	}
+	m := form.(map[string]interface{})
+	idp.doLogin(c, m["username"].(string), m["password"].(string))
 }
 
-var keystoneSchemaResponse = struct {
-	Schema environschema.Fields `json:"schema"`
-}{
-	Schema: environschema.Fields{
-		"username": environschema.Attr{
-			Type:      environschema.Tstring,
-			Mandatory: true,
-			EnvVars:   gooseidentity.CredEnvUser,
-		},
-		"password": environschema.Attr{
-			Type:      environschema.Tstring,
-			Mandatory: true,
-			Secret:    true,
-			EnvVars:   gooseidentity.CredEnvSecrets,
-		},
+var keystoneSchemaResponse = form.SchemaResponse{
+	Schema: keystoneFields,
+}
+
+var keystoneFields = environschema.Fields{
+	"username": environschema.Attr{
+		Type:      environschema.Tstring,
+		Mandatory: true,
+		EnvVars:   gooseidentity.CredEnvUser,
+	},
+	"password": environschema.Attr{
+		Type:      environschema.Tstring,
+		Mandatory: true,
+		Secret:    true,
+		EnvVars:   gooseidentity.CredEnvSecrets,
 	},
 }
 
-// keystoneLogin contains the data corresponding to the entries specified
-// in keystoneSchemaResponse. A client will POST a response compatible
-// with this type after receiving and processing the schema above.
-type keystoneLogin struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
-}
+var keystoneFieldsChecker = schema.FieldMap(mustValidationSchema(keystoneFields))
 
-// keystoneLoginRequest defines the login request in a form that is
-// compatible with httprequest.Unmarshal.
-type keystoneLoginRequest struct {
-	keystoneLogin `httprequest:",body"`
+func mustValidationSchema(fields environschema.Fields) (schema.Fields, schema.Defaults) {
+	f, d, err := fields.ValidationSchema()
+	if err != nil {
+		panic(err)
+	}
+	return f, d
 }

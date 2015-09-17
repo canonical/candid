@@ -25,6 +25,7 @@ import (
 	"gopkg.in/macaroon-bakery.v1/bakery"
 	"gopkg.in/macaroon-bakery.v1/bakery/checkers"
 	"gopkg.in/macaroon-bakery.v1/httpbakery"
+	"gopkg.in/macaroon-bakery.v1/httpbakery/form"
 	"gopkg.in/macaroon.v1"
 
 	"github.com/CanonicalLtd/blues-identity/idp"
@@ -841,12 +842,15 @@ func (s *dischargeSuite) TestKeystoneSchema(c *gc.C) {
 	})
 	c.Assert(err, gc.IsNil)
 	m, err := svc.NewMacaroon("", nil, []checkers.Caveat{{
-		Location:  s.netSrv.URL + "/v1/discharger/",
+		Location:  s.netSrv.URL,
 		Condition: "is-authenticated-user",
 	}})
 	c.Assert(err, gc.IsNil)
 	bakeryClient := httpbakery.NewClient()
-	bakeryClient.VisitWebPage = keystoneVisit(c, bakeryClient, "ksuser", "kspass")
+	form.SetUpAuth(bakeryClient, &keystoneFormFiller{
+		username: "ksuser",
+		password: "kspass",
+	})
 	ms, err := bakeryClient.DischargeAll(m)
 	c.Assert(err, gc.IsNil)
 	d := checkers.InferDeclared(ms)
@@ -885,56 +889,19 @@ func (s *dischargeSuite) handleTenants(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func keystoneVisit(c *gc.C, doer *httpbakery.Client, username, password string) func(u *url.URL) error {
-	client := httprequest.Client{
-		Doer: doer,
+type keystoneFormFiller struct {
+	username, password string
+}
+
+func (h keystoneFormFiller) Fill(s environschema.Fields) (map[string]interface{}, error) {
+	if _, ok := s["username"]; !ok {
+		return nil, errgo.New("schema has no username")
 	}
-	return func(u *url.URL) error {
-		client.BaseURL = u.String()
-		req, err := http.NewRequest("GET", "", nil)
-		if err != nil {
-			return errgo.Notef(err, "cannot create request")
-		}
-		req.Header.Set("Accept", "application/json")
-		var loginMethods params.LoginMethods
-		if err := client.Do(req, nil, &loginMethods); err != nil {
-			return errgo.Notef(err, "error getting login methods")
-		}
-		if loginMethods.Form == "" {
-			return errgo.Newf("form login not supported")
-		}
-		client.BaseURL = loginMethods.Form
-		var schemaResponse struct {
-			Schema environschema.Fields `json:"schema"`
-		}
-		if err := client.Get("", &schemaResponse); err != nil {
-			return errgo.Notef(err, "cannot get schema")
-		}
-		if _, ok := schemaResponse.Schema["username"]; !ok {
-			return errgo.Notef(err, "schema has no username")
-		}
-		if _, ok := schemaResponse.Schema["password"]; !ok {
-			return errgo.Notef(err, "schema has no password")
-		}
-		formResponse := struct {
-			Username string `json:"username"`
-			Password string `json:"password"`
-		}{
-			Username: username,
-			Password: password,
-		}
-		body, err := json.Marshal(formResponse)
-		if err != nil {
-			panic(err)
-		}
-		req, err = http.NewRequest("POST", "", nil)
-		if err != nil {
-			return errgo.Notef(err, "cannot create request")
-		}
-		req.Header.Set("Content-Type", "application/json")
-		if err := client.Do(req, bytes.NewReader(body), nil); err != nil {
-			return errgo.Notef(err, "cannot log in")
-		}
-		return nil
+	if _, ok := s["password"]; !ok {
+		return nil, errgo.New("schema has no password")
 	}
+	return map[string]interface{}{
+		"username": h.username,
+		"password": h.password,
+	}, nil
 }

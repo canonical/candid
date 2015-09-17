@@ -3,5 +3,3 @@
 package idp
 
 var KeystoneSchemaResponse = keystoneSchemaResponse
-
-type KeystoneLogin keystoneLogin
