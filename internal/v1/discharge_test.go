@@ -12,15 +12,13 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/garyburd/go-oauth/oauth"
-	"github.com/juju/httprequest"
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/testing/httptesting"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/goose.v1/testing/httpsuite"
-	"gopkg.in/goose.v1/testservices/identityservice"
 	"gopkg.in/juju/environschema.v1"
 	"gopkg.in/macaroon-bakery.v1/bakery"
 	"gopkg.in/macaroon-bakery.v1/bakery/checkers"
@@ -29,7 +27,9 @@ import (
 	"gopkg.in/macaroon.v1"
 
 	"github.com/CanonicalLtd/blues-identity/idp"
+	"github.com/CanonicalLtd/blues-identity/internal/idtesting/mockkeystone"
 	"github.com/CanonicalLtd/blues-identity/internal/idtesting/mockusso"
+	"github.com/CanonicalLtd/blues-identity/internal/keystone"
 	"github.com/CanonicalLtd/blues-identity/internal/mongodoc"
 	"github.com/CanonicalLtd/blues-identity/params"
 )
@@ -37,31 +37,27 @@ import (
 type dischargeSuite struct {
 	apiSuite
 	mockusso.Suite
-	httpsuite.HTTPSuite
 	locator  *bakery.PublicKeyRing
 	netSrv   *httptest.Server
-	keystone *identityservice.UserPass
+	keystone *mockkeystone.Server
+	v2Mux    *http.ServeMux
 }
 
 var _ = gc.Suite(&dischargeSuite{})
 
 func (s *dischargeSuite) SetUpSuite(c *gc.C) {
 	s.Suite.SetUpSuite(c)
-	s.HTTPSuite.SetUpSuite(c)
 	s.apiSuite.SetUpSuite(c)
 }
 
 func (s *dischargeSuite) TearDownSuite(c *gc.C) {
-	s.HTTPSuite.TearDownSuite(c)
 	s.Suite.TearDownSuite(c)
 	s.apiSuite.TearDownSuite(c)
 }
 
 func (s *dischargeSuite) SetUpTest(c *gc.C) {
 	s.Suite.SetUpTest(c)
-	s.HTTPSuite.SetUpTest(c)
-	s.keystone = identityservice.NewUserPass()
-	s.keystone.SetupHTTP(s.Mux)
+	s.keystone = mockkeystone.NewServer()
 	s.apiSuite.idps = []idp.IdentityProvider{
 		idp.UbuntuSSOIdentityProvider,
 		idp.UbuntuSSOOAuthIdentityProvider,
@@ -69,7 +65,7 @@ func (s *dischargeSuite) SetUpTest(c *gc.C) {
 		idp.KeystoneUserpassIdentityProvider(
 			&idp.KeystoneParams{
 				Name: "form",
-				URL:  s.Server.URL,
+				URL:  s.keystone.URL,
 			},
 		),
 	}
@@ -80,8 +76,8 @@ func (s *dischargeSuite) SetUpTest(c *gc.C) {
 }
 
 func (s *dischargeSuite) TearDownTest(c *gc.C) {
+	s.keystone.Close()
 	s.netSrv.Close()
-	s.HTTPSuite.TearDownTest(c)
 	s.apiSuite.TearDownTest(c)
 	s.Suite.TearDownTest(c)
 }
@@ -825,16 +821,46 @@ func agentVisit(c *gc.C, client *httpbakery.Client, username string, pk *bakery.
 }
 
 func (s *dischargeSuite) TestKeystoneSchema(c *gc.C) {
-	s.Mux.Handle("/tenants", http.HandlerFunc(s.handleTenants))
 	s.PatchValue(&http.DefaultTransport, transport{
 		prefix: location,
 		srv:    s.srv,
 		rt:     http.DefaultTransport,
 	})
-	userInfo := s.keystone.AddUser("ksuser", "kspass", "test_project")
+	s.keystone.TokensFunc = func(r *keystone.TokensRequest) (*keystone.TokensResponse, error) {
+		if r.Body.Auth.PasswordCredentials.Username != "ksuser" {
+			return nil, errgo.Newf("bad username %q", r.Body.Auth.PasswordCredentials.Username)
+		}
+		if r.Body.Auth.PasswordCredentials.Password != "kspass" {
+			return nil, errgo.Newf("bad password %q", r.Body.Auth.PasswordCredentials.Password)
+		}
+		return &keystone.TokensResponse{
+			Access: keystone.Access{
+				Token: keystone.Token{
+					ID:       "123",
+					IssuedAt: &keystone.Time{time.Now()},
+					Expires:  &keystone.Time{time.Now().Add(24 * time.Hour)},
+				},
+				User: keystone.User{
+					ID:       "ABC",
+					Name:     "A. User",
+					Username: r.Body.Auth.PasswordCredentials.Username,
+				},
+			},
+		}, nil
+	}
+	s.keystone.TenantsFunc = func(r *keystone.TenantsRequest) (*keystone.TenantsResponse, error) {
+		if r.AuthToken != "123" {
+			return nil, errgo.Newf("bad token %q", r.AuthToken)
+		}
+		return &keystone.TenantsResponse{
+			Tenants: []keystone.Tenant{{
+				ID: "abc",
+			}},
+		}, nil
+	}
 	uuid := s.createIdentity(c, &mongodoc.Identity{
 		Username:   "ksuser",
-		ExternalID: userInfo.Id,
+		ExternalID: "ABC",
 	})
 	// Create the service which will issue the third party caveat.
 	svc, err := bakery.NewService(bakery.NewServiceParams{
@@ -859,33 +885,6 @@ func (s *dischargeSuite) TestKeystoneSchema(c *gc.C) {
 	c.Assert(d, jc.DeepEquals, checkers.Declared{
 		"uuid":     uuid,
 		"username": "ksuser",
-	})
-}
-
-type tenant struct {
-	Description string `json:"description"`
-	Enabled     bool   `json:"enabled"`
-	ID          string `json:"id"`
-	Name        string `json:"name"`
-}
-
-type tenantsResponse struct {
-	Tenants []tenant `json:"tenants"`
-}
-
-func (s *dischargeSuite) handleTenants(w http.ResponseWriter, r *http.Request) {
-	token := r.Header.Get("X-Auth-Token")
-	_, err := s.keystone.FindUser(token)
-	if err != nil {
-		w.WriteHeader(http.StatusUnauthorized)
-	}
-	httprequest.WriteJSON(w, http.StatusOK, tenantsResponse{
-		Tenants: []tenant{{
-			Description: "test_project description",
-			Enabled:     true,
-			ID:          "test_project_id",
-			Name:        "test_project",
-		}},
 	})
 }
 

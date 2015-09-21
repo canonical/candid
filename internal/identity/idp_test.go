@@ -33,14 +33,6 @@ var newIDPTests = []struct {
 	idp:    idp.AgentIdentityProvider,
 	expect: mustIDP(intidp.NewAgentIdentityProvider("https://idm.test/")),
 }, {
-	about:  "Keystone",
-	idp:    idp.KeystoneIdentityProvider(&idp.KeystoneParams{}),
-	expect: intidp.NewKeystoneIdentityProvider(&idp.KeystoneParams{}),
-}, {
-	about:  "Keystone Userpass",
-	idp:    idp.KeystoneUserpassIdentityProvider(&idp.KeystoneParams{}),
-	expect: intidp.NewKeystoneUserpassIdentityProvider(&idp.KeystoneParams{}),
-}, {
 	about: "not found",
 	idp: idp.IdentityProvider{
 		Type: "unknown type",
@@ -69,4 +61,34 @@ func mustIDP(idp identity.IdentityProvider, err error) identity.IdentityProvider
 		panic(err)
 	}
 	return idp
+}
+
+var newkeystoneIDPTests = []struct {
+	about  string
+	idp    idp.IdentityProvider
+	expect interface{}
+}{{
+	about:  "Keystone",
+	idp:    idp.KeystoneIdentityProvider(&idp.KeystoneParams{}),
+	expect: intidp.NewKeystoneIdentityProvider(&idp.KeystoneParams{}),
+}, {
+	about:  "Keystone Userpass",
+	idp:    idp.KeystoneUserpassIdentityProvider(&idp.KeystoneParams{}),
+	expect: intidp.NewKeystoneUserpassIdentityProvider(&idp.KeystoneParams{}),
+}, {
+	about:  "Keystone Token",
+	idp:    idp.KeystoneTokenIdentityProvider(&idp.KeystoneParams{}),
+	expect: intidp.NewKeystoneTokenIdentityProvider(&idp.KeystoneParams{}),
+}}
+
+func (s *idpSuite) TestNewKeystoneIDP(c *gc.C) {
+	sp := identity.ServerParams{
+		Location: "https://idm.test/",
+	}
+	for i, test := range newkeystoneIDPTests {
+		c.Logf("%d. %s", i, test.about)
+		obtained, err := identity.NewIDP(sp, test.idp)
+		c.Assert(err, gc.IsNil)
+		c.Assert(obtained, gc.FitsTypeOf, test.expect)
+	}
 }

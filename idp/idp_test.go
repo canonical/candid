@@ -75,6 +75,19 @@ url: https://example.com/keystone`,
 		Description: "Keystone Userpass Login",
 		URL:         "https://example.com/keystone",
 	}),
+}, {
+	about: "keystone_token",
+	data: `type: keystone_token
+name: ks1
+domain: openstack
+description: Keystone Token Login
+url: https://example.com/keystone`,
+	expectValue: idp.KeystoneTokenIdentityProvider(&idp.KeystoneParams{
+		Name:        "ks1",
+		Domain:      "openstack",
+		Description: "Keystone Token Login",
+		URL:         "https://example.com/keystone",
+	}),
 }}
 
 func (s *idpSuite) TestIdentityProviderUnmarshalYAML(c *gc.C) {

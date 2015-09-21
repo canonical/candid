@@ -3,3 +3,5 @@
 package idp
 
 var KeystoneSchemaResponse = keystoneSchemaResponse
+
+type KeystoneToken keystoneToken

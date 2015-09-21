@@ -9,12 +9,12 @@ import (
 	"github.com/juju/httprequest"
 	"github.com/juju/schema"
 	"gopkg.in/errgo.v1"
-	goosehttp "gopkg.in/goose.v1/http"
 	gooseidentity "gopkg.in/goose.v1/identity"
 	"gopkg.in/juju/environschema.v1"
 	"gopkg.in/macaroon-bakery.v1/httpbakery/form"
 
 	"github.com/CanonicalLtd/blues-identity/idp"
+	"github.com/CanonicalLtd/blues-identity/internal/keystone"
 	"github.com/CanonicalLtd/blues-identity/internal/mongodoc"
 	"github.com/CanonicalLtd/blues-identity/params"
 )
@@ -23,7 +23,7 @@ import (
 // configured keystone instance to authenticate against.
 type KeystoneIdentityProvider struct {
 	params idp.KeystoneParams
-	auth   gooseidentity.Authenticator
+	client *keystone.Client
 }
 
 // NewKeystoneIdentityProvider creates a KeystoneIdentityProvider with
@@ -31,7 +31,7 @@ type KeystoneIdentityProvider struct {
 func NewKeystoneIdentityProvider(p *idp.KeystoneParams) *KeystoneIdentityProvider {
 	idp := KeystoneIdentityProvider{
 		params: *p,
-		auth:   gooseidentity.NewAuthenticator(gooseidentity.AuthUserPass, nil),
+		client: keystone.NewClient(p.URL),
 	}
 	if idp.params.Description == "" {
 		idp.params.Description = idp.params.Name
@@ -63,7 +63,12 @@ func (idp *KeystoneIdentityProvider) Handle(c Context) {
 	p := c.Params()
 	p.Request.ParseForm()
 	if p.Request.Form.Get("username") != "" {
-		idp.doLogin(c, p.Request.Form.Get("username"), p.Request.Form.Get("password"))
+		idp.doLogin(c, keystone.Auth{
+			PasswordCredentials: &keystone.PasswordCredentials{
+				Username: p.Request.Form.Get("username"),
+				Password: p.Request.Form.Get("password"),
+			},
+		})
 		return
 	}
 	url := c.IDPURL("/login")
@@ -95,28 +100,24 @@ const loginPage = `<!doctype html>
 </html>
 `
 
-func (idp *KeystoneIdentityProvider) doLogin(c Context, username, password string) {
-	ad, err := idp.auth.Auth(&gooseidentity.Credentials{
-		URL:     idp.params.URL + "/tokens",
-		User:    username,
-		Secrets: password,
+func (idp *KeystoneIdentityProvider) doLogin(c Context, a keystone.Auth) {
+	resp, err := idp.client.Tokens(&keystone.TokensRequest{
+		Body: keystone.TokensBody{
+			Auth: a,
+		},
 	})
 	if err != nil {
 		c.LoginFailure(errgo.WithCausef(err, params.ErrUnauthorized, "cannot log in"))
 		return
 	}
-	groups, err := getKeystoneTenants(&idp.params, ad.Token)
+	groups, err := idp.getGroups(resp.Access.Token.ID)
 	if err != nil {
 		c.LoginFailure(errgo.Mask(err))
-	}
-	externalID := ad.UserId
-	if idp.params.Domain != "" {
-		username += "@" + idp.params.Domain
-		externalID += "@" + idp.params.Domain
+		return
 	}
 	identity := mongodoc.Identity{
-		Username:   username,
-		ExternalID: externalID,
+		Username:   idp.qualifiedName(resp.Access.User.Username),
+		ExternalID: idp.qualifiedName(resp.Access.User.ID),
 		Groups:     groups,
 	}
 	if err := c.Store().UpsertIdentity(&identity); err != nil {
@@ -126,36 +127,30 @@ func (idp *KeystoneIdentityProvider) doLogin(c Context, username, password strin
 	loginIdentity(c, &identity)
 }
 
-// getKeystoneTenants connects to keystone using token and lists tenants
-// associated with the token.
-func getKeystoneTenants(params *idp.KeystoneParams, token string) ([]string, error) {
-	var tenantResponse struct {
-		Tenants []struct {
-			Name string `json:"name"`
-		} `json:"tenants"`
-	}
-	c := goosehttp.New()
-	err := c.JsonRequest(
-		"GET",
-		params.URL+"/tenants",
-		token,
-		&goosehttp.RequestData{
-			RespValue: &tenantResponse,
-		},
-		nil,
-	)
+// getGroups connects to keystone using token and lists tenants
+// associated with the token. The tenants are then converted to groups
+// names by suffixing with the domain, if configured.
+func (idp *KeystoneIdentityProvider) getGroups(token string) ([]string, error) {
+	resp, err := idp.client.Tenants(&keystone.TenantsRequest{
+		AuthToken: token,
+	})
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot get tenants")
 	}
-	groups := make([]string, len(tenantResponse.Tenants))
-	for i, t := range tenantResponse.Tenants {
-		name := t.Name
-		if params.Domain != "" {
-			name += "@" + params.Domain
-		}
-		groups[i] = name
+	groups := make([]string, len(resp.Tenants))
+	for i, t := range resp.Tenants {
+		groups[i] = idp.qualifiedName(t.Name)
 	}
 	return groups, nil
+}
+
+// qualifiedName returns the given name qualified as appropriate with
+// the provider's configured domain.
+func (idp *KeystoneIdentityProvider) qualifiedName(name string) string {
+	if idp.params.Domain != "" {
+		return name + "@" + idp.params.Domain
+	}
+	return name
 }
 
 // KeystoneUserpassIdentityProvider is an IdentityProvider with identical
@@ -194,7 +189,12 @@ func (idp *KeystoneUserpassIdentityProvider) Handle(c Context) {
 		return
 	}
 	m := form.(map[string]interface{})
-	idp.doLogin(c, m["username"].(string), m["password"].(string))
+	idp.doLogin(c, keystone.Auth{
+		PasswordCredentials: &keystone.PasswordCredentials{
+			Username: m["username"].(string),
+			Password: m["password"].(string),
+		},
+	})
 }
 
 var keystoneSchemaResponse = form.SchemaResponse{
@@ -223,4 +223,70 @@ func mustValidationSchema(fields environschema.Fields) (schema.Fields, schema.De
 		panic(err)
 	}
 	return f, d
+}
+
+// KeystoneTokenIdentityProvider is an identity provider that uses a
+// configured keystone instance to authenticate against using an existing
+// token to authenticate.
+type KeystoneTokenIdentityProvider struct {
+	KeystoneIdentityProvider
+}
+
+// NewKeystoneTokenIdentityProvider creates a KeystoneTokenIdentityProvider with
+// the given configuration.
+func NewKeystoneTokenIdentityProvider(p *idp.KeystoneParams) *KeystoneTokenIdentityProvider {
+	return &KeystoneTokenIdentityProvider{
+		KeystoneIdentityProvider: *NewKeystoneIdentityProvider(p),
+	}
+}
+
+func (*KeystoneTokenIdentityProvider) Interactive() bool {
+	return false
+}
+
+func (idp *KeystoneTokenIdentityProvider) Handle(c Context) {
+	var lr keystoneTokenLoginRequest
+	if err := httprequest.Unmarshal(c.Params(), &lr); err != nil {
+		c.LoginFailure(errgo.WithCausef(err, params.ErrBadRequest, "cannot unmarshal login request"))
+		return
+	}
+	idp.doLogin(c, keystone.Auth{
+		Token: &keystone.Token{
+			ID: lr.Token.Login.ID,
+		},
+	})
+}
+
+type keystoneTokenLoginRequest struct {
+	httprequest.Route `httprequest:"POST"`
+	Token             keystoneToken `httprequest:",body"`
+}
+
+type idName struct {
+	Name string `json:"name"`
+	ID   string `json:"id"`
+}
+
+// keystoneToken is the token sent to use to login to the keystone
+// server. The only part that is used is Login.ID.
+type keystoneToken struct {
+	Login struct {
+		Domain idName `json:"domain"`
+		User   idName `json:"user"`
+		Tenant idName `json:"tenant"`
+		ID     string `json:"id"`
+	} `json:"login"`
+}
+
+type keystoneTokenAuthenticationRequest struct {
+	Auth keystoneTokenAuth `json:"auth"`
+}
+
+type keystoneTokenAuth struct {
+	Token      keystoneTokenToken `json:"token"`
+	TenantName string             `json:"tenantName"`
+}
+
+type keystoneTokenToken struct {
+	ID string `json:"id"`
 }
