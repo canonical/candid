@@ -5,6 +5,7 @@ package idp
 import (
 	"net/http"
 	"net/url"
+	"strings"
 
 	"github.com/juju/httprequest"
 	"gopkg.in/errgo.v1"
@@ -36,7 +37,11 @@ func NewAgentIdentityProvider(location string) (*AgentIdentityProvider, error) {
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot parse location")
 	}
-	return &AgentIdentityProvider{u.Path}, nil
+	path := u.Path
+	if !strings.HasSuffix(path, "/") {
+		path = path + "/"
+	}
+	return &AgentIdentityProvider{path}, nil
 }
 
 // Name gives the name of the identity provider (agent).
