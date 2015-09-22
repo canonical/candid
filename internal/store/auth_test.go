@@ -208,7 +208,7 @@ func (s *authSuite) TestGroupsFromRequest(c *gc.C) {
 	herr, ok := err.(*httpbakery.Error)
 	c.Assert(ok, gc.Equals, true, gc.Commentf("unexpected error %s", err))
 	c.Assert(herr.Code, gc.Equals, httpbakery.ErrDischargeRequired)
-	c.Assert(herr.Info.MacaroonPath, gc.Equals, "/id")
+	c.Assert(herr.Info.MacaroonPath, gc.Equals, "/id/")
 	c.Assert(herr.Info.Macaroon, gc.Not(gc.IsNil))
 	var foundThirdParty bool
 	for _, cav := range herr.Info.Macaroon.Caveats() {
@@ -300,7 +300,6 @@ func (s *authSuite) TestCheckACL(c *gc.C) {
 	err = store.CheckACL(testChecker, req, []string{"test-group3", "test-group1"})
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 }
-
 
 func (s *authSuite) TestMacaroonRequired(c *gc.C) {
 	testChecker := checkers.OperationChecker("test")

@@ -166,6 +166,7 @@ func (h *dischargeHandler) Wait(p httprequest.Params, w *waitRequest) (*waitResp
 	if err != nil {
 		return nil, errgo.NoteMask(err, "cannot discharge", errgo.Any)
 	}
+
 	// Return the identity macaroon as a cookie in the wait
 	// response. Note that this is a security hole that means that
 	// any web site can obtain the capability to do arbitrary things
@@ -176,7 +177,8 @@ func (h *dischargeHandler) Wait(p httprequest.Params, w *waitRequest) (*waitResp
 	// X-Requested-With header, return the identity cookie only when
 	// it's not present (i.e. when /wait is not called from an AJAX
 	// request).
-	p.Response.Header().Add("Set-Cookie", cookie.String())
+	cookie.Path = "/"
+	http.SetCookie(p.Response, cookie)
 
 	return &waitResponse{
 		Macaroon: m,

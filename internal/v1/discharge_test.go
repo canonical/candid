@@ -905,3 +905,58 @@ func (h keystoneFormFiller) Fill(s environschema.Fields) (map[string]interface{}
 		"password": h.password,
 	}, nil
 }
+
+func (s *dischargeSuite) TestIdentityCookieLocation(c *gc.C) {
+	store := s.pool.GetNoLimit()
+	defer s.pool.Put(store)
+	s.MockUSSO.AddUser(&mockusso.User{
+		ID:       "test",
+		NickName: "test",
+		FullName: "Test User",
+		Email:    "test@example.com",
+		Groups:   []string{"test1", "test2"},
+	})
+	s.MockUSSO.SetLoginUser("test")
+	svc, err := bakery.NewService(bakery.NewServiceParams{
+		Locator: s.locator,
+	})
+	c.Assert(err, gc.IsNil)
+	client := httpbakery.NewClient()
+	client.Client.Transport = transport{
+		prefix: location,
+		srv:    s.srv,
+		rt:     http.DefaultTransport,
+	}
+	jar := new(testCookieJar)
+	client.Client.Jar = jar
+	client.VisitWebPage = s.doVisit(c)
+	m := newMacaroon(c, svc, []checkers.Caveat{{
+		Location:  s.netSrv.URL,
+		Condition: "is-authenticated-user",
+	}})
+	ms, err := client.DischargeAll(m)
+	c.Assert(err, gc.IsNil)
+	d := checkers.InferDeclared(ms)
+	err = svc.Check(ms, checkers.New(
+		d,
+		checkers.TimeBefore,
+	))
+	c.Assert(jar.Cookie.Path, gc.Equals, "/")
+}
+
+type testCookieJar struct {
+	Cookie *http.Cookie
+}
+
+func (j *testCookieJar) SetCookies(_ *url.URL, c []*http.Cookie) {
+	for _, cookie := range c {
+		if j.Cookie != nil {
+			panic("too many cookies")
+		}
+		j.Cookie = cookie
+	}
+}
+
+func (j *testCookieJar) Cookies(u *url.URL) []*http.Cookie {
+	return nil
+}
