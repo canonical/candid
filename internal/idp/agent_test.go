@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 
 	gc "gopkg.in/check.v1"
 	"gopkg.in/macaroon-bakery.v1/bakery"
@@ -58,6 +59,9 @@ func (s *agentSuite) TestHandleBadRequest(c *gc.C) {
 		store: s.store,
 	}
 	tc.params.Request = &http.Request{
+		URL: &url.URL{
+			Path: "/",
+		},
 		Header: http.Header{
 			"Content-Type": []string{"text/plain"},
 		},
@@ -77,6 +81,9 @@ func (s *agentSuite) TestHandleNoMacaroon(c *gc.C) {
 		store: s.store,
 	}
 	tc.params.Request = &http.Request{
+		URL: &url.URL{
+			Path: "/",
+		},
 		Header: http.Header{
 			"Content-Type": []string{"application/json"},
 		},
@@ -128,6 +135,9 @@ func (s *agentSuite) TestHandleWithUnsableMacaroon(c *gc.C) {
 		store: s.store,
 	}
 	tc.params.Request = &http.Request{
+		URL: &url.URL{
+			Path: "/",
+		},
 		Header: http.Header{
 			"Content-Type": []string{"application/json"},
 		},
@@ -162,6 +172,9 @@ func (s *agentSuite) TestHandleShortcutNoMacaroon(c *gc.C) {
 		},
 	}
 	tc.params.Request = &http.Request{
+		URL: &url.URL{
+			Path: "/",
+		},
 		Header: http.Header{},
 	}
 	rr := httptest.NewRecorder()
@@ -211,7 +224,7 @@ func (s *agentSuite) TestHandleShortcutWithUnsableMacaroon(c *gc.C) {
 			PublicKey: &key.Public,
 		},
 	}
-	tc.params.Request, err = http.NewRequest("", "", nil)
+	tc.params.Request, err = http.NewRequest("", "/", nil)
 	c.Assert(err, gc.IsNil)
 	m, err := s.store.Service.NewMacaroon("", nil, []checkers.Caveat{checkers.DenyCaveat("discharge")})
 	c.Assert(err, gc.IsNil)

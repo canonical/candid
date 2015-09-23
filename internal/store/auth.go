@@ -5,7 +5,6 @@ package store
 import (
 	"bytes"
 	"net/http"
-	"net/url"
 	"strings"
 
 	"github.com/juju/utils"
@@ -174,12 +173,53 @@ func (s *Store) GroupsFromRequest(c checkers.Checker, req *http.Request) ([]stri
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot create macaroon")
 	}
-	path := "/"
-	if u, err := url.Parse(s.pool.params.Location); err == nil {
-		path = u.Path
+	mpath, err := RelativeURLPath(req.URL.Path, "/")
+	if err != nil {
+		return nil, errgo.Mask(err)
 	}
-	if !strings.HasSuffix(path, "/") {
-		path += "/"
+	return nil, httpbakery.NewDischargeRequiredErrorForRequest(m, mpath, verr, req)
+}
+
+// TODO(mhilton) RelativeURLPath was copy & pasted from charmstore. It
+// should be moved to a shared location and included in both.
+
+// RelativeURLPath returns a relative URL path that is lexically equivalent to
+// targpath when interpreted by url.URL.ResolveReference.
+// On succes, the returned path will always be relative to basePath, even if basePath
+// and targPath share no elements. An error is returned if targPath can't
+// be made relative to basePath (for example when either basePath
+// or targetPath are non-absolute).
+func RelativeURLPath(basePath, targPath string) (string, error) {
+	if !strings.HasPrefix(basePath, "/") {
+		return "", errgo.Newf("non-absolute base URL")
 	}
-	return nil, httpbakery.NewDischargeRequiredErrorForRequest(m, path, verr, req)
+	if !strings.HasPrefix(targPath, "/") {
+		return "", errgo.Newf("non-absolute target URL")
+	}
+	baseParts := strings.Split(basePath, "/")
+	targParts := strings.Split(targPath, "/")
+
+	// For the purposes of dotdot, the last element of
+	// the paths are irrelevant. We save the last part
+	// of the target path for later.
+	lastElem := targParts[len(targParts)-1]
+	baseParts = baseParts[0 : len(baseParts)-1]
+	targParts = targParts[0 : len(targParts)-1]
+
+	// Find the common prefix between the two paths:
+	var i int
+	for ; i < len(baseParts); i++ {
+		if i >= len(targParts) || baseParts[i] != targParts[i] {
+			break
+		}
+	}
+	dotdotCount := len(baseParts) - i
+	targOnly := targParts[i:]
+	result := make([]string, 0, dotdotCount+len(targOnly)+1)
+	for i := 0; i < dotdotCount; i++ {
+		result = append(result, "..")
+	}
+	result = append(result, targOnly...)
+	result = append(result, lastElem)
+	return strings.Join(result, "/"), nil
 }
