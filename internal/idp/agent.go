@@ -119,5 +119,5 @@ func (a *AgentIdentityProvider) Handle(c Context) {
 		c.LoginFailure(errgo.Notef(err, "cannot create macaroon"))
 		return
 	}
-	httpbakery.WriteDischargeRequiredError(p.Response, m, a.path, nil)
+	httpbakery.WriteDischargeRequiredError(p.Response, m, store.RelativeRoot(p.Request.URL.Path), nil)
 }

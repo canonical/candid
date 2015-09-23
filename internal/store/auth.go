@@ -5,7 +5,6 @@ package store
 import (
 	"bytes"
 	"net/http"
-	"net/url"
 	"strings"
 
 	"github.com/juju/utils"
@@ -174,12 +173,18 @@ func (s *Store) GroupsFromRequest(c checkers.Checker, req *http.Request) ([]stri
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot create macaroon")
 	}
-	path := "/"
-	if u, err := url.Parse(s.pool.params.Location); err == nil {
-		path = u.Path
+	return nil, httpbakery.NewDischargeRequiredErrorForRequest(m, RelativeRoot(req.URL.Path), verr, req)
+}
+
+// RelativeRoot determines a new path relative to p that is equivilent to /.
+func RelativeRoot(p string) string {
+	parts := strings.Split(p, "/")
+	parts = parts[1:]
+	if len(parts) > 0 {
+		parts = parts[1:]
 	}
-	if !strings.HasSuffix(path, "/") {
-		path += "/"
+	for i := range parts {
+		parts[i] = ".."
 	}
-	return nil, httpbakery.NewDischargeRequiredErrorForRequest(m, path, verr, req)
+	return strings.Join(parts, "/") + "/"
 }

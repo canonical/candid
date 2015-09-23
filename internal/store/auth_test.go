@@ -201,14 +201,14 @@ func (s *authSuite) TestGroupsFromRequest(c *gc.C) {
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrUnauthorized)
 
 	// Request with no credentials (discharge required)
-	req, err = http.NewRequest("GET", "", nil)
+	req, err = http.NewRequest("GET", "http://example.com/v1/test", nil)
 	c.Assert(err, gc.IsNil)
 	groups, err = store.GroupsFromRequest(testChecker, req)
 	c.Assert(len(groups), gc.Equals, 0)
 	herr, ok := err.(*httpbakery.Error)
 	c.Assert(ok, gc.Equals, true, gc.Commentf("unexpected error %s", err))
 	c.Assert(herr.Code, gc.Equals, httpbakery.ErrDischargeRequired)
-	c.Assert(herr.Info.MacaroonPath, gc.Equals, "/id/")
+	c.Assert(herr.Info.MacaroonPath, gc.Equals, "../")
 	c.Assert(herr.Info.Macaroon, gc.Not(gc.IsNil))
 	var foundThirdParty bool
 	for _, cav := range herr.Info.Macaroon.Caveats() {
@@ -313,4 +313,37 @@ func (s *authSuite) TestMacaroonRequired(c *gc.C) {
 	bakeryError, ok := err.(*httpbakery.Error)
 	c.Assert(ok, gc.Equals, true)
 	c.Assert(bakeryError.Code.Error(), gc.Equals, "macaroon discharge required")
+}
+
+var relativeRootTests = []struct {
+	path   string
+	expect string
+}{{
+	path:   "",
+	expect: "/",
+}, {
+	path:   "/",
+	expect: "/",
+}, {
+	path:   "/foo",
+	expect: "/",
+}, {
+	path:   "/foo/",
+	expect: "../",
+}, {
+	path:   "/foo/bar",
+	expect: "../",
+}, {
+	path:   "/foo/bar/baz",
+	expect: "../../",
+}, {
+	path:   "/foo/bar/baz/",
+	expect: "../../../",
+}}
+
+func (s *authSuite) TestRelativeRoot(c *gc.C) {
+	for i, test := range relativeRootTests {
+		c.Logf("%d. %s", i, test.path)
+		c.Assert(store.RelativeRoot(test.path), gc.Equals, test.expect)
+	}
 }
