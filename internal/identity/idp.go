@@ -50,6 +50,8 @@ func newIDP(sp ServerParams, p idp.IdentityProvider) (IdentityProvider, error) {
 		return intidp.NewKeystoneIdentityProvider(p.Config.(*idp.KeystoneParams)), nil
 	case idp.KeystoneUserpass:
 		return intidp.NewKeystoneUserpassIdentityProvider(p.Config.(*idp.KeystoneParams)), nil
+	case idp.KeystoneToken:
+		return intidp.NewKeystoneTokenIdentityProvider(p.Config.(*idp.KeystoneParams)), nil
 	default:
 		return nil, errgo.Newf("unknown provider type %q", p.Type)
 	}

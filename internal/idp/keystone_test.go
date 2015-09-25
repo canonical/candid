@@ -10,103 +10,78 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/juju/httprequest"
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/testing/httptesting"
 	gc "gopkg.in/check.v1"
-	"gopkg.in/goose.v1/testing/httpsuite"
-	"gopkg.in/goose.v1/testservices/identityservice"
 	"gopkg.in/macaroon-bakery.v1/httpbakery/form"
 
 	extidp "github.com/CanonicalLtd/blues-identity/idp"
 	"github.com/CanonicalLtd/blues-identity/internal/idp"
+	"github.com/CanonicalLtd/blues-identity/internal/idtesting/mockkeystone"
+	"github.com/CanonicalLtd/blues-identity/internal/keystone"
 	"github.com/CanonicalLtd/blues-identity/internal/mongodoc"
 	"github.com/CanonicalLtd/blues-identity/params"
 )
 
 type keystoneSuite struct {
 	idpSuite
-	httpsuite.HTTPSuite
-	idp     *idp.KeystoneIdentityProvider
-	service *identityservice.UserPass
+	server *mockkeystone.Server
+	params *extidp.KeystoneParams
 }
 
 var _ = gc.Suite(&keystoneSuite{})
 
-func (s *keystoneSuite) SetUpTest(c *gc.C) {
-	s.idpSuite.SetUpTest(c)
-	s.HTTPSuite.SetUpTest(c)
-	s.service = identityservice.NewUserPass()
-	s.service.SetupHTTP(s.Mux)
-	s.idp = idp.NewKeystoneIdentityProvider(&extidp.KeystoneParams{
+func (s *keystoneSuite) SetUpSuite(c *gc.C) {
+	s.idpSuite.SetUpSuite(c)
+	s.server = mockkeystone.NewServer()
+	s.params = &extidp.KeystoneParams{
 		Name:        "openstack",
 		Description: "OpenStack",
 		Domain:      "openstack",
-		URL:         s.Server.URL,
-	})
-	s.Mux.Handle("/tenants", http.HandlerFunc(s.handleTenants))
-}
-
-func (s *keystoneSuite) TearDownTest(c *gc.C) {
-	s.HTTPSuite.TearDownTest(c)
-	s.idpSuite.TearDownTest(c)
-}
-
-type tenant struct {
-	Description string `json:"description"`
-	Enabled     bool   `json:"enabled"`
-	ID          string `json:"id"`
-	Name        string `json:"name"`
-}
-
-type tenantsResponse struct {
-	Tenants []tenant `json:"tenants"`
-}
-
-func (s *keystoneSuite) handleTenants(w http.ResponseWriter, r *http.Request) {
-	token := r.Header.Get("X-Auth-Token")
-	_, err := s.service.FindUser(token)
-	if err != nil {
-		w.WriteHeader(http.StatusUnauthorized)
+		URL:         s.server.URL,
 	}
-	httprequest.WriteJSON(w, http.StatusOK, tenantsResponse{
-		Tenants: []tenant{{
-			Description: "test_project description",
-			Enabled:     true,
-			ID:          "test_project_id",
-			Name:        "test_project",
-		}},
-	})
+	s.server.TokensFunc = testTokens
+	s.server.TenantsFunc = testTenants
 }
 
-func (s *keystoneSuite) TestName(c *gc.C) {
-	c.Assert(s.idp.Name(), gc.Equals, "openstack")
+func (s *keystoneSuite) TearDownSuite(c *gc.C) {
+	s.server.Close()
+	s.idpSuite.TearDownSuite(c)
 }
 
-func (s *keystoneSuite) TestDescription(c *gc.C) {
-	c.Assert(s.idp.Description(), gc.Equals, "OpenStack")
+func (s *keystoneSuite) TestKeystoneIdentityProviderName(c *gc.C) {
+	provider := idp.NewKeystoneIdentityProvider(s.params)
+	c.Assert(provider.Name(), gc.Equals, "openstack")
 }
 
-func (s *keystoneSuite) TestUseNameForDescription(c *gc.C) {
+func (s *keystoneSuite) TestKeystoneIdentityProviderDescription(c *gc.C) {
+	provider := idp.NewKeystoneIdentityProvider(s.params)
+	c.Assert(provider.Description(), gc.Equals, "OpenStack")
+}
+
+func (s *keystoneSuite) TestKeystoneIdentityProviderUseNameForDescription(c *gc.C) {
 	provider := idp.NewKeystoneIdentityProvider(&extidp.KeystoneParams{
 		Name: "openstack",
-		URL:  s.Server.URL,
+		URL:  s.server.URL,
 	})
 	c.Assert(provider.Description(), gc.Equals, "openstack")
 }
 
-func (s *keystoneSuite) TestInteractive(c *gc.C) {
-	c.Assert(s.idp.Interactive(), gc.Equals, true)
+func (s *keystoneSuite) TestKeystoneIdentityProviderInteractive(c *gc.C) {
+	provider := idp.NewKeystoneIdentityProvider(s.params)
+	c.Assert(provider.Interactive(), gc.Equals, true)
 }
 
-func (s *keystoneSuite) TestURL(c *gc.C) {
+func (s *keystoneSuite) TestKeystoneIdentityProviderURL(c *gc.C) {
+	provider := idp.NewKeystoneIdentityProvider(s.params)
 	tc := &testContext{}
-	u, err := s.idp.URL(tc, "1")
+	u, err := provider.URL(tc, "1")
 	c.Assert(err, gc.IsNil)
 	c.Assert(u, gc.Equals, "https://idp.test/login?waitid=1")
 }
 
-func (s *keystoneSuite) TestHandle(c *gc.C) {
+func (s *keystoneSuite) TestKeystoneIdentityProviderHandleGet(c *gc.C) {
+	provider := idp.NewKeystoneIdentityProvider(s.params)
 	tc := &testContext{
 		requestURL: "https://idp.test/login?waitid=1",
 	}
@@ -115,7 +90,7 @@ func (s *keystoneSuite) TestHandle(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 	rr := httptest.NewRecorder()
 	tc.params.Response = rr
-	s.idp.Handle(tc)
+	provider.Handle(tc)
 	c.Assert(rr.Code, gc.Equals, http.StatusOK)
 	c.Assert(rr.HeaderMap.Get("Content-Type"), gc.Equals, "text/html;charset=UTF-8")
 	c.Assert(rr.Body.String(), gc.Equals, `<!doctype html>
@@ -132,16 +107,16 @@ func (s *keystoneSuite) TestHandle(c *gc.C) {
 `)
 }
 
-func (s *keystoneSuite) TestHandleResponse(c *gc.C) {
+func (s *keystoneSuite) TestKeystoneIdentityProviderHandlePost(c *gc.C) {
+	provider := idp.NewKeystoneIdentityProvider(s.params)
 	tc := &testContext{
 		store:      s.store,
 		requestURL: "https://idp.test/login?waitid=1",
 		success:    true,
 	}
-	userInfo := s.service.AddUser("testuser", "testpass", "test_project")
 	v := url.Values{
-		"username": []string{"testuser"},
-		"password": []string{"testpass"},
+		"username": {"testuser"},
+		"password": {"testpass"},
 	}
 	var err error
 	tc.params.Request, err = http.NewRequest("POST", tc.requestURL, strings.NewReader(v.Encode()))
@@ -149,22 +124,23 @@ func (s *keystoneSuite) TestHandleResponse(c *gc.C) {
 	tc.params.Request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	rr := httptest.NewRecorder()
 	tc.params.Response = rr
-	s.idp.Handle(tc)
+	provider.Handle(tc)
 	c.Assert(tc.err, gc.IsNil)
 	c.Assert(tc.macaroon, gc.Not(gc.IsNil))
 	identity, err := s.store.GetIdentity(params.Username("testuser@openstack"))
 	c.Assert(err, gc.IsNil)
-	c.Assert(identity.ExternalID, gc.Equals, userInfo.Id+"@openstack")
-	c.Assert(identity.Groups, jc.DeepEquals, []string{"test_project@openstack"})
+	c.Assert(identity.ExternalID, gc.Equals, "abc@openstack")
+	c.Assert(identity.Groups, jc.DeepEquals, []string{"abc_project@openstack"})
 	c.Assert(rr.Body.String(), gc.Equals, "login successful as user testuser@openstack\n")
 }
 
-func (s *keystoneSuite) TestHandleBadPassword(c *gc.C) {
+func (s *keystoneSuite) TestKeystoneIdentityProviderHandlePostBadPassword(c *gc.C) {
+	provider := idp.NewKeystoneIdentityProvider(s.params)
 	tc := &testContext{
 		store:      s.store,
 		requestURL: "https://idp.test/login?waitid=1",
+		success:    true,
 	}
-	s.service.AddUser("testuser", "testpass", "")
 	v := url.Values{
 		"username": []string{"testuser"},
 		"password": []string{"nottestpass"},
@@ -175,13 +151,35 @@ func (s *keystoneSuite) TestHandleBadPassword(c *gc.C) {
 	tc.params.Request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	rr := httptest.NewRecorder()
 	tc.params.Response = rr
-	s.idp.Handle(tc)
-	c.Assert(tc.err, gc.ErrorMatches, `cannot log in: Unauthorised URL .*/tokens
-caused by: request \(.*/tokens\) returned unexpected status: 401; error info: Failed: 401 error: Invalid user / password`)
+	provider.Handle(tc)
+	c.Assert(tc.err, gc.ErrorMatches, `cannot log in: POST .*/v2.0/tokens: invalid credentials`)
 	c.Assert(tc.macaroon, gc.IsNil)
 }
 
-func (s *keystoneSuite) TestHandleExistingUser(c *gc.C) {
+func (s *keystoneSuite) TestKeystoneIdentityProviderHandlePostNoTenants(c *gc.C) {
+	provider := idp.NewKeystoneIdentityProvider(s.params)
+	tc := &testContext{
+		store:      s.store,
+		requestURL: "https://idp.test/login?waitid=1",
+		success:    true,
+	}
+	v := url.Values{
+		"username": []string{"testuser2"},
+		"password": []string{"testpass"},
+	}
+	var err error
+	tc.params.Request, err = http.NewRequest("POST", tc.requestURL, strings.NewReader(v.Encode()))
+	c.Assert(err, gc.IsNil)
+	tc.params.Request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rr := httptest.NewRecorder()
+	tc.params.Response = rr
+	provider.Handle(tc)
+	c.Assert(tc.err, gc.ErrorMatches, `cannot get tenants: GET .*/v2.0/tenants: bad token`)
+	c.Assert(tc.macaroon, gc.IsNil)
+}
+
+func (s *keystoneSuite) TestKeystoneIdentityProviderHandleExistingUser(c *gc.C) {
+	provider := idp.NewKeystoneIdentityProvider(s.params)
 	tc := &testContext{
 		store:      s.store,
 		requestURL: "https://idp.test/login?waitid=1",
@@ -192,7 +190,6 @@ func (s *keystoneSuite) TestHandleExistingUser(c *gc.C) {
 		ExternalID: "some other thing",
 	})
 	c.Assert(err, gc.IsNil)
-	s.service.AddUser("testuser", "testpass", "")
 	v := url.Values{
 		"username": []string{"testuser"},
 		"password": []string{"testpass"},
@@ -202,83 +199,44 @@ func (s *keystoneSuite) TestHandleExistingUser(c *gc.C) {
 	tc.params.Request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	rr := httptest.NewRecorder()
 	tc.params.Response = rr
-	s.idp.Handle(tc)
+	provider.Handle(tc)
 	c.Assert(tc.err, gc.ErrorMatches, "cannot update identity: cannot add user: duplicate username or external_id")
 	c.Assert(tc.macaroon, gc.IsNil)
 }
 
-type keystoneUserpassSuite struct {
-	idpSuite
-	httpsuite.HTTPSuite
-	idp     *idp.KeystoneUserpassIdentityProvider
-	service *identityservice.UserPass
+func (s *keystoneSuite) TestKeystoneUserpassIdentityProviderName(c *gc.C) {
+	provider := idp.NewKeystoneUserpassIdentityProvider(s.params)
+	c.Assert(provider.Name(), gc.Equals, "openstack")
 }
 
-var _ = gc.Suite(&keystoneUserpassSuite{})
-
-func (s *keystoneUserpassSuite) SetUpTest(c *gc.C) {
-	s.idpSuite.SetUpTest(c)
-	s.HTTPSuite.SetUpTest(c)
-	s.service = identityservice.NewUserPass()
-	s.service.SetupHTTP(s.Mux)
-	s.idp = idp.NewKeystoneUserpassIdentityProvider(&extidp.KeystoneParams{
-		Name:        "openstack",
-		Description: "OpenStack",
-		Domain:      "openstack",
-		URL:         s.Server.URL,
-	})
-	s.Mux.Handle("/tenants", http.HandlerFunc(s.handleTenants))
+func (s *keystoneSuite) TestKeystoneUserpassIdentityProviderDescription(c *gc.C) {
+	provider := idp.NewKeystoneUserpassIdentityProvider(s.params)
+	c.Assert(provider.Description(), gc.Equals, "OpenStack")
 }
 
-func (s *keystoneUserpassSuite) TearDownTest(c *gc.C) {
-	s.HTTPSuite.TearDownTest(c)
-	s.idpSuite.TearDownTest(c)
-}
-
-func (s *keystoneUserpassSuite) handleTenants(w http.ResponseWriter, r *http.Request) {
-	token := r.Header.Get("X-Auth-Token")
-	_, err := s.service.FindUser(token)
-	if err != nil {
-		w.WriteHeader(http.StatusUnauthorized)
-	}
-	httprequest.WriteJSON(w, http.StatusOK, tenantsResponse{
-		Tenants: []tenant{{
-			Description: "test_project description",
-			Enabled:     true,
-			ID:          "test_project_id",
-			Name:        "test_project",
-		}},
-	})
-}
-
-func (s *keystoneUserpassSuite) TestName(c *gc.C) {
-	c.Assert(s.idp.Name(), gc.Equals, "openstack")
-}
-
-func (s *keystoneUserpassSuite) TestDescription(c *gc.C) {
-	c.Assert(s.idp.Description(), gc.Equals, "OpenStack")
-}
-
-func (s *keystoneUserpassSuite) TestUseNameForDescription(c *gc.C) {
-	provider := idp.NewKeystoneIdentityProvider(&extidp.KeystoneParams{
+func (s *keystoneSuite) TestKeystoneUserpassIdentityProviderUseNameForDescription(c *gc.C) {
+	provider := idp.NewKeystoneUserpassIdentityProvider(&extidp.KeystoneParams{
 		Name: "openstack",
-		URL:  s.Server.URL,
+		URL:  s.server.URL,
 	})
 	c.Assert(provider.Description(), gc.Equals, "openstack")
 }
 
-func (s *keystoneUserpassSuite) TestInteractive(c *gc.C) {
-	c.Assert(s.idp.Interactive(), gc.Equals, false)
+func (s *keystoneSuite) TestKeystoneUserpassIdentityProviderInteractive(c *gc.C) {
+	provider := idp.NewKeystoneUserpassIdentityProvider(s.params)
+	c.Assert(provider.Interactive(), gc.Equals, false)
 }
 
-func (s *keystoneUserpassSuite) TestURL(c *gc.C) {
+func (s *keystoneSuite) TestKeystoneUserpassIdentityProviderURL(c *gc.C) {
+	provider := idp.NewKeystoneUserpassIdentityProvider(s.params)
 	tc := &testContext{}
-	u, err := s.idp.URL(tc, "1")
+	u, err := provider.URL(tc, "1")
 	c.Assert(err, gc.IsNil)
 	c.Assert(u, gc.Equals, "https://idp.test/login?waitid=1")
 }
 
-func (s *keystoneUserpassSuite) TestHandle(c *gc.C) {
+func (s *keystoneSuite) TestKeystoneUserpassIdentityProviderHandle(c *gc.C) {
+	provider := idp.NewKeystoneUserpassIdentityProvider(s.params)
 	tc := &testContext{
 		store:      s.store,
 		requestURL: "https://idp.test/login?waitid=1",
@@ -289,18 +247,18 @@ func (s *keystoneUserpassSuite) TestHandle(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 	rr := httptest.NewRecorder()
 	tc.params.Response = rr
-	s.idp.Handle(tc)
+	provider.Handle(tc)
 	c.Assert(tc.err, gc.IsNil)
 	httptesting.AssertJSONResponse(c, rr, http.StatusOK, idp.KeystoneSchemaResponse)
 }
 
-func (s *keystoneUserpassSuite) TestHandleResponse(c *gc.C) {
+func (s *keystoneSuite) TestKeystoneUserpassIdentityProviderHandleResponse(c *gc.C) {
+	provider := idp.NewKeystoneUserpassIdentityProvider(s.params)
 	tc := &testContext{
 		store:      s.store,
 		requestURL: "https://idp.test/login?waitid=1",
 		success:    true,
 	}
-	userInfo := s.service.AddUser("testuser", "testpass", "test_project")
 	login := map[string]interface{}{
 		"username": "testuser",
 		"password": "testpass",
@@ -314,39 +272,39 @@ func (s *keystoneUserpassSuite) TestHandleResponse(c *gc.C) {
 	tc.params.Request.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 	tc.params.Response = rr
-	s.idp.Handle(tc)
+	provider.Handle(tc)
 	c.Assert(tc.err, gc.IsNil)
 	c.Assert(tc.macaroon, gc.Not(gc.IsNil))
 	identity, err := s.store.GetIdentity(params.Username("testuser@openstack"))
 	c.Assert(err, gc.IsNil)
-	c.Assert(identity.ExternalID, gc.Equals, userInfo.Id+"@openstack")
-	c.Assert(identity.Groups, jc.DeepEquals, []string{"test_project@openstack"})
+	c.Assert(identity.ExternalID, gc.Equals, "abc@openstack")
+	c.Assert(identity.Groups, jc.DeepEquals, []string{"abc_project@openstack"})
 	c.Assert(rr.Body.String(), gc.Equals, "login successful as user testuser@openstack\n")
 }
 
-func (s *keystoneUserpassSuite) TestHandleBadRequest(c *gc.C) {
+func (s *keystoneSuite) TestKeystoneUserpassIdentityProviderHandleBadRequest(c *gc.C) {
+	provider := idp.NewKeystoneUserpassIdentityProvider(s.params)
 	tc := &testContext{
 		store:      s.store,
 		requestURL: "https://idp.test/login?waitid=1",
 	}
-	s.service.AddUser("testuser", "testpass", "")
 	var err error
 	tc.params.Request, err = http.NewRequest("POST", tc.requestURL, strings.NewReader("{"))
 	c.Assert(err, gc.IsNil)
 	tc.params.Request.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 	tc.params.Response = rr
-	s.idp.Handle(tc)
+	provider.Handle(tc)
 	c.Assert(tc.err, gc.ErrorMatches, `cannot unmarshal login request: cannot unmarshal into field: cannot unmarshal request body: unexpected end of JSON input`)
 	c.Assert(tc.macaroon, gc.IsNil)
 }
 
-func (s *keystoneUserpassSuite) TestHandleNoUsername(c *gc.C) {
+func (s *keystoneSuite) TestKeystoneUserpassIdentityProviderHandleNoUsername(c *gc.C) {
+	provider := idp.NewKeystoneUserpassIdentityProvider(s.params)
 	tc := &testContext{
 		store:      s.store,
 		requestURL: "https://idp.test/login?waitid=1",
 	}
-	s.service.AddUser("testuser", "testpass", "")
 	login := map[string]interface{}{
 		"password": "testpass",
 	}
@@ -359,7 +317,168 @@ func (s *keystoneUserpassSuite) TestHandleNoUsername(c *gc.C) {
 	tc.params.Request.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 	tc.params.Response = rr
-	s.idp.Handle(tc)
+	provider.Handle(tc)
 	c.Assert(tc.err, gc.ErrorMatches, `cannot validate form: username: expected string, got nothing`)
 	c.Assert(tc.macaroon, gc.IsNil)
+}
+
+func (s *keystoneSuite) TestKeystoneTokenIdentityProviderName(c *gc.C) {
+	provider := idp.NewKeystoneTokenIdentityProvider(s.params)
+	c.Assert(provider.Name(), gc.Equals, "openstack")
+}
+
+func (s *keystoneSuite) TestKeystoneTokenIdentityProviderDescription(c *gc.C) {
+	provider := idp.NewKeystoneTokenIdentityProvider(s.params)
+	c.Assert(provider.Description(), gc.Equals, "OpenStack")
+}
+
+func (s *keystoneSuite) TestKeystoneTokenIdentityProviderUseNameForDescription(c *gc.C) {
+	provider := idp.NewKeystoneTokenIdentityProvider(&extidp.KeystoneParams{
+		Name: "openstack",
+		URL:  s.server.URL,
+	})
+	c.Assert(provider.Description(), gc.Equals, "openstack")
+}
+
+func (s *keystoneSuite) TestKeystoneTokenIdentityProviderInteractive(c *gc.C) {
+	provider := idp.NewKeystoneTokenIdentityProvider(s.params)
+	c.Assert(provider.Interactive(), gc.Equals, false)
+}
+
+func (s *keystoneSuite) TestKeystoneTokenIdentityProviderURL(c *gc.C) {
+	provider := idp.NewKeystoneTokenIdentityProvider(s.params)
+	tc := &testContext{}
+	u, err := provider.URL(tc, "1")
+	c.Assert(err, gc.IsNil)
+	c.Assert(u, gc.Equals, "https://idp.test/login?waitid=1")
+}
+
+func (s *keystoneSuite) TestKeystoneTokenIdentityProviderHandle(c *gc.C) {
+	provider := idp.NewKeystoneTokenIdentityProvider(s.params)
+	tc := &testContext{
+		store:      s.store,
+		requestURL: "https://idp.test/login?waitid=1",
+		success:    true,
+	}
+	var req idp.KeystoneToken
+	req.Login.ID = "789"
+	body, err := json.Marshal(req)
+	c.Assert(err, gc.IsNil)
+	tc.params.Request, err = http.NewRequest("POST", tc.requestURL, bytes.NewReader(body))
+	c.Assert(err, gc.IsNil)
+	tc.params.Request.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+	tc.params.Response = rr
+	provider.Handle(tc)
+	c.Assert(tc.err, gc.IsNil)
+	c.Assert(tc.macaroon, gc.Not(gc.IsNil))
+	identity, err := s.store.GetIdentity(params.Username("testuser@openstack"))
+	c.Assert(err, gc.IsNil)
+	c.Assert(identity.ExternalID, gc.Equals, "abc@openstack")
+	c.Assert(identity.Groups, jc.DeepEquals, []string{"abc_project@openstack"})
+	c.Assert(rr.Body.String(), gc.Equals, "login successful as user testuser@openstack\n")
+}
+
+func (s *keystoneSuite) TestKeystoneTokenIdentityProviderHandleBadToken(c *gc.C) {
+	provider := idp.NewKeystoneTokenIdentityProvider(s.params)
+	tc := &testContext{
+		store:      s.store,
+		requestURL: "https://idp.test/login?waitid=1",
+		success:    true,
+	}
+	var req idp.KeystoneToken
+	req.Login.ID = "012"
+	body, err := json.Marshal(req)
+	c.Assert(err, gc.IsNil)
+	tc.params.Request, err = http.NewRequest("POST", tc.requestURL, bytes.NewReader(body))
+	c.Assert(err, gc.IsNil)
+	tc.params.Request.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+	tc.params.Response = rr
+	provider.Handle(tc)
+	c.Assert(tc.err, gc.ErrorMatches, "cannot log in: POST .*/v2.0/tokens: invalid credentials")
+	c.Assert(tc.macaroon, gc.IsNil)
+}
+
+func (s *keystoneSuite) TestKeystoneTokenIdentityProviderHandleBadRequest(c *gc.C) {
+	provider := idp.NewKeystoneTokenIdentityProvider(s.params)
+	tc := &testContext{
+		store:      s.store,
+		requestURL: "https://idp.test/login?waitid=1",
+		success:    true,
+	}
+	var err error
+	tc.params.Request, err = http.NewRequest("POST", tc.requestURL, strings.NewReader("{"))
+	c.Assert(err, gc.IsNil)
+	tc.params.Request.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+	tc.params.Response = rr
+	provider.Handle(tc)
+	c.Assert(tc.err, gc.ErrorMatches, "cannot unmarshal login request: cannot unmarshal into field: cannot unmarshal request body: unexpected end of JSON input")
+	c.Assert(tc.macaroon, gc.IsNil)
+}
+
+func testTokens(r *keystone.TokensRequest) (*keystone.TokensResponse, error) {
+	var id string
+	var username string
+	if r.Body.Auth.PasswordCredentials != nil {
+		switch r.Body.Auth.PasswordCredentials.Username {
+		case "testuser":
+			id = "123"
+		case "testuser2":
+			id = "456"
+		default:
+			return nil, &keystone.Error{
+				Code:    http.StatusUnauthorized,
+				Message: "invalid credentials",
+				Title:   "Unauthorized",
+			}
+		}
+		if r.Body.Auth.PasswordCredentials.Password != "testpass" {
+			return nil, &keystone.Error{
+				Code:    http.StatusUnauthorized,
+				Message: "invalid credentials",
+				Title:   "Unauthorized",
+			}
+		}
+		username = r.Body.Auth.PasswordCredentials.Username
+	} else {
+		if r.Body.Auth.Token.ID != "789" {
+			return nil, &keystone.Error{
+				Code:    http.StatusUnauthorized,
+				Message: "invalid credentials",
+				Title:   "Unauthorized",
+			}
+		}
+		id = "123"
+		username = "testuser"
+	}
+	return &keystone.TokensResponse{
+		Access: keystone.Access{
+			Token: keystone.Token{
+				ID: id,
+			},
+			User: keystone.User{
+				ID:       "abc",
+				Username: username,
+				Name:     "Test User",
+			},
+		},
+	}, nil
+}
+
+func testTenants(r *keystone.TenantsRequest) (*keystone.TenantsResponse, error) {
+	if r.AuthToken != "123" {
+		return nil, &keystone.Error{
+			Code:    http.StatusUnauthorized,
+			Message: "bad token",
+			Title:   "Unauthorized",
+		}
+	}
+	return &keystone.TenantsResponse{
+		Tenants: []keystone.Tenant{{
+			ID:   "def",
+			Name: "abc_project",
+		}},
+	}, nil
 }

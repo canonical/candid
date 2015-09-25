@@ -10,6 +10,7 @@ const (
 	Agent            = "agent"
 	Keystone         = "keystone"
 	KeystoneUserpass = "keystone_userpass"
+	KeystoneToken    = "keystone_token"
 )
 
 // IdentityProvider describes the configuration of an Identity provider.
@@ -35,7 +36,7 @@ func (idp *IdentityProvider) UnmarshalYAML(unmarshal func(interface{}) error) er
 		*idp = UbuntuSSOOAuthIdentityProvider
 	case Agent:
 		*idp = AgentIdentityProvider
-	case Keystone, KeystoneUserpass:
+	case Keystone, KeystoneUserpass, KeystoneToken:
 		var err error
 		*idp, err = unmarshalKeystone(t.Type, unmarshal)
 		if err != nil {
@@ -85,10 +86,22 @@ var AgentIdentityProvider = IdentityProvider{
 // KeystoneParams holds the parameters to use with a
 // KeystoneIdentityProvider.
 type KeystoneParams struct {
-	Name        string `yaml:"name"`
-	Domain      string `yaml:"domain"`
+	// Name is the name that the identity provider will have within
+	// the identity manager. The name is used as part of the url for
+	// communicating with the identity provider.
+	Name string `yaml:"name"`
+
+	// If Domain is set it will be appended to any usernames or
+	// groups provided by the identity provider. A user created by
+	// this identity provide would be username@domain.
+	Domain string `yaml:"domain"`
+
+	// Description is a human readable description that will be used
+	// if a list of providers is shown for a user to choose.
 	Description string `yaml:"description"`
-	URL         string `yaml:"url"`
+
+	// URL is the address of the keystone server.
+	URL string `yaml:"url"`
 }
 
 // KeystoneIdentityProvider creates a new identity provider using a
@@ -101,6 +114,12 @@ func KeystoneIdentityProvider(p *KeystoneParams) IdentityProvider {
 // keystone service with a non-interactive interface.
 func KeystoneUserpassIdentityProvider(p *KeystoneParams) IdentityProvider {
 	return newKeystoneIdentityProvider(KeystoneUserpass, p)
+}
+
+// KeystoneTokenIdentityProvider creates a new identity provider that
+// identifies users using Keystone user tokens.
+func KeystoneTokenIdentityProvider(p *KeystoneParams) IdentityProvider {
+	return newKeystoneIdentityProvider(KeystoneToken, p)
 }
 
 // newKeystoneIdentityProvider creates a new identity provider using a
