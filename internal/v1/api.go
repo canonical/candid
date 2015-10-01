@@ -254,6 +254,7 @@ func (c idpHandler) LoginSuccess(ms macaroon.Slice) bool {
 		c.LoginFailure(errgo.Notef(err, "cannot create cookie"))
 		return false
 	}
+	cookie.Path = "/"
 	http.SetCookie(c.params.Response, cookie)
 	c.params.Request.ParseForm()
 	waitId := c.params.Request.Form.Get("waitid")

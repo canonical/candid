@@ -417,7 +417,7 @@ func (s *dischargeSuite) TestDischargeWithOpenID(c *gc.C) {
 		srv:    s.srv,
 		rt:     http.DefaultTransport,
 	}
-	client.VisitWebPage = s.doVisit(c)
+	client.VisitWebPage = s.doVisit(c, client.Client)
 	m := newMacaroon(c, svc, []checkers.Caveat{{
 		Location:  s.netSrv.URL,
 		Condition: "is-authenticated-user",
@@ -442,16 +442,9 @@ func (s *dischargeSuite) TestDischargeWithOpenID(c *gc.C) {
 	})
 }
 
-func (s *dischargeSuite) doVisit(c *gc.C) func(*url.URL) error {
+func (s *dischargeSuite) doVisit(c *gc.C, client *http.Client) func(*url.URL) error {
 	return func(u *url.URL) error {
 		c.Logf("visiting %s", u)
-		client := &http.Client{
-			Transport: transport{
-				prefix: location,
-				srv:    s.srv,
-				rt:     http.DefaultTransport,
-			},
-		}
 		resp, err := client.Get(u.String())
 		if err != nil {
 			return err
@@ -928,7 +921,7 @@ func (s *dischargeSuite) TestIdentityCookieLocation(c *gc.C) {
 	}
 	jar := new(testCookieJar)
 	client.Client.Jar = jar
-	client.VisitWebPage = s.doVisit(c)
+	client.VisitWebPage = s.doVisit(c, client.Client)
 	m := newMacaroon(c, svc, []checkers.Caveat{{
 		Location:  s.netSrv.URL,
 		Condition: "is-authenticated-user",
@@ -940,19 +933,39 @@ func (s *dischargeSuite) TestIdentityCookieLocation(c *gc.C) {
 		d,
 		checkers.TimeBefore,
 	))
-	c.Assert(jar.Cookie.Path, gc.Equals, "/")
+	c.Assert(jar.cookies, gc.HasLen, 1)
+	for k := range jar.cookies {
+		c.Assert(k.path, gc.Equals, "/")
+	}
+}
+
+type cookieKey struct {
+	domain string
+	path string
+	name string
 }
 
 type testCookieJar struct {
-	Cookie *http.Cookie
+	cookies map[cookieKey]*http.Cookie
 }
 
-func (j *testCookieJar) SetCookies(_ *url.URL, c []*http.Cookie) {
-	for _, cookie := range c {
-		if j.Cookie != nil {
-			panic("too many cookies")
+func (j *testCookieJar) SetCookies(u *url.URL, cs []*http.Cookie) {
+	if j.cookies == nil {
+		j.cookies = make(map[cookieKey]*http.Cookie)
+	}
+	for _, c := range cs {
+		key := cookieKey{
+			domain: u.Host,
+			path: u.Path,
+			name: c.Name,
 		}
-		j.Cookie = cookie
+		if c.Domain != "" {
+			key.domain = c.Domain
+		}
+		if c.Path != "" {
+			key.path = c.Path
+		}
+		j.cookies[key] = c
 	}
 }
 
