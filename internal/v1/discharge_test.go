@@ -941,8 +941,8 @@ func (s *dischargeSuite) TestIdentityCookieLocation(c *gc.C) {
 
 type cookieKey struct {
 	domain string
-	path string
-	name string
+	path   string
+	name   string
 }
 
 type testCookieJar struct {
@@ -956,8 +956,8 @@ func (j *testCookieJar) SetCookies(u *url.URL, cs []*http.Cookie) {
 	for _, c := range cs {
 		key := cookieKey{
 			domain: u.Host,
-			path: u.Path,
-			name: c.Name,
+			path:   u.Path,
+			name:   c.Name,
 		}
 		if c.Domain != "" {
 			key.domain = c.Domain

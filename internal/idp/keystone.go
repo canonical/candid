@@ -203,15 +203,17 @@ var keystoneSchemaResponse = form.SchemaResponse{
 
 var keystoneFields = environschema.Fields{
 	"username": environschema.Attr{
-		Type:      environschema.Tstring,
-		Mandatory: true,
-		EnvVars:   gooseidentity.CredEnvUser,
+		Description: "username",
+		Type:        environschema.Tstring,
+		Mandatory:   true,
+		EnvVars:     gooseidentity.CredEnvUser,
 	},
 	"password": environschema.Attr{
-		Type:      environschema.Tstring,
-		Mandatory: true,
-		Secret:    true,
-		EnvVars:   gooseidentity.CredEnvSecrets,
+		Description: "password",
+		Type:        environschema.Tstring,
+		Mandatory:   true,
+		Secret:      true,
+		EnvVars:     gooseidentity.CredEnvSecrets,
 	},
 }
 
