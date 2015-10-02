@@ -92,7 +92,7 @@ type Server struct {
 // ServeHTTP implements http.Handler.
 func (srv *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Access-Control-Allow-Headers", "Bakery-Protocol-Version, Macaroons, X-Requested-With")
+	w.Header().Set("Access-Control-Allow-Headers", "Bakery-Protocol-Version, Macaroons, X-Requested-With, Content-Type")
 	w.Header().Set("Access-Control-Cache-Max-Age", "600")
 	srv.router.ServeHTTP(w, req)
 }
