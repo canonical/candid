@@ -126,7 +126,7 @@ func (h *Handler) ExcludeExtensions() {
 
 func (h *Handler) root(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	w.Header().Set("Content-Type", "text/html")
-	w.Header().Set("X-Xrds-Location", h.location+"+xrds")
+	w.Header().Set("X-Xrds-Location", h.location+"/+xrds")
 	content := `<html><head><title>Mock UbuntuSSO</title></head><body></body><html>`
 	w.Header().Set("Content-Length", fmt.Sprint(len(content)))
 	if r.Method == "HEAD" {

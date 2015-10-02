@@ -412,11 +412,6 @@ func (s *dischargeSuite) TestDischargeWithOpenID(c *gc.C) {
 	})
 	c.Assert(err, gc.IsNil)
 	client := httpbakery.NewClient()
-	client.Client.Transport = transport{
-		prefix: location,
-		srv:    s.srv,
-		rt:     http.DefaultTransport,
-	}
 	client.VisitWebPage = s.doVisit(c, client.Client)
 	m := newMacaroon(c, svc, []checkers.Caveat{{
 		Location:  s.netSrv.URL,
@@ -460,11 +455,6 @@ func (s *dischargeSuite) doVisit(c *gc.C, client *http.Client) func(*url.URL) er
 }
 
 func (s *dischargeSuite) TestDischargeWithOAuth(c *gc.C) {
-	s.PatchValue(&http.DefaultTransport, transport{
-		prefix: location,
-		srv:    s.srv,
-		rt:     http.DefaultTransport,
-	})
 	uuid := s.createUser(c, &params.User{
 		Username:   "test",
 		ExternalID: "https://login.ubuntu.com/+id/1234",
@@ -510,11 +500,6 @@ func (s *dischargeSuite) TestDischargeWithOAuth(c *gc.C) {
 }
 
 func (s *dischargeSuite) TestDischargeWithOAuthBadToken(c *gc.C) {
-	s.PatchValue(&http.DefaultTransport, transport{
-		prefix: location,
-		srv:    s.srv,
-		rt:     http.DefaultTransport,
-	})
 	s.createUser(c, &params.User{
 		Username:   "test",
 		ExternalID: "https://login.ubuntu.com/+id/1234",
@@ -658,11 +643,6 @@ var badToken = &oauth.Credentials{
 }
 
 func (s *dischargeSuite) TestDischargeWithAgentLogin(c *gc.C) {
-	s.PatchValue(&http.DefaultTransport, transport{
-		prefix: location,
-		srv:    s.srv,
-		rt:     http.DefaultTransport,
-	})
 	keys, err := bakery.GenerateKey()
 	c.Assert(err, gc.IsNil)
 	uuid := s.createIdentity(c, &mongodoc.Identity{
@@ -814,11 +794,6 @@ func agentVisit(c *gc.C, client *httpbakery.Client, username string, pk *bakery.
 }
 
 func (s *dischargeSuite) TestKeystoneSchema(c *gc.C) {
-	s.PatchValue(&http.DefaultTransport, transport{
-		prefix: location,
-		srv:    s.srv,
-		rt:     http.DefaultTransport,
-	})
 	s.keystone.TokensFunc = func(r *keystone.TokensRequest) (*keystone.TokensResponse, error) {
 		if r.Body.Auth.PasswordCredentials.Username != "ksuser" {
 			return nil, errgo.Newf("bad username %q", r.Body.Auth.PasswordCredentials.Username)
@@ -914,11 +889,6 @@ func (s *dischargeSuite) TestIdentityCookieLocation(c *gc.C) {
 	})
 	c.Assert(err, gc.IsNil)
 	client := httpbakery.NewClient()
-	client.Client.Transport = transport{
-		prefix: location,
-		srv:    s.srv,
-		rt:     http.DefaultTransport,
-	}
 	jar := new(testCookieJar)
 	client.Client.Jar = jar
 	client.VisitWebPage = s.doVisit(c, client.Client)

@@ -3,15 +3,10 @@
 package v1_test
 
 import (
-	"bufio"
 	"bytes"
 	"encoding/json"
-	"fmt"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
-	"strings"
 
 	"github.com/juju/testing"
 	"github.com/juju/testing/httptesting"
@@ -44,6 +39,7 @@ type apiSuite struct {
 	pool    *store.Pool
 	keyPair *bakery.KeyPair
 	idps    []idp.IdentityProvider
+	server  *httptest.Server
 }
 
 var _ = gc.Suite(&apiSuite{})
@@ -63,6 +59,12 @@ func (s *apiSuite) SetUpTest(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 	s.srv, s.pool = newServer(c, s.Session, key, s.idps)
 	s.keyPair = key
+	s.server = httptest.NewServer(s.srv)
+	s.PatchValue(&http.DefaultTransport, httptesting.URLRewritingTransport{
+		MatchPrefix:  location,
+		Replace:      s.server.URL,
+		RoundTripper: http.DefaultTransport,
+	})
 }
 
 func (s *apiSuite) TearDownTest(c *gc.C) {
@@ -147,43 +149,7 @@ func (s *apiSuite) createIdentity(c *gc.C, doc *mongodoc.Identity) (uuid string)
 }
 
 func apiURL(path string) string {
-	return "/" + version + "/" + path
-}
-
-// transport implements an http.RoundTripper that will intercept anly calls
-// destined to a location starting with prefix and serves them using srv. For
-// all other requests rt will be used.
-type transport struct {
-	prefix string
-	srv    http.Handler
-	rt     http.RoundTripper
-}
-
-func (t transport) RoundTrip(req *http.Request) (*http.Response, error) {
-	dest := req.URL.String()
-	if !strings.HasPrefix(dest, t.prefix) {
-		return t.rt.RoundTrip(req)
-	}
-	var buf bytes.Buffer
-	req.Write(&buf)
-	sreq, _ := http.ReadRequest(bufio.NewReader(&buf))
-	u, _ := url.Parse(t.prefix)
-	sreq.URL.Path = strings.TrimPrefix(sreq.URL.Path, u.Path)
-	sreq.RequestURI = strings.TrimPrefix(sreq.RequestURI, u.Path)
-	sreq.RemoteAddr = "127.0.0.1:1234"
-	rr := httptest.NewRecorder()
-	t.srv.ServeHTTP(rr, sreq)
-	return &http.Response{
-		Status:        fmt.Sprintf("%d Status", rr.Code),
-		StatusCode:    rr.Code,
-		Proto:         "HTTP/1.1",
-		ProtoMajor:    1,
-		ProtoMinor:    1,
-		Header:        rr.HeaderMap,
-		Body:          ioutil.NopCloser(rr.Body),
-		ContentLength: int64(rr.Body.Len()),
-		Request:       req,
-	}, nil
+	return location + "/" + version + "/" + path
 }
 
 var DischargeRequiredBody httptesting.BodyAsserter = func(c *gc.C, body json.RawMessage) {
