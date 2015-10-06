@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/garyburd/go-oauth/oauth"
+	"github.com/juju/testing/httptesting"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/macaroon-bakery.v1/bakery"
 	"gopkg.in/macaroon-bakery.v1/httpbakery"
@@ -68,14 +69,7 @@ func (s *loginSuite) TestInteractiveLogin(c *gc.C) {
 		Groups:   []string{"test1", "test2"},
 	})
 	s.MockUSSO.SetLoginUser("test")
-	client := &http.Client{
-		Transport: transport{
-			prefix: location,
-			srv:    s.srv,
-			rt:     http.DefaultTransport,
-		},
-	}
-	resp, err := client.Get(location + "/v1/login")
+	resp, err := http.Get(location + "/v1/login")
 	c.Assert(err, gc.IsNil)
 	defer resp.Body.Close()
 	c.Assert(resp.StatusCode, gc.Equals, http.StatusOK)
@@ -84,10 +78,12 @@ func (s *loginSuite) TestInteractiveLogin(c *gc.C) {
 
 func (s *loginSuite) TestInteractiveLoginFromDifferentProvider(c *gc.C) {
 	mockUSSO := mockusso.New("https://login.badplace.com")
-	s.PatchValue(&http.DefaultTransport, transport{
-		prefix: "https://login.badplace.com",
-		srv:    mockUSSO,
-		rt:     http.DefaultTransport,
+	server := httptest.NewServer(mockUSSO)
+	defer server.Close()
+	s.PatchValue(&http.DefaultTransport, httptesting.URLRewritingTransport{
+		MatchPrefix:  "https://login.badplace.com",
+		Replace:      server.URL,
+		RoundTripper: http.DefaultTransport,
 	})
 	mockUSSO.AddUser(&mockusso.User{
 		ID:       "test",
@@ -97,13 +93,6 @@ func (s *loginSuite) TestInteractiveLoginFromDifferentProvider(c *gc.C) {
 		Groups:   []string{"test1", "test2"},
 	})
 	mockUSSO.SetLoginUser("test")
-	client := &http.Client{
-		Transport: transport{
-			prefix: location,
-			srv:    s.srv,
-			rt:     http.DefaultTransport,
-		},
-	}
 	v := url.Values{}
 	v.Set("openid.ns", "http://specs.openid.net/auth/2.0")
 	v.Set("openid.mode", "checkid_setup")
@@ -117,7 +106,7 @@ func (s *loginSuite) TestInteractiveLoginFromDifferentProvider(c *gc.C) {
 		Path:     "/+openid",
 		RawQuery: v.Encode(),
 	}
-	resp, err := client.Get(u.String())
+	resp, err := http.Get(u.String())
 	c.Assert(err, gc.IsNil)
 	defer resp.Body.Close()
 	c.Assert(resp.StatusCode, gc.Equals, http.StatusForbidden)
@@ -149,14 +138,7 @@ func (s *loginSuite) TestInteractiveLoginNoExtensions(c *gc.C) {
 	})
 	s.MockUSSO.SetLoginUser("test")
 	s.MockUSSO.ExcludeExtensions()
-	client := &http.Client{
-		Transport: transport{
-			prefix: location,
-			srv:    s.srv,
-			rt:     http.DefaultTransport,
-		},
-	}
-	resp, err := client.Get(location + "/v1/login")
+	resp, err := http.Get(location + "/v1/login")
 	c.Assert(err, gc.IsNil)
 	defer resp.Body.Close()
 	c.Assert(resp.StatusCode, gc.Equals, http.StatusOK)
@@ -173,14 +155,7 @@ func (s *loginSuite) TestInteractiveLoginNoExtensionsUnknownUser(c *gc.C) {
 	})
 	s.MockUSSO.SetLoginUser("test")
 	s.MockUSSO.ExcludeExtensions()
-	client := &http.Client{
-		Transport: transport{
-			prefix: location,
-			srv:    s.srv,
-			rt:     http.DefaultTransport,
-		},
-	}
-	resp, err := client.Get(location + "/v1/login")
+	resp, err := http.Get(location + "/v1/login")
 	c.Assert(err, gc.IsNil)
 	defer resp.Body.Close()
 	c.Assert(resp.StatusCode, gc.Equals, http.StatusForbidden)
@@ -209,11 +184,6 @@ func (s *loginSuite) TestOAuthLogin(c *gc.C) {
 		TokenSecret:    "secret2",
 	})
 	client := new(http.Client)
-	client.Transport = transport{
-		prefix: location,
-		srv:    s.srv,
-		rt:     http.DefaultTransport,
-	}
 	req, err := http.NewRequest("GET", location+"/v1/login", nil)
 	c.Assert(err, gc.IsNil)
 	req.Header.Set("Accept", "application/json")
@@ -264,11 +234,6 @@ func (s *loginSuite) TestAgentLogin(c *gc.C) {
 		}},
 	})
 	client := httpbakery.NewClient()
-	client.Client.Transport = transport{
-		prefix: location,
-		srv:    s.srv,
-		rt:     http.DefaultTransport,
-	}
 	client.Key = keys
 	req, err := http.NewRequest("GET", location+"/v1/login", nil)
 	c.Assert(err, gc.IsNil)
@@ -319,11 +284,6 @@ func (s *loginSuite) TestCookieBasedAgentLogin(c *gc.C) {
 		}},
 	})
 	client := httpbakery.NewClient()
-	client.Client.Transport = transport{
-		prefix: location,
-		srv:    s.srv,
-		rt:     http.DefaultTransport,
-	}
 	client.Key = keys
 	var p params.AgentLogin
 	p.Username = "test"

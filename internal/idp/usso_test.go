@@ -23,6 +23,16 @@ type ussoSuite struct {
 
 var _ = gc.Suite(&ussoSuite{})
 
+func (s *ussoSuite) SetUpSuite(c *gc.C) {
+	s.idpSuite.SetUpSuite(c)
+	s.Suite.SetUpSuite(c)
+}
+
+func (s *ussoSuite) TearDownSuite(c *gc.C) {
+	s.Suite.TearDownSuite(c)
+	s.idpSuite.TearDownSuite(c)
+}
+
 func (s *ussoSuite) SetUpTest(c *gc.C) {
 	s.idpSuite.SetUpTest(c)
 	s.Suite.SetUpTest(c)

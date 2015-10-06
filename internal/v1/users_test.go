@@ -1214,11 +1214,6 @@ func (s *usersSuite) TestMultipleEndpointAccess(c *gc.C) {
 		Groups:   []string{"g3", "g4"},
 	})
 	client := httpbakery.NewClient()
-	client.Client.Transport = transport{
-		prefix: location,
-		srv:    s.srv,
-		rt:     http.DefaultTransport,
-	}
 	m, err := store.Service.NewMacaroon("", nil, []checkers.Caveat{
 		checkers.DeclaredCaveat("username", "jbloggs1"),
 	})
@@ -1232,7 +1227,7 @@ func (s *usersSuite) TestMultipleEndpointAccess(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 	resp, err := client.Do(req)
 	c.Assert(err, gc.IsNil)
-	resp.Body.Close()
+	defer resp.Body.Close()
 	c.Assert(resp.StatusCode, gc.Equals, http.StatusOK)
 	body, err := ioutil.ReadAll(resp.Body)
 	c.Assert(err, gc.IsNil)
@@ -1242,7 +1237,7 @@ func (s *usersSuite) TestMultipleEndpointAccess(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 	resp, err = client.Do(req)
 	c.Assert(err, gc.IsNil)
-	resp.Body.Close()
+	defer resp.Body.Close()
 	c.Assert(resp.StatusCode, gc.Equals, http.StatusForbidden)
 	body, err = ioutil.ReadAll(resp.Body)
 	c.Assert(err, gc.IsNil)

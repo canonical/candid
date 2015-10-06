@@ -7,7 +7,7 @@ github.com/juju/httprequest	git	642e10a13f302e3036fb75932e902487ea632f96	2015-09
 github.com/juju/loggo	git	8477fc936adf0e382d680310047ca27e128a309a	2015-05-27T03:58:39Z
 github.com/juju/names	git	a6a253b0a94cc79e99a68d284b970ffce2a11ecd	2015-07-09T13:59:32Z
 github.com/juju/schema	git	afe1151cb49d1d7ed3c75592dfc6f38703f2e988	2015-08-07T07:58:08Z
-github.com/juju/testing	git	f521911d9a79aeb62c051fe18e689796369c5564	2015-05-29T04:40:43Z
+github.com/juju/testing	git	6e944d606b6efca96146fbda3e6a27f73313d867	2015-10-02T11:09:45Z
 github.com/juju/utils	git	03357ca1fc29e4a2b9189c82906475b6bc34f84a	2015-09-10T07:18:02Z
 github.com/julienschmidt/httprouter	git	8c199fb6259ffc1af525cc3ad52ee60ba8359669	2015-04-21T17:00:07Z
 github.com/mhilton/openid	git	7922a4e937d8433528e1cbc30ed742f1573bc9fb	2015-05-11T10:32:07Z
