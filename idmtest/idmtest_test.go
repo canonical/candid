@@ -3,8 +3,6 @@
 package idmtest_test
 
 import (
-	"github.com/CanonicalLtd/blues-identity/idmclient"
-	idmparams "github.com/CanonicalLtd/blues-identity/params"
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/macaroon-bakery.v1/bakery"
@@ -12,7 +10,9 @@ import (
 	"gopkg.in/macaroon-bakery.v1/httpbakery"
 	"gopkg.in/macaroon.v1"
 
+	"github.com/CanonicalLtd/blues-identity/idmclient"
 	"github.com/CanonicalLtd/blues-identity/idmtest"
+	idmparams "github.com/CanonicalLtd/blues-identity/params"
 )
 
 type suite struct{}

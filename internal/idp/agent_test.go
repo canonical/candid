@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 
+	"github.com/juju/testing/httptesting"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/macaroon-bakery.v1/bakery"
 	"gopkg.in/macaroon-bakery.v1/bakery/checkers"
@@ -18,7 +19,6 @@ import (
 
 	"github.com/CanonicalLtd/blues-identity/internal/idp"
 	"github.com/CanonicalLtd/blues-identity/params"
-	"github.com/juju/testing/httptesting"
 )
 
 type agentSuite struct {
