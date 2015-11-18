@@ -19,6 +19,7 @@ import (
 	"github.com/CanonicalLtd/blues-identity/internal/mempool"
 	"github.com/CanonicalLtd/blues-identity/internal/mongodoc"
 	"github.com/CanonicalLtd/blues-identity/meeting"
+	"github.com/CanonicalLtd/blues-identity/meeting/mgomeeting"
 	"github.com/CanonicalLtd/blues-identity/params"
 )
 
@@ -57,9 +58,10 @@ type StoreParams struct {
 type Pool struct {
 	sessionPool *limitpool.Pool
 	storePool   mempool.Pool
-	// Place holds the place where openid-callback rendezvous
-	// are created.
-	Place *meeting.Place
+
+	// meetingServer holds the server used to create
+	// InteractionRequired rendezvous.
+	meetingServer *meeting.Server
 
 	params StoreParams
 	db     *mgo.Database
@@ -67,20 +69,21 @@ type Pool struct {
 
 // NewPool creates a new Pool. The pool will be sized at sp.MaxMgoSessions.
 func NewPool(db *mgo.Database, sp StoreParams) (*Pool, error) {
-	// TODO replace localhost by actual address of server.
-	place, err := meeting.New(newMeetingStore(), "localhost")
-	if err != nil {
-		return nil, errgo.Mask(err)
-	}
 	p := &Pool{
 		db:     db,
-		Place:  place,
 		params: sp,
 	}
 	p.sessionPool = limitpool.NewPool(sp.MaxMgoSessions, p.newSession)
 	p.storePool.New = func() interface{} {
 		return p.newStore()
 	}
+	// TODO replace localhost by actual address of server.
+	var err error
+	p.meetingServer, err = meeting.NewServer(p.newMeetingStore, "localhost")
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
+
 	if p.params.Key == nil {
 		var err error
 		p.params.Key, err = bakery.GenerateKey()
@@ -96,6 +99,24 @@ func NewPool(db *mgo.Database, sp StoreParams) (*Pool, error) {
 	return p, nil
 }
 
+// newMeetingStore returns a new meeting.Store.
+// If none are available it waits for the time specified as the
+// RequestTimeout in the ServiceParameters for one to become available.
+// If a *Store does not become available in that time it returns an error
+// with a cause of params.ErrServiceUnavailable.
+func (p *Pool) newMeetingStore() (meeting.Store, error) {
+	session, err := p.getSession()
+	if err != nil {
+		return nil, errgo.Mask(err, errgo.Is(params.ErrServiceUnavailable))
+	}
+	db := StoreDatabase{p.db.With(session)}
+	return &poolMeetingStore{
+		pool:    p,
+		session: session,
+		Store:   mgomeeting.NewStore(db.Meeting()),
+	}, nil
+}
+
 func (p *Pool) newSession() limitpool.Item {
 	return p.db.Session.Copy()
 }
@@ -106,6 +127,21 @@ func (p *Pool) newSession() limitpool.Item {
 // If a *Store does not become available in that time it returns an error
 // with a cause of params.ErrServiceUnavailable.
 func (p *Pool) Get() (*Store, error) {
+	session, err := p.getSession()
+	if err != nil {
+		return nil, errgo.Mask(err, errgo.Is(params.ErrServiceUnavailable))
+	}
+	// Now associate the store we've just acquired with
+	// the session we've also acquired.
+	store := p.storePool.Get().(*Store)
+	store.setSession(session)
+	return store, nil
+}
+
+// getSesson returns a session from the session limit-pool.
+// The session must be returned to the pool with putSession
+// after use.
+func (p *Pool) getSession() (*mgo.Session, error) {
 	v, err := p.sessionPool.Get(p.params.RequestTimeout)
 	if err == limitpool.ErrLimitExceeded {
 		return nil, errgo.WithCausef(err, params.ErrServiceUnavailable, "too many mongo sessions in use")
@@ -114,11 +150,12 @@ func (p *Pool) Get() (*Store, error) {
 		// This should be impossible.
 		return nil, errgo.Notef(err, "cannot get Session")
 	}
-	// Now associate the store we've just acquired with
-	// the session we've also acquired.
-	store := p.storePool.Get().(*Store)
-	store.setSession(v.(*mgo.Session))
-	return store, nil
+	return v.(*mgo.Session), nil
+}
+
+func (p *Pool) putSession(session *mgo.Session) {
+	session.Refresh()
+	p.sessionPool.Put(session)
 }
 
 // GetNoLimit immediately retrieves a Store from the pool. If there is no
@@ -133,8 +170,7 @@ func (p *Pool) GetNoLimit() *Store {
 // Put places a Store back into the pool. Put will automatically close
 // the Store if it cannot go back into the pool.
 func (p *Pool) Put(s *Store) {
-	s.DB.Database.Session.Refresh()
-	p.sessionPool.Put(s.DB.Session)
+	p.putSession(s.DB.Session)
 	p.storePool.Put(s)
 }
 
@@ -142,7 +178,7 @@ func (p *Pool) Put(s *Store) {
 // any new Stores from being added.
 func (p *Pool) Close() {
 	p.sessionPool.Close()
-	p.Place.Close()
+	p.meetingServer.Close()
 	p.db.Session.Close()
 }
 
@@ -170,8 +206,7 @@ type Store struct {
 // returned, it isn't associated with any mongo session.
 func (p *Pool) newStore() *Store {
 	s := &Store{
-		Place: p.Place,
-		pool:  p,
+		pool: p,
 	}
 	var err error
 	s.Service, err = bakery.NewService(bakery.NewServiceParams{
@@ -196,6 +231,7 @@ func (p *Pool) newStore() *Store {
 // (assuming the session is valid).
 func (s *Store) setSession(session *mgo.Session) {
 	s.DB.Database = s.pool.db.With(session)
+	s.Place = s.pool.meetingServer.Place(mgomeeting.NewStore(s.DB.Meeting()))
 	ms, err := mgostorage.New(s.DB.Macaroons())
 	if err != nil {
 		// mgostorage.New no longer returns an error, so this
@@ -352,8 +388,18 @@ func (s StoreDatabase) Macaroons() *mgo.Collection {
 	return s.C("macaroons")
 }
 
+func (s StoreDatabase) Meeting() *mgo.Collection {
+	return s.C("meeting")
+}
+
+// IdentityProviders returns the mongo collection where identity providers are stored.
+func (s StoreDatabase) IdentityProviders() *mgo.Collection {
+	return s.C("identity_providers")
+}
+
 // allCollections holds for each collection used by the identity service a
 // function returning that collection.
+// TODO consider adding other collections here.
 var allCollections = []func(StoreDatabase) *mgo.Collection{
 	StoreDatabase.Identities,
 }
@@ -388,4 +434,18 @@ func (s bakeryStore) Get(location string) (string, error) {
 
 func (s bakeryStore) Del(location string) error {
 	return s.store.bakeryStore.Del(location)
+}
+
+// poolMeetingStore implements meeting.Store by
+// wrapping the Store returned by mgomeeting
+// and returning its session to the session pool
+// when it is closed.
+type poolMeetingStore struct {
+	pool    *Pool
+	session *mgo.Session
+	meeting.Store
+}
+
+func (s *poolMeetingStore) Close() {
+	s.pool.putSession(s.session)
 }

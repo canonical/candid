@@ -1,3 +1,5 @@
+// Copyright 2015 Canonical Ltd.
+
 package meeting
 
 import (
@@ -6,7 +8,7 @@ import (
 )
 
 type handler struct {
-	place *Place
+	srv *Server
 }
 
 type waitRequest struct {
@@ -20,7 +22,13 @@ type waitData struct {
 }
 
 func (h *handler) Wait(req *waitRequest) (*waitData, error) {
-	data0, data1, err := h.place.localWait(req.Id)
+	store, err := h.srv.getStore()
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
+	defer store.Close()
+
+	data0, data1, err := h.srv.localWait(req.Id, store)
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}
@@ -41,7 +49,7 @@ type doneRequest struct {
 }
 
 func (h *handler) Done(req *doneRequest) error {
-	if err := h.place.localDone(req.Id, req.Body.Data1); err != nil {
+	if err := h.srv.localDone(req.Id, req.Body.Data1); err != nil {
 		return errgo.Mask(err)
 	}
 	return nil

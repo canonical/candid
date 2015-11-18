@@ -4,17 +4,11 @@ package store
 
 import (
 	"gopkg.in/errgo.v1"
-	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 
 	"github.com/CanonicalLtd/blues-identity/internal/mongodoc"
 	"github.com/CanonicalLtd/blues-identity/params"
 )
-
-// IdentityProviders returns the mongo collection where identity providers are stored.
-func (s StoreDatabase) IdentityProviders() *mgo.Collection {
-	return s.C("identity_providers")
-}
 
 // ListIdentityProviders returns a list of all the registered identity
 // provider names.

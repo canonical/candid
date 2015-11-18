@@ -1,3 +1,5 @@
+// Copyright 2015 Canonical Ltd.
+
 // +build go1.3
 
 // Package mempool implements a version of sync.Pool

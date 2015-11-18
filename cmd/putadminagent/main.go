@@ -1,3 +1,5 @@
+// Copyright 2015 Canonical Ltd.
+
 // The putagent command is a temporary stopgap until
 // we have proper semantics for adding agents.
 //
