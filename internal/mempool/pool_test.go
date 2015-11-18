@@ -8,6 +8,7 @@
 package mempool
 
 import (
+	"reflect"
 	"testing"
 )
 
@@ -23,11 +24,19 @@ func TestPool(t *testing.T) {
 	}
 	p.Put("a")
 	p.Put("b")
-	if g := p.Get(); g != "b" {
-		t.Fatalf("got %#v; want a", g)
+	// Check that we get the same two values out
+	// without depending on the exact order.
+	vals := make(map[interface{}]bool)
+	vals[p.Get()] = true
+	vals[p.Get()] = true
+	if !reflect.DeepEqual(vals, map[interface{}]bool{
+		"a": true,
+		"b": true,
+	}) {
+		t.Fatalf("got %#v; want a: true, b: true", vals)
 	}
-	if g := p.Get(); g != "a" {
-		t.Fatalf("got %#v; want b", g)
+	if g := p.Get(); g != nil {
+		t.Fatalf("got %#v; want nil", g)
 	}
 	if g := p.Get(); g != nil {
 		t.Fatalf("got %#v; want nil", g)

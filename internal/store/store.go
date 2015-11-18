@@ -16,6 +16,7 @@ import (
 	"launchpad.net/lpad"
 
 	"github.com/CanonicalLtd/blues-identity/internal/limitpool"
+	"github.com/CanonicalLtd/blues-identity/internal/mempool"
 	"github.com/CanonicalLtd/blues-identity/internal/mongodoc"
 	"github.com/CanonicalLtd/blues-identity/meeting"
 	"github.com/CanonicalLtd/blues-identity/params"
@@ -54,7 +55,8 @@ type StoreParams struct {
 
 // Pool provides a pool of *Store objects.
 type Pool struct {
-	pool *limitpool.Pool
+	sessionPool *limitpool.Pool
+	storePool   mempool.Pool
 	// Place holds the place where openid-callback rendezvous
 	// are created.
 	Place *meeting.Place
@@ -75,7 +77,10 @@ func NewPool(db *mgo.Database, sp StoreParams) (*Pool, error) {
 		Place:  place,
 		params: sp,
 	}
-	p.pool = limitpool.NewPool(sp.MaxMgoSessions, p.newStore)
+	p.sessionPool = limitpool.NewPool(sp.MaxMgoSessions, p.newSession)
+	p.storePool.New = func() interface{} {
+		return p.newStore()
+	}
 	if p.params.Key == nil {
 		var err error
 		p.params.Key, err = bakery.GenerateKey()
@@ -91,35 +96,8 @@ func NewPool(db *mgo.Database, sp StoreParams) (*Pool, error) {
 	return p, nil
 }
 
-// newStore creates a new Store.
-func (p *Pool) newStore() limitpool.Item {
-	s := &Store{
-		DB:    StoreDatabase{p.db.With(p.db.Session.Copy())},
-		Place: p.Place,
-		pool:  p,
-	}
-	ms, err := mgostorage.New(s.DB.Macaroons())
-	if err != nil {
-		// mgostorage.New no longer returns an error, so this
-		// cannot happen.
-		panic(errgo.Notef(err, "cannot create macaroon store"))
-	}
-	// Create the bakery Service.
-	s.Service, err = bakery.NewService(bakery.NewServiceParams{
-		Location: p.params.Location,
-		Store:    ms,
-		Key:      p.params.Key,
-		Locator: bakery.PublicKeyLocatorMap{
-			p.params.Location + "/v1/discharger": &p.params.Key.Public,
-		},
-	})
-	if err != nil {
-		// bakery.NewService only returns an error if the key
-		// cannot be created. The key will always have been
-		// generated before it is called so it should not happen.
-		panic(errgo.Notef(err, "cannot create bakery service"))
-	}
-	return s
+func (p *Pool) newSession() limitpool.Item {
+	return p.db.Session.Copy()
 }
 
 // Get retrieves a Store object from the pool if there is one available.
@@ -128,7 +106,7 @@ func (p *Pool) newStore() limitpool.Item {
 // If a *Store does not become available in that time it returns an error
 // with a cause of params.ErrServiceUnavailable.
 func (p *Pool) Get() (*Store, error) {
-	v, err := p.pool.Get(p.params.RequestTimeout)
+	v, err := p.sessionPool.Get(p.params.RequestTimeout)
 	if err == limitpool.ErrLimitExceeded {
 		return nil, errgo.WithCausef(err, params.ErrServiceUnavailable, "too many mongo sessions in use")
 	}
@@ -136,26 +114,34 @@ func (p *Pool) Get() (*Store, error) {
 		// This should be impossible.
 		return nil, errgo.Notef(err, "cannot get Session")
 	}
-	return v.(*Store), nil
+	// Now associate the store we've just acquired with
+	// the session we've also acquired.
+	store := p.storePool.Get().(*Store)
+	store.setSession(v.(*mgo.Session))
+	return store, nil
 }
 
 // GetNoLimit immediately retrieves a Store from the pool. If there is no
 // Store available one will be created, even if that overflows the limit.
 func (p *Pool) GetNoLimit() *Store {
-	return p.pool.GetNoLimit().(*Store)
+	session := p.sessionPool.GetNoLimit().(*mgo.Session)
+	store := p.storePool.Get().(*Store)
+	store.setSession(session)
+	return store
 }
 
 // Put places a Store back into the pool. Put will automatically close
 // the Store if it cannot go back into the pool.
 func (p *Pool) Put(s *Store) {
 	s.DB.Database.Session.Refresh()
-	p.pool.Put(s)
+	p.sessionPool.Put(s.DB.Session)
+	p.storePool.Put(s)
 }
 
 // Close clears out the pool closing the contained stores and prevents
 // any new Stores from being added.
 func (p *Pool) Close() {
-	p.pool.Close()
+	p.sessionPool.Close()
 	p.Place.Close()
 	p.db.Session.Close()
 }
@@ -172,8 +158,51 @@ type Store struct {
 	// are created.
 	Place *meeting.Place
 
+	// bakeryStore holds the bakery storage that
+	// will be used by Service.
+	bakeryStore bakery.Storage
+
 	// pool holds the pool which created this Store.
 	pool *Pool
+}
+
+// newStore returns a new Store instance. When it's
+// returned, it isn't associated with any mongo session.
+func (p *Pool) newStore() *Store {
+	s := &Store{
+		Place: p.Place,
+		pool:  p,
+	}
+	var err error
+	s.Service, err = bakery.NewService(bakery.NewServiceParams{
+		Location: p.params.Location,
+		Store:    bakeryStore{s},
+		Key:      p.params.Key,
+		Locator: bakery.PublicKeyLocatorMap{
+			p.params.Location + "/v1/discharger": &p.params.Key.Public,
+		},
+	})
+	if err != nil {
+		// bakery.NewService only returns an error if the key
+		// cannot be created. The key will always have been
+		// generated before it is called so it should not happen.
+		panic(errgo.Notef(err, "cannot create bakery service"))
+	}
+	return s
+}
+
+// setSession sets the mongo session associated with the Store.
+// After this has been called, the store becomes usable
+// (assuming the session is valid).
+func (s *Store) setSession(session *mgo.Session) {
+	s.DB.Database = s.pool.db.With(session)
+	ms, err := mgostorage.New(s.DB.Macaroons())
+	if err != nil {
+		// mgostorage.New no longer returns an error, so this
+		// cannot happen.
+		panic(errgo.Notef(err, "cannot create macaroon store"))
+	}
+	s.bakeryStore = ms
 }
 
 func (s *Store) ensureIndexes() error {
@@ -337,4 +366,26 @@ func (s StoreDatabase) Collections() []*mgo.Collection {
 		cs[i] = f(s)
 	}
 	return cs
+}
+
+// bakeryStore implements bakery.Storage by redirecting
+// its storage requests to s.store.bakeryStore.
+//
+// We do this so that we can replace the bakeryStore
+// value without needing to create a new bakery service
+// for every request.
+type bakeryStore struct {
+	store *Store
+}
+
+func (s bakeryStore) Put(location, item string) error {
+	return s.store.bakeryStore.Put(location, item)
+}
+
+func (s bakeryStore) Get(location string) (string, error) {
+	return s.store.bakeryStore.Get(location)
+}
+
+func (s bakeryStore) Del(location string) error {
+	return s.store.bakeryStore.Del(location)
 }

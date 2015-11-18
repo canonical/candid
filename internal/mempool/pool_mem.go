@@ -5,7 +5,9 @@
 // Package mempool implements a version of sync.Pool
 // as supported in Go versions later than 1.2.
 //
-// TODO use sync.Pool when we can use Go 1.3 or later.
+
+// +build !go1.3
+
 package mempool
 
 import "sync"

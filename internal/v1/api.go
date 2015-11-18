@@ -14,6 +14,7 @@ import (
 	"gopkg.in/macaroon.v1"
 
 	"github.com/CanonicalLtd/blues-identity/internal/identity"
+	"github.com/CanonicalLtd/blues-identity/internal/mempool"
 	"github.com/CanonicalLtd/blues-identity/internal/store"
 	"github.com/CanonicalLtd/blues-identity/params"
 )
@@ -41,20 +42,19 @@ func NewAPIHandler(p *store.Pool, params identity.ServerParams, idps []identity.
 // Handler handles the /v1 api requests. Handler implements http.Handler
 type Handler struct {
 	storePool   *store.Pool
-	handlerPool pool
+	handlerPool mempool.Pool
 	location    string
 	idps        []identity.IdentityProvider
 }
 
 // New returns a new instance of the v1 API handler.
 func New(p *store.Pool, params identity.ServerParams, idps []identity.IdentityProvider) *Handler {
-
 	h := &Handler{
 		storePool: p,
 		location:  params.Location,
 		idps:      idps,
 	}
-	h.handlerPool = newPool(h.newHandler)
+	h.handlerPool.New = h.newHandler
 	return h
 }
 
