@@ -5,8 +5,9 @@ package keystone_test
 import (
 	"time"
 
-	"github.com/CanonicalLtd/blues-identity/internal/keystone"
 	gc "gopkg.in/check.v1"
+
+	"github.com/CanonicalLtd/blues-identity/internal/keystone"
 )
 
 type paramsSuite struct{}

@@ -66,11 +66,10 @@ func New(db *mgo.Database, sp ServerParams, versions map[string]NewAPIHandlerFun
 	// future.
 	srv.router.RedirectTrailingSlash = false
 	srv.router.RedirectFixedPath = false
-	srv.router.NotFound = notFound
-	srv.router.MethodNotAllowed = srv.methodNotAllowed
+	srv.router.NotFound = http.HandlerFunc(notFound)
+	srv.router.MethodNotAllowed = http.HandlerFunc(srv.methodNotAllowed)
 
 	srv.router.Handle("OPTIONS", "/*path", srv.options)
-
 	for name, newAPI := range versions {
 		handlers, err := newAPI(pool, sp, idps)
 		if err != nil {

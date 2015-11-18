@@ -65,9 +65,14 @@ type Pool struct {
 
 // NewPool creates a new Pool. The pool will be sized at sp.MaxMgoSessions.
 func NewPool(db *mgo.Database, sp StoreParams) (*Pool, error) {
+	// TODO replace localhost by actual address of server.
+	place, err := meeting.New(newMeetingStore(), "localhost")
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
 	p := &Pool{
 		db:     db,
-		Place:  meeting.New(),
+		Place:  place,
 		params: sp,
 	}
 	p.pool = limitpool.NewPool(sp.MaxMgoSessions, p.newStore)
@@ -151,6 +156,7 @@ func (p *Pool) Put(s *Store) {
 // any new Stores from being added.
 func (p *Pool) Close() {
 	p.pool.Close()
+	p.Place.Close()
 	p.db.Session.Close()
 }
 

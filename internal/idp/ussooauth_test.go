@@ -6,12 +6,12 @@ import (
 	"net/http"
 	"net/http/httptest"
 
+	"github.com/garyburd/go-oauth/oauth"
 	gc "gopkg.in/check.v1"
 
 	"github.com/CanonicalLtd/blues-identity/internal/idp"
 	"github.com/CanonicalLtd/blues-identity/internal/idtesting/mockusso"
 	"github.com/CanonicalLtd/blues-identity/internal/mongodoc"
-	"github.com/garyburd/go-oauth/oauth"
 )
 
 type ussoOAuthSuite struct {
