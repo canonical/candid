@@ -30,7 +30,9 @@ var _ = gc.Suite(&storeSuite{})
 func (s *storeSuite) SetUpTest(c *gc.C) {
 	s.IsolatedMgoSuite.SetUpTest(c)
 	var err error
-	s.pool, err = store.NewPool(s.Session.DB("store-tests"), store.StoreParams{})
+	s.pool, err = store.NewPool(s.Session.DB("store-tests"), store.StoreParams{
+		MaxMgoSessions: 10,
+	})
 	c.Assert(err, gc.IsNil)
 }
 
@@ -434,7 +436,7 @@ func (s *storeSuite) TestGetStoreFromPoolLimit(c *gc.C) {
 	c.Assert(err, gc.ErrorMatches, "too many mongo sessions in use: pool limit exceeded")
 }
 
-func (s *storeSuite) TestGetStoreFromPoolClosedBeforeTimeout(c *gc.C) {
+func (s *storeSuite) TestGetStoreFromPoolPutBeforeTimeout(c *gc.C) {
 	p, err := store.NewPool(s.Session.DB("store-launchpad-tests"),
 		store.StoreParams{
 			MaxMgoSessions: 1,
@@ -445,6 +447,7 @@ func (s *storeSuite) TestGetStoreFromPoolClosedBeforeTimeout(c *gc.C) {
 	defer p.Close()
 	s1, err := p.Get()
 	c.Assert(err, gc.IsNil)
+	s1Session := s1.DB.Session
 	go func() {
 		time.Sleep(500 * time.Millisecond)
 		p.Put(s1)
@@ -452,5 +455,5 @@ func (s *storeSuite) TestGetStoreFromPoolClosedBeforeTimeout(c *gc.C) {
 	s2, err := p.Get()
 	c.Assert(err, gc.IsNil)
 	defer p.Put(s2)
-	c.Assert(s2.DB.Database.Session, gc.Equals, s1.DB.Database.Session)
+	c.Assert(s2.DB.Session, gc.Equals, s1Session)
 }

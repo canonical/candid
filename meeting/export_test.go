@@ -8,3 +8,13 @@ func ItemCount(srv *Server) int {
 	defer srv.mu.Unlock()
 	return len(srv.items)
 }
+
+var (
+	ExpiryDuration          = expiryDuration
+	ReallyOldExpiryDuration = reallyOldExpiryDuration
+	RunGC                   = (*Server).runGC
+)
+
+func NewServerNoGC(getStore func() (Store, error), listenAddr string) (*Server, error) {
+	return newServer(getStore, listenAddr, false)
+}

@@ -92,6 +92,22 @@ func (s *poolSuite) TestGetClosed(c *gc.C) {
 	c.Assert(err, gc.Equals, limitpool.ErrClosed)
 }
 
+func (s *poolSuite) TestGetClosedDuringTimeout(c *gc.C) {
+	p := limitpool.NewPool(1, func() limitpool.Item {
+		return &item{
+			value: "TestGetWaiting",
+		}
+	})
+	p.GetNoLimit()
+	go func() {
+		time.Sleep(20 * time.Millisecond)
+		p.Close()
+	}()
+	v, err := p.Get(5 * time.Second)
+	c.Assert(err, gc.Equals, limitpool.ErrClosed)
+	c.Assert(v, gc.Equals, nil)
+}
+
 func (s *poolSuite) TestGetNoLimitClosed(c *gc.C) {
 	p := limitpool.NewPool(0, func() limitpool.Item {
 		return &item{

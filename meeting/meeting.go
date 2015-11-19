@@ -16,11 +16,32 @@ import (
 	"github.com/juju/loggo"
 	"github.com/julienschmidt/httprouter"
 	"gopkg.in/errgo.v1"
+	"gopkg.in/tomb.v2"
 )
 
 //go:generate httprequest-generate-client . handler client
 
 var logger = loggo.GetLogger("meeting")
+
+var (
+	// pollInterval holds the interval at which the
+	// garbage collector goroutine polls for expired
+	// rendezvous.
+	pollInterval = 30 * time.Second
+
+	// expiryDuration holds the length of time that we keep
+	// a rendezvous around before deleting it. This needs to
+	// be long enough that the user can do all the web page
+	// interaction that they need to before the rendezvous is
+	// completed.
+	expiryDuration = time.Hour
+
+	// reallyOldExpiryDuration holds the length of time after
+	// which we'll delete rendezvous regardless of server.
+	// This caters for the case where a given server has restarted
+	// without removing its existing entries.
+	reallyOldExpiryDuration = 7 * 24 * time.Hour
+)
 
 // Store defines the backing store required by the
 // participants in the rendezvous.
@@ -39,6 +60,8 @@ type Store interface {
 
 	// RemoveOld removes entries with the given address that were created
 	// earlier than the given time. It returns any ids removed.
+	// If it encountered an error while deleting the ids, it
+	// may return a non-empty ids slice and a non-nil error.
 	RemoveOld(address string, olderThan time.Time) (ids []string, err error)
 
 	// Close closes the Store.
@@ -47,6 +70,7 @@ type Store interface {
 
 // Server represents a rendezvous server.
 type Server struct {
+	tomb      tomb.Tomb
 	getStore  func() (Store, error)
 	localAddr string
 	listener  net.Listener
@@ -77,6 +101,10 @@ type Place struct {
 // Note that listenAddr must also be sufficient for other
 // servers to use to contact this one.
 func NewServer(getStore func() (Store, error), listenAddr string) (*Server, error) {
+	return newServer(getStore, listenAddr, true)
+}
+
+func newServer(getStore func() (Store, error), listenAddr string, runGC bool) (*Server, error) {
 	// TODO start garbage collection goroutine
 	listener, err := net.Listen("tcp", listenAddr+":0")
 	if err != nil {
@@ -96,8 +124,77 @@ func NewServer(getStore func() (Store, error), listenAddr string) (*Server, erro
 	for _, h := range errMapper.Handlers(srv.newHandler) {
 		router.Handle(h.Method, h.Path, h.Handle)
 	}
-	go http.Serve(srv.listener, router)
+	if runGC {
+		srv.tomb.Go(srv.gc)
+	}
+	srv.tomb.Go(func() error {
+		http.Serve(srv.listener, router)
+		return nil
+	})
 	return srv, nil
+}
+
+// Close stops the server.
+func (srv *Server) Close() {
+	srv.listener.Close()
+	srv.tomb.Kill(nil)
+	srv.tomb.Wait()
+}
+
+// gc garbage collects expired rendezvous by polling occasionally.
+func (srv *Server) gc() error {
+	dying := false
+	for {
+		err := srv.runGC(dying, time.Now())
+		if err != nil {
+			logger.Errorf("meeting GC: %v", err)
+		}
+		if dying {
+			return nil
+		}
+		// We wait at the end of the loop rather than the start
+		// so we are always guaranteed a GC when the server starts
+		// up.
+		select {
+		case <-time.After(pollInterval):
+		case <-srv.tomb.Dying():
+			dying = true
+		}
+	}
+}
+
+// runGC runs a single garbage collection at the given time.
+// If dying is true, it removes all entries in the server.
+func (srv *Server) runGC(dying bool, now time.Time) error {
+	store, err := srv.getStore()
+	if err != nil {
+		return errgo.Notef(err, "cannot get Store")
+	}
+	defer store.Close()
+	var expiryTime time.Time
+	if dying {
+		// A little bit in the future so that we're sure to
+		// find all entries.
+		expiryTime = now.Add(time.Millisecond)
+	} else {
+		expiryTime = now.Add(-expiryDuration)
+	}
+	ids, err := store.RemoveOld(srv.localAddr, expiryTime)
+	if len(ids) > 0 {
+		srv.mu.Lock()
+		for _, id := range ids {
+			delete(srv.items, id)
+		}
+		srv.mu.Unlock()
+	}
+	if err != nil {
+		return errgo.Notef(err, "cannot remove old entries")
+	}
+	_, err = store.RemoveOld("", time.Now().Add(-reallyOldExpiryDuration))
+	if err != nil {
+		return errgo.Notef(err, "cannot remove really old entries")
+	}
+	return nil
 }
 
 // Place returns a new Place that can be used to
@@ -155,11 +252,6 @@ func (srv *Server) localDone(id string, data []byte) error {
 
 func (srv *Server) newHandler(httprequest.Params) (*handler, error) {
 	return srv.handler, nil
-}
-
-// Close stops the server.
-func (srv *Server) Close() {
-	srv.listener.Close()
 }
 
 var errMapper httprequest.ErrorMapper = func(err error) (httpStatus int, errorBody interface{}) {
