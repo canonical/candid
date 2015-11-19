@@ -106,7 +106,7 @@ func NewServer(getStore func() (Store, error), listenAddr string) (*Server, erro
 
 func newServer(getStore func() (Store, error), listenAddr string, runGC bool) (*Server, error) {
 	// TODO start garbage collection goroutine
-	listener, err := net.Listen("tcp", listenAddr+":0")
+	listener, err := net.Listen("tcp", net.JoinHostPort(listenAddr, "0"))
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot start listener")
 	}
@@ -171,6 +171,7 @@ func (srv *Server) runGC(dying bool, now time.Time) error {
 		return errgo.Notef(err, "cannot get Store")
 	}
 	defer store.Close()
+
 	var expiryTime time.Time
 	if dying {
 		// A little bit in the future so that we're sure to

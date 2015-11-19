@@ -87,6 +87,7 @@ func serve(confPath string) error {
 			MaxMgoSessions:    conf.MaxMgoSessions,
 			RequestTimeout:    conf.RequestTimeout.Duration,
 			IdentityProviders: conf.IdentityProviders,
+			PrivateAddr:       conf.PrivateAddr,
 		},
 		identity.V1,
 	)

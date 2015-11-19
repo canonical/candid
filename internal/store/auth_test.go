@@ -39,6 +39,7 @@ func (s *authSuite) SetUpTest(c *gc.C) {
 			AuthUsername: "test-admin",
 			AuthPassword: "open sesame",
 			Location:     identityLocation,
+			PrivateAddr:  "localhost",
 		},
 	)
 	c.Assert(err, gc.IsNil)

@@ -20,7 +20,9 @@ var _ = gc.Suite(&idpsSuite{})
 func (s *idpsSuite) SetUpTest(c *gc.C) {
 	s.IsolatedMgoSuite.SetUpTest(c)
 	var err error
-	s.pool, err = store.NewPool(s.Session.DB("idps-tests"), store.StoreParams{})
+	s.pool, err = store.NewPool(s.Session.DB("idps-tests"), store.StoreParams{
+		PrivateAddr: "localhost",
+	})
 	c.Assert(err, gc.IsNil)
 }
 

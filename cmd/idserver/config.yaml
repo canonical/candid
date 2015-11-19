@@ -8,3 +8,4 @@ public-key: CIdWcEUN+0OZnKW9KwruRQnQDY/qqzVdD30CijwiWCk=
 access-log: access.log
 max-mgo-sessions: 300
 request-timeout: 2s
+private-addr: localhost

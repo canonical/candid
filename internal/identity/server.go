@@ -41,6 +41,7 @@ func New(db *mgo.Database, sp ServerParams, versions map[string]NewAPIHandlerFun
 		Launchpad:      sp.Launchpad,
 		MaxMgoSessions: sp.MaxMgoSessions,
 		RequestTimeout: sp.RequestTimeout,
+		PrivateAddr:    sp.PrivateAddr,
 	})
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot make store")
@@ -128,6 +129,11 @@ type ServerParams struct {
 	// RequestTimeout holds the time to wait for a request to be able
 	// to start.
 	RequestTimeout time.Duration
+
+	// PrivateAddr should hold a dialable address that will be used
+	// for communication between identity servers. Note that this
+	// should not contain a port.
+	PrivateAddr string
 
 	// IdentityProviders contains the set of identity providers that
 	// should be initialised by the service.

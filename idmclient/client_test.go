@@ -53,6 +53,7 @@ func (s *clientSuite) SetUpTest(c *gc.C) {
 			IdentityProviders: []idp.IdentityProvider{
 				idp.AgentIdentityProvider,
 			},
+			PrivateAddr: "localhost",
 		},
 		identity.V1,
 	)
@@ -258,22 +259,21 @@ var ubuntuSSOOAuthVisitWebPageTests = []struct {
 	hnd: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/oauth" {
 			auth := r.Header.Get("Authorization")
-			if strings.HasPrefix(auth, "OAuth") {
-				httprequest.WriteJSON(
-					w,
-					http.StatusInternalServerError,
-					&httpbakery.Error{
-						Message: "error",
-					},
-				)
+			if !strings.HasPrefix(auth, "OAuth") {
+				panic("unexpected Authorization header; want OAuth* got " + auth)
 			}
-			w.WriteHeader(http.StatusBadRequest)
+			httprequest.WriteJSON(
+				w,
+				http.StatusInternalServerError,
+				&httpbakery.Error{
+					Message: "error",
+				},
+			)
 			return
 		}
 		accept := r.Header.Get("Accept")
 		if accept != "application/json" {
-			w.WriteHeader(http.StatusBadRequest)
-			return
+			panic("unexpected Accept header; want application/json got " + accept)
 		}
 		u := url.URL{
 			Scheme: "http",

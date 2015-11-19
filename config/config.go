@@ -29,6 +29,7 @@ type Config struct {
 	MaxMgoSessions    int                    `yaml:"max-mgo-sessions"`
 	RequestTimeout    DurationString         `yaml:"request-timeout"`
 	IdentityProviders []idp.IdentityProvider `yaml:"identity-providers"`
+	PrivateAddr       string                 `yaml:"private-addr"`
 }
 
 func (c *Config) validate() error {
@@ -60,6 +61,9 @@ func (c *Config) validate() error {
 	}
 	if c.MaxMgoSessions == 0 {
 		missing = append(missing, "max-mgo-sessions")
+	}
+	if c.PrivateAddr == "" {
+		missing = append(missing, "private-addr")
 	}
 	if len(missing) != 0 {
 		return errgo.Newf("missing fields %s in config file", strings.Join(missing, ", "))

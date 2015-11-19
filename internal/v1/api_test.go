@@ -87,6 +87,7 @@ func newServer(c *gc.C, session *mgo.Session, key *bakery.KeyPair, idps []idp.Id
 		MaxMgoSessions:    50,
 		Launchpad:         lpad.Production,
 		IdentityProviders: idps,
+		PrivateAddr:       "localhost",
 	}
 	pool, err := store.NewPool(db, store.StoreParams{
 		AuthUsername:   sp.AuthUsername,
@@ -95,6 +96,7 @@ func newServer(c *gc.C, session *mgo.Session, key *bakery.KeyPair, idps []idp.Id
 		Location:       sp.Location,
 		MaxMgoSessions: sp.MaxMgoSessions,
 		Launchpad:      sp.Launchpad,
+		PrivateAddr:    sp.PrivateAddr,
 	})
 	c.Assert(err, gc.IsNil)
 	srv, err := identity.New(
