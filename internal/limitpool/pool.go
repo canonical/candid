@@ -80,7 +80,10 @@ func (p *Pool) Get(t time.Duration) (Item, error) {
 	v, err := p.get(false)
 	if err == ErrLimitExceeded {
 		select {
-		case v := <-p.c:
+		case v, ok := <-p.c:
+			if !ok {
+				return nil, ErrClosed
+			}
 			return v, nil
 		case <-time.After(t):
 		}

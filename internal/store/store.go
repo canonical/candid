@@ -177,8 +177,11 @@ func (p *Pool) Put(s *Store) {
 // Close clears out the pool closing the contained stores and prevents
 // any new Stores from being added.
 func (p *Pool) Close() {
-	p.sessionPool.Close()
+	// Note that the meetingServer (indirectly) uses the session
+	// pool, so we need to close it down before closing the session
+	// pool.
 	p.meetingServer.Close()
+	p.sessionPool.Close()
 	p.db.Session.Close()
 }
 
@@ -265,6 +268,10 @@ func (s *Store) ensureIndexes() error {
 			return errgo.Mask(err)
 		}
 	}
+	if err := mgomeeting.CreateCollection(s.DB.Meeting()); err != nil {
+		return errgo.Mask(err)
+	}
+
 	return nil
 }
 
@@ -402,6 +409,7 @@ func (s StoreDatabase) IdentityProviders() *mgo.Collection {
 // TODO consider adding other collections here.
 var allCollections = []func(StoreDatabase) *mgo.Collection{
 	StoreDatabase.Identities,
+	StoreDatabase.Meeting,
 }
 
 // Collections returns a slice of all the collections used

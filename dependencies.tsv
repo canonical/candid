@@ -23,6 +23,7 @@ gopkg.in/macaroon-bakery.v1	git	d3b2b51f823042d4b13d0f6a892e75a6384121b7	2015-09
 gopkg.in/macaroon.v1	git	ab3940c6c16510a850e1c2dd628b919f0f3f1464	2015-01-21T11:42:31Z
 gopkg.in/mgo.v2	git	3569c88678d88179dcbd68d02ab081cbca3cd4d0	2015-06-04T15:26:27Z
 gopkg.in/natefinch/lumberjack.v2	git	d28785c2f27cd682d872df46ccd8232843629f54	2014-07-25T20:51:33Z
+gopkg.in/tomb.v2	git	14b3d72120e8d10ea6e6b7f87f7175734b1faab8	2014-06-26T14:46:23Z
 gopkg.in/yaml.v1	git	9f9df34309c04878acc86042b16630b0f696e1de	2014-09-24T16:16:07Z
 gopkg.in/yaml.v2	git	7ad95dd0798a40da1ccdff6dff35fd177b5edf40	2015-06-24T10:29:02Z
 launchpad.net/lpad	bzr	gustavo@niemeyer.net-20131113112110-fqow8xpml1pxyutb	65
