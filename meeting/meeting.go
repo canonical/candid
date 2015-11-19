@@ -2,9 +2,6 @@
 
 // Package meeting provides a way for one thread of control
 // to wait for information provided by another thread.
-//
-// Currently the threads must be on the same server, but
-// this is an implementation restriction that will be lifted.
 package meeting
 
 import (
@@ -25,7 +22,8 @@ import (
 
 var logger = loggo.GetLogger("meeting")
 
-// Store defines the backing store required by a Place.
+// Store defines the backing store required by the
+// participants in the rendezvous.
 // Entries created in the store should be visible
 // to all participants.
 type Store interface {
@@ -42,12 +40,14 @@ type Store interface {
 	// RemoveOld removes entries with the given address that were created
 	// earlier than the given time. It returns any ids removed.
 	RemoveOld(address string, olderThan time.Time) (ids []string, err error)
+
+	// Close closes the Store.
+	Close()
 }
 
-// Place represents a meeting place for any number
-// of rendezvous.
-type Place struct {
-	store     Store
+// Server represents a rendezvous server.
+type Server struct {
+	getStore  func() (Store, error)
 	localAddr string
 	listener  net.Listener
 	handler   *handler
@@ -62,33 +62,104 @@ type item struct {
 	data1 []byte
 }
 
-// New returns a new Place that will use the given store.
-// The given address should be an IP address that will
-// be used to listen for requests for other servers.
-// Note that this must also be sufficient for other
+// Place represents a meeting place for any number
+// of rendezvous.
+type Place struct {
+	store Store
+	srv   *Server
+}
+
+// NewServer returns a new rendezvous server that listens on the given
+// address. When a store is required by a server request,
+// it will be acquired by calling getStore and closed after the
+// request has finished.
+//
+// Note that listenAddr must also be sufficient for other
 // servers to use to contact this one.
-func New(store Store, listenAddr string) (*Place, error) {
+func NewServer(getStore func() (Store, error), listenAddr string) (*Server, error) {
 	// TODO start garbage collection goroutine
 	listener, err := net.Listen("tcp", listenAddr+":0")
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot start listener")
 	}
 
-	p := &Place{
-		store:     store,
+	srv := &Server{
+		getStore:  getStore,
 		listener:  listener,
 		localAddr: listener.Addr().String(),
 		items:     make(map[string]*item),
 	}
-	p.handler = &handler{
-		place: p,
+	srv.handler = &handler{
+		srv: srv,
 	}
 	router := httprouter.New()
-	for _, h := range errMapper.Handlers(p.newHandler) {
+	for _, h := range errMapper.Handlers(srv.newHandler) {
 		router.Handle(h.Method, h.Path, h.Handle)
 	}
-	go http.Serve(p.listener, router)
-	return p, nil
+	go http.Serve(srv.listener, router)
+	return srv, nil
+}
+
+// Place returns a new Place that can be used to
+// create and wait for rendezvous. When a store is
+// required by methods on Place, the given store
+// is used.
+func (srv *Server) Place(store Store) *Place {
+	return &Place{
+		store: store,
+		srv:   srv,
+	}
+}
+
+// localWait is the internal version of Place.Wait.
+// It only works if the given id is stored locally.
+func (srv *Server) localWait(id string, store Store) (data0, data1 []byte, err error) {
+	// TODO support for timeouts.
+
+	srv.mu.Lock()
+	item := srv.items[id]
+	srv.mu.Unlock()
+	if item == nil {
+		return nil, nil, errgo.Newf("rendezvous %q not found", id)
+	}
+	// Wait for the channel to be closed by Done.
+	<-item.c
+	srv.mu.Lock()
+	defer srv.mu.Unlock()
+	delete(srv.items, id)
+	if err := store.Remove(id); err != nil {
+		logger.Errorf("cannot remove rendezvous %q: %v", id, err)
+	}
+	return item.data0, item.data1, nil
+}
+
+// localDone is the internal version of Place.Done.
+// It only works if the given id is stored locally.
+func (srv *Server) localDone(id string, data []byte) error {
+	srv.mu.Lock()
+	item := srv.items[id]
+	defer srv.mu.Unlock()
+
+	if item == nil {
+		return errgo.Newf("rendezvous %q not found", id)
+	}
+	select {
+	case <-item.c:
+		return errgo.Newf("rendezvous %q done twice", id)
+	default:
+		item.data1 = data
+		close(item.c)
+	}
+	return nil
+}
+
+func (srv *Server) newHandler(httprequest.Params) (*handler, error) {
+	return srv.handler, nil
+}
+
+// Close stops the server.
+func (srv *Server) Close() {
+	srv.listener.Close()
 }
 
 var errMapper httprequest.ErrorMapper = func(err error) (httpStatus int, errorBody interface{}) {
@@ -105,14 +176,6 @@ func newId() (string, error) {
 	return fmt.Sprintf("%x", id[:]), nil
 }
 
-func (p *Place) newHandler(httprequest.Params) (*handler, error) {
-	return p.handler, nil
-}
-
-func (p *Place) Close() error {
-	return p.listener.Close()
-}
-
 // NewRendezvous creates a new rendezvous holding
 // the given data. The rendezvous id is returned.
 func (p *Place) NewRendezvous(data []byte) (string, error) {
@@ -120,21 +183,25 @@ func (p *Place) NewRendezvous(data []byte) (string, error) {
 	if err != nil {
 		return "", errgo.Mask(err)
 	}
-	p.mu.Lock()
-	p.items[id] = &item{
+	srv := p.srv
+	srv.mu.Lock()
+	srv.items[id] = &item{
 		c:     make(chan struct{}),
 		data0: data,
 	}
-	p.mu.Unlock()
-	if err := p.store.Put(id, p.localAddr); err != nil {
-		p.mu.Lock()
-		defer p.mu.Unlock()
-		delete(p.items, id)
+	srv.mu.Unlock()
+	if err := p.store.Put(id, srv.localAddr); err != nil {
+		srv.mu.Lock()
+		defer srv.mu.Unlock()
+		delete(srv.items, id)
 		return "", errgo.Notef(err, "cannot create entry for rendezvous")
 	}
 	return id, nil
 }
 
+// Wait waits for the rendezvous with the given id
+// and returns the data provided to NewRendezvous
+// and the data provided to Done.
 func (p *Place) Wait(id string) (data0, data1 []byte, err error) {
 	client, err := p.clientForId(id)
 	if err != nil {
@@ -149,6 +216,9 @@ func (p *Place) Wait(id string) (data0, data1 []byte, err error) {
 	return resp.Data0, resp.Data1, nil
 }
 
+// Done marks the rendezvous with the given id as complete,
+// and provides it with the given data which will be
+// returned from Wait.
 func (p *Place) Done(id string, data []byte) error {
 	client, err := p.clientForId(id)
 	if err != nil {
@@ -175,48 +245,4 @@ func (p *Place) clientForId(id string) (*client, error) {
 			BaseURL: "http://" + addr,
 		},
 	}, nil
-}
-
-// Wait waits for the rendezvous with the given id
-// and returns the data provided to NewRendezvous
-// and the data provided to Done.
-func (p *Place) localWait(id string) (data0, data1 []byte, err error) {
-	// TODO support for timeouts.
-
-	p.mu.Lock()
-	item := p.items[id]
-	p.mu.Unlock()
-	if item == nil {
-		return nil, nil, errgo.Newf("rendezvous %q not found", id)
-	}
-	// Wait for the channel to be closed by Done.
-	<-item.c
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	delete(p.items, id)
-	if err := p.store.Remove(id); err != nil {
-		logger.Errorf("cannot remove rendezvous %q: %v", id, err)
-	}
-	return item.data0, item.data1, nil
-}
-
-// Done marks the rendezvous with the given id as complete,
-// and provides it with the given data which will be
-// returned from Wait.
-func (p *Place) localDone(id string, data []byte) error {
-	p.mu.Lock()
-	item := p.items[id]
-	defer p.mu.Unlock()
-
-	if item == nil {
-		return errgo.Newf("rendezvous %q not found", id)
-	}
-	select {
-	case <-item.c:
-		return errgo.Newf("rendezvous %q done twice", id)
-	default:
-		item.data1 = data
-		close(item.c)
-	}
-	return nil
 }

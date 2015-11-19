@@ -1,3 +1,5 @@
+// Copyright 2015 Canonical Ltd.
+
 package v1_test
 
 import (
