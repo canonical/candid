@@ -52,6 +52,11 @@ type StoreParams struct {
 	// RequestTimeout holds the time to wait for a request to be able
 	// to start.
 	RequestTimeout time.Duration
+
+	// PrivateAddr should hold a dialable address that will be used
+	// for communication between identity servers. Note that this
+	// should not contain a port.
+	PrivateAddr string
 }
 
 // Pool provides a pool of *Store objects.
@@ -73,13 +78,16 @@ func NewPool(db *mgo.Database, sp StoreParams) (*Pool, error) {
 		db:     db,
 		params: sp,
 	}
+	if sp.PrivateAddr == "" {
+		return nil, errgo.New("no private address configured")
+	}
 	p.sessionPool = limitpool.NewPool(sp.MaxMgoSessions, p.newSession)
 	p.storePool.New = func() interface{} {
 		return p.newStore()
 	}
 	// TODO replace localhost by actual address of server.
 	var err error
-	p.meetingServer, err = meeting.NewServer(p.newMeetingStore, "localhost")
+	p.meetingServer, err = meeting.NewServer(p.newMeetingStore, p.params.PrivateAddr)
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}

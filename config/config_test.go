@@ -43,6 +43,7 @@ identity-providers:
  - type: keystone
    name: ks1
    url: http://example.com/keystone
+private-addr: localhost
 `
 
 func (s *configSuite) readConfig(c *gc.C, content string) (*config.Config, error) {
@@ -75,6 +76,7 @@ func (s *configSuite) TestRead(c *gc.C) {
 				URL:  "http://example.com/keystone",
 			}),
 		},
+		PrivateAddr: "localhost",
 	})
 }
 
@@ -86,7 +88,7 @@ func (s *configSuite) TestReadErrorNotFound(c *gc.C) {
 
 func (s *configSuite) TestReadErrorEmpty(c *gc.C) {
 	cfg, err := s.readConfig(c, "")
-	c.Assert(err, gc.ErrorMatches, "missing fields mongo-addr, api-addr, auth-username, auth-password, private-key, public-key, location, max-mgo-sessions in config file")
+	c.Assert(err, gc.ErrorMatches, "missing fields mongo-addr, api-addr, auth-username, auth-password, private-key, public-key, location, max-mgo-sessions, private-addr in config file")
 	c.Assert(cfg, gc.IsNil)
 }
 

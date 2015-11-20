@@ -63,6 +63,11 @@ type ServerParams struct {
 	// to start.
 	RequestTimeout time.Duration
 
+	// PrivateAddr should hold a dialable address that will be used
+	// for communication between identity servers. Note that this
+	// should not contain a port.
+	PrivateAddr string
+
 	// IdentityProviders contains the set of identity providers that
 	// should be initialised by the service.
 	IdentityProviders []idp.IdentityProvider

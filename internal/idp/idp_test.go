@@ -29,7 +29,8 @@ func (s *idpSuite) SetUpTest(c *gc.C) {
 	var err error
 
 	s.pool, err = store.NewPool(s.Session.DB("testing"), store.StoreParams{
-		Launchpad: lpad.Production,
+		Launchpad:   lpad.Production,
+		PrivateAddr: "localhost",
 	})
 	c.Assert(err, gc.IsNil)
 	s.store = s.pool.GetNoLimit()

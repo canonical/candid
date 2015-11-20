@@ -23,7 +23,9 @@ type serverSuite struct {
 var _ = gc.Suite(&serverSuite{})
 
 func (s *serverSuite) TestNewServerWithNoVersions(c *gc.C) {
-	h, err := identity.New(s.Session.DB("foo"), identity.ServerParams{}, nil)
+	h, err := identity.New(s.Session.DB("foo"), identity.ServerParams{
+		PrivateAddr: "localhost",
+	}, nil)
 	c.Assert(err, gc.ErrorMatches, `identity server must serve at least one version of the API`)
 	c.Assert(h, gc.IsNil)
 }
@@ -54,7 +56,9 @@ func (s *serverSuite) TestNewServerWithVersions(c *gc.C) {
 		}
 	}
 
-	h, err := identity.New(db, identity.ServerParams{}, map[string]identity.NewAPIHandlerFunc{
+	h, err := identity.New(db, identity.ServerParams{
+		PrivateAddr: "localhost",
+	}, map[string]identity.NewAPIHandlerFunc{
 		"version1": serveVersion("version1"),
 	})
 	c.Assert(err, gc.IsNil)
@@ -62,7 +66,9 @@ func (s *serverSuite) TestNewServerWithVersions(c *gc.C) {
 	assertDoesNotServeVersion(c, h, "version2")
 	assertDoesNotServeVersion(c, h, "version3")
 
-	h, err = identity.New(db, identity.ServerParams{}, map[string]identity.NewAPIHandlerFunc{
+	h, err = identity.New(db, identity.ServerParams{
+		PrivateAddr: "localhost",
+	}, map[string]identity.NewAPIHandlerFunc{
 		"version1": serveVersion("version1"),
 		"version2": serveVersion("version2"),
 	})
@@ -71,7 +77,9 @@ func (s *serverSuite) TestNewServerWithVersions(c *gc.C) {
 	assertServesVersion(c, h, "version2")
 	assertDoesNotServeVersion(c, h, "version3")
 
-	h, err = identity.New(db, identity.ServerParams{}, map[string]identity.NewAPIHandlerFunc{
+	h, err = identity.New(db, identity.ServerParams{
+		PrivateAddr: "localhost",
+	}, map[string]identity.NewAPIHandlerFunc{
 		"version1": serveVersion("version1"),
 		"version2": serveVersion("version2"),
 		"version3": serveVersion("version3"),
@@ -95,7 +103,9 @@ func (s *serverSuite) TestServerHasAccessControlAllowHeaders(c *gc.C) {
 		},
 	}
 
-	h, err := identity.New(db, identity.ServerParams{}, impl)
+	h, err := identity.New(db, identity.ServerParams{
+		PrivateAddr: "localhost",
+	}, impl)
 	c.Assert(err, gc.IsNil)
 	rec := httptesting.DoRequest(c, httptesting.DoRequestParams{
 		Handler: h,
