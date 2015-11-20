@@ -56,6 +56,8 @@ type Store interface {
 	Get(id string) (address string, err error)
 
 	// Remove removes the entry with the given id.
+	// It should not return an error if the entry has already
+	// been removed.
 	Remove(id string) error
 
 	// RemoveOld removes entries with the given address that were created
@@ -212,8 +214,6 @@ func (srv *Server) Place(store Store) *Place {
 // localWait is the internal version of Place.Wait.
 // It only works if the given id is stored locally.
 func (srv *Server) localWait(id string, store Store) (data0, data1 []byte, err error) {
-	// TODO support for timeouts.
-
 	srv.mu.Lock()
 	item := srv.items[id]
 	srv.mu.Unlock()
@@ -221,12 +221,20 @@ func (srv *Server) localWait(id string, store Store) (data0, data1 []byte, err e
 		return nil, nil, errgo.Newf("rendezvous %q not found", id)
 	}
 	// Wait for the channel to be closed by Done.
-	<-item.c
+	expired := false
+	select {
+	case <-item.c:
+	case <-time.After(expiryDuration):
+		expired = true
+	}
 	srv.mu.Lock()
 	defer srv.mu.Unlock()
 	delete(srv.items, id)
 	if err := store.Remove(id); err != nil {
 		logger.Errorf("cannot remove rendezvous %q: %v", id, err)
+	}
+	if expired {
+		return nil, nil, errgo.Newf("rendezvous has expired after %v", expiryDuration)
 	}
 	return item.data0, item.data1, nil
 }

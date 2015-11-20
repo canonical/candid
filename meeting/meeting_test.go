@@ -7,13 +7,16 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/juju/testing"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
 
 	"github.com/CanonicalLtd/blues-identity/meeting"
 )
 
-type suite struct{}
+type suite struct {
+	testing.IsolationSuite
+}
 
 var _ = gc.Suite(&suite{})
 
@@ -195,10 +198,10 @@ func (*suite) TestRunGCNotDying(c *gc.C) {
 	// Create four rendezvous using the both servers server,
 	// one really old, two old and one newer.
 	for _, d := range []time.Duration{
-		meeting.ReallyOldExpiryDuration + time.Millisecond,
-		meeting.ExpiryDuration + time.Millisecond,
-		meeting.ExpiryDuration + 2*time.Millisecond,
-		meeting.ExpiryDuration / 2,
+		*meeting.ReallyOldExpiryDuration + time.Millisecond,
+		*meeting.ExpiryDuration + time.Millisecond,
+		*meeting.ExpiryDuration + 2*time.Millisecond,
+		*meeting.ExpiryDuration / 2,
 	} {
 		id, err := m1.NewRendezvous([]byte("something"))
 		c.Assert(err, gc.IsNil)
@@ -246,9 +249,9 @@ func (*suite) TestPartialRemoveOldFailure(c *gc.C) {
 
 	now := time.Now()
 	for _, d := range []time.Duration{
-		meeting.ExpiryDuration + time.Millisecond,
-		meeting.ExpiryDuration + 2*time.Millisecond,
-		meeting.ExpiryDuration / 2,
+		*meeting.ExpiryDuration + time.Millisecond,
+		*meeting.ExpiryDuration + 2*time.Millisecond,
+		*meeting.ExpiryDuration / 2,
 	} {
 		id, err := m.NewRendezvous([]byte("something"))
 		c.Assert(err, gc.IsNil)
@@ -294,6 +297,20 @@ func (*suite) TestPutFailure(c *gc.C) {
 	c.Assert(err, gc.ErrorMatches, "cannot create entry for rendezvous: put error")
 	c.Assert(id, gc.Equals, "")
 	c.Assert(meeting.ItemCount(srv), gc.Equals, 0)
+}
+
+func (s *suite) TestWaitTimeout(c *gc.C) {
+	s.PatchValue(meeting.ExpiryDuration, 100*time.Millisecond)
+	store := newFakeStore(nil)
+	srv, err := meeting.NewServerNoGC(storeGetter(store, nil), "localhost")
+	c.Assert(err, gc.IsNil)
+
+	m := srv.Place(store)
+	id, err := m.NewRendezvous(nil)
+	c.Assert(err, gc.IsNil)
+	_, _, err = m.Wait(id)
+	c.Logf("err: %#v", err)
+	c.Assert(err, gc.ErrorMatches, "GET .*: rendezvous has expired after 100ms")
 }
 
 type putErrorStore struct {

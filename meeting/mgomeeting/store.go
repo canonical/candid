@@ -82,7 +82,7 @@ func (s store) Get(id string) (address string, err error) {
 // Remove implements meeting.Store.Remove.
 func (s store) Remove(id string) error {
 	err := s.coll.RemoveId(id)
-	if err != nil {
+	if err != nil && err != mgo.ErrNotFound {
 		return errgo.Mask(err)
 	}
 	return nil

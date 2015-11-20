@@ -40,6 +40,10 @@ func (s *storeSuite) TestPutGetRemove(c *gc.C) {
 	err = store.Remove("y")
 	c.Assert(err, gc.IsNil)
 
+	// Check it's idempotent.
+	err = store.Remove("y")
+	c.Assert(err, gc.IsNil)
+
 	addr, err = store.Get("y")
 	c.Assert(err, gc.ErrorMatches, "rendezvous not found, probably expired")
 
