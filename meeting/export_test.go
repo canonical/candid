@@ -10,8 +10,8 @@ func ItemCount(srv *Server) int {
 }
 
 var (
-	ExpiryDuration          = expiryDuration
-	ReallyOldExpiryDuration = reallyOldExpiryDuration
+	ExpiryDuration          = &expiryDuration
+	ReallyOldExpiryDuration = &reallyOldExpiryDuration
 	RunGC                   = (*Server).runGC
 )
 
