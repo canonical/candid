@@ -244,8 +244,8 @@ func (srv *Server) localWait(id string, getStore func() Store) (data0, data1 []b
 // It only works if the given id is stored locally.
 func (srv *Server) localDone(id string, data []byte) error {
 	srv.mu.Lock()
-	item := srv.items[id]
 	defer srv.mu.Unlock()
+	item := srv.items[id]
 
 	if item == nil {
 		return errgo.Newf("rendezvous %q not found", id)
@@ -258,6 +258,12 @@ func (srv *Server) localDone(id string, data []byte) error {
 		close(item.c)
 	}
 	return nil
+}
+
+func (srv *Server) isLocal(id string) bool {
+	srv.mu.Lock()
+	defer srv.mu.Unlock()
+	return srv.items[id] != nil
 }
 
 func (srv *Server) newHandler(httprequest.Params) (*handler, error) {
@@ -305,6 +311,13 @@ func (p *Place) NewRendezvous(data []byte) (string, error) {
 // and returns the data provided to NewRendezvous
 // and the data provided to Done.
 func (p *Place) Wait(id string) (data0, data1 []byte, err error) {
+	if p.srv.isLocal(id) {
+		return p.srv.localWait(id, func() Store {
+			// Note that the Place doesn't close its store,
+			// so neither should localWait.
+			return storeNopCloser{p.store}
+		})
+	}
 	client, err := p.clientForId(id)
 	if err != nil {
 		return nil, nil, errgo.Mask(err)
@@ -322,6 +335,9 @@ func (p *Place) Wait(id string) (data0, data1 []byte, err error) {
 // and provides it with the given data which will be
 // returned from Wait.
 func (p *Place) Done(id string, data []byte) error {
+	if p.srv.isLocal(id) {
+		return p.srv.localDone(id, data)
+	}
 	client, err := p.clientForId(id)
 	if err != nil {
 		return errgo.Mask(err)
@@ -347,4 +363,11 @@ func (p *Place) clientForId(id string) (*client, error) {
 			BaseURL: "http://" + addr,
 		},
 	}, nil
+}
+
+type storeNopCloser struct {
+	Store
+}
+
+func (storeNopCloser) Close() {
 }
