@@ -4,6 +4,7 @@ package idp
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/juju/httprequest"
 	"github.com/juju/loggo"
@@ -16,6 +17,17 @@ import (
 )
 
 var logger = loggo.GetLogger("identity.internal.idp")
+
+const (
+	// agentMacaroonDuration is the length of time for which an agent
+	// identity macaroon is valid. This is shorter than for users as
+	// an agent can authenticate without interaction.
+	agentMacaroonDuration = 30 * time.Minute
+
+	// identityMacaroonDuration is the length of time for which an
+	// identity macaroon is valid.
+	identityMacaroonDuration = 28 * 24 * time.Hour
+)
 
 // Context provides the identity provider methods with the context in
 // which they are being run.
@@ -49,6 +61,7 @@ func loginIdentity(c Context, identity *mongodoc.Identity) {
 	// TODO add expiry date and maybe more first party caveats to this.
 	m, err := c.Store().Service.NewMacaroon("", nil, []checkers.Caveat{
 		checkers.DeclaredCaveat("username", identity.Username),
+		checkers.TimeBeforeCaveat(time.Now().Add(identityMacaroonDuration)),
 	})
 	if err != nil {
 		c.LoginFailure(errgo.Notef(err, "cannot create macaroon"))

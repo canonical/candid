@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/juju/httprequest"
 	"gopkg.in/errgo.v1"
@@ -114,6 +115,7 @@ func (a *AgentIdentityProvider) Handle(c Context) {
 		checkers.DeclaredCaveat("username", string(login.Username)),
 		bakery.LocalThirdPartyCaveat(login.PublicKey),
 		store.UserHasPublicKeyCaveat(login.Username, login.PublicKey),
+		checkers.TimeBeforeCaveat(time.Now().Add(agentMacaroonDuration)),
 	})
 	if err != nil {
 		c.LoginFailure(errgo.Notef(err, "cannot create macaroon"))

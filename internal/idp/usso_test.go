@@ -9,6 +9,7 @@ import (
 	"net/url"
 
 	gc "gopkg.in/check.v1"
+	"gopkg.in/macaroon-bakery.v1/bakery/checkers"
 
 	"github.com/CanonicalLtd/blues-identity/internal/idp"
 	"github.com/CanonicalLtd/blues-identity/internal/idtesting/mockusso"
@@ -100,6 +101,8 @@ func (s *ussoSuite) TestHandleSuccess(c *gc.C) {
 	s.idp.Handle(&tc)
 	c.Assert(tc.err, gc.IsNil)
 	c.Assert(tc.macaroon, gc.Not(gc.IsNil))
+	_, ok := checkers.MacaroonsExpiryTime(tc.macaroon)
+	c.Assert(ok, gc.Equals, true)
 	c.Assert(rr.Body.String(), gc.Equals, "login successful as user test\n")
 }
 
