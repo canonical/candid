@@ -22,13 +22,7 @@ type waitData struct {
 }
 
 func (h *handler) Wait(req *waitRequest) (*waitData, error) {
-	store, err := h.srv.getStore()
-	if err != nil {
-		return nil, errgo.Mask(err)
-	}
-	defer store.Close()
-
-	data0, data1, err := h.srv.localWait(req.Id, store)
+	data0, data1, err := h.srv.localWait(req.Id, h.srv.getStore)
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}

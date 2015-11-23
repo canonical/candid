@@ -108,21 +108,14 @@ func NewPool(db *mgo.Database, sp StoreParams) (*Pool, error) {
 }
 
 // newMeetingStore returns a new meeting.Store.
-// If none are available it waits for the time specified as the
-// RequestTimeout in the ServiceParameters for one to become available.
-// If a *Store does not become available in that time it returns an error
-// with a cause of params.ErrServiceUnavailable.
-func (p *Pool) newMeetingStore() (meeting.Store, error) {
-	session, err := p.getSession()
-	if err != nil {
-		return nil, errgo.Mask(err, errgo.Is(params.ErrServiceUnavailable))
-	}
+func (p *Pool) newMeetingStore() meeting.Store {
+	session := p.getSessionNoLimit()
 	db := StoreDatabase{p.db.With(session)}
 	return &poolMeetingStore{
 		pool:    p,
 		session: session,
 		Store:   mgomeeting.NewStore(db.Meeting()),
-	}, nil
+	}
 }
 
 func (p *Pool) newSession() limitpool.Item {
@@ -144,6 +137,14 @@ func (p *Pool) Get() (*Store, error) {
 	store := p.storePool.Get().(*Store)
 	store.setSession(session)
 	return store, nil
+}
+
+// getSessionNoLimit returns a session from the session limit-pool
+// without deferring to the limit.
+// The session must be returned to the pool with putSession
+// after use.
+func (p *Pool) getSessionNoLimit() *mgo.Session {
+	return p.sessionPool.GetNoLimit().(*mgo.Session)
 }
 
 // getSesson returns a session from the session limit-pool.
@@ -169,9 +170,8 @@ func (p *Pool) putSession(session *mgo.Session) {
 // GetNoLimit immediately retrieves a Store from the pool. If there is no
 // Store available one will be created, even if that overflows the limit.
 func (p *Pool) GetNoLimit() *Store {
-	session := p.sessionPool.GetNoLimit().(*mgo.Session)
 	store := p.storePool.Get().(*Store)
-	store.setSession(session)
+	store.setSession(p.getSessionNoLimit())
 	return store
 }
 
