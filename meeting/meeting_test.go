@@ -27,12 +27,12 @@ func fakeStoreGet(count *int32) (meeting.Store, error) {
 // storeGetter returns a function that always returns the given store.
 // If count is non-nil, it will be atomically incremented each time
 // the function is called.
-func storeGetter(store meeting.Store, count *int32) func() (meeting.Store, error) {
-	return func() (meeting.Store, error) {
+func storeGetter(store meeting.Store, count *int32) func() meeting.Store {
+	return func() meeting.Store {
 		if count != nil {
 			atomic.AddInt32(count, 1)
 		}
-		return store, nil
+		return store
 	}
 }
 

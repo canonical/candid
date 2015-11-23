@@ -73,7 +73,7 @@ type Store interface {
 // Server represents a rendezvous server.
 type Server struct {
 	tomb      tomb.Tomb
-	getStore  func() (Store, error)
+	getStore  func() Store
 	localAddr string
 	listener  net.Listener
 	handler   *handler
@@ -102,11 +102,11 @@ type Place struct {
 //
 // Note that listenAddr must also be sufficient for other
 // servers to use to contact this one.
-func NewServer(getStore func() (Store, error), listenAddr string) (*Server, error) {
+func NewServer(getStore func() Store, listenAddr string) (*Server, error) {
 	return newServer(getStore, listenAddr, true)
 }
 
-func newServer(getStore func() (Store, error), listenAddr string, runGC bool) (*Server, error) {
+func newServer(getStore func() Store, listenAddr string, runGC bool) (*Server, error) {
 	// TODO start garbage collection goroutine
 	listener, err := net.Listen("tcp", net.JoinHostPort(listenAddr, "0"))
 	if err != nil {
@@ -168,10 +168,7 @@ func (srv *Server) gc() error {
 // runGC runs a single garbage collection at the given time.
 // If dying is true, it removes all entries in the server.
 func (srv *Server) runGC(dying bool, now time.Time) error {
-	store, err := srv.getStore()
-	if err != nil {
-		return errgo.Notef(err, "cannot get Store")
-	}
+	store := srv.getStore()
 	defer store.Close()
 
 	var expiryTime time.Time
@@ -213,7 +210,7 @@ func (srv *Server) Place(store Store) *Place {
 
 // localWait is the internal version of Place.Wait.
 // It only works if the given id is stored locally.
-func (srv *Server) localWait(id string, store Store) (data0, data1 []byte, err error) {
+func (srv *Server) localWait(id string, getStore func() Store) (data0, data1 []byte, err error) {
 	srv.mu.Lock()
 	item := srv.items[id]
 	srv.mu.Unlock()
@@ -227,6 +224,10 @@ func (srv *Server) localWait(id string, store Store) (data0, data1 []byte, err e
 	case <-time.After(expiryDuration):
 		expired = true
 	}
+	// Note that we get the Store *after* waiting, so we
+	// don't tie up resources while waiting.
+	store := getStore()
+	defer store.Close()
 	srv.mu.Lock()
 	defer srv.mu.Unlock()
 	delete(srv.items, id)

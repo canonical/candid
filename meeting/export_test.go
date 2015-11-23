@@ -15,6 +15,6 @@ var (
 	RunGC                   = (*Server).runGC
 )
 
-func NewServerNoGC(getStore func() (Store, error), listenAddr string) (*Server, error) {
+func NewServerNoGC(getStore func() Store, listenAddr string) (*Server, error) {
 	return newServer(getStore, listenAddr, false)
 }
