@@ -310,7 +310,7 @@ func (s *suite) TestWaitTimeout(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 	_, _, err = m.Wait(id)
 	c.Logf("err: %#v", err)
-	c.Assert(err, gc.ErrorMatches, "GET .*: rendezvous has expired after 100ms")
+	c.Assert(err, gc.ErrorMatches, "rendezvous has expired after 100ms")
 }
 
 type putErrorStore struct {
