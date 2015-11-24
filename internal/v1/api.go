@@ -3,20 +3,15 @@
 package v1
 
 import (
-	"net/http"
-
 	"github.com/juju/httprequest"
 	"github.com/juju/loggo"
-	"github.com/julienschmidt/httprouter"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v1/bakery/checkers"
-	"gopkg.in/macaroon-bakery.v1/httpbakery"
-	"gopkg.in/macaroon.v1"
 
+	"github.com/CanonicalLtd/blues-identity/idp"
 	"github.com/CanonicalLtd/blues-identity/internal/identity"
 	"github.com/CanonicalLtd/blues-identity/internal/mempool"
 	"github.com/CanonicalLtd/blues-identity/internal/store"
-	"github.com/CanonicalLtd/blues-identity/params"
 )
 
 var logger = loggo.GetLogger("identity.internal.v1")
@@ -30,8 +25,8 @@ const (
 )
 
 // NewAPIHandler is an identity.NewAPIHandlerFunc.
-func NewAPIHandler(p *store.Pool, params identity.ServerParams, idps []identity.IdentityProvider) ([]httprequest.Handler, error) {
-	h := New(p, params, idps)
+func NewAPIHandler(p *store.Pool, params identity.ServerParams) ([]httprequest.Handler, error) {
+	h := New(p, params)
 	handlers := identity.ErrorMapper.Handlers(h.apiHandler)
 	handlers = append(handlers, identity.ErrorMapper.Handlers(h.debugHandler)...)
 	handlers = append(handlers, identity.ErrorMapper.Handlers(h.dischargeHandler)...)
@@ -44,15 +39,15 @@ type Handler struct {
 	storePool   *store.Pool
 	handlerPool mempool.Pool
 	location    string
-	idps        []identity.IdentityProvider
+	idps        []idp.IdentityProvider
 }
 
 // New returns a new instance of the v1 API handler.
-func New(p *store.Pool, params identity.ServerParams, idps []identity.IdentityProvider) *Handler {
+func New(p *store.Pool, params identity.ServerParams) *Handler {
 	h := &Handler{
 		storePool: p,
 		location:  params.Location,
-		idps:      idps,
+		idps:      params.IdentityProviders,
 	}
 	h.handlerPool.New = h.newHandler
 	return h
@@ -168,11 +163,6 @@ type dischargeHandler struct {
 	*handler
 }
 
-type pool interface {
-	Get() interface{}
-	Put(interface{})
-}
-
 var errNotImplemented = errgo.Newf("method not implemented")
 
 func (h *Handler) idpHandlers() []httprequest.Handler {
@@ -200,87 +190,4 @@ func (h *Handler) idpHandlers() []httprequest.Handler {
 		)
 	}
 	return handlers
-}
-
-func (h *Handler) newIDPHandler(idp identity.IdentityProvider) httprouter.Handle {
-	return func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
-		r.ParseForm()
-		store, err := h.storePool.Get()
-		if err != nil {
-			identity.ErrorMapper.WriteError(w, errgo.NoteMask(err, "cannot get store", errgo.Any))
-			return
-		}
-		defer store.Close()
-		// TODO have a pool of these?
-		c := &idpHandler{
-			h:      h,
-			idp:    idp,
-			store:  store,
-			params: httprequest.Params{w, r, p},
-			place:  &place{store.Place},
-		}
-		idp.Handle(c)
-	}
-}
-
-type idpHandler struct {
-	h          *Handler
-	store      *store.Store
-	idp        identity.IdentityProvider
-	params     httprequest.Params
-	place      *place
-	agentLogin params.AgentLogin
-}
-
-func (c idpHandler) Params() httprequest.Params {
-	return c.params
-}
-
-func (c idpHandler) Store() *store.Store {
-	return c.store
-}
-
-func (c idpHandler) IDPURL(path string) string {
-	return c.h.location + "/v1/idp/" + c.idp.Name() + path
-}
-
-func (c idpHandler) RequestURL() string {
-	return c.h.location + c.params.Request.RequestURI
-}
-
-func (c idpHandler) LoginSuccess(ms macaroon.Slice) bool {
-	cookie, err := httpbakery.NewCookie(ms)
-	if err != nil {
-		c.LoginFailure(errgo.Notef(err, "cannot create cookie"))
-		return false
-	}
-	cookie.Path = "/"
-	http.SetCookie(c.params.Response, cookie)
-	c.params.Request.ParseForm()
-	waitId := c.params.Request.Form.Get("waitid")
-	if waitId != "" {
-		if err := c.place.Done(waitId, &loginInfo{
-			IdentityMacaroon: ms,
-		}); err != nil {
-			c.LoginFailure(errgo.Notef(err, "cannot complete rendezvous"))
-			return false
-		}
-	}
-	return true
-}
-
-func (c idpHandler) LoginFailure(err error) {
-	c.params.Request.ParseForm()
-	waitId := c.params.Request.Form.Get("waitid")
-	_, bakeryErr := httpbakery.ErrorToResponse(err)
-	if waitId != "" {
-		c.place.Done(waitId, &loginInfo{
-			Error: bakeryErr.(*httpbakery.Error),
-		})
-	}
-	identity.WriteError(c.params.Response, err)
-}
-
-func (c idpHandler) AgentLogin() params.AgentLogin {
-	return c.agentLogin
 }

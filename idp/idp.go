@@ -1,132 +1,90 @@
 // Copyright 2015 Canonical Ltd.
 
+// Package idp defines the API provided by all identity providers.
 package idp
 
-import "gopkg.in/errgo.v1"
+import (
+	"github.com/juju/httprequest"
+	"gopkg.in/macaroon-bakery.v1/bakery"
+	"gopkg.in/macaroon.v1"
+	"gopkg.in/mgo.v2"
 
-const (
-	UbuntuSSO        = "usso"
-	UbuntuSSOOAuth   = "usso_oauth"
-	Agent            = "agent"
-	Keystone         = "keystone"
-	KeystoneUserpass = "keystone_userpass"
-	KeystoneToken    = "keystone_token"
+	"github.com/CanonicalLtd/blues-identity/params"
 )
 
-// IdentityProvider describes the configuration of an Identity provider.
-type IdentityProvider struct {
-	Type   string
-	Config interface{}
+// URLContext is the interface expected by the IdentityProvider.URL
+// method. It allows an identity provider to define a URL destined for
+// its Handle method.
+type URLContext interface {
+	// URL returns a URL addressed to path within the identity provider.
+	URL(path string) string
 }
 
-// UnmarshalYAML unmarshals an IdentityProvider from configuration made
-// accessible through unmarshal. UnmarshalYAML implements
-// yaml.Unmarshaler.
-func (idp *IdentityProvider) UnmarshalYAML(unmarshal func(interface{}) error) error {
-	var t struct {
-		Type string
-	}
-	if err := unmarshal(&t); err != nil {
-		return errgo.Notef(err, "cannot unmarshal identity provider type")
-	}
-	switch t.Type {
-	case UbuntuSSO:
-		*idp = UbuntuSSOIdentityProvider
-	case UbuntuSSOOAuth:
-		*idp = UbuntuSSOOAuthIdentityProvider
-	case Agent:
-		*idp = AgentIdentityProvider
-	case Keystone, KeystoneUserpass, KeystoneToken:
-		var err error
-		*idp, err = unmarshalKeystone(t.Type, unmarshal)
-		if err != nil {
-			return errgo.Notef(err, "cannot unmarshal keystone configuration")
-		}
-	default:
-		return errgo.Newf("unrecognised identity provider type %q", t.Type)
-	}
-	return nil
+// Context provides information about the identity-manager context
+// to an identity provider. The context is specific to a given client
+// HTTP request to the identity provider.
+type Context interface {
+	URLContext
+
+	// RequestURL gets the original URL used to initiate the request
+	RequestURL() string
+
+	// Params gets the params for the current request.
+	Params() httprequest.Params
+
+	// LoginSuccess completes a login request successfully. The
+	// macaroon.Slice contains a macaroon, with third-party
+	// discharges if appropriate, that will be set as a cookie and
+	// used to identify the user when discharging third party
+	// caveats.
+	LoginSuccess(macaroon.Slice) bool
+
+	// LoginFailure fails a login request.
+	LoginFailure(error)
+
+	// Bakery returns a *bakery.Service that the identity provider
+	// should use to mint new macaroons.
+	Bakery() *bakery.Service
+
+	// UpdateUser creates or updates the record for the given user in
+	// the database.
+	UpdateUser(*params.User) error
+
+	// FindUserByName finds the user with the given username.
+	FindUserByName(params.Username) (*params.User, error)
+
+	// FindUserByExternalId finds the user with the given external Id.
+	FindUserByExternalId(string) (*params.User, error)
+
+	// Database returns a mgo.Database that the identity provider may use to
+	// store any necessary state data.
+	Database() *mgo.Database
 }
 
-// unmarshalKeystone unmarshals the configuration provided unmarshal.
-// unmarshal is expected to behave in the way described in
-// yaml.Unmarshaler.
-func unmarshalKeystone(t string, unmarshal func(interface{}) error) (IdentityProvider, error) {
-	var p KeystoneParams
-	if err := unmarshal(&p); err != nil {
-		return IdentityProvider{}, errgo.Mask(err)
-	}
-	if p.Name == "" {
-		return IdentityProvider{}, errgo.Newf("name not specified")
-	}
-	if p.URL == "" {
-		return IdentityProvider{}, errgo.Newf("url not specified")
-	}
-	return newKeystoneIdentityProvider(t, &p), nil
-}
+// IdentityProvider is the interface that is satisfied by all identity providers.
+type IdentityProvider interface {
+	// Name is the short name for the identity provider, this will
+	// appear in urls.
+	Name() string
 
-// UbuntuSSOIdentityProvider is an identity provider that uses Ubuntu
-// SSO.
-var UbuntuSSOIdentityProvider = IdentityProvider{
-	Type: UbuntuSSO,
-}
+	// Description is a name for the identity provider used to show
+	// end users.
+	Description() string
 
-// UbuntuSSOOAuthIdentityProvider is an identity provider that uses
-// Ubuntu SSO OAuth.
-var UbuntuSSOOAuthIdentityProvider = IdentityProvider{
-	Type: UbuntuSSOOAuth,
-}
+	// Interactive indicates whether login is provided by the end
+	// user interacting directly with the identity provider (usually
+	// through a web browser).
+	Interactive() bool
 
-// AgentIdentityProvider is an identity provider that uses the agent
-// login mechanism.
-var AgentIdentityProvider = IdentityProvider{
-	Type: Agent,
-}
+	// URL returns the URL to use to attempt a login with this
+	// identity provider. If the identity provider is interactive
+	// then the user will be automatically redirected to the URL.
+	// Otherwise the URL is returned in the response to a
+	// request for login methods.
+	URL(c URLContext, waitid string) (string, error)
 
-// KeystoneParams holds the parameters to use with a
-// KeystoneIdentityProvider.
-type KeystoneParams struct {
-	// Name is the name that the identity provider will have within
-	// the identity manager. The name is used as part of the url for
-	// communicating with the identity provider.
-	Name string `yaml:"name"`
-
-	// If Domain is set it will be appended to any usernames or
-	// groups provided by the identity provider. A user created by
-	// this identity provide would be username@domain.
-	Domain string `yaml:"domain"`
-
-	// Description is a human readable description that will be used
-	// if a list of providers is shown for a user to choose.
-	Description string `yaml:"description"`
-
-	// URL is the address of the keystone server.
-	URL string `yaml:"url"`
-}
-
-// KeystoneIdentityProvider creates a new identity provider using a
-// keystone service.
-func KeystoneIdentityProvider(p *KeystoneParams) IdentityProvider {
-	return newKeystoneIdentityProvider(Keystone, p)
-}
-
-// KeystoneUserpassIdentityProvider creates a new identity provider using a
-// keystone service with a non-interactive interface.
-func KeystoneUserpassIdentityProvider(p *KeystoneParams) IdentityProvider {
-	return newKeystoneIdentityProvider(KeystoneUserpass, p)
-}
-
-// KeystoneTokenIdentityProvider creates a new identity provider that
-// identifies users using Keystone user tokens.
-func KeystoneTokenIdentityProvider(p *KeystoneParams) IdentityProvider {
-	return newKeystoneIdentityProvider(KeystoneToken, p)
-}
-
-// newKeystoneIdentityProvider creates a new identity provider using a
-// keystone service with the specified type.
-func newKeystoneIdentityProvider(t string, p *KeystoneParams) IdentityProvider {
-	return IdentityProvider{
-		Type:   t,
-		Config: p,
-	}
+	// Handle handles any requests sent to the identity provider's
+	// endpoints. All URLs returned by URLContext.URL will be
+	// directed to Handle.
+	Handle(c Context)
 }

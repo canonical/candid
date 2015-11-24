@@ -38,7 +38,7 @@ type versionResponse struct {
 func (s *serverSuite) TestNewServerWithVersions(c *gc.C) {
 	db := s.Session.DB("foo")
 	serveVersion := func(vers string) identity.NewAPIHandlerFunc {
-		return func(*store.Pool, identity.ServerParams, []identity.IdentityProvider) ([]httprequest.Handler, error) {
+		return func(*store.Pool, identity.ServerParams) ([]httprequest.Handler, error) {
 			return []httprequest.Handler{{
 				Method: "GET",
 				Path:   "/" + vers + "/*path",
@@ -93,7 +93,7 @@ func (s *serverSuite) TestNewServerWithVersions(c *gc.C) {
 func (s *serverSuite) TestServerHasAccessControlAllowHeaders(c *gc.C) {
 	db := s.Session.DB("foo")
 	impl := map[string]identity.NewAPIHandlerFunc{
-		"/a": func(*store.Pool, identity.ServerParams, []identity.IdentityProvider) ([]httprequest.Handler, error) {
+		"/a": func(*store.Pool, identity.ServerParams) ([]httprequest.Handler, error) {
 			return []httprequest.Handler{{
 				Method: "GET",
 				Path:   "/a",

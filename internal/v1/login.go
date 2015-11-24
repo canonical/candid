@@ -35,7 +35,7 @@ func (h *dischargeHandler) Login(p httprequest.Params, lr *loginRequest) error {
 	if p.Request.Header.Get("Accept") == "application/json" {
 		methods := make(map[string]string)
 		for _, idp := range h.h.idps {
-			ctxt := idpHandler{
+			ctxt := &idpHandler{
 				h:     h.h,
 				store: h.store,
 				idp:   idp,
@@ -55,7 +55,7 @@ func (h *dischargeHandler) Login(p httprequest.Params, lr *loginRequest) error {
 	// Use the normal interactive login method.
 	for _, idp := range h.h.idps {
 		if idp.Interactive() {
-			ctxt := idpHandler{
+			ctxt := &idpHandler{
 				h:     h.h,
 				store: h.store,
 				idp:   idp,
@@ -80,7 +80,7 @@ func (h *dischargeHandler) agentLogin(user string, key *bakery.PublicKey) bool {
 		if idp.Name() != "agent" {
 			continue
 		}
-		ctxt := idpHandler{
+		ctxt := &idpHandler{
 			h:      h.h,
 			store:  h.store,
 			idp:    idp,

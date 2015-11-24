@@ -57,27 +57,7 @@ func (h *apiHandler) User(p httprequest.Params, r *params.UserRequest) (*params.
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
-	var publicKeys []*bakery.PublicKey
-	if len(id.PublicKeys) > 0 {
-		publicKeys = make([]*bakery.PublicKey, len(id.PublicKeys))
-		for i, key := range id.PublicKeys {
-			var pk bakery.PublicKey
-			if err := pk.UnmarshalBinary(key.Key); err != nil {
-				return nil, errgo.Notef(err, "cannot unmarshal public key from database")
-			}
-			publicKeys[i] = &pk
-		}
-	}
-	return &params.User{
-		Username:   params.Username(id.Username),
-		ExternalID: id.ExternalID,
-		FullName:   id.FullName,
-		Email:      id.Email,
-		GravatarID: id.GravatarID,
-		IDPGroups:  id.Groups,
-		Owner:      params.Username(id.Owner),
-		PublicKeys: publicKeys,
-	}, nil
+	return userFromIdentity(id)
 }
 
 func (h *apiHandler) SetUser(p httprequest.Params, u *params.SetUserRequest) error {
@@ -134,20 +114,9 @@ func (h *apiHandler) upsertUser(r *http.Request, u *params.SetUserRequest) error
 }
 
 func identityFromSetUserParams(u *params.SetUserRequest) *mongodoc.Identity {
-	keys := make([]mongodoc.PublicKey, len(u.User.PublicKeys))
-	for i, pk := range u.User.PublicKeys {
-		keys[i].Key = pk.Key[:]
-	}
-	return &mongodoc.Identity{
-		Username:   string(u.Username),
-		ExternalID: u.User.ExternalID,
-		Email:      u.User.Email,
-		GravatarID: gravatarHash(u.User.Email),
-		FullName:   u.User.FullName,
-		Groups:     u.User.IDPGroups,
-		Owner:      string(u.User.Owner),
-		PublicKeys: keys,
-	}
+	id := identityFromUser(&u.User)
+	id.Username = string(u.Username)
+	return id
 }
 
 func (h *handler) checkRequestHasAllGroups(r *http.Request, groups []string) error {
@@ -329,4 +298,45 @@ func checkExtraInfoKey(key string) error {
 		return errgo.WithCausef(nil, params.ErrBadRequest, "%q bad key for extra-info", key)
 	}
 	return nil
+}
+
+func userFromIdentity(id *mongodoc.Identity) (*params.User, error) {
+	var publicKeys []*bakery.PublicKey
+	if len(id.PublicKeys) > 0 {
+		publicKeys = make([]*bakery.PublicKey, len(id.PublicKeys))
+		for i, key := range id.PublicKeys {
+			var pk bakery.PublicKey
+			if err := pk.UnmarshalBinary(key.Key); err != nil {
+				return nil, errgo.Notef(err, "cannot unmarshal public key from database")
+			}
+			publicKeys[i] = &pk
+		}
+	}
+	return &params.User{
+		Username:   params.Username(id.Username),
+		ExternalID: id.ExternalID,
+		FullName:   id.FullName,
+		Email:      id.Email,
+		GravatarID: id.GravatarID,
+		IDPGroups:  id.Groups,
+		Owner:      params.Username(id.Owner),
+		PublicKeys: publicKeys,
+	}, nil
+}
+
+func identityFromUser(u *params.User) *mongodoc.Identity {
+	keys := make([]mongodoc.PublicKey, len(u.PublicKeys))
+	for i, pk := range u.PublicKeys {
+		keys[i].Key = pk.Key[:]
+	}
+	return &mongodoc.Identity{
+		Username:   string(u.Username),
+		ExternalID: u.ExternalID,
+		Email:      u.Email,
+		GravatarID: gravatarHash(u.Email),
+		FullName:   u.FullName,
+		Groups:     u.IDPGroups,
+		Owner:      string(u.Owner),
+		PublicKeys: keys,
+	}
 }
