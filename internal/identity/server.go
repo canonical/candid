@@ -23,7 +23,7 @@ var logger = loggo.GetLogger("identity.internal.identity")
 
 // NewAPIHandlerFunc is a function that returns set of httprequest
 // handlers that uses the given Store pool, server params and identity providers.
-type NewAPIHandlerFunc func(*store.Pool, ServerParams, []IdentityProvider) ([]httprequest.Handler, error)
+type NewAPIHandlerFunc func(*store.Pool, ServerParams) ([]httprequest.Handler, error)
 
 // New returns a handler that serves the given identity API versions using the
 // db to store identity data. The key of the versions map is the version name.
@@ -47,16 +47,6 @@ func New(db *mgo.Database, sp ServerParams, versions map[string]NewAPIHandlerFun
 		return nil, errgo.Notef(err, "cannot make store")
 	}
 
-	// Create the identity providers
-	idps := make([]IdentityProvider, len(sp.IdentityProviders))
-	for i, idp := range sp.IdentityProviders {
-		var err error
-		idps[i], err = newIDP(sp, idp)
-		if err != nil {
-			return nil, errgo.Notef(err, "cannot make identity provider")
-		}
-	}
-
 	// Create the HTTP server.
 	srv := &Server{
 		router: httprouter.New(),
@@ -72,7 +62,7 @@ func New(db *mgo.Database, sp ServerParams, versions map[string]NewAPIHandlerFun
 
 	srv.router.Handle("OPTIONS", "/*path", srv.options)
 	for name, newAPI := range versions {
-		handlers, err := newAPI(pool, sp, idps)
+		handlers, err := newAPI(pool, sp)
 		if err != nil {
 			return nil, errgo.Notef(err, "cannot create API %s", name)
 		}

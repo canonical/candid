@@ -57,6 +57,8 @@ func (s *configSuite) readConfig(c *gc.C, content string) (*config.Config, error
 }
 
 func (s *configSuite) TestRead(c *gc.C) {
+	config.RegisterIDP("usso", testIdentityProvider)
+	config.RegisterIDP("keystone", testIdentityProvider)
 	conf, err := s.readConfig(c, testConfig)
 	c.Assert(err, gc.IsNil)
 	c.Assert(conf, jc.DeepEquals, &config.Config{
@@ -69,13 +71,21 @@ func (s *configSuite) TestRead(c *gc.C) {
 		Location:       "http://foo.com:1234",
 		MaxMgoSessions: 10,
 		RequestTimeout: config.DurationString{Duration: 500 * time.Millisecond},
-		IdentityProviders: []idp.IdentityProvider{
-			idp.UbuntuSSOIdentityProvider,
-			idp.KeystoneIdentityProvider(&idp.KeystoneParams{
-				Name: "ks1",
-				URL:  "http://example.com/keystone",
-			}),
-		},
+		IdentityProviders: []config.IdentityProvider{{
+			IdentityProvider: IdentityProvider{
+				Params: map[string]string{
+					"type": "usso",
+				},
+			},
+		}, {
+			IdentityProvider: IdentityProvider{
+				Params: map[string]string{
+					"type": "keystone",
+					"name": "ks1",
+					"url":  "http://example.com/keystone",
+				},
+			},
+		}},
 		PrivateAddr: "localhost",
 	})
 }
@@ -96,4 +106,29 @@ func (s *configSuite) TestReadErrorInvalidYAML(c *gc.C) {
 	cfg, err := s.readConfig(c, ":")
 	c.Assert(err, gc.ErrorMatches, "cannot parse .*: yaml: did not find expected key")
 	c.Assert(cfg, gc.IsNil)
+}
+
+func (s *configSuite) TestUnrecognisedIDP(c *gc.C) {
+	cfg, err := s.readConfig(c, `
+identity-providers:
+ - type: nosuch
+`)
+	c.Assert(err, gc.ErrorMatches, `cannot parse ".*": unrecognised identity provider type "nosuch"`)
+	c.Assert(cfg, gc.IsNil)
+}
+
+type IdentityProvider struct {
+	idp.IdentityProvider
+	Params map[string]string
+}
+
+func testIdentityProvider(unmarshal func(interface{}) error) (idp.IdentityProvider, error) {
+	idp := IdentityProvider{
+		IdentityProvider: nil,
+		Params:           make(map[string]string),
+	}
+	if err := unmarshal(&idp.Params); err != nil {
+		return nil, err
+	}
+	return idp, nil
 }

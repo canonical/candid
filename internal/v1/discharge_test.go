@@ -3,293 +3,163 @@
 package v1_test
 
 import (
-	"bytes"
-	"encoding/json"
 	"errors"
-	"fmt"
-	"io/ioutil"
 	"net/http"
-	"net/http/httptest"
 	"net/url"
 	"strings"
-	"time"
 
-	"github.com/garyburd/go-oauth/oauth"
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/testing/httptesting"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/juju/environschema.v1"
 	"gopkg.in/macaroon-bakery.v1/bakery"
 	"gopkg.in/macaroon-bakery.v1/bakery/checkers"
 	"gopkg.in/macaroon-bakery.v1/httpbakery"
-	"gopkg.in/macaroon-bakery.v1/httpbakery/form"
+	"gopkg.in/macaroon-bakery.v1/httpbakery/agent"
 	"gopkg.in/macaroon.v1"
 
 	"github.com/CanonicalLtd/blues-identity/idp"
-	"github.com/CanonicalLtd/blues-identity/internal/idtesting/mockkeystone"
-	"github.com/CanonicalLtd/blues-identity/internal/idtesting/mockusso"
-	"github.com/CanonicalLtd/blues-identity/internal/keystone"
-	"github.com/CanonicalLtd/blues-identity/internal/mongodoc"
+	agentidp "github.com/CanonicalLtd/blues-identity/idp/agent"
+	"github.com/CanonicalLtd/blues-identity/idp/idptest"
+	"github.com/CanonicalLtd/blues-identity/idp/test"
 	"github.com/CanonicalLtd/blues-identity/params"
 )
 
 type dischargeSuite struct {
-	apiSuite
-	mockusso.Suite
-	locator  *bakery.PublicKeyRing
-	netSrv   *httptest.Server
-	keystone *mockkeystone.Server
-	v2Mux    *http.ServeMux
+	idptest.DischargeSuite
+	user *params.User
 }
 
 var _ = gc.Suite(&dischargeSuite{})
 
-func (s *dischargeSuite) SetUpSuite(c *gc.C) {
-	s.Suite.SetUpSuite(c)
-	s.apiSuite.SetUpSuite(c)
-}
-
-func (s *dischargeSuite) TearDownSuite(c *gc.C) {
-	s.Suite.TearDownSuite(c)
-	s.apiSuite.TearDownSuite(c)
-}
-
 func (s *dischargeSuite) SetUpTest(c *gc.C) {
-	s.Suite.SetUpTest(c)
-	s.keystone = mockkeystone.NewServer()
-	s.apiSuite.idps = []idp.IdentityProvider{
-		idp.UbuntuSSOIdentityProvider,
-		idp.UbuntuSSOOAuthIdentityProvider,
-		idp.AgentIdentityProvider,
-		idp.KeystoneUserpassIdentityProvider(
-			&idp.KeystoneParams{
-				Name: "form",
-				URL:  s.keystone.URL,
-			},
-		),
+	s.IDPs = []idp.IdentityProvider{
+		test.IdentityProvider,
+		agentidp.IdentityProvider,
 	}
-	s.apiSuite.SetUpTest(c)
-	s.locator = bakery.NewPublicKeyRing()
-	s.netSrv = httptest.NewServer(s.srv)
-	s.locator.AddPublicKeyForLocation(s.netSrv.URL, true, &s.keyPair.Public)
+	s.DischargeSuite.SetUpTest(c)
+	s.user = &params.User{
+		Username:   "test",
+		ExternalID: "https://example.com/+id/test",
+		FullName:   "Test User",
+		Email:      "test@example.com",
+		IDPGroups:  []string{"test1", "test2"},
+	}
 }
 
-func (s *dischargeSuite) TearDownTest(c *gc.C) {
-	s.keystone.Close()
-	s.netSrv.Close()
-	s.apiSuite.TearDownTest(c)
-	s.Suite.TearDownTest(c)
+func (s *dischargeSuite) TestInteractiveDischarge(c *gc.C) {
+	visitor := &test.WebPageVisitor{
+		Client: s.HTTPRequestClient,
+		User:   s.user,
+	}
+	s.AssertDischarge(c, visitor.Interactive, checkers.New(
+		checkers.TimeBefore,
+	))
+}
+
+func (s *dischargeSuite) TestNonInteractiveDischarge(c *gc.C) {
+	visitor := &test.WebPageVisitor{
+		Client: s.HTTPRequestClient,
+		User:   s.user,
+	}
+	s.AssertDischarge(c, visitor.NonInteractive, checkers.New(
+		checkers.TimeBefore,
+	))
+}
+
+func (s *dischargeSuite) TestDischargeUsernameLookup(c *gc.C) {
+	err := s.IDMClient.SetUser(&params.SetUserRequest{
+		Username: s.user.Username,
+		User:     *s.user,
+	})
+	c.Assert(err, gc.IsNil)
+	visitor := &test.WebPageVisitor{
+		Client: s.HTTPRequestClient,
+		User: &params.User{
+			Username: s.user.Username,
+		},
+	}
+	s.AssertDischarge(c, visitor.Interactive, checkers.New(
+		checkers.TimeBefore,
+	))
+}
+
+func (s *dischargeSuite) TestDischargeExternalIDLookup(c *gc.C) {
+	err := s.IDMClient.SetUser(&params.SetUserRequest{
+		Username: s.user.Username,
+		User:     *s.user,
+	})
+	c.Assert(err, gc.IsNil)
+	visitor := &test.WebPageVisitor{
+		Client: s.HTTPRequestClient,
+		User: &params.User{
+			ExternalID: s.user.ExternalID,
+		},
+	}
+	s.AssertDischarge(c, visitor.Interactive, checkers.New(
+		checkers.TimeBefore,
+	))
 }
 
 func (s *dischargeSuite) TestDischargeWhenLoggedIn(c *gc.C) {
-	store := s.pool.GetNoLimit()
-	defer s.pool.Put(store)
-	uuid := s.createUser(c, &params.User{
-		Username:   "test-user",
-		ExternalID: "http://example.com/test-user",
-		Email:      "test-user@example.com",
-		FullName:   "Test User III",
-		IDPGroups: []string{
-			"test",
-			"test2",
-		},
-	})
-	// Create the service which will issue the third party caveat.
-	svc, err := bakery.NewService(bakery.NewServiceParams{
-		Locator: s.locator,
-	})
-	c.Assert(err, gc.IsNil)
-	m, err := svc.NewMacaroon("", nil, []checkers.Caveat{{
-		Location:  s.netSrv.URL,
-		Condition: "is-authenticated-user",
-	}})
-	c.Assert(err, gc.IsNil)
-	idm, err := store.Service.NewMacaroon("", nil, []checkers.Caveat{
-		checkers.DeclaredCaveat("username", "test-user"),
-	})
-	c.Assert(err, gc.IsNil)
-	u, err := url.Parse(s.netSrv.URL)
-	c.Assert(err, gc.IsNil)
-	bakeryClient := httpbakery.NewClient()
-	err = httpbakery.SetCookie(bakeryClient.Client.Jar, u, macaroon.Slice{idm})
-	c.Assert(err, gc.IsNil)
-	ms, err := bakeryClient.DischargeAll(m)
-	c.Assert(err, gc.IsNil)
-	d := checkers.InferDeclared(ms)
-	err = svc.Check(ms, checkers.New(d, checkers.TimeBefore))
-	c.Assert(err, gc.IsNil)
-	c.Assert(d, jc.DeepEquals, checkers.Declared{
-		"uuid":     uuid,
-		"username": "test-user",
-	})
+	visitor := &test.WebPageVisitor{
+		Client: s.HTTPRequestClient,
+		User:   s.user,
+	}
+	s.AssertDischarge(c, visitor.Interactive, checkers.New(
+		checkers.TimeBefore,
+	))
+	s.AssertDischarge(c, noVisit, checkers.New(
+		checkers.TimeBefore,
+	))
 }
 
-// This test is not sending the bakery protocol version so it will use the default
-// one and return a 407.
-func (s *dischargeSuite) TestDischargeStatusProxyAuthRequiredResponse(c *gc.C) {
-	// Create the service which will issue the third party caveat.
-	svc, err := bakery.NewService(bakery.NewServiceParams{
-		Locator: s.locator,
-	})
-	c.Assert(err, gc.IsNil)
-	m, err := svc.NewMacaroon("", nil, []checkers.Caveat{{
-		Location:  s.netSrv.URL,
-		Condition: "is-authenticated-user",
-	}})
-
-	cav := m.Caveats()[0]
-	resp, err := http.PostForm(s.netSrv.URL+"/discharge", url.Values{
-		"id":       {cav.Id},
-		"location": {cav.Location},
-	})
-	c.Assert(err, gc.IsNil)
-	defer resp.Body.Close()
-
-	c.Assert(resp.StatusCode, gc.Equals, http.StatusProxyAuthRequired)
+func noVisit(*url.URL) error {
+	return errors.New("unexpected call to visit")
 }
 
-// This test is using the bakery protocol version at value 1 to be able to return a 401
-// instead of a 407
-func (s *dischargeSuite) TestDischargeStatusUnauthorizedResponse(c *gc.C) {
-	// Create the service which will issue the third party caveat.
-	svc, err := bakery.NewService(bakery.NewServiceParams{
-		Locator: s.locator,
-	})
+func (s *dischargeSuite) TestDischargeAgentShortcut(c *gc.C) {
+	key, err := bakery.GenerateKey()
 	c.Assert(err, gc.IsNil)
-	m, err := svc.NewMacaroon("", nil, []checkers.Caveat{{
-		Location:  s.netSrv.URL,
-		Condition: "is-authenticated-user",
-	}})
-
-	cav := m.Caveats()[0]
-	values := url.Values{
-		"id":       {cav.Id},
-		"location": {cav.Location},
-	}
-
-	req, err := http.NewRequest("POST", s.netSrv.URL+"/discharge", strings.NewReader(values.Encode()))
+	err = s.IDMClient.SetUser(
+		&params.SetUserRequest{
+			Username: "testagent@admin@idm",
+			User: params.User{
+				Username: "testagent@admin@idm",
+				Owner:    "admin@idm",
+				PublicKeys: []*bakery.PublicKey{
+					&key.Public,
+				},
+			},
+		},
+	)
 	c.Assert(err, gc.IsNil)
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req.Header.Set("Bakery-Protocol-Version", "1")
-	resp, err := http.DefaultClient.Do(req)
-	c.Assert(err, gc.IsNil)
-	defer resp.Body.Close()
-
-	c.Assert(resp.StatusCode, gc.Equals, http.StatusUnauthorized)
-	c.Assert(resp.Header.Get("WWW-Authenticate"), gc.Equals, "Macaroon")
-}
-
-func (s *dischargeSuite) TestDischargeMemberOf(c *gc.C) {
-	store := s.pool.GetNoLimit()
-	defer s.pool.Put(store)
-	s.createUser(c, &params.User{
-		Username:   "test-user",
-		ExternalID: "http://example.com/test-user",
-		Email:      "test-user@example.com",
-		FullName:   "Test User III",
-		IDPGroups: []string{
-			"test",
-			"test2",
-		},
-	})
-	// Create the service which will issue the third party caveat.
-	svc, err := bakery.NewService(bakery.NewServiceParams{
-		Locator: s.locator,
-	})
-	c.Assert(err, gc.IsNil)
-
-	tests := []struct {
-		about          string
-		createMacaroon func() (*macaroon.Macaroon, error)
-		expectError    string
-		expectDeclared checkers.Declared
-	}{{
-		about: "test membership in single group - matches",
-		createMacaroon: func() (*macaroon.Macaroon, error) {
-			return svc.NewMacaroon("", nil, []checkers.Caveat{{
-				Location:  s.netSrv.URL,
-				Condition: "is-member-of test",
-			}})
-		},
-		expectDeclared: checkers.Declared{},
-	}, {
-		about: "test membership in a set of groups",
-		createMacaroon: func() (*macaroon.Macaroon, error) {
-			return svc.NewMacaroon("", nil, []checkers.Caveat{{
-				Location:  s.netSrv.URL,
-				Condition: "is-member-of test test2",
-			}})
-		},
-		expectDeclared: checkers.Declared{},
-	}, {
-		about: "test membership in single group - no match",
-		createMacaroon: func() (*macaroon.Macaroon, error) {
-			return svc.NewMacaroon("", nil, []checkers.Caveat{{
-				Location:  s.netSrv.URL,
-				Condition: "is-member-of test1",
-			}})
-		},
-		expectError: "third party refused discharge: cannot discharge: user is not a member of required groups",
-	}, {
-		about: "test membership in a set of groups - one group matches",
-		createMacaroon: func() (*macaroon.Macaroon, error) {
-			return svc.NewMacaroon("", nil, []checkers.Caveat{{
-				Location:  s.netSrv.URL,
-				Condition: "is-member-of test test3 test4",
-			}})
-		},
-		expectDeclared: checkers.Declared{},
-	}, {
-		about: "test membership in a set of groups fail - no match",
-		createMacaroon: func() (*macaroon.Macaroon, error) {
-			return svc.NewMacaroon("", nil, []checkers.Caveat{{
-				Location:  s.netSrv.URL,
-				Condition: "is-member-of test1 test3",
-			}})
-		},
-		expectError: "third party refused discharge: cannot discharge: user is not a member of required groups",
-	},
-	}
-
-	for _, test := range tests {
-		c.Logf("test: %q", test.about)
-		m, err := test.createMacaroon()
-		c.Assert(err, gc.IsNil)
-		idm, err := store.Service.NewMacaroon("", nil, []checkers.Caveat{
-			checkers.DeclaredCaveat("username", "test-user"),
-		})
-		c.Assert(err, gc.IsNil)
-		u, err := url.Parse(s.netSrv.URL)
-		c.Assert(err, gc.IsNil)
-		bakeryClient := httpbakery.NewClient()
-		err = httpbakery.SetCookie(bakeryClient.Client.Jar, u, macaroon.Slice{idm})
-		c.Assert(err, gc.IsNil)
-		ms, err := bakeryClient.DischargeAll(m)
-		if test.expectError != "" {
-			c.Assert(errgo.Cause(err), gc.ErrorMatches, test.expectError)
-		} else {
-			c.Assert(err, gc.IsNil)
-			d := checkers.InferDeclared(ms)
-			err = svc.Check(ms, checkers.New(d, checkers.TimeBefore))
-			c.Assert(err, gc.IsNil)
-			c.Assert(d, jc.DeepEquals, test.expectDeclared)
-		}
-	}
+	s.BakeryClient.Key = key
+	u, err := url.Parse(idptest.DischargeLocation)
+	agent.SetUpAuth(s.BakeryClient, u, "testagent@admin@idm")
+	s.AssertDischarge(c, nil, checkers.New(
+		checkers.TimeBefore,
+	))
 }
 
 func (s *dischargeSuite) TestAdminDischarge(c *gc.C) {
-	s.createUser(c, &params.User{
-		Username:   "jbloggs",
-		ExternalID: "http://example.com/jbloggs",
-		Email:      "jbloggs@example.com",
-		FullName:   "Joe Bloggs",
-		IDPGroups: []string{
-			"test",
+	err := s.IDMClient.SetUser(
+		&params.SetUserRequest{
+			Username: "jbloggs",
+			User: params.User{
+				Username:   "jbloggs",
+				ExternalID: "http://example.com/jbloggs",
+				Email:      "jbloggs@example.com",
+				FullName:   "Joe Bloggs",
+				IDPGroups: []string{
+					"test",
+				},
+			},
 		},
-	})
+	)
+	c.Assert(err, gc.IsNil)
 	svc, err := bakery.NewService(bakery.NewServiceParams{
-		Locator: s.locator,
+		Locator: s.Locator,
 	})
 	c.Assert(err, gc.IsNil)
 	tests := []struct {
@@ -300,7 +170,7 @@ func (s *dischargeSuite) TestAdminDischarge(c *gc.C) {
 	}{{
 		about: "discharge macaroon",
 		m: newMacaroon(c, svc, []checkers.Caveat{{
-			Location:  s.netSrv.URL,
+			Location:  idptest.DischargeLocation,
 			Condition: "is-authenticated-user",
 		}}),
 		modifier: &requestModifier{
@@ -313,11 +183,12 @@ func (s *dischargeSuite) TestAdminDischarge(c *gc.C) {
 	}, {
 		about: "no discharge user",
 		m: newMacaroon(c, svc, []checkers.Caveat{{
-			Location:  s.netSrv.URL,
+			Location:  idptest.DischargeLocation,
 			Condition: "is-authenticated-user",
 		}}),
 		modifier: &requestModifier{
 			f: func(r *http.Request) {
+
 				r.SetBasicAuth(adminUsername, adminPassword)
 			},
 		},
@@ -325,7 +196,7 @@ func (s *dischargeSuite) TestAdminDischarge(c *gc.C) {
 	}, {
 		about: "no authentication",
 		m: newMacaroon(c, svc, []checkers.Caveat{{
-			Location:  s.netSrv.URL,
+			Location:  idptest.DischargeLocation,
 			Condition: "is-authenticated-user",
 		}}),
 		modifier: &requestModifier{
@@ -337,7 +208,7 @@ func (s *dischargeSuite) TestAdminDischarge(c *gc.C) {
 	}, {
 		about: "unsupported user",
 		m: newMacaroon(c, svc, []checkers.Caveat{{
-			Location:  s.netSrv.URL,
+			Location:  idptest.DischargeLocation,
 			Condition: "is-authenticated-user",
 		}}),
 		modifier: &requestModifier{
@@ -350,7 +221,8 @@ func (s *dischargeSuite) TestAdminDischarge(c *gc.C) {
 	}, {
 		about: "unsupported condition",
 		m: newMacaroon(c, svc, []checkers.Caveat{{
-			Location:  s.netSrv.URL,
+
+			Location:  idptest.DischargeLocation,
 			Condition: "is-authenticated-group",
 		}}),
 		modifier: &requestModifier{
@@ -363,7 +235,7 @@ func (s *dischargeSuite) TestAdminDischarge(c *gc.C) {
 	}, {
 		about: "bad credentials",
 		m: newMacaroon(c, svc, []checkers.Caveat{{
-			Location:  s.netSrv.URL,
+			Location:  idptest.DischargeLocation,
 			Condition: "is-authenticated-user",
 		}}),
 		modifier: &requestModifier{
@@ -377,11 +249,13 @@ func (s *dischargeSuite) TestAdminDischarge(c *gc.C) {
 	for i, test := range tests {
 		c.Logf("test %d. %s", i, test.about)
 		client := httpbakery.NewClient()
+		client.Transport = s.RoundTripper
 		if test.modifier != nil {
 			test.modifier.transport = client.Client.Transport
 			client.Client.Transport = test.modifier
 		}
 		ms, err := client.DischargeAll(test.m)
+
 		if test.expectErr != "" {
 			c.Assert(err, gc.ErrorMatches, test.expectErr)
 			continue
@@ -396,210 +270,11 @@ func (s *dischargeSuite) TestAdminDischarge(c *gc.C) {
 	}
 }
 
-func (s *dischargeSuite) TestDischargeWithOpenID(c *gc.C) {
-	store := s.pool.GetNoLimit()
-	defer s.pool.Put(store)
-	s.MockUSSO.AddUser(&mockusso.User{
-		ID:       "test",
-		NickName: "test",
-		FullName: "Test User",
-		Email:    "test@example.com",
-		Groups:   []string{"test1", "test2"},
-	})
-	s.MockUSSO.SetLoginUser("test")
-	svc, err := bakery.NewService(bakery.NewServiceParams{
-		Locator: s.locator,
-	})
+func newMacaroon(c *gc.C, svc *bakery.Service, cav []checkers.Caveat) *macaroon.Macaroon {
+	m, err := svc.NewMacaroon("", nil, cav)
 	c.Assert(err, gc.IsNil)
-	client := httpbakery.NewClient()
-	client.VisitWebPage = s.doVisit(c, client.Client)
-	m := newMacaroon(c, svc, []checkers.Caveat{{
-		Location:  s.netSrv.URL,
-		Condition: "is-authenticated-user",
-	}})
-	ms, err := client.DischargeAll(m)
-	c.Assert(err, gc.IsNil)
-	d := checkers.InferDeclared(ms)
-	err = svc.Check(ms, checkers.New(
-		d,
-		checkers.TimeBefore,
-	))
-	c.Assert(err, gc.IsNil)
-	id, err := store.GetIdentity(params.Username("test"))
-	c.Assert(err, gc.IsNil)
-	id.UUID = ""
-	c.Assert(id, jc.DeepEquals, &mongodoc.Identity{
-		ExternalID: "https://login.ubuntu.com/+id/test",
-		Username:   "test",
-		FullName:   "Test User",
-		Email:      "test@example.com",
-		Groups:     []string{"test1", "test2"},
-	})
+	return m
 }
-
-func (s *dischargeSuite) doVisit(c *gc.C, client *http.Client) func(*url.URL) error {
-	return func(u *url.URL) error {
-		c.Logf("visiting %s", u)
-		resp, err := client.Get(u.String())
-		if err != nil {
-			return err
-		}
-		defer resp.Body.Close()
-		if resp.StatusCode != http.StatusOK {
-			data, _ := ioutil.ReadAll(resp.Body)
-			c.Logf("Body: %s", data)
-			return fmt.Errorf("bad status %q", resp.Status)
-		}
-		return nil
-	}
-}
-
-func (s *dischargeSuite) TestDischargeWithOAuth(c *gc.C) {
-	uuid := s.createUser(c, &params.User{
-		Username:   "test",
-		ExternalID: "https://login.ubuntu.com/+id/1234",
-		Email:      "test@example.com",
-		FullName:   "Test User",
-		IDPGroups: []string{
-			"test",
-		},
-	})
-	s.MockUSSO.AddUser(&mockusso.User{
-		ID:       "1234",
-		NickName: "test",
-		FullName: "Test User",
-		Email:    "test@example.com",
-		Groups: []string{
-			"test",
-		},
-		ConsumerSecret: "secret1",
-		TokenKey:       "test-token",
-		TokenSecret:    "secret2",
-	})
-	// Create the service which will issue the third party caveat.
-	svc, err := bakery.NewService(bakery.NewServiceParams{
-		Locator: s.locator,
-	})
-	c.Assert(err, gc.IsNil)
-	m, err := svc.NewMacaroon("", nil, []checkers.Caveat{{
-		Location:  s.netSrv.URL,
-		Condition: "is-authenticated-user",
-	}})
-	c.Assert(err, gc.IsNil)
-	bakeryClient := httpbakery.NewClient()
-	bakeryClient.VisitWebPage = oauthVisit(c, client, goodToken)
-	ms, err := bakeryClient.DischargeAll(m)
-	c.Assert(err, gc.IsNil)
-	d := checkers.InferDeclared(ms)
-	err = svc.Check(ms, checkers.New(d, checkers.TimeBefore))
-	c.Assert(err, gc.IsNil)
-	c.Assert(d, jc.DeepEquals, checkers.Declared{
-		"uuid":     uuid,
-		"username": "test",
-	})
-}
-
-func (s *dischargeSuite) TestDischargeWithOAuthBadToken(c *gc.C) {
-	s.createUser(c, &params.User{
-		Username:   "test",
-		ExternalID: "https://login.ubuntu.com/+id/1234",
-		Email:      "test@example.com",
-		FullName:   "Test User",
-		IDPGroups: []string{
-			"test",
-		},
-	})
-	s.MockUSSO.AddUser(&mockusso.User{
-		ID:       "1234",
-		NickName: "test",
-		FullName: "Test User",
-		Email:    "test@example.com",
-		Groups: []string{
-			"test",
-		},
-		ConsumerSecret: "secret1",
-		TokenKey:       "test-token",
-		TokenSecret:    "secret2",
-	})
-	// Create the service which will issue the third party caveat.
-	svc, err := bakery.NewService(bakery.NewServiceParams{
-		Locator: s.locator,
-	})
-	c.Assert(err, gc.IsNil)
-	m, err := svc.NewMacaroon("", nil, []checkers.Caveat{{
-		Location:  s.netSrv.URL,
-		Condition: "is-authenticated-user",
-	}})
-	c.Assert(err, gc.IsNil)
-	bakeryClient := httpbakery.NewClient()
-	bakeryClient.VisitWebPage = oauthVisit(c, client, badToken)
-	_, err = bakeryClient.DischargeAll(m)
-	c.Assert(err, gc.ErrorMatches, `cannot get discharge from ".*": cannot start interactive session: invalid OAuth credentials`)
-}
-
-func noVisit(*url.URL) error {
-	return errors.New("unexpected call to visit")
-}
-
-// oauthVisit returns a visit function that will sign a response to the return_to url
-// with a the oauth credentials provided.
-func oauthVisit(c *gc.C, client *oauth.Client, token *oauth.Credentials) func(*url.URL) error {
-	return func(u *url.URL) error {
-		req, err := http.NewRequest("GET", u.String(), nil)
-		if err != nil {
-			return err
-		}
-		req.Header.Set("Accept", "application/json")
-		resp, err := http.DefaultClient.Do(req)
-		if err != nil {
-			return err
-		}
-		defer resp.Body.Close()
-		var loginMethods params.LoginMethods
-		body, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			return err
-		}
-		err = json.Unmarshal(body, &loginMethods)
-		if err != nil {
-			return err
-		}
-		uOAuth, err := url.Parse(loginMethods.UbuntuSSOOAuth)
-		if err != nil {
-			return err
-		}
-		q := uOAuth.Query()
-		uOAuth.RawQuery = ""
-		c.Logf("OAUTH Visiting %s", loginMethods.UbuntuSSOOAuth)
-		resp, err = client.Get(nil, token, uOAuth.String(), q)
-		if err != nil {
-			return err
-		}
-		defer resp.Body.Close()
-		if resp.StatusCode == http.StatusOK {
-			return nil
-		}
-		c.Logf("Status: %s", resp.Status)
-		var perr params.Error
-		body, err = ioutil.ReadAll(resp.Body)
-		if err != nil {
-			return err
-		}
-		err = json.Unmarshal(body, &perr)
-		if err != nil {
-			return err
-		}
-		return &perr
-	}
-}
-
-var never = bakery.FirstPartyCheckerFunc(func(string) error {
-	return errors.New("unexpected first party caveat")
-})
-
-var always = bakery.FirstPartyCheckerFunc(func(string) error {
-	return nil
-})
 
 // requestModifier implements an http RoundTripper
 // that modifies any requests using the given function
@@ -618,93 +293,156 @@ func (m *requestModifier) RoundTrip(r *http.Request) (*http.Response, error) {
 	}
 }
 
-func newMacaroon(c *gc.C, svc *bakery.Service, cav []checkers.Caveat) *macaroon.Macaroon {
-	m, err := svc.NewMacaroon("", nil, cav)
-	c.Assert(err, gc.IsNil)
-	return m
-}
-
-var client = &oauth.Client{
-	Credentials: oauth.Credentials{
-		Token:  "1234",
-		Secret: "secret1",
-	},
-	SignatureMethod: oauth.HMACSHA1,
-}
-
-var goodToken = &oauth.Credentials{
-	Token:  "test-token",
-	Secret: "secret2",
-}
-
-var badToken = &oauth.Credentials{
-	Token:  "bad-token",
-	Secret: "bad-secret2",
-}
-
-func (s *dischargeSuite) TestDischargeWithAgentLogin(c *gc.C) {
-	keys, err := bakery.GenerateKey()
-	c.Assert(err, gc.IsNil)
-	uuid := s.createIdentity(c, &mongodoc.Identity{
-		Username: "test",
-		Email:    "test@example.com",
-		FullName: "Test User",
-		Groups: []string{
-			"test",
+func (s *dischargeSuite) TestDischargeMemberOf(c *gc.C) {
+	visitor := test.WebPageVisitor{
+		Client: s.HTTPRequestClient,
+		User: &params.User{
+			Username:   "test-user",
+			ExternalID: "http://example.com/test-user",
+			Email:      "test-user@example.com",
+			FullName:   "Test User III",
+			IDPGroups: []string{
+				"test",
+				"test2",
+			},
 		},
-		Owner: "admin",
-		PublicKeys: []mongodoc.PublicKey{{
-			Key: keys.Public.Key[:],
-		}},
-	})
+	}
+	s.BakeryClient.VisitWebPage = visitor.Interactive
 	// Create the service which will issue the third party caveat.
 	svc, err := bakery.NewService(bakery.NewServiceParams{
-		Locator: s.locator,
+		Locator: s.Locator,
+	})
+	c.Assert(err, gc.IsNil)
+
+	tests := []struct {
+		about          string
+		m              *macaroon.Macaroon
+		expectError    string
+		expectDeclared checkers.Declared
+	}{{
+		about: "test membership in single group - matches",
+		m: newMacaroon(c, svc, []checkers.Caveat{{
+			Location:  idptest.DischargeLocation,
+			Condition: "is-member-of test",
+		}}),
+		expectDeclared: checkers.Declared{},
+	}, {
+		about: "test membership in a set of groups",
+		m: newMacaroon(c, svc, []checkers.Caveat{{
+			Location:  idptest.DischargeLocation,
+			Condition: "is-member-of test test2",
+		}}),
+		expectDeclared: checkers.Declared{},
+	}, {
+		about: "test membership in single group - no match",
+		m: newMacaroon(c, svc, []checkers.Caveat{{
+			Location:  idptest.DischargeLocation,
+			Condition: "is-member-of test1",
+		}}),
+		expectError: "third party refused discharge: cannot discharge: user is not a member of required groups",
+	}, {
+		about: "test membership in a set of groups - one group matches",
+		m: newMacaroon(c, svc, []checkers.Caveat{{
+			Location:  idptest.DischargeLocation,
+			Condition: "is-member-of test2 test4",
+		}}),
+		expectDeclared: checkers.Declared{},
+	}, {
+		about: "test membership in a set of groups fail - no match",
+		m: newMacaroon(c, svc, []checkers.Caveat{{
+			Location:  idptest.DischargeLocation,
+			Condition: "is-member-of test1 test3",
+		}}),
+		expectError: "third party refused discharge: cannot discharge: user is not a member of required groups",
+	},
+	}
+
+	for i, test := range tests {
+		c.Logf("%d. %q", i, test.about)
+		ms, err := s.BakeryClient.DischargeAll(test.m)
+		if test.expectError != "" {
+			c.Assert(errgo.Cause(err), gc.ErrorMatches, test.expectError)
+		} else {
+			c.Assert(err, gc.IsNil)
+			d := checkers.InferDeclared(ms)
+			err = svc.Check(ms, checkers.New(d, checkers.TimeBefore))
+			c.Assert(err, gc.IsNil)
+			c.Assert(d, jc.DeepEquals, test.expectDeclared)
+		}
+	}
+}
+
+// This test is not sending the bakery protocol version so it will use the default
+// one and return a 407.
+func (s *dischargeSuite) TestDischargeStatusProxyAuthRequiredResponse(c *gc.C) {
+	// Create the service which will issue the third party caveat.
+	svc, err := bakery.NewService(bakery.NewServiceParams{
+		Locator: s.Locator,
 	})
 	c.Assert(err, gc.IsNil)
 	m, err := svc.NewMacaroon("", nil, []checkers.Caveat{{
-		Location:  s.netSrv.URL,
+		Location:  idptest.DischargeLocation,
 		Condition: "is-authenticated-user",
 	}})
-	c.Assert(err, gc.IsNil)
-	bakeryClient := httpbakery.NewClient()
-	bakeryClient.VisitWebPage = agentVisit(c, bakeryClient, "test", &keys.Public)
-	bakeryClient.Key = keys
-	ms, err := bakeryClient.DischargeAll(m)
-	c.Assert(err, gc.IsNil)
-	d := checkers.InferDeclared(ms)
-	err = svc.Check(ms, checkers.New(d, checkers.TimeBefore))
-	c.Assert(err, gc.IsNil)
-	c.Assert(d, jc.DeepEquals, checkers.Declared{
-		"uuid":     uuid,
-		"username": "test",
+
+	cav := m.Caveats()[0]
+	resp, err := s.HTTPClient.PostForm(idptest.DischargeLocation+"/discharge", url.Values{
+		"id":       {cav.Id},
+		"location": {cav.Location},
 	})
+	c.Assert(err, gc.IsNil)
+	defer resp.Body.Close()
+
+	c.Assert(resp.StatusCode, gc.Equals, http.StatusProxyAuthRequired)
+}
+
+// This test is using the bakery protocol version at value 1 to be able to return a 401
+// instead of a 407
+func (s *dischargeSuite) TestDischargeStatusUnauthorizedResponse(c *gc.C) {
+	// Create the service which will issue the third party caveat.
+	svc, err := bakery.NewService(bakery.NewServiceParams{
+		Locator: s.Locator,
+	})
+	c.Assert(err, gc.IsNil)
+	m, err := svc.NewMacaroon("", nil, []checkers.Caveat{{
+		Location:  idptest.DischargeLocation,
+		Condition: "is-authenticated-user",
+	}})
+
+	cav := m.Caveats()[0]
+	values := url.Values{
+		"id":       {cav.Id},
+		"location": {cav.Location},
+	}
+
+	req, err := http.NewRequest("POST", idptest.DischargeLocation+"/discharge", strings.NewReader(values.Encode()))
+	c.Assert(err, gc.IsNil)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Bakery-Protocol-Version", "1")
+	resp, err := s.HTTPClient.Do(req)
+	c.Assert(err, gc.IsNil)
+	defer resp.Body.Close()
+
+	c.Assert(resp.StatusCode, gc.Equals, http.StatusUnauthorized)
+	c.Assert(resp.Header.Get("WWW-Authenticate"), gc.Equals, "Macaroon")
 }
 
 func (s *dischargeSuite) TestDischargeLegacyLocation(c *gc.C) {
-	s.createUser(c, &params.User{
-		Username:   "jbloggs",
-		ExternalID: "http://example.com/jbloggs",
-		Email:      "jbloggs@example.com",
-		FullName:   "Joe Bloggs",
-		IDPGroups: []string{
-			"test",
-		},
-	})
+	visitor := &test.WebPageVisitor{
+		Client: s.HTTPRequestClient,
+		User:   s.user,
+	}
+	s.BakeryClient.VisitWebPage = visitor.Interactive
+	pk, err := s.Locator.PublicKeyForLocation(idptest.DischargeLocation)
+	c.Assert(err, gc.IsNil)
 	svc, err := bakery.NewService(bakery.NewServiceParams{
-		Locator: s.locator,
+		Locator: bakery.PublicKeyLocatorMap{
+			idptest.DischargeLocation + "/v1/discharger": pk,
+		},
 	})
 	c.Assert(err, gc.IsNil)
-	client := httpbakery.NewClient()
-	client.Client.Transport = &requestModifier{
-		f: func(r *http.Request) {
-			r.SetBasicAuth(adminUsername, adminPassword)
-			r.URL.RawQuery += "&discharge-for-user=jbloggs"
-		},
-		transport: client.Client.Transport,
-	}
-	ms, err := client.DischargeAll(newMacaroon(c, svc, []checkers.Caveat{{
-		Location:  s.netSrv.URL + "/v1/discharger",
+	ms, err := s.BakeryClient.DischargeAll(newMacaroon(c, svc, []checkers.Caveat{{
+		Location:  idptest.DischargeLocation + "/v1/discharger",
 		Condition: "is-authenticated-user",
 	}}))
 	c.Assert(err, gc.IsNil)
@@ -717,186 +455,48 @@ func (s *dischargeSuite) TestDischargeLegacyLocation(c *gc.C) {
 }
 
 func (s *dischargeSuite) TestPublicKeyLegacyLocation(c *gc.C) {
+	pk, err := s.Locator.PublicKeyForLocation(idptest.DischargeLocation)
+	c.Assert(err, gc.IsNil)
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
-		Handler:      s.srv,
-		URL:          apiURL("discharger/publickey"),
+		URL:          idptest.DischargeLocation + "/v1/discharger/publickey",
+		Do:           s.HTTPClient.Do,
 		ExpectStatus: http.StatusOK,
 		ExpectBody: map[string]*bakery.PublicKey{
-			"PublicKey": &s.keyPair.Public,
+			"PublicKey": pk,
 		},
 	})
 }
 
 func (s *dischargeSuite) TestPublicKey(c *gc.C) {
+	pk, err := s.Locator.PublicKeyForLocation(idptest.DischargeLocation)
+	c.Assert(err, gc.IsNil)
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
-		Handler:      s.srv,
-		URL:          "/publickey",
+		URL:          idptest.DischargeLocation + "/publickey",
+		Do:           s.HTTPClient.Do,
 		ExpectStatus: http.StatusOK,
 		ExpectBody: map[string]*bakery.PublicKey{
-			"PublicKey": &s.keyPair.Public,
+			"PublicKey": pk,
 		},
 	})
 }
 
-func agentVisit(c *gc.C, client *httpbakery.Client, username string, pk *bakery.PublicKey) func(u *url.URL) error {
-	return func(u *url.URL) error {
-		req, err := http.NewRequest("GET", u.String(), nil)
-		if err != nil {
-			return err
-		}
-		req.Header.Set("Accept", "application/json")
-		resp, err := client.Do(req)
-		if err != nil {
-			return err
-		}
-		defer resp.Body.Close()
-		var loginMethods params.LoginMethods
-		body, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			return err
-		}
-		err = json.Unmarshal(body, &loginMethods)
-		if err != nil {
-			return err
-		}
-		var p params.AgentLogin
-		p.Username = params.Username(username)
-		p.PublicKey = pk
-		body, err = json.Marshal(p)
-		if err != nil {
-			return err
-		}
-		req, err = http.NewRequest("POST", loginMethods.Agent, nil)
-		req.Header.Set("Content-Type", "application/json")
-		if err != nil {
-			return err
-		}
-		resp, err = client.DoWithBody(req, bytes.NewReader(body))
-		if err != nil {
-			return err
-		}
-		defer resp.Body.Close()
-		if resp.StatusCode == http.StatusOK {
-			return nil
-		}
-		c.Logf("Status: %s", resp.Status)
-		var perr params.Error
-		body, err = ioutil.ReadAll(resp.Body)
-		if err != nil {
-			return err
-		}
-		err = json.Unmarshal(body, &perr)
-		if err != nil {
-			return err
-		}
-		return &perr
-	}
-}
-
-func (s *dischargeSuite) TestKeystoneSchema(c *gc.C) {
-	s.keystone.TokensFunc = func(r *keystone.TokensRequest) (*keystone.TokensResponse, error) {
-		if r.Body.Auth.PasswordCredentials.Username != "ksuser" {
-			return nil, errgo.Newf("bad username %q", r.Body.Auth.PasswordCredentials.Username)
-		}
-		if r.Body.Auth.PasswordCredentials.Password != "kspass" {
-			return nil, errgo.Newf("bad password %q", r.Body.Auth.PasswordCredentials.Password)
-		}
-		return &keystone.TokensResponse{
-			Access: keystone.Access{
-				Token: keystone.Token{
-					ID:       "123",
-					IssuedAt: &keystone.Time{time.Now()},
-					Expires:  &keystone.Time{time.Now().Add(24 * time.Hour)},
-				},
-				User: keystone.User{
-					ID:       "ABC",
-					Name:     "A. User",
-					Username: r.Body.Auth.PasswordCredentials.Username,
-				},
-			},
-		}, nil
-	}
-	s.keystone.TenantsFunc = func(r *keystone.TenantsRequest) (*keystone.TenantsResponse, error) {
-		if r.AuthToken != "123" {
-			return nil, errgo.Newf("bad token %q", r.AuthToken)
-		}
-		return &keystone.TenantsResponse{
-			Tenants: []keystone.Tenant{{
-				ID: "abc",
-			}},
-		}, nil
-	}
-	uuid := s.createIdentity(c, &mongodoc.Identity{
-		Username:   "ksuser",
-		ExternalID: "ABC",
-	})
-	// Create the service which will issue the third party caveat.
-	svc, err := bakery.NewService(bakery.NewServiceParams{
-		Locator: s.locator,
-	})
-	c.Assert(err, gc.IsNil)
-	m, err := svc.NewMacaroon("", nil, []checkers.Caveat{{
-		Location:  s.netSrv.URL,
-		Condition: "is-authenticated-user",
-	}})
-	c.Assert(err, gc.IsNil)
-	bakeryClient := httpbakery.NewClient()
-	form.SetUpAuth(bakeryClient, &keystoneFormFiller{
-		username: "ksuser",
-		password: "kspass",
-	})
-	ms, err := bakeryClient.DischargeAll(m)
-	c.Assert(err, gc.IsNil)
-	d := checkers.InferDeclared(ms)
-	err = svc.Check(ms, checkers.New(d, checkers.TimeBefore))
-	c.Assert(err, gc.IsNil)
-	c.Assert(d, jc.DeepEquals, checkers.Declared{
-		"uuid":     uuid,
-		"username": "ksuser",
-	})
-}
-
-type keystoneFormFiller struct {
-	username, password string
-}
-
-func (h keystoneFormFiller) Fill(s environschema.Fields) (map[string]interface{}, error) {
-	if _, ok := s["username"]; !ok {
-		return nil, errgo.New("schema has no username")
-	}
-	if _, ok := s["password"]; !ok {
-		return nil, errgo.New("schema has no password")
-	}
-	return map[string]interface{}{
-		"username": h.username,
-		"password": h.password,
-	}, nil
-}
-
 func (s *dischargeSuite) TestIdentityCookieLocation(c *gc.C) {
-	store := s.pool.GetNoLimit()
-	defer s.pool.Put(store)
-	s.MockUSSO.AddUser(&mockusso.User{
-		ID:       "test",
-		NickName: "test",
-		FullName: "Test User",
-		Email:    "test@example.com",
-		Groups:   []string{"test1", "test2"},
-	})
-	s.MockUSSO.SetLoginUser("test")
 	svc, err := bakery.NewService(bakery.NewServiceParams{
-		Locator: s.locator,
+		Locator: s.Locator,
 	})
 	c.Assert(err, gc.IsNil)
-	client := httpbakery.NewClient()
 	jar := new(testCookieJar)
-	client.Client.Jar = jar
-	client.VisitWebPage = s.doVisit(c, client.Client)
+	s.BakeryClient.Client.Jar = jar
+	visitor := test.WebPageVisitor{
+		Client: s.HTTPRequestClient,
+		User:   s.user,
+	}
+	s.BakeryClient.VisitWebPage = visitor.Interactive
 	m := newMacaroon(c, svc, []checkers.Caveat{{
-		Location:  s.netSrv.URL,
+		Location:  idptest.DischargeLocation,
 		Condition: "is-authenticated-user",
 	}})
-	ms, err := client.DischargeAll(m)
+	ms, err := s.BakeryClient.DischargeAll(m)
 	c.Assert(err, gc.IsNil)
 	d := checkers.InferDeclared(ms)
 	err = svc.Check(ms, checkers.New(

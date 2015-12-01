@@ -20,6 +20,10 @@ import (
 	"github.com/CanonicalLtd/blues-identity"
 	"github.com/CanonicalLtd/blues-identity/config"
 	"github.com/CanonicalLtd/blues-identity/idp"
+	"github.com/CanonicalLtd/blues-identity/idp/agent"
+	_ "github.com/CanonicalLtd/blues-identity/idp/keystone"
+	"github.com/CanonicalLtd/blues-identity/idp/usso"
+	"github.com/CanonicalLtd/blues-identity/idp/usso/ussooauth"
 )
 
 var (
@@ -73,8 +77,12 @@ func serve(confPath string) error {
 	if err := keypair.Public.UnmarshalText([]byte(conf.PublicKey)); err != nil {
 		return errgo.Notef(err, "cannot unmarshal public key")
 	}
-	if len(conf.IdentityProviders) == 0 {
-		conf.IdentityProviders = defaultIDPs
+	idps := defaultIDPs
+	if len(conf.IdentityProviders) > 0 {
+		idps = make([]idp.IdentityProvider, len(conf.IdentityProviders))
+		for i, idp := range conf.IdentityProviders {
+			idps[i] = idp
+		}
 	}
 	srv, err := identity.NewServer(
 		db,
@@ -86,7 +94,7 @@ func serve(confPath string) error {
 			Launchpad:         lpad.Production,
 			MaxMgoSessions:    conf.MaxMgoSessions,
 			RequestTimeout:    conf.RequestTimeout.Duration,
-			IdentityProviders: conf.IdentityProviders,
+			IdentityProviders: idps,
 			PrivateAddr:       conf.PrivateAddr,
 		},
 		identity.V1,
@@ -114,7 +122,7 @@ func serve(confPath string) error {
 }
 
 var defaultIDPs = []idp.IdentityProvider{
-	idp.UbuntuSSOIdentityProvider,
-	idp.UbuntuSSOOAuthIdentityProvider,
-	idp.AgentIdentityProvider,
+	usso.IdentityProvider,
+	ussooauth.IdentityProvider,
+	agent.IdentityProvider,
 }

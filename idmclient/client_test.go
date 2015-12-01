@@ -21,6 +21,7 @@ import (
 	"github.com/CanonicalLtd/blues-identity"
 	"github.com/CanonicalLtd/blues-identity/idmclient"
 	"github.com/CanonicalLtd/blues-identity/idp"
+	agentidp "github.com/CanonicalLtd/blues-identity/idp/agent"
 	"github.com/CanonicalLtd/blues-identity/internal/store"
 	"github.com/CanonicalLtd/blues-identity/params"
 )
@@ -51,7 +52,7 @@ func (s *clientSuite) SetUpTest(c *gc.C) {
 			Location:       "http://" + s.server.Listener.Addr().String(),
 			AuthPassword:   "password",
 			IdentityProviders: []idp.IdentityProvider{
-				idp.AgentIdentityProvider,
+				agentidp.IdentityProvider,
 			},
 			PrivateAddr: "localhost",
 		},

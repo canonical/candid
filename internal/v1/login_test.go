@@ -3,53 +3,37 @@
 package v1_test
 
 import (
-	"bytes"
 	"encoding/base64"
 	"encoding/json"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"strings"
 
-	"github.com/garyburd/go-oauth/oauth"
-	"github.com/juju/testing/httptesting"
+	"github.com/juju/httprequest"
 	gc "gopkg.in/check.v1"
-	"gopkg.in/macaroon-bakery.v1/bakery"
-	"gopkg.in/macaroon-bakery.v1/httpbakery"
 	"gopkg.in/macaroon.v1"
 
 	"github.com/CanonicalLtd/blues-identity/idp"
-	"github.com/CanonicalLtd/blues-identity/internal/idtesting/mockusso"
-	"github.com/CanonicalLtd/blues-identity/internal/mongodoc"
+	"github.com/CanonicalLtd/blues-identity/idp/test"
 	"github.com/CanonicalLtd/blues-identity/params"
 )
 
 type loginSuite struct {
 	apiSuite
-	mockusso.Suite
 	netSrv *httptest.Server
 }
 
 var _ = gc.Suite(&loginSuite{})
 
 func (s *loginSuite) SetUpSuite(c *gc.C) {
-	s.Suite.SetUpSuite(c)
 	s.apiSuite.idps = []idp.IdentityProvider{
-		idp.UbuntuSSOIdentityProvider,
-		idp.UbuntuSSOOAuthIdentityProvider,
-		idp.AgentIdentityProvider,
+		test.IdentityProvider,
 	}
 	s.apiSuite.SetUpSuite(c)
 }
 
-func (s *loginSuite) TearDownSuite(c *gc.C) {
-	s.Suite.TearDownSuite(c)
-	s.apiSuite.TearDownSuite(c)
-}
-
 func (s *loginSuite) SetUpTest(c *gc.C) {
-	s.Suite.SetUpTest(c)
 	s.apiSuite.SetUpTest(c)
 	s.netSrv = httptest.NewServer(s.srv)
 }
@@ -57,256 +41,71 @@ func (s *loginSuite) SetUpTest(c *gc.C) {
 func (s *loginSuite) TearDownTest(c *gc.C) {
 	s.netSrv.Close()
 	s.apiSuite.TearDownTest(c)
-	s.Suite.TearDownTest(c)
 }
 
 func (s *loginSuite) TestInteractiveLogin(c *gc.C) {
-	s.MockUSSO.AddUser(&mockusso.User{
-		ID:       "test",
-		NickName: "test",
-		FullName: "Test User",
-		Email:    "test@example.com",
-		Groups:   []string{"test1", "test2"},
-	})
-	s.MockUSSO.SetLoginUser("test")
-	resp, err := http.Get(location + "/v1/login")
-	c.Assert(err, gc.IsNil)
-	defer resp.Body.Close()
-	c.Assert(resp.StatusCode, gc.Equals, http.StatusOK)
-	s.assertMacaroon(c, resp, "test")
-}
-
-func (s *loginSuite) TestInteractiveLoginFromDifferentProvider(c *gc.C) {
-	mockUSSO := mockusso.New("https://login.badplace.com")
-	server := httptest.NewServer(mockUSSO)
-	defer server.Close()
-	s.PatchValue(&http.DefaultTransport, httptesting.URLRewritingTransport{
-		MatchPrefix:  "https://login.badplace.com",
-		Replace:      server.URL,
-		RoundTripper: http.DefaultTransport,
-	})
-	mockUSSO.AddUser(&mockusso.User{
-		ID:       "test",
-		NickName: "test",
-		FullName: "Test User",
-		Email:    "test@example.com",
-		Groups:   []string{"test1", "test2"},
-	})
-	mockUSSO.SetLoginUser("test")
-	v := url.Values{}
-	v.Set("openid.ns", "http://specs.openid.net/auth/2.0")
-	v.Set("openid.mode", "checkid_setup")
-	v.Set("openid.claimed_id", "https://login.badplace.com")
-	v.Set("openid.identity", "http://specs.openid.net/auth/2.0/identifier_select")
-	v.Set("openid.return_to", location+"/v1/idp/usso/callback")
-	v.Set("openid.realm", location+"/v1/idp/usso/callback")
-	u := &url.URL{
-		Scheme:   "https",
-		Host:     "login.badplace.com",
-		Path:     "/+openid",
-		RawQuery: v.Encode(),
+	jar := &testCookieJar{}
+	client := &http.Client{
+		Jar: jar,
 	}
-	resp, err := http.Get(u.String())
-	c.Assert(err, gc.IsNil)
-	defer resp.Body.Close()
-	c.Assert(resp.StatusCode, gc.Equals, http.StatusForbidden)
-	body, err := ioutil.ReadAll(resp.Body)
-	c.Assert(err, gc.IsNil)
-	var perr params.Error
-	err = json.Unmarshal(body, &perr)
-	c.Assert(err, gc.IsNil)
-	c.Assert(perr.Code, gc.Equals, params.ErrForbidden)
-	c.Assert(&perr, gc.ErrorMatches, `.*rejecting login from https://login\.badplace\.com/\+openid`)
-}
-
-func (s *loginSuite) TestInteractiveLoginNoExtensions(c *gc.C) {
-	s.createUser(c, &params.User{
-		Username:   "test",
-		ExternalID: "https://login.ubuntu.com/+id/test",
-		Email:      "test@example.com",
-		FullName:   "Test User",
-		IDPGroups: []string{
-			"test",
+	visitor := test.WebPageVisitor{
+		Client: &httprequest.Client{Doer: client},
+		User: &params.User{
+			Username:   "test",
+			ExternalID: "http://example.com/+id/test",
+			FullName:   "Test User",
+			Email:      "test@example.com",
+			IDPGroups:  []string{"test1", "test2"},
 		},
-	})
-	s.MockUSSO.AddUser(&mockusso.User{
-		ID:       "test",
-		NickName: "test",
-		FullName: "Test User",
-		Email:    "test@example.com",
-		Groups:   []string{"test1", "test2"},
-	})
-	s.MockUSSO.SetLoginUser("test")
-	s.MockUSSO.ExcludeExtensions()
-	resp, err := http.Get(location + "/v1/login")
-	c.Assert(err, gc.IsNil)
-	defer resp.Body.Close()
-	c.Assert(resp.StatusCode, gc.Equals, http.StatusOK)
-	s.assertMacaroon(c, resp, "test")
-}
-
-func (s *loginSuite) TestInteractiveLoginNoExtensionsUnknownUser(c *gc.C) {
-	s.MockUSSO.AddUser(&mockusso.User{
-		ID:       "test",
-		NickName: "test",
-		FullName: "Test User",
-		Email:    "test@example.com",
-		Groups:   []string{"test1", "test2"},
-	})
-	s.MockUSSO.SetLoginUser("test")
-	s.MockUSSO.ExcludeExtensions()
-	resp, err := http.Get(location + "/v1/login")
-	c.Assert(err, gc.IsNil)
-	defer resp.Body.Close()
-	c.Assert(resp.StatusCode, gc.Equals, http.StatusForbidden)
-}
-
-func (s *loginSuite) TestOAuthLogin(c *gc.C) {
-	s.createUser(c, &params.User{
-		Username:   "test",
-		ExternalID: "https://login.ubuntu.com/+id/1234",
-		Email:      "test@example.com",
-		FullName:   "Test User",
-		IDPGroups: []string{
-			"test",
-		},
-	})
-	s.MockUSSO.AddUser(&mockusso.User{
-		ID:       "1234",
-		NickName: "test",
-		FullName: "Test User",
-		Email:    "test@example.com",
-		Groups: []string{
-			"test",
-		},
-		ConsumerSecret: "secret1",
-		TokenKey:       "test-token",
-		TokenSecret:    "secret2",
-	})
-	client := new(http.Client)
-	req, err := http.NewRequest("GET", location+"/v1/login", nil)
-	c.Assert(err, gc.IsNil)
-	req.Header.Set("Accept", "application/json")
-	resp, err := client.Do(req)
-	c.Assert(err, gc.IsNil)
-	defer resp.Body.Close()
-	c.Assert(resp.StatusCode, gc.Equals, http.StatusOK)
-	c.Assert(resp.Header.Get("Content-Type"), gc.Equals, "application/json")
-	data, err := ioutil.ReadAll(resp.Body)
-	c.Assert(err, gc.IsNil)
-	var loginMethods params.LoginMethods
-	err = json.Unmarshal(data, &loginMethods)
-	c.Assert(err, gc.IsNil)
-	oc := &oauth.Client{
-		Credentials: oauth.Credentials{
-			Token:  "1234",
-			Secret: "secret1",
-		},
-		SignatureMethod: oauth.HMACSHA1,
 	}
-	resp, err = oc.Get(
-		client,
-		&oauth.Credentials{
-			Token:  "test-token",
-			Secret: "secret2",
-		},
-		loginMethods.UbuntuSSOOAuth,
-		nil,
-	)
-	c.Assert(err, gc.IsNil)
-	defer resp.Body.Close()
-	s.assertMacaroon(c, resp, "test")
-}
-
-func (s *loginSuite) TestAgentLogin(c *gc.C) {
-	keys, err := bakery.GenerateKey()
-	c.Assert(err, gc.IsNil)
-	s.createIdentity(c, &mongodoc.Identity{
-		Username: "test",
-		Email:    "test@example.com",
-		FullName: "Test User",
-		Groups: []string{
-			"test",
-		},
-		Owner: "admin",
-		PublicKeys: []mongodoc.PublicKey{{
-			Key: keys.Public.Key[:],
-		}},
-	})
-	client := httpbakery.NewClient()
-	client.Key = keys
-	req, err := http.NewRequest("GET", location+"/v1/login", nil)
-	c.Assert(err, gc.IsNil)
-	req.Header.Set("Accept", "application/json")
-	resp, err := client.Do(req)
-	c.Assert(err, gc.IsNil)
-	defer resp.Body.Close()
-	c.Assert(resp.StatusCode, gc.Equals, http.StatusOK)
-	c.Assert(resp.Header.Get("Content-Type"), gc.Equals, "application/json")
-	data, err := ioutil.ReadAll(resp.Body)
-	c.Assert(err, gc.IsNil)
-	var loginMethods params.LoginMethods
-	err = json.Unmarshal(data, &loginMethods)
-	c.Assert(err, gc.IsNil)
-	var p params.AgentLogin
-	p.Username = "test"
-	p.PublicKey = &keys.Public
-	data, err = json.Marshal(p)
-	c.Assert(err, gc.IsNil)
-	req, err = http.NewRequest("POST", loginMethods.Agent, nil)
-	c.Assert(err, gc.IsNil)
-	req.Header.Set("Content-Type", "application/json")
-	resp, err = client.DoWithBody(req, bytes.NewReader(data))
-	c.Assert(err, gc.IsNil)
-	defer resp.Body.Close()
-	data, err = ioutil.ReadAll(resp.Body)
-	c.Assert(err, gc.IsNil)
-	var al params.AgentLoginResponse
-	err = json.Unmarshal(data, &al)
-	c.Assert(err, gc.IsNil)
-	c.Assert(al.AgentLogin, gc.Equals, true)
-	s.assertMacaroon(c, resp, "test")
-}
-
-func (s *loginSuite) TestCookieBasedAgentLogin(c *gc.C) {
-	keys, err := bakery.GenerateKey()
-	c.Assert(err, gc.IsNil)
-	s.createIdentity(c, &mongodoc.Identity{
-		Username: "test",
-		Email:    "test@example.com",
-		FullName: "Test User",
-		Groups: []string{
-			"test",
-		},
-		Owner: "admin",
-		PublicKeys: []mongodoc.PublicKey{{
-			Key: keys.Public.Key[:],
-		}},
-	})
-	client := httpbakery.NewClient()
-	client.Key = keys
-	var p params.AgentLogin
-	p.Username = "test"
-	p.PublicKey = &keys.Public
-	data, err := json.Marshal(p)
-	c.Assert(err, gc.IsNil)
 	u, err := url.Parse(location + "/v1/login")
 	c.Assert(err, gc.IsNil)
-	client.Jar.SetCookies(u, []*http.Cookie{{
-		Name:  "agent-login",
-		Value: base64.StdEncoding.EncodeToString(data),
-	}})
-	req, err := http.NewRequest("GET", location+"/v1/login", nil)
+	err = visitor.Interactive(u)
 	c.Assert(err, gc.IsNil)
-	resp, err := client.Do(req)
-	c.Assert(err, gc.IsNil)
-	defer resp.Body.Close()
-	s.assertMacaroon(c, resp, "test")
+	s.assertMacaroon(c, jar, "test")
 }
 
-func (s *loginSuite) assertMacaroon(c *gc.C, resp *http.Response, userId string) {
+func (s *loginSuite) TestNonInteractiveLogin(c *gc.C) {
+	jar := &testCookieJar{}
+	client := &http.Client{
+		Jar: jar,
+	}
+	visitor := test.WebPageVisitor{
+		Client: &httprequest.Client{Doer: client},
+		User: &params.User{
+			Username:   "test",
+			ExternalID: "http://example.com/+id/test",
+			FullName:   "Test User",
+			Email:      "test@example.com",
+			IDPGroups:  []string{"test1", "test2"},
+		},
+	}
+	u, err := url.Parse(location + "/v1/login")
+	c.Assert(err, gc.IsNil)
+	err = visitor.NonInteractive(u)
+	c.Assert(err, gc.IsNil)
+	s.assertMacaroon(c, jar, "test")
+}
+
+func (s *loginSuite) TestLoginFailure(c *gc.C) {
+	jar := &testCookieJar{}
+	client := &http.Client{
+		Jar: jar,
+	}
+	visitor := test.WebPageVisitor{
+		Client: &httprequest.Client{Doer: client},
+		User:   &params.User{},
+	}
+	u, err := url.Parse(location + "/v1/login")
+	c.Assert(err, gc.IsNil)
+	err = visitor.Interactive(u)
+	c.Assert(err, gc.ErrorMatches, `POST .*: httprequest: user "" not found: not found`)
+	c.Assert(jar.cookies, gc.HasLen, 0)
+}
+
+func (s *loginSuite) assertMacaroon(c *gc.C, jar *testCookieJar, userId string) {
 	var ms macaroon.Slice
-	for _, cookie := range resp.Cookies() {
+	for _, cookie := range jar.cookies {
 		if strings.HasPrefix(cookie.Name, "macaroon-") {
 			data, err := base64.StdEncoding.DecodeString(cookie.Value)
 			c.Assert(err, gc.IsNil)

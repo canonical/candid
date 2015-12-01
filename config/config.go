@@ -18,18 +18,18 @@ import (
 
 // Config holds the configuration parameters for the identity service.
 type Config struct {
-	MongoAddr         string                 `yaml:"mongo-addr"`
-	APIAddr           string                 `yaml:"api-addr"`
-	AuthUsername      string                 `yaml:"auth-username"`
-	AuthPassword      string                 `yaml:"auth-password"`
-	PublicKey         string                 `yaml:"public-key"`
-	PrivateKey        string                 `yaml:"private-key"`
-	Location          string                 `yaml:"location"`
-	AccessLog         string                 `yaml:"access-log"`
-	MaxMgoSessions    int                    `yaml:"max-mgo-sessions"`
-	RequestTimeout    DurationString         `yaml:"request-timeout"`
-	IdentityProviders []idp.IdentityProvider `yaml:"identity-providers"`
-	PrivateAddr       string                 `yaml:"private-addr"`
+	MongoAddr         string             `yaml:"mongo-addr"`
+	APIAddr           string             `yaml:"api-addr"`
+	AuthUsername      string             `yaml:"auth-username"`
+	AuthPassword      string             `yaml:"auth-password"`
+	PublicKey         string             `yaml:"public-key"`
+	PrivateKey        string             `yaml:"private-key"`
+	Location          string             `yaml:"location"`
+	AccessLog         string             `yaml:"access-log"`
+	MaxMgoSessions    int                `yaml:"max-mgo-sessions"`
+	RequestTimeout    DurationString     `yaml:"request-timeout"`
+	IdentityProviders []IdentityProvider `yaml:"identity-providers"`
+	PrivateAddr       string             `yaml:"private-addr"`
 }
 
 func (c *Config) validate() error {
@@ -106,4 +106,40 @@ func (dp *DurationString) UnmarshalText(data []byte) error {
 	}
 	dp.Duration = d
 	return nil
+}
+
+// IdentityProvider represents a configured idp.IdentityProvider
+type IdentityProvider struct {
+	idp.IdentityProvider
+}
+
+var idps = make(map[string]func(func(interface{}) error) (idp.IdentityProvider, error))
+
+func (idp *IdentityProvider) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	var t struct {
+		Type string
+	}
+	if err := unmarshal(&t); err != nil {
+		return errgo.Notef(err, "cannot unmarshal identity provider type")
+	}
+	if idpf, ok := idps[t.Type]; ok {
+		var err error
+		idp.IdentityProvider, err = idpf(unmarshal)
+		if err != nil {
+			err = errgo.Notef(err, "cannot unmarshal %s configuration", t.Type)
+		}
+		return err
+	}
+	return errgo.Newf("unrecognised identity provider type %q", t.Type)
+}
+
+// RegisterIDP is used by identity providers to register a function that
+// can be used to unmarshal an identity provider type. When the identity
+// provider with the given name is used, the given function will be
+// called to unmarshal its parameters from YAML. Its argument will be an
+// unmarshalYAML function that can be used to unmarshal the configuration
+// parameters into its argument according to the rules specified in
+// gopkg.in/yaml.v2.
+func RegisterIDP(idpType string, f func(func(interface{}) error) (idp.IdentityProvider, error)) {
+	idps[idpType] = f
 }
