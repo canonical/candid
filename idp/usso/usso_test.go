@@ -27,31 +27,31 @@ import (
 
 type ussoSuite struct {
 	mockusso.Suite
-	testing.IsolationSuite
+	testing.IsolatedMgoSuite
 	idp idp.IdentityProvider
 }
 
 var _ = gc.Suite(&ussoSuite{})
 
 func (s *ussoSuite) SetUpSuite(c *gc.C) {
-	s.IsolationSuite.SetUpSuite(c)
+	s.IsolatedMgoSuite.SetUpSuite(c)
 	s.Suite.SetUpSuite(c)
 }
 
 func (s *ussoSuite) TearDownSuite(c *gc.C) {
 	s.Suite.TearDownSuite(c)
-	s.IsolationSuite.TearDownSuite(c)
+	s.IsolatedMgoSuite.TearDownSuite(c)
 }
 
 func (s *ussoSuite) SetUpTest(c *gc.C) {
-	s.IsolationSuite.SetUpTest(c)
+	s.IsolatedMgoSuite.SetUpTest(c)
 	s.Suite.SetUpTest(c)
 	s.idp = usso.IdentityProvider
 }
 
 func (s *ussoSuite) TearDownTest(c *gc.C) {
 	s.Suite.TearDownTest(c)
-	s.IsolationSuite.TearDownTest(c)
+	s.IsolatedMgoSuite.TearDownTest(c)
 }
 
 func (s *ussoSuite) TestConfig(c *gc.C) {
@@ -81,6 +81,7 @@ func (s *ussoSuite) TestInteractive(c *gc.C) {
 func (s *ussoSuite) TestURL(c *gc.C) {
 	tc := &idptest.TestContext{
 		URLPrefix: "https://idp.test",
+		Database_: s.Session.DB("test"),
 	}
 	t, err := s.idp.URL(tc, "1")
 	c.Assert(err, gc.IsNil)
@@ -109,6 +110,7 @@ func (s *ussoSuite) TestHandleSuccess(c *gc.C) {
 	tc := &idptest.TestContext{
 		URLPrefix: "https://idp.test",
 		Bakery_:   b,
+		Database_: s.Session.DB("test"),
 	}
 	s.MockUSSO.AddUser(&mockusso.User{
 		ID:       "test",
@@ -144,6 +146,7 @@ func (s *ussoSuite) TestHandleSuccessNoExtensions(c *gc.C) {
 	tc := &idptest.TestContext{
 		URLPrefix: "https://idp.test",
 		Bakery_:   b,
+		Database_: s.Session.DB("test"),
 	}
 	err = tc.UpdateUser(&params.User{
 		ExternalID: "https://login.ubuntu.com/+id/test",
@@ -185,6 +188,7 @@ func (s *ussoSuite) TestHandleSuccessNoExtensions(c *gc.C) {
 func (s *ussoSuite) TestHandleNoExtensionsNotFound(c *gc.C) {
 	tc := &idptest.TestContext{
 		URLPrefix: "https://idp.test",
+		Database_: s.Session.DB("test"),
 	}
 	s.MockUSSO.AddUser(&mockusso.User{
 		ID:       "test",
@@ -215,6 +219,7 @@ func (s *ussoSuite) TestHandleNoExtensionsNotFound(c *gc.C) {
 func (s *ussoSuite) TestInteractiveLoginFromDifferentProvider(c *gc.C) {
 	tc := &idptest.TestContext{
 		URLPrefix: "https://idp.test",
+		Database_: s.Session.DB("test"),
 	}
 	mockUSSO := mockusso.New("https://login.badplace.com")
 	server := httptest.NewServer(mockUSSO)
