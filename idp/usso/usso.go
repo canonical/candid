@@ -16,6 +16,7 @@ import (
 	"github.com/CanonicalLtd/blues-identity/config"
 	"github.com/CanonicalLtd/blues-identity/idp"
 	"github.com/CanonicalLtd/blues-identity/idp/idputil"
+	"github.com/CanonicalLtd/blues-identity/idp/usso/internal/mgononcestore"
 	"github.com/CanonicalLtd/blues-identity/params"
 )
 
@@ -28,9 +29,7 @@ func init() {
 // IdentityProvider is an idp.IdentityProvider that provides
 // authentication via Ubuntu SSO.
 var IdentityProvider idp.IdentityProvider = &identityProvider{
-	nonceStore: &openid.SimpleNonceStore{
-		Store: make(map[string][]*openid.Nonce),
-	},
+	noncePool:      mgononcestore.New(mgononcestore.Params{}),
 	discoveryCache: &openid.SimpleDiscoveryCache{},
 }
 
@@ -46,7 +45,7 @@ const openIdRequestedTeams = "blues-development,charm-beta"
 
 // USSOIdentityProvider allows login using Ubuntu SSO credentials.
 type identityProvider struct {
-	nonceStore     *openid.SimpleNonceStore
+	noncePool      *mgononcestore.Pool
 	discoveryCache *openid.SimpleDiscoveryCache
 }
 
@@ -98,15 +97,30 @@ type callbackRequest struct {
 }
 
 // Handle handles the Ubuntu SSO login process.
-func (u *identityProvider) Handle(c idp.Context) {
+func (idp *identityProvider) Handle(c idp.Context) {
 	var r callbackRequest
 	if err := httprequest.Unmarshal(c.Params(), &r); err != nil {
 		c.LoginFailure(err)
 	}
+	ns := idp.noncePool.Store(c.Database())
+	defer ns.Close()
+	u, err := url.Parse(c.RequestURL())
+	if err != nil {
+		c.LoginFailure(err)
+		return
+	}
+	// openid.Verify gets the endpoint name from openid.endpoint, but
+	// the spec says it's openid.op_endpoint. Munge it in to make
+	// openid.Verify happy.
+	q := u.Query()
+	if q.Get("openid.endpoint") == "" {
+		q.Set("openid.endpoint", q.Get("openid.op_endpoint"))
+	}
+	u.RawQuery = q.Encode()
 	id, err := openid.Verify(
-		c.RequestURL(),
-		u.discoveryCache,
-		u.nonceStore,
+		u.String(),
+		idp.discoveryCache,
+		ns,
 	)
 	if err != nil {
 		c.LoginFailure(err)
