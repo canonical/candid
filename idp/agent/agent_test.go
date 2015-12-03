@@ -18,7 +18,9 @@ import (
 	"gopkg.in/macaroon-bakery.v1/bakery"
 	"gopkg.in/macaroon-bakery.v1/bakery/checkers"
 	"gopkg.in/macaroon.v1"
+	"gopkg.in/yaml.v2"
 
+	"github.com/CanonicalLtd/blues-identity/config"
 	"github.com/CanonicalLtd/blues-identity/idp"
 	"github.com/CanonicalLtd/blues-identity/idp/agent"
 	"github.com/CanonicalLtd/blues-identity/idp/idptest"
@@ -50,6 +52,18 @@ func (s *agentSuite) TearDownTest(c *gc.C) {
 	s.store.Close()
 	s.pool.Close()
 	s.IsolatedMgoSuite.TearDownTest(c)
+}
+
+func (s *agentSuite) TestConfig(c *gc.C) {
+	configYaml := `
+identity-providers:
+ - type: agent
+`
+	var conf config.Config
+	err := yaml.Unmarshal([]byte(configYaml), &conf)
+	c.Assert(err, gc.IsNil)
+	c.Assert(conf.IdentityProviders, gc.HasLen, 1)
+	c.Assert(conf.IdentityProviders[0].Name(), gc.Equals, "agent")
 }
 
 func (s *agentSuite) TestName(c *gc.C) {
