@@ -14,6 +14,7 @@ import (
 	"gopkg.in/macaroon-bakery.v1/bakery/checkers"
 	"gopkg.in/macaroon-bakery.v1/httpbakery"
 
+	"github.com/CanonicalLtd/blues-identity/config"
 	"github.com/CanonicalLtd/blues-identity/idp"
 	"github.com/CanonicalLtd/blues-identity/internal/store"
 	"github.com/CanonicalLtd/blues-identity/params"
@@ -30,6 +31,12 @@ const (
 	// an agent can authenticate without interaction.
 	agentMacaroonDuration = 30 * time.Minute
 )
+
+func init() {
+	config.RegisterIDP("agent", func(func(interface{}) error) (idp.IdentityProvider, error) {
+		return IdentityProvider, nil
+	})
+}
 
 // identityProvider allows login using pre-registered agent users.
 type identityProvider struct{}
