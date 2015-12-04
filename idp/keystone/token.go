@@ -13,7 +13,7 @@ import (
 )
 
 func init() {
-	config.RegisterIDP("keystone_token", constructor(NewUserpassIdentityProvider))
+	config.RegisterIDP("keystone_token", constructor(NewTokenIdentityProvider))
 }
 
 // NewTokenIdentityProvider creates a idp.IdentityProvider which will
