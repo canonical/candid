@@ -5,6 +5,7 @@ package v1
 import (
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/juju/httprequest"
 	"gopkg.in/errgo.v1"
@@ -96,4 +97,24 @@ func (h *dischargeHandler) agentLogin(user string, key *bakery.PublicKey) bool {
 	}
 	logger.Warningf("agent cookie found, but agent identity provider not configured")
 	return false
+}
+
+// logoutRequest is a request to log out of the identity manager by
+// removing all macaroon cookies.
+type logoutRequest struct {
+	httprequest.Route `httprequest:"GET /v1/logout"`
+}
+
+// Logout handles the GET /v1/logout endpoint that is used to log out of
+// identity manager.
+func (h *dischargeHandler) Logout(p httprequest.Params, lr *logoutRequest) {
+	for _, c := range p.Request.Cookies() {
+		if !strings.HasPrefix(c.Name, "macaroon-") {
+			continue
+		}
+		c.Value = ""
+		c.MaxAge = -1
+		c.Path = "/"
+		http.SetCookie(p.Response, c)
+	}
 }
