@@ -3,7 +3,12 @@
 package v1_test
 
 import (
+	"bytes"
+	"encoding/base64"
+	"encoding/json"
 	"errors"
+	"io"
+	"io/ioutil"
 	"net/http"
 	"net/url"
 	"strings"
@@ -22,6 +27,7 @@ import (
 	agentidp "github.com/CanonicalLtd/blues-identity/idp/agent"
 	"github.com/CanonicalLtd/blues-identity/idp/idptest"
 	"github.com/CanonicalLtd/blues-identity/idp/test"
+	"github.com/CanonicalLtd/blues-identity/internal/v1"
 	"github.com/CanonicalLtd/blues-identity/params"
 )
 
@@ -112,6 +118,158 @@ func (s *dischargeSuite) TestDischargeWhenLoggedIn(c *gc.C) {
 	s.AssertDischarge(c, noVisit, checkers.New(
 		checkers.TimeBefore,
 	))
+
+	// Check that we cannot do the same when we're
+	// making the requests from a different origin.
+	s.AssertDischarge(c, noVisit, checkers.New(
+		checkers.TimeBefore,
+	))
+}
+
+func (s *dischargeSuite) TestWaitReturnsDischargeToken(c *gc.C) {
+	visitor := &test.WebPageVisitor{
+		Client: s.HTTPRequestClient,
+		User:   s.user,
+	}
+	transport := &responseBodyRecordingTransport{
+		c:         c,
+		transport: s.BakeryClient.Transport,
+	}
+	s.BakeryClient.Transport = transport
+	s.AssertDischarge(c, visitor.Interactive, checkers.New(
+		checkers.TimeBefore,
+	))
+	u, _ := url.Parse(idptest.DischargeLocation)
+	mss := cookiesToMacaroons(s.BakeryClient.Jar.Cookies(u))
+	c.Assert(mss, gc.HasLen, 1)
+	c.Assert(mss[0], gc.HasLen, 1)
+
+	dischargeCount := 0
+	// Check that the responses to /discharge also included discharge tokens
+	// the same as the cookie.
+	for _, resp := range transport.responses {
+		if !strings.HasSuffix(resp.url.Path, "/wait") {
+			c.Logf("ignoring %v (path %s)", resp.url, resp.url.Path)
+			continue
+		}
+		dischargeCount++
+		var wresp v1.WaitResponse
+		err := json.Unmarshal(resp.body, &wresp)
+		c.Assert(err, gc.IsNil)
+		c.Assert(wresp.DischargeToken, gc.HasLen, 1)
+		c.Assert(wresp.DischargeToken[0].Signature(), gc.DeepEquals, mss[0][0].Signature())
+	}
+	c.Assert(dischargeCount, gc.Not(gc.Equals), 0)
+}
+
+// cookiesToMacaroons returns a slice of any macaroons found
+// in the given slice of cookies.
+func cookiesToMacaroons(cookies []*http.Cookie) []macaroon.Slice {
+	var mss []macaroon.Slice
+	for _, cookie := range cookies {
+		if !strings.HasPrefix(cookie.Name, "macaroon-") {
+			continue
+		}
+		ms, err := decodeMacaroonSlice(cookie.Value)
+		if err != nil {
+			continue
+		}
+		mss = append(mss, ms)
+	}
+	return mss
+}
+
+// decodeMacaroonSlice decodes a base64-JSON-encoded slice of macaroons from
+// the given string.
+func decodeMacaroonSlice(value string) (macaroon.Slice, error) {
+	data, err := base64.StdEncoding.DecodeString(value)
+	if err != nil {
+		return nil, errgo.NoteMask(err, "cannot base64-decode macaroons")
+	}
+	var ms macaroon.Slice
+	if err := json.Unmarshal(data, &ms); err != nil {
+		return nil, errgo.NoteMask(err, "cannot unmarshal macaroons")
+	}
+	return ms, nil
+}
+
+func isVerificationError(err error) bool {
+	_, ok := err.(*bakery.VerificationError)
+	return ok
+}
+
+type responseBody struct {
+	url    *url.URL
+	body   []byte
+	header http.Header
+}
+
+type responseBodyRecordingTransport struct {
+	c         *gc.C
+	transport http.RoundTripper
+	responses []responseBody
+}
+
+func (t *responseBodyRecordingTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	resp, err := t.transport.RoundTrip(req)
+	if err != nil {
+		return nil, err
+	}
+	var buf bytes.Buffer
+	io.Copy(&buf, resp.Body)
+	resp.Body = ioutil.NopCloser(&buf)
+	if resp.StatusCode == 200 {
+		t.responses = append(t.responses, responseBody{
+			url:  req.URL,
+			body: buf.Bytes(),
+		})
+	}
+	return resp, nil
+}
+
+func (s *dischargeSuite) TestDischargeFromDifferentOriginWhenLoggedIn(c *gc.C) {
+	visitor := &test.WebPageVisitor{
+		Client: s.HTTPRequestClient,
+		User:   s.user,
+	}
+	s.AssertDischarge(c, visitor.Interactive, checkers.New(
+		checkers.TimeBefore,
+	))
+	s.AssertDischarge(c, noVisit, checkers.New(
+		checkers.TimeBefore,
+	))
+
+	// Check that we can't discharge using the idm macaroon
+	// when we've got a different origin header.
+	b, err := bakery.NewService(bakery.NewServiceParams{
+		Locator: s.Locator,
+	})
+	c.Assert(err, gc.IsNil)
+	m, err := b.NewMacaroon("", nil, []checkers.Caveat{{
+		Location:  idptest.DischargeLocation,
+		Condition: "is-authenticated-user",
+	}})
+	c.Assert(err, gc.IsNil)
+	s.BakeryClient.VisitWebPage = noVisit
+	s.BakeryClient.Transport = originTransport{s.BakeryClient.Transport, "somewhere"}
+	_, err = s.BakeryClient.DischargeAll(m)
+	c.Assert(err, gc.ErrorMatches, `cannot get discharge from "https://idp.test": cannot start interactive session: unexpected call to visit`)
+}
+
+type originTransport struct {
+	transport http.RoundTripper
+	origin    string
+}
+
+func (t originTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	h := make(http.Header)
+	for attr, val := range req.Header {
+		h[attr] = val
+	}
+	h.Set("Origin", t.origin)
+	req1 := *req
+	req1.Header = h
+	return t.transport.RoundTrip(&req1)
 }
 
 func noVisit(*url.URL) error {

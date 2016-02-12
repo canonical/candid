@@ -137,6 +137,7 @@ func (s *DischargeSuite) AssertDischarge(c *gc.C, visit func(*url.URL) error, ch
 		Location:  DischargeLocation,
 		Condition: "is-authenticated-user",
 	}})
+	c.Assert(err, gc.IsNil)
 	if visit != nil {
 		s.BakeryClient.VisitWebPage = visit
 	}

@@ -10,7 +10,7 @@ import (
 
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/juju/environschema.v1"
+	envschemaform "gopkg.in/juju/environschema.v1/form"
 	"gopkg.in/macaroon-bakery.v1/bakery/checkers"
 	"gopkg.in/macaroon-bakery.v1/httpbakery/form"
 
@@ -124,11 +124,11 @@ type keystoneFormFiller struct {
 	username, password string
 }
 
-func (h keystoneFormFiller) Fill(s environschema.Fields) (map[string]interface{}, error) {
-	if _, ok := s["username"]; !ok {
+func (h keystoneFormFiller) Fill(f envschemaform.Form) (map[string]interface{}, error) {
+	if _, ok := f.Fields["username"]; !ok {
 		return nil, errgo.New("schema has no username")
 	}
-	if _, ok := s["password"]; !ok {
+	if _, ok := f.Fields["password"]; !ok {
 		return nil, errgo.New("schema has no password")
 	}
 	return map[string]interface{}{

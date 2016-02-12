@@ -5,3 +5,5 @@ package v1
 var (
 	GravatarHash = gravatarHash
 )
+
+type WaitResponse waitResponse

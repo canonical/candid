@@ -70,13 +70,6 @@ func (c *idpHandler) RequestURL() string {
 
 // LoginSuccess implements idp.Context.LoginSuccess.
 func (c *idpHandler) LoginSuccess(ms macaroon.Slice) bool {
-	cookie, err := httpbakery.NewCookie(ms)
-	if err != nil {
-		c.LoginFailure(errgo.Notef(err, "cannot create cookie"))
-		return false
-	}
-	cookie.Path = "/"
-	http.SetCookie(c.params.Response, cookie)
 	c.params.Request.ParseForm()
 	waitId := c.params.Request.Form.Get("waitid")
 	if waitId != "" {
