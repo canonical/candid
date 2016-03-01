@@ -6,7 +6,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"net/http"
-	"net/http/cookiejar"
 	"net/http/httptest"
 	"net/url"
 	"strings"
@@ -63,7 +62,7 @@ func (s *loginSuite) TestInteractiveLogin(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 	err = visitor.Interactive(u)
 	c.Assert(err, gc.IsNil)
-	s.assertMacaroon(c, jar, "test")
+	c.Assert(jar.cookies, gc.HasLen, 0)
 }
 
 func (s *loginSuite) TestNonInteractiveLogin(c *gc.C) {
@@ -85,7 +84,7 @@ func (s *loginSuite) TestNonInteractiveLogin(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 	err = visitor.NonInteractive(u)
 	c.Assert(err, gc.IsNil)
-	s.assertMacaroon(c, jar, "test")
+	c.Assert(jar.cookies, gc.HasLen, 0)
 }
 
 func (s *loginSuite) TestLoginFailure(c *gc.C) {
@@ -102,46 +101,6 @@ func (s *loginSuite) TestLoginFailure(c *gc.C) {
 	err = visitor.Interactive(u)
 	c.Assert(err, gc.ErrorMatches, `POST .*: httprequest: user "" not found: not found`)
 	c.Assert(jar.cookies, gc.HasLen, 0)
-}
-
-func (s *loginSuite) TestLogout(c *gc.C) {
-	jar, err := cookiejar.New(&cookiejar.Options{})
-	c.Assert(err, gc.IsNil)
-	client := &http.Client{
-		Jar: jar,
-	}
-	visitor := test.WebPageVisitor{
-		Client: &httprequest.Client{Doer: client},
-		User: &params.User{
-			Username:   "test",
-			ExternalID: "http://example.com/+id/test",
-			FullName:   "Test User",
-			Email:      "test@example.com",
-			IDPGroups:  []string{"test1", "test2"},
-		},
-	}
-	u, err := url.Parse(location + "/v1/login")
-	c.Assert(err, gc.IsNil)
-	err = visitor.Interactive(u)
-	c.Assert(err, gc.IsNil)
-	u, err = url.Parse(location)
-	cookies := jar.Cookies(u)
-	c.Assert(cookies, gc.HasLen, 1)
-	jar.SetCookies(u, []*http.Cookie{{
-		Name:   "test",
-		Value:  "test",
-		Path:   "/",
-		MaxAge: 100 * 24 * 60 * 60,
-	}})
-	cookies = jar.Cookies(u)
-	c.Assert(cookies, gc.HasLen, 2)
-	resp, err := client.Get(location + "/v1/logout")
-	c.Assert(err, gc.IsNil)
-	cookies = resp.Cookies()
-	c.Assert(cookies, gc.HasLen, 1)
-	cookies = jar.Cookies(u)
-	c.Assert(cookies, gc.HasLen, 1)
-	c.Assert(cookies[0].Name, gc.Equals, "test")
 }
 
 func (s *loginSuite) assertMacaroon(c *gc.C, jar *testCookieJar, userId string) {

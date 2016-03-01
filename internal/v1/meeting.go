@@ -12,9 +12,10 @@ import (
 	"github.com/CanonicalLtd/blues-identity/meeting"
 )
 
-type thirdPartyCaveatInfo struct {
+type dischargeRequestInfo struct {
 	CaveatId string
 	Caveat   string
+	Origin   string
 }
 
 type loginInfo struct {
@@ -32,7 +33,7 @@ type place struct {
 	place *meeting.Place
 }
 
-func (p *place) NewRendezvous(info *thirdPartyCaveatInfo) (string, error) {
+func (p *place) NewRendezvous(info *dischargeRequestInfo) (string, error) {
 	reqData, err := json.Marshal(info)
 	if err != nil {
 		return "", fmt.Errorf("cannot marshal reqData: %v", err)
@@ -48,18 +49,18 @@ func (p *place) Done(waitId string, info *loginInfo) error {
 	return p.place.Done(waitId, data)
 }
 
-func (p *place) Wait(waitId string) (*thirdPartyCaveatInfo, *loginInfo, error) {
+func (p *place) Wait(waitId string) (*dischargeRequestInfo, *loginInfo, error) {
 	reqData, loginData, err := p.place.Wait(waitId)
 	if err != nil {
 		return nil, nil, fmt.Errorf("cannot wait: %v", err)
 	}
-	var caveat thirdPartyCaveatInfo
-	if err := json.Unmarshal(reqData, &caveat); err != nil {
+	var info dischargeRequestInfo
+	if err := json.Unmarshal(reqData, &info); err != nil {
 		return nil, nil, fmt.Errorf("cannot unmarshal reqData: %v", err)
 	}
 	var login loginInfo
 	if err := json.Unmarshal(loginData, &login); err != nil {
 		return nil, nil, fmt.Errorf("cannot unmarshal loginData: %v", err)
 	}
-	return &caveat, &login, nil
+	return &info, &login, nil
 }

@@ -52,7 +52,11 @@ func (h *dischargeHandler) checkThirdPartyCaveat(req *http.Request, cavId, cav s
 			checkers.OperationChecker("discharge"),
 		))
 		if err != nil {
-			return nil, h.needLoginError(cavId, cav, err)
+			return nil, h.needLoginError(&dischargeRequestInfo{
+				CaveatId: cavId,
+				Caveat:   cav,
+				Origin:   req.Header.Get("Origin"),
+			}, err)
 		}
 		username = attrs["username"]
 	}
@@ -102,13 +106,10 @@ func (h *dischargeHandler) checkMemberOfGroup(user *mongodoc.Identity, targetGro
 // needLoginError returns an error suitable for returning
 // from a discharge request that can only be satisfied
 // if the user logs in.
-func (h *dischargeHandler) needLoginError(cavId, caveat string, why error) error {
+func (h *dischargeHandler) needLoginError(info *dischargeRequestInfo, why error) error {
 	// TODO(rog) If the user is already logged in (username != ""),
 	// we should perhaps just return an error here.
-	waitId, err := h.place.NewRendezvous(&thirdPartyCaveatInfo{
-		CaveatId: cavId,
-		Caveat:   caveat,
-	})
+	waitId, err := h.place.NewRendezvous(info)
 	if err != nil {
 		return errgo.Notef(err, "cannot make rendezvous")
 	}
@@ -131,6 +132,11 @@ type waitRequest struct {
 type waitResponse struct {
 	// Macaroon holds the acquired discharge macaroon.
 	Macaroon *macaroon.Macaroon
+
+	// DischargeToken holds a macaroon that can be attached as
+	// authorization for future discharge requests. This will also
+	// be returned as a cookie.
+	DischargeToken macaroon.Slice
 }
 
 // serveWait serves an HTTP endpoint that waits until a macaroon
@@ -140,12 +146,26 @@ func (h *dischargeHandler) Wait(p httprequest.Params, w *waitRequest) (*waitResp
 		return nil, errgo.WithCausef(nil, params.ErrBadRequest, "wait id parameter not found")
 	}
 	// TODO don't wait forever here.
-	caveat, login, err := h.place.Wait(w.WaitID)
+	reqInfo, login, err := h.place.Wait(w.WaitID)
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot wait")
 	}
 	if login.Error != nil {
 		return nil, errgo.NoteMask(login.Error, "login failed", errgo.Any)
+	}
+	// Ensure the identity macaroon can only be used from the same
+	// origin as the original discharge request.
+	//
+	// Note: If there is more than one macaroon in the slice it is
+	// conventional that the macaroon already has bound discharges,
+	// and therefore the caveat cannot be added. This currently
+	// doesn't matter because the only IDP that has a third party
+	// caveat is agent login, which does not need origin protection.
+	if len(login.IdentityMacaroon) == 1 {
+		err = login.IdentityMacaroon[0].AddFirstPartyCaveat(checkers.ClientOriginCaveat(reqInfo.Origin).Condition)
+		if err != nil {
+			return nil, errgo.Notef(err, "cannot add origin caveat to identity macaroon")
+		}
 	}
 	// We've now got the newly minted identity macaroon. Now
 	// we want to check the third party caveat against the
@@ -162,7 +182,7 @@ func (h *dischargeHandler) Wait(p httprequest.Params, w *waitRequest) (*waitResp
 	checker := bakery.ThirdPartyCheckerFunc(func(cavId, cav string) ([]checkers.Caveat, error) {
 		return h.checkThirdPartyCaveat(p.Request, cavId, cav)
 	})
-	m, err := h.store.Service.Discharge(checker, caveat.CaveatId)
+	m, err := h.store.Service.Discharge(checker, reqInfo.CaveatId)
 	if err != nil {
 		return nil, errgo.NoteMask(err, "cannot discharge", errgo.Any)
 	}
@@ -181,7 +201,8 @@ func (h *dischargeHandler) Wait(p httprequest.Params, w *waitRequest) (*waitResp
 	http.SetCookie(p.Response, cookie)
 
 	return &waitResponse{
-		Macaroon: m,
+		Macaroon:       m,
+		DischargeToken: login.IdentityMacaroon,
 	}, nil
 }
 
