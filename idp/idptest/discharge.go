@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/juju/httprequest"
+	"github.com/juju/idmclient"
 	"github.com/juju/testing"
 	"github.com/juju/testing/httptesting"
 	gc "gopkg.in/check.v1"
@@ -18,7 +19,6 @@ import (
 	"launchpad.net/lpad"
 
 	"github.com/CanonicalLtd/blues-identity"
-	"github.com/CanonicalLtd/blues-identity/idmclient"
 	"github.com/CanonicalLtd/blues-identity/idp"
 )
 

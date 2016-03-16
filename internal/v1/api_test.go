@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 
+	"github.com/juju/idmclient/params"
 	"github.com/juju/testing"
 	"github.com/juju/testing/httptesting"
 	gc "gopkg.in/check.v1"
@@ -23,7 +24,6 @@ import (
 	"github.com/CanonicalLtd/blues-identity/internal/mongodoc"
 	"github.com/CanonicalLtd/blues-identity/internal/store"
 	"github.com/CanonicalLtd/blues-identity/internal/v1"
-	"github.com/CanonicalLtd/blues-identity/params"
 )
 
 const (

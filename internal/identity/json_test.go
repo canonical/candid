@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/juju/httprequest"
+	"github.com/juju/idmclient/params"
 	jujutesting "github.com/juju/testing"
 	"github.com/juju/testing/httptesting"
 	"github.com/julienschmidt/httprouter"
@@ -13,7 +14,6 @@ import (
 	"gopkg.in/errgo.v1"
 
 	"github.com/CanonicalLtd/blues-identity/internal/identity"
-	"github.com/CanonicalLtd/blues-identity/params"
 )
 
 type jsonSuite struct {

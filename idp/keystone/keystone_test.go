@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/juju/idmclient/params"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/macaroon-bakery.v1/bakery"
 	"gopkg.in/macaroon-bakery.v1/bakery/checkers"
@@ -18,7 +19,6 @@ import (
 	keystoneidp "github.com/CanonicalLtd/blues-identity/idp/keystone"
 	"github.com/CanonicalLtd/blues-identity/idp/keystone/internal/keystone"
 	"github.com/CanonicalLtd/blues-identity/idp/keystone/internal/mockkeystone"
-	"github.com/CanonicalLtd/blues-identity/params"
 )
 
 type keystoneSuite struct {

@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/juju/httprequest"
+	"github.com/juju/idmclient/params"
 	"github.com/yohcop/openid-go"
 	"gopkg.in/errgo.v1"
 
@@ -17,7 +18,6 @@ import (
 	"github.com/CanonicalLtd/blues-identity/idp"
 	"github.com/CanonicalLtd/blues-identity/idp/idputil"
 	"github.com/CanonicalLtd/blues-identity/idp/usso/internal/mgononcestore"
-	"github.com/CanonicalLtd/blues-identity/params"
 )
 
 func init() {

@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/juju/httprequest"
+	"github.com/juju/idmclient/params"
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
@@ -16,8 +17,6 @@ import (
 	"gopkg.in/macaroon-bakery.v1/bakery/checkers"
 	"gopkg.in/macaroon.v1"
 	"gopkg.in/mgo.v2"
-
-	"github.com/CanonicalLtd/blues-identity/params"
 )
 
 // TestContext is an idp.Context that can be used to test identity providers.

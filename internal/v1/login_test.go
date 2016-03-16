@@ -11,12 +11,12 @@ import (
 	"strings"
 
 	"github.com/juju/httprequest"
+	"github.com/juju/idmclient/params"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/macaroon.v1"
 
 	"github.com/CanonicalLtd/blues-identity/idp"
 	"github.com/CanonicalLtd/blues-identity/idp/test"
-	"github.com/CanonicalLtd/blues-identity/params"
 )
 
 type loginSuite struct {

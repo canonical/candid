@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/juju/httprequest"
+	"github.com/juju/idmclient/params"
 	"github.com/juju/schema"
 	"gopkg.in/errgo.v1"
 	gooseidentity "gopkg.in/goose.v1/identity"
@@ -15,7 +16,6 @@ import (
 	"github.com/CanonicalLtd/blues-identity/config"
 	"github.com/CanonicalLtd/blues-identity/idp"
 	"github.com/CanonicalLtd/blues-identity/idp/keystone/internal/keystone"
-	"github.com/CanonicalLtd/blues-identity/params"
 )
 
 func init() {

@@ -7,11 +7,10 @@ import (
 	"net/http"
 
 	"github.com/juju/httprequest"
+	"github.com/juju/idmclient/params"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v1/bakery"
 	"gopkg.in/macaroon-bakery.v1/httpbakery/agent"
-
-	"github.com/CanonicalLtd/blues-identity/params"
 )
 
 // loginRequest is a request to start a login to the identity manager.

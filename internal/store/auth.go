@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/juju/idmclient/params"
 	"github.com/juju/utils"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v1/bakery"
@@ -14,7 +15,6 @@ import (
 	"gopkg.in/macaroon-bakery.v1/httpbakery"
 
 	"github.com/CanonicalLtd/blues-identity/internal/mongodoc"
-	"github.com/CanonicalLtd/blues-identity/params"
 )
 
 const (

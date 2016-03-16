@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 
+	"github.com/juju/idmclient/params"
 	"github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/testing/httptesting"
@@ -22,7 +23,6 @@ import (
 	"github.com/CanonicalLtd/blues-identity/idp/idptest"
 	"github.com/CanonicalLtd/blues-identity/idp/usso"
 	"github.com/CanonicalLtd/blues-identity/idp/usso/internal/mockusso"
-	"github.com/CanonicalLtd/blues-identity/params"
 )
 
 type ussoSuite struct {

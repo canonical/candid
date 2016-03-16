@@ -3,11 +3,11 @@
 package store
 
 import (
+	"github.com/juju/idmclient/params"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/mgo.v2/bson"
 
 	"github.com/CanonicalLtd/blues-identity/internal/mongodoc"
-	"github.com/CanonicalLtd/blues-identity/params"
 )
 
 // ListIdentityProviders returns a list of all the registered identity

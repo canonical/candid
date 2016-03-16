@@ -10,13 +10,13 @@ import (
 	"net/url"
 	"time"
 
+	"github.com/juju/httprequest"
+	"github.com/juju/idmclient/params"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v1/bakery/checkers"
 	"gopkg.in/macaroon.v1"
 
 	"github.com/CanonicalLtd/blues-identity/idp"
-	"github.com/CanonicalLtd/blues-identity/params"
-	"github.com/juju/httprequest"
 )
 
 const (

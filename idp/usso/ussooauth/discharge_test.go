@@ -8,6 +8,7 @@ import (
 
 	"github.com/garyburd/go-oauth/oauth"
 	"github.com/juju/httprequest"
+	"github.com/juju/idmclient/params"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v1/bakery/checkers"
@@ -17,7 +18,6 @@ import (
 	"github.com/CanonicalLtd/blues-identity/idp/idputil"
 	"github.com/CanonicalLtd/blues-identity/idp/usso/internal/mockusso"
 	"github.com/CanonicalLtd/blues-identity/idp/usso/ussooauth"
-	"github.com/CanonicalLtd/blues-identity/params"
 )
 
 type dischargeSuite struct {

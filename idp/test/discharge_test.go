@@ -3,13 +3,13 @@
 package test_test
 
 import (
+	"github.com/juju/idmclient/params"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/macaroon-bakery.v1/bakery/checkers"
 
 	"github.com/CanonicalLtd/blues-identity/idp"
 	"github.com/CanonicalLtd/blues-identity/idp/idptest"
 	"github.com/CanonicalLtd/blues-identity/idp/test"
-	"github.com/CanonicalLtd/blues-identity/params"
 )
 
 type dischargeSuite struct {

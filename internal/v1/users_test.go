@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/juju/idmclient/params"
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/testing/httptesting"
 	gc "gopkg.in/check.v1"
@@ -22,7 +23,6 @@ import (
 
 	"github.com/CanonicalLtd/blues-identity/internal/mongodoc"
 	"github.com/CanonicalLtd/blues-identity/internal/store"
-	"github.com/CanonicalLtd/blues-identity/params"
 )
 
 type usersSuite struct {

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/juju/httprequest"
+	"github.com/juju/idmclient/params"
 	"github.com/juju/loggo"
 	"github.com/julienschmidt/httprouter"
 	"gopkg.in/errgo.v1"
@@ -16,7 +17,6 @@ import (
 
 	"github.com/CanonicalLtd/blues-identity/idp"
 	"github.com/CanonicalLtd/blues-identity/internal/store"
-	"github.com/CanonicalLtd/blues-identity/params"
 )
 
 var logger = loggo.GetLogger("identity.internal.identity")

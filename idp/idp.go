@@ -5,11 +5,10 @@ package idp
 
 import (
 	"github.com/juju/httprequest"
+	"github.com/juju/idmclient/params"
 	"gopkg.in/macaroon-bakery.v1/bakery"
 	"gopkg.in/macaroon.v1"
 	"gopkg.in/mgo.v2"
-
-	"github.com/CanonicalLtd/blues-identity/params"
 )
 
 // URLContext is the interface expected by the IdentityProvider.URL

@@ -6,10 +6,9 @@ import (
 	"net/http"
 
 	"github.com/juju/httprequest"
+	"github.com/juju/idmclient/params"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v1/httpbakery"
-
-	"github.com/CanonicalLtd/blues-identity/params"
 )
 
 var (

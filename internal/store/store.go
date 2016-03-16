@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/juju/idmclient/params"
 	"github.com/juju/loggo"
 	"github.com/pborman/uuid"
 	"gopkg.in/errgo.v1"
@@ -20,7 +21,6 @@ import (
 	"github.com/CanonicalLtd/blues-identity/internal/mongodoc"
 	"github.com/CanonicalLtd/blues-identity/meeting"
 	"github.com/CanonicalLtd/blues-identity/meeting/mgomeeting"
-	"github.com/CanonicalLtd/blues-identity/params"
 )
 
 var logger = loggo.GetLogger("identity.internal.store")

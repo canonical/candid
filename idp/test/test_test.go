@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/juju/idmclient/params"
 	"github.com/juju/testing/httptesting"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/macaroon-bakery.v1/bakery"
@@ -19,7 +20,6 @@ import (
 	"github.com/CanonicalLtd/blues-identity/idp"
 	"github.com/CanonicalLtd/blues-identity/idp/idptest"
 	"github.com/CanonicalLtd/blues-identity/idp/test"
-	"github.com/CanonicalLtd/blues-identity/params"
 )
 
 type testSuite struct {
