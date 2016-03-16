@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"regexp"
 
+	"github.com/juju/httprequest"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
 	envschemaform "gopkg.in/juju/environschema.v1/form"
@@ -19,7 +20,6 @@ import (
 	"github.com/CanonicalLtd/blues-identity/idp/idputil"
 	"github.com/CanonicalLtd/blues-identity/idp/keystone"
 	"github.com/CanonicalLtd/blues-identity/idp/keystone/internal/mockkeystone"
-	"github.com/juju/httprequest"
 )
 
 type dischargeSuite struct {

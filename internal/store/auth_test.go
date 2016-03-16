@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"sort"
 
+	"github.com/juju/idmclient/params"
 	"github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
@@ -18,7 +19,6 @@ import (
 
 	"github.com/CanonicalLtd/blues-identity/internal/mongodoc"
 	"github.com/CanonicalLtd/blues-identity/internal/store"
-	"github.com/CanonicalLtd/blues-identity/params"
 )
 
 type authSuite struct {

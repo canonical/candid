@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/garyburd/go-oauth/oauth"
+	"github.com/juju/idmclient/params"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/macaroon-bakery.v1/bakery"
 	"gopkg.in/macaroon-bakery.v1/bakery/checkers"
@@ -16,7 +17,6 @@ import (
 	"github.com/CanonicalLtd/blues-identity/idp/idptest"
 	"github.com/CanonicalLtd/blues-identity/idp/usso/internal/mockusso"
 	"github.com/CanonicalLtd/blues-identity/idp/usso/ussooauth"
-	"github.com/CanonicalLtd/blues-identity/params"
 )
 
 type ussooauthSuite struct {

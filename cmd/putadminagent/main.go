@@ -16,11 +16,10 @@ import (
 	"os"
 	"strings"
 
+	"github.com/juju/idmclient"
+	"github.com/juju/idmclient/params"
 	"gopkg.in/macaroon-bakery.v1/bakery"
 	"gopkg.in/macaroon-bakery.v1/httpbakery"
-
-	"github.com/CanonicalLtd/blues-identity/idmclient"
-	"github.com/CanonicalLtd/blues-identity/params"
 )
 
 var pubKey = flag.String("k", "", "public key of agent")

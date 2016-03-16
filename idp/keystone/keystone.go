@@ -7,13 +7,13 @@ package keystone
 import (
 	"html/template"
 
+	"github.com/juju/idmclient/params"
 	"gopkg.in/errgo.v1"
 
 	"github.com/CanonicalLtd/blues-identity/config"
 	"github.com/CanonicalLtd/blues-identity/idp"
 	"github.com/CanonicalLtd/blues-identity/idp/idputil"
 	"github.com/CanonicalLtd/blues-identity/idp/keystone/internal/keystone"
-	"github.com/CanonicalLtd/blues-identity/params"
 )
 
 func init() {

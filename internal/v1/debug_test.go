@@ -7,12 +7,12 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/juju/idmclient/params"
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/testing/httptesting"
 	"github.com/juju/utils/debugstatus"
 	gc "gopkg.in/check.v1"
 
-	"github.com/CanonicalLtd/blues-identity/params"
 	buildver "github.com/CanonicalLtd/blues-identity/version"
 )
 

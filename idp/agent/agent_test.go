@@ -11,6 +11,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 
+	"github.com/juju/idmclient/params"
 	"github.com/juju/testing"
 	"github.com/juju/testing/httptesting"
 	gc "gopkg.in/check.v1"
@@ -25,7 +26,6 @@ import (
 	"github.com/CanonicalLtd/blues-identity/idp/agent"
 	"github.com/CanonicalLtd/blues-identity/idp/idptest"
 	"github.com/CanonicalLtd/blues-identity/internal/store"
-	"github.com/CanonicalLtd/blues-identity/params"
 )
 
 type agentSuite struct {

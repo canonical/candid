@@ -13,6 +13,7 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/juju/idmclient/params"
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/testing/httptesting"
 	gc "gopkg.in/check.v1"
@@ -28,7 +29,6 @@ import (
 	"github.com/CanonicalLtd/blues-identity/idp/idptest"
 	"github.com/CanonicalLtd/blues-identity/idp/test"
 	"github.com/CanonicalLtd/blues-identity/internal/v1"
-	"github.com/CanonicalLtd/blues-identity/params"
 )
 
 type dischargeSuite struct {

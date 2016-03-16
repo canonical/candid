@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/juju/httprequest"
+	"github.com/juju/idmclient/params"
 	"github.com/julienschmidt/httprouter"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v1/bakery"
@@ -18,7 +19,6 @@ import (
 	"github.com/CanonicalLtd/blues-identity/internal/identity"
 	"github.com/CanonicalLtd/blues-identity/internal/mongodoc"
 	"github.com/CanonicalLtd/blues-identity/internal/store"
-	"github.com/CanonicalLtd/blues-identity/params"
 )
 
 func (h *Handler) newIDPHandler(idp idp.IdentityProvider) httprouter.Handle {

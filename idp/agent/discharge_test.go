@@ -5,6 +5,8 @@ package agent_test
 import (
 	"net/url"
 
+	"github.com/juju/httprequest"
+	"github.com/juju/idmclient/params"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v1/bakery"
@@ -16,8 +18,6 @@ import (
 	"github.com/CanonicalLtd/blues-identity/idp/agent"
 	"github.com/CanonicalLtd/blues-identity/idp/idptest"
 	"github.com/CanonicalLtd/blues-identity/idp/idputil"
-	"github.com/CanonicalLtd/blues-identity/params"
-	"github.com/juju/httprequest"
 )
 
 type dischargeSuite struct {
