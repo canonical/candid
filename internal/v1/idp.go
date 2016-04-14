@@ -29,7 +29,7 @@ func (h *Handler) newIDPHandler(idp idp.IdentityProvider) httprouter.Handle {
 			identity.ErrorMapper.WriteError(w, errgo.NoteMask(err, "cannot get store", errgo.Any))
 			return
 		}
-		defer store.Close()
+		defer h.storePool.Put(store)
 		// TODO have a pool of these?
 		c := &idpHandler{
 			h:      h,
