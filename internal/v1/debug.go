@@ -3,6 +3,11 @@
 package v1
 
 import (
+	"fmt"
+	"strconv"
+
+	"gopkg.in/mgo.v2"
+
 	"github.com/juju/httpprof"
 	"github.com/juju/httprequest"
 	"github.com/juju/utils/debugstatus"
@@ -20,11 +25,16 @@ type debugStatusRequest struct {
 
 // GET /debug/status
 func (h *debugHandler) DebugStatus(*debugStatusRequest) (map[string]debugstatus.CheckResult, error) {
-	return debugstatus.Check(
+	checks := []debugstatus.CheckerFunc{
 		debugstatus.ServerStartTime,
 		debugstatus.Connection(h.store.DB.Session),
 		debugstatus.MongoCollections(h.store.DB),
-	), nil
+		h.meetingStatus(),
+		h.storePoolStatus()}
+	if NoncesStatus != nil {
+		checks = append(checks, NoncesStatus)
+	}
+	return debugstatus.Check(checks...), nil
 }
 
 // debugInfoRequest documents the /debug/info endpoint. As
@@ -77,5 +87,52 @@ func (h *debugHandler) ServeDebugPprofHandler(p httprequest.Params, r *debugPpro
 		pprof.Symbol(p.Response, p.Request)
 	default:
 		pprof.Handler(r.Name).ServeHTTP(p.Response, p.Request)
+	}
+}
+
+func (h *debugHandler) meetingStatus() debugstatus.CheckerFunc {
+	return func() (key string, result debugstatus.CheckResult) {
+		result.Name = "count of meeting collection"
+		result.Passed = true
+		c, err := h.store.DB.Meeting().Count()
+		result.Value = strconv.Itoa(c)
+		if err != nil {
+			result.Value = err.Error()
+			result.Passed = false
+		}
+		return "meeting_count", result
+	}
+}
+
+func NoncesStatusFunc(db *mgo.Database, collection string) debugstatus.CheckerFunc {
+	return func() (key string, result debugstatus.CheckResult) {
+		result.Name = "count of usso nonces collection"
+		result.Passed = true
+		c, err := db.C(collection).Count()
+		result.Value = strconv.Itoa(c)
+		if err != nil {
+			result.Value = err.Error()
+			result.Passed = false
+		}
+		return "nonce_count", result
+	}
+}
+
+var NoncesStatus debugstatus.CheckerFunc
+
+func (h *debugHandler) storePoolStatus() debugstatus.CheckerFunc {
+	return func() (key string, result debugstatus.CheckResult) {
+		result.Name = "Status of store limit pool (mgo)"
+		result.Passed = true
+		result.Value = "disabled"
+		if h.h != nil && h.h.storePool != nil {
+			info := h.h.storePool.SessionPoolInfo()
+			free := info.Free()
+			limit := info.Limit()
+			size := info.Size()
+			result.Value = fmt.Sprintf("free: %d; limit: %d; size: %d", free, limit, size)
+			result.Passed = size-free < limit
+		}
+		return "store_pool_status", result
 	}
 }

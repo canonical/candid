@@ -5,6 +5,7 @@ package v1_test
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/juju/idmclient/params"
@@ -41,6 +42,11 @@ func (s *debugSuite) TestServeDebugStatus(c *gc.C) {
 				v.Duration = 0
 				result[k] = v
 			}
+			// There is a race in pool use. Size will be 1 or 2.
+			sps := result["store_pool_status"]
+			sps.Value = strings.Replace(sps.Value, "size: 1", "size: 1or2", 1)
+			sps.Value = strings.Replace(sps.Value, "size: 2", "size: 1or2", 1)
+			result["store_pool_status"] = sps
 			c.Assert(result, jc.DeepEquals, map[string]debugstatus.CheckResult{
 				"server_started": {
 					Name:   "Server started",
@@ -55,6 +61,16 @@ func (s *debugSuite) TestServeDebugStatus(c *gc.C) {
 				"mongo_collections": {
 					Name:   "MongoDB collections",
 					Value:  "All required collections exist",
+					Passed: true,
+				},
+				"meeting_count": {
+					Name:   "count of meeting collection",
+					Value:  "0",
+					Passed: true,
+				},
+				"store_pool_status": {
+					Name:   "Status of store limit pool (mgo)",
+					Value:  "free: 0; limit: 50; size: 1or2",
 					Passed: true,
 				},
 			})

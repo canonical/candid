@@ -182,6 +182,10 @@ func (p *Pool) Put(s *Store) {
 	p.storePool.Put(s)
 }
 
+func (p *Pool) SessionPoolInfo() limitpool.Info {
+	return p.sessionPool
+}
+
 // Close clears out the pool closing the contained stores and prevents
 // any new Stores from being added.
 func (p *Pool) Close() {
