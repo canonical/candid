@@ -38,9 +38,6 @@ type Pool struct {
 	// n holds the current number of allocated items.
 	n int
 
-	// a holds current number of available items.
-	a int
-
 	// closed holds whether the pool has been closed.
 	closed bool
 }
@@ -106,7 +103,6 @@ func (p *Pool) get(noLimit bool) (Item, error) {
 	}
 	select {
 	case v := <-p.c:
-		p.a--
 		return v, nil
 	default:
 	}
@@ -154,37 +150,37 @@ func (p *Pool) Put(v Item) {
 	}
 	select {
 	case p.c <- v:
-		p.a++
 		return
 	default:
+		// This should be impossible (if n <= max then there must be room in the channel)
+		// but it can be recovered by deleting.
 	}
-	// This should be impossible (if n <= max then there must be room in the channel)
-	// but it can be recovered by deleting.
 	p.n--
 	v.Close()
 }
 
-// Limit returns the limit of items in the pool.
-func (p *Pool) Limit() int {
-	return p.limit
+// Stats holds information about pool item allocation statistics.
+type Stats struct {
+	// Limit holds the maximum number of items that
+	// can be created at any one time.
+	Limit int
+
+	// Size holds the total number of items currently allocated.
+	// This can actually exceed Limit because internal processes are
+	// free to obtain as many items as they like.
+	Size int
+
+	// Free holds the number of free items in the pool.
+	Free int
 }
 
-// Size returns the total number of items in the pool.
-func (p *Pool) Size() int {
-	return p.n
-}
-
-// Free returns the number of unused items in the pool.
-func (p *Pool) Free() int {
-	return p.a
-}
-
-// Info is the interface which wraps limit pool information.
-type Info interface {
-	// Limit returns the limit of items in the pool.
-	Limit() int
-	// Size returns the total number of items in the pool.
-	Size() int
-	// Free returns the number of unused items in the pool.
-	Free() int
+// Stats returns information about the pool.
+func (p *Pool) Stats() Stats {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return Stats{
+		Limit: p.limit,
+		Size:  p.n,
+		Free:  len(p.c),
+	}
 }
