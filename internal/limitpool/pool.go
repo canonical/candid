@@ -38,6 +38,9 @@ type Pool struct {
 	// n holds the current number of allocated items.
 	n int
 
+	// a holds current number of available items.
+	a int
+
 	// closed holds whether the pool has been closed.
 	closed bool
 }
@@ -103,6 +106,7 @@ func (p *Pool) get(noLimit bool) (Item, error) {
 	}
 	select {
 	case v := <-p.c:
+		p.a--
 		return v, nil
 	default:
 	}
@@ -150,6 +154,7 @@ func (p *Pool) Put(v Item) {
 	}
 	select {
 	case p.c <- v:
+		p.a++
 		return
 	default:
 	}
@@ -157,4 +162,29 @@ func (p *Pool) Put(v Item) {
 	// but it can be recovered by deleting.
 	p.n--
 	v.Close()
+}
+
+// Limit returns the limit of items in the pool.
+func (p *Pool) Limit() int {
+	return p.limit
+}
+
+// Size returns the total number of items in the pool.
+func (p *Pool) Size() int {
+	return p.n
+}
+
+// Free returns the number of unused items in the pool.
+func (p *Pool) Free() int {
+	return p.a
+}
+
+// Info is the interface which wraps limit pool information.
+type Info interface {
+	// Limit returns the limit of items in the pool.
+	Limit() int
+	// Size returns the total number of items in the pool.
+	Size() int
+	// Free returns the number of unused items in the pool.
+	Free() int
 }

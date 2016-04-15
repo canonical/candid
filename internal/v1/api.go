@@ -188,6 +188,15 @@ func (h *Handler) idpHandlers() []httprequest.Handler {
 				Handle: hfunc,
 			},
 		)
+		if idp.Name() == "usso" {
+			logger.Debugf("adding USSO NoncesStatus to debug status")
+			// Use the pool to grab the DB Session for use in debug status.
+			// Put it back in the pool.
+			s := h.storePool.GetNoLimit()
+			db := s.DB.Session.DB("idp" + idp.Name())
+			h.storePool.Put(s)
+			NoncesStatus = NoncesStatusFunc(db, "nonces")
+		}
 	}
 	return handlers
 }
