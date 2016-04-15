@@ -182,8 +182,9 @@ func (p *Pool) Put(s *Store) {
 	p.storePool.Put(s)
 }
 
-func (p *Pool) SessionPoolInfo() limitpool.Info {
-	return p.sessionPool
+// Stats returns information about the current pool statistics.
+func (p *Pool) Stats() limitpool.Stats {
+	return p.sessionPool.Stats()
 }
 
 // Close clears out the pool closing the contained stores and prevents

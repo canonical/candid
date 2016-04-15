@@ -35,7 +35,7 @@ var unmarshalErrorTests = []struct {
 }, {
 	about:       "bad json",
 	body:        `{"error":{"code":400, "message":"test error","title":"Test"}`,
-	expectError: "GET http://example.com/test: unexpected EOF",
+	expectError: "unexpected EOF",
 }}
 
 func (s *clientSuite) TestUnmarshalError(c *gc.C) {

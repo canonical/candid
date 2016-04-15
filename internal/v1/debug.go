@@ -6,11 +6,10 @@ import (
 	"fmt"
 	"strconv"
 
-	"gopkg.in/mgo.v2"
-
 	"github.com/juju/httpprof"
 	"github.com/juju/httprequest"
 	"github.com/juju/utils/debugstatus"
+	"gopkg.in/mgo.v2"
 
 	"github.com/CanonicalLtd/blues-identity/internal/identity"
 	"github.com/CanonicalLtd/blues-identity/version"
@@ -126,12 +125,9 @@ func (h *debugHandler) storePoolStatus() debugstatus.CheckerFunc {
 		result.Passed = true
 		result.Value = "disabled"
 		if h.h != nil && h.h.storePool != nil {
-			info := h.h.storePool.SessionPoolInfo()
-			free := info.Free()
-			limit := info.Limit()
-			size := info.Size()
-			result.Value = fmt.Sprintf("free: %d; limit: %d; size: %d", free, limit, size)
-			result.Passed = size-free < limit
+			info := h.h.storePool.Stats()
+			result.Value = fmt.Sprintf("free: %d; limit: %d; size: %d", info.Free, info.Limit, info.Size)
+			result.Passed = info.Size-info.Free < info.Limit
 		}
 		return "store_pool_status", result
 	}
