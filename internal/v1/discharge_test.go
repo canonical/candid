@@ -638,7 +638,7 @@ func (s *dischargeSuite) TestPublicKey(c *gc.C) {
 	})
 }
 
-func (s *dischargeSuite) TestIdentityCookieLocation(c *gc.C) {
+func (s *dischargeSuite) TestIdentityCookieParameters(c *gc.C) {
 	svc, err := bakery.NewService(bakery.NewServiceParams{
 		Locator: s.Locator,
 	})
@@ -663,6 +663,7 @@ func (s *dischargeSuite) TestIdentityCookieLocation(c *gc.C) {
 	))
 	c.Assert(jar.cookies, gc.HasLen, 1)
 	for k := range jar.cookies {
+		c.Assert(k.name, gc.Equals, "macaroon-identity")
 		c.Assert(k.path, gc.Equals, "/")
 	}
 }

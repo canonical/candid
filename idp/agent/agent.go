@@ -136,5 +136,8 @@ func (a *identityProvider) Handle(c idp.Context) {
 		c.LoginFailure(errgo.Mask(err))
 		return
 	}
-	httpbakery.WriteDischargeRequiredError(p.Response, m, path, nil)
+
+	err = httpbakery.NewDischargeRequiredErrorForRequest(m, path, nil, p.Request)
+	err.(*httpbakery.Error).Info.CookieNameSuffix = "identity"
+	httprequest.ErrorMapper(httpbakery.ErrorToResponse).WriteError(p.Response, err)
 }

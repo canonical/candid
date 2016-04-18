@@ -212,6 +212,7 @@ func (s *authSuite) TestGroupsFromRequest(c *gc.C) {
 	c.Assert(herr.Code, gc.Equals, httpbakery.ErrDischargeRequired)
 	c.Assert(herr.Info.MacaroonPath, gc.Equals, "../")
 	c.Assert(herr.Info.Macaroon, gc.Not(gc.IsNil))
+	c.Assert(herr.Info.CookieNameSuffix, gc.Equals, "idm")
 	var foundThirdParty bool
 	for _, cav := range herr.Info.Macaroon.Caveats() {
 		if cav.Location == "" {
