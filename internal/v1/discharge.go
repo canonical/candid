@@ -178,6 +178,7 @@ func (h *dischargeHandler) Wait(p httprequest.Params, w *waitRequest) (*waitResp
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot make cookie")
 	}
+	cookie.Name = "macaroon-identity"
 	p.Request.AddCookie(cookie)
 	checker := bakery.ThirdPartyCheckerFunc(func(cavId, cav string) ([]checkers.Caveat, error) {
 		return h.checkThirdPartyCaveat(p.Request, cavId, cav)

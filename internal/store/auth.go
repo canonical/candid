@@ -177,7 +177,9 @@ func (s *Store) GroupsFromRequest(c checkers.Checker, req *http.Request) ([]stri
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}
-	return nil, httpbakery.NewDischargeRequiredErrorForRequest(m, mpath, verr, req)
+	err = httpbakery.NewDischargeRequiredErrorForRequest(m, mpath, verr, req)
+	err.(*httpbakery.Error).Info.CookieNameSuffix = "idm"
+	return nil, err
 }
 
 // TODO(mhilton) RelativeURLPath was copy & pasted from charmstore. It

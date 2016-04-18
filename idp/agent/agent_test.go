@@ -283,6 +283,7 @@ func (s *agentSuite) assertDischargeRequired(c *gc.C, rr *httptest.ResponseRecor
 	err := json.Unmarshal(rr.Body.Bytes(), &herr)
 	c.Assert(err, gc.IsNil)
 	c.Assert(herr.Info.Macaroon, gc.Not(gc.IsNil))
+	c.Assert(herr.Info.CookieNameSuffix, gc.Equals, "identity")
 	_, ok := checkers.ExpiryTime(herr.Info.Macaroon.Caveats())
 	c.Assert(ok, gc.Equals, true)
 }

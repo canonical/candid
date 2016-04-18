@@ -42,10 +42,12 @@ func (s *debugSuite) TestServeDebugStatus(c *gc.C) {
 				v.Duration = 0
 				result[k] = v
 			}
-			// There is a race in pool use. Size will be 1 or 2.
+			// There is a race in pool use. Size will be 1 or 2 and Free will be 0 or 1..
 			sps := result["store_pool_status"]
 			sps.Value = strings.Replace(sps.Value, "size: 1", "size: 1or2", 1)
 			sps.Value = strings.Replace(sps.Value, "size: 2", "size: 1or2", 1)
+			sps.Value = strings.Replace(sps.Value, "free: 0", "free: 0or1", 1)
+			sps.Value = strings.Replace(sps.Value, "free: 1", "free: 0or1", 1)
 			result["store_pool_status"] = sps
 			c.Assert(result, jc.DeepEquals, map[string]debugstatus.CheckResult{
 				"server_started": {
@@ -70,7 +72,7 @@ func (s *debugSuite) TestServeDebugStatus(c *gc.C) {
 				},
 				"store_pool_status": {
 					Name:   "Status of store limit pool (mgo)",
-					Value:  "free: 0; limit: 50; size: 1or2",
+					Value:  "free: 0or1; limit: 50; size: 1or2",
 					Passed: true,
 				},
 			})
