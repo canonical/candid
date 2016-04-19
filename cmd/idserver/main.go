@@ -96,8 +96,10 @@ func serve(confPath string) error {
 			RequestTimeout:    conf.RequestTimeout.Duration,
 			IdentityProviders: idps,
 			PrivateAddr:       conf.PrivateAddr,
+			DebugTeams:        conf.DebugTeams,
 		},
 		identity.V1,
+		identity.Debug,
 	)
 	if err != nil {
 		return errgo.Notef(err, "cannot create new server at %q", conf.APIAddr)

@@ -28,7 +28,6 @@ const (
 func NewAPIHandler(p *store.Pool, params identity.ServerParams) ([]httprequest.Handler, error) {
 	h := New(p, params)
 	handlers := identity.ErrorMapper.Handlers(h.apiHandler)
-	handlers = append(handlers, identity.ErrorMapper.Handlers(h.debugHandler)...)
 	handlers = append(handlers, identity.ErrorMapper.Handlers(h.dischargeHandler)...)
 	handlers = append(handlers, h.idpHandlers()...)
 	return handlers, nil
@@ -124,25 +123,6 @@ type apiHandler struct {
 	*handler
 }
 
-// debugHandler creates a per-request handler for endpoints relating to
-// debug operations. This method conforms to the specification for
-// https://godoc.org/github.com/juju/httprequest#ErrorMapper.Handlers and
-// so can be used to automatically derive the list of endpoints to add to
-// the router.
-func (h *Handler) debugHandler(p httprequest.Params) (*debugHandler, error) {
-	hnd, err := h.getHandler(p)
-	if err != nil {
-		return nil, errgo.NoteMask(err, "cannot create handler", errgo.Any)
-	}
-	return &debugHandler{
-		handler: hnd,
-	}, nil
-}
-
-type debugHandler struct {
-	*handler
-}
-
 // dischargeHandler creates a per-request handler for endpoints relating
 // to discharge and login operations. This method conforms to the
 // specification for
@@ -188,15 +168,6 @@ func (h *Handler) idpHandlers() []httprequest.Handler {
 				Handle: hfunc,
 			},
 		)
-		if idp.Name() == "usso" {
-			logger.Debugf("adding USSO NoncesStatus to debug status")
-			// Use the pool to grab the DB Session for use in debug status.
-			// Put it back in the pool.
-			s := h.storePool.GetNoLimit()
-			db := s.DB.Session.DB("idp" + idp.Name())
-			h.storePool.Put(s)
-			NoncesStatus = NoncesStatusFunc(db, "nonces")
-		}
 	}
 	return handlers
 }

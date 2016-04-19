@@ -30,7 +30,7 @@ func init() {
 // authentication via Ubuntu SSO.
 var IdentityProvider idp.IdentityProvider = &identityProvider{
 	noncePool:      mgononcestore.New(mgononcestore.Params{}),
-	discoveryCache: &openid.SimpleDiscoveryCache{},
+	discoveryCache: openid.NewSimpleDiscoveryCache(),
 }
 
 const (
