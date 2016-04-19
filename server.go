@@ -13,17 +13,20 @@ import (
 	"launchpad.net/lpad"
 
 	"github.com/CanonicalLtd/blues-identity/idp"
+	"github.com/CanonicalLtd/blues-identity/internal/debug"
 	"github.com/CanonicalLtd/blues-identity/internal/identity"
 	"github.com/CanonicalLtd/blues-identity/internal/v1"
 )
 
 // Versions of the API that can be served.
 const (
-	V1 = "v1"
+	V1    = "v1"
+	Debug = "debug"
 )
 
 var versions = map[string]identity.NewAPIHandlerFunc{
-	V1: v1.NewAPIHandler,
+	V1:    v1.NewAPIHandler,
+	Debug: debug.NewAPIHandler,
 }
 
 // Versions returns all known API version strings in alphabetical order.
@@ -71,6 +74,10 @@ type ServerParams struct {
 	// IdentityProviders contains the set of identity providers that
 	// should be initialised by the service.
 	IdentityProviders []idp.IdentityProvider
+
+	// DebugTeams contains the set of launchpad teams that may access
+	// the restricted debug endpoints.
+	DebugTeams []string
 }
 
 // NewServer returns a new handler that handles identity service requests and

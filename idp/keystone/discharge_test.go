@@ -13,6 +13,7 @@ import (
 	"gopkg.in/errgo.v1"
 	envschemaform "gopkg.in/juju/environschema.v1/form"
 	"gopkg.in/macaroon-bakery.v1/bakery/checkers"
+	"gopkg.in/macaroon-bakery.v1/httpbakery"
 	"gopkg.in/macaroon-bakery.v1/httpbakery/form"
 
 	"github.com/CanonicalLtd/blues-identity/idp"
@@ -111,10 +112,14 @@ func (s *dischargeSuite) visitInteractive(u *url.URL) error {
 }
 
 func (s *dischargeSuite) TestFormDischarge(c *gc.C) {
-	form.SetUpAuth(s.BakeryClient, keystoneFormFiller{
-		username: "testuser",
-		password: "testpass",
-	})
+	s.BakeryClient.WebPageVisitor = httpbakery.NewMultiVisitor(
+		form.Visitor{
+			Filler: keystoneFormFiller{
+				username: "testuser",
+				password: "testpass",
+			},
+		},
+	)
 	s.AssertDischarge(c, nil, checkers.New(
 		checkers.TimeBefore,
 	))

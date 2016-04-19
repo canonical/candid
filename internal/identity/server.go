@@ -22,7 +22,7 @@ import (
 var logger = loggo.GetLogger("identity.internal.identity")
 
 // NewAPIHandlerFunc is a function that returns set of httprequest
-// handlers that uses the given Store pool, server params and identity providers.
+// handlers that uses the given Store pool, and server params.
 type NewAPIHandlerFunc func(*store.Pool, ServerParams) ([]httprequest.Handler, error)
 
 // New returns a handler that serves the given identity API versions using the
@@ -128,6 +128,10 @@ type ServerParams struct {
 	// IdentityProviders contains the set of identity providers that
 	// should be initialised by the service.
 	IdentityProviders []idp.IdentityProvider
+
+	// DebugTeams contains the set of launchpad teams that may access
+	// the restricted debug endpoints.
+	DebugTeams []string
 }
 
 //notFound is the handler that is called when a handler cannot be found

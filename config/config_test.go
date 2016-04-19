@@ -44,6 +44,9 @@ identity-providers:
    name: ks1
    url: http://example.com/keystone
 private-addr: localhost
+debug-teams:
+ - yellow
+ - cloud-green
 `
 
 func (s *configSuite) readConfig(c *gc.C, content string) (*config.Config, error) {
@@ -87,6 +90,7 @@ func (s *configSuite) TestRead(c *gc.C) {
 			},
 		}},
 		PrivateAddr: "localhost",
+		DebugTeams:  []string{"yellow", "cloud-green"},
 	})
 }
 

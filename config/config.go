@@ -30,6 +30,7 @@ type Config struct {
 	RequestTimeout    DurationString     `yaml:"request-timeout"`
 	IdentityProviders []IdentityProvider `yaml:"identity-providers"`
 	PrivateAddr       string             `yaml:"private-addr"`
+	DebugTeams        []string           `yaml:"debug-teams"`
 }
 
 func (c *Config) validate() error {

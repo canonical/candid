@@ -11,6 +11,10 @@ import (
 	"gopkg.in/macaroon-bakery.v1/httpbakery"
 )
 
+// ErrLoginRequired is returned by the /debug/* endpoints when OpenID
+// authentication is required.
+const ErrLoginRequired params.ErrorCode = "login required"
+
 var (
 	ErrorMapper = httprequest.ErrorMapper(errToResp)
 	WriteError  = ErrorMapper.WriteError
@@ -25,6 +29,8 @@ func errToResp(err error) (int, interface{}) {
 	errorBody := errorResponseBody(err)
 	status := http.StatusInternalServerError
 	switch errorBody.Code {
+	case ErrLoginRequired:
+		status = http.StatusFound
 	case params.ErrNotFound:
 		status = http.StatusNotFound
 	case params.ErrForbidden, params.ErrAlreadyExists:
@@ -41,9 +47,10 @@ func errToResp(err error) (int, interface{}) {
 	return status, errorBody
 }
 
-// errorResponse returns an appropriate error response for the provided error.
-func errorResponseBody(err error) *params.Error {
-	errResp := &params.Error{
+// errorResponseBody returns an appropriate error response for the
+// provided error.
+func errorResponseBody(err error) *apiError {
+	errResp := params.Error{
 		Message: err.Error(),
 	}
 	cause := errgo.Cause(err)
@@ -52,7 +59,21 @@ func errorResponseBody(err error) *params.Error {
 	} else if errgo.Cause(err) == httprequest.ErrUnmarshal {
 		errResp.Code = params.ErrBadRequest
 	}
-	return errResp
+	return &apiError{
+		originalError: cause,
+		Error:         errResp,
+	}
+}
+
+type apiError struct {
+	originalError error
+	params.Error
+}
+
+func (err *apiError) SetHeader(h http.Header) {
+	if setter, ok := err.originalError.(httprequest.HeaderSetter); ok {
+		setter.SetHeader(h)
+	}
 }
 
 type errorCoder interface {
