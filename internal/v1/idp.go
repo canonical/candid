@@ -5,6 +5,8 @@ package v1
 import (
 	"net/http"
 
+	"golang.org/x/net/trace"
+
 	"github.com/juju/httprequest"
 	"github.com/juju/idmclient/params"
 	"github.com/julienschmidt/httprouter"
@@ -23,20 +25,36 @@ import (
 
 func (h *Handler) newIDPHandler(idp idp.IdentityProvider) httprouter.Handle {
 	return func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
+		t := trace.New("identity.internal.v1.idp", idp.Name())
 		r.ParseForm()
 		store, err := h.storePool.Get()
 		if err != nil {
+			// TODO(mhilton) consider logging inside the pool.
+			t.LazyPrintf("cannot get store: %s", err)
+			if errgo.Cause(err) != params.ErrServiceUnavailable {
+				t.SetError()
+			}
+			t.Finish()
 			identity.ErrorMapper.WriteError(w, errgo.NoteMask(err, "cannot get store", errgo.Any))
 			return
 		}
-		defer h.storePool.Put(store)
+		defer func() {
+			h.storePool.Put(store)
+			t.LazyPrintf("store released")
+			t.Finish()
+		}()
+		t.LazyPrintf("store acquired")
 		// TODO have a pool of these?
 		c := &idpHandler{
-			h:      h,
-			idp:    idp,
-			store:  store,
-			params: httprequest.Params{w, r, p},
-			place:  &place{store.Place},
+			h:     h,
+			idp:   idp,
+			store: store,
+			params: httprequest.Params{
+				Response: w,
+				Request:  r,
+				PathVar:  p,
+			},
+			place: &place{store.Place},
 		}
 		idp.Handle(c)
 	}

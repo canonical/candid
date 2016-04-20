@@ -4,7 +4,10 @@ package v1
 
 import (
 	"github.com/juju/httprequest"
+	"github.com/juju/idmclient/params"
 	"github.com/juju/loggo"
+	"golang.org/x/net/context"
+	"golang.org/x/net/trace"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v1/bakery/checkers"
 
@@ -58,23 +61,33 @@ func (h *Handler) newHandler() interface{} {
 	}
 }
 
-func (h *Handler) getHandler(p httprequest.Params) (*handler, error) {
+func (h *Handler) getHandler(p httprequest.Params, traceFamily string) (*handler, error) {
+	t := trace.New(traceFamily, p.PathPattern)
 	store, err := h.storePool.Get()
 	if err != nil {
+		// TODO(mhilton) consider logging inside the pool.
+		t.LazyPrintf("cannot get store: %s", err)
+		if errgo.Cause(err) != params.ErrServiceUnavailable {
+			t.SetError()
+		}
+		t.Finish()
 		return nil, errgo.NoteMask(err, "cannot get store", errgo.Any)
 	}
+	t.LazyPrintf("store acquired")
 	handler := h.handlerPool.Get().(*handler)
 	handler.store = store
 	handler.place = &place{store.Place}
+	handler.context = trace.NewContext(context.Background(), t)
 	handler.params = p
 	return handler, nil
 }
 
 type handler struct {
-	h      *Handler
-	params httprequest.Params
-	store  *store.Store
-	place  *place
+	h       *Handler
+	params  httprequest.Params
+	store   *store.Store
+	place   *place
+	context context.Context
 }
 
 func (h *handler) checkAdmin() error {
@@ -97,8 +110,13 @@ func (h *handler) serviceURL(path string) string {
 // once a request is complete.
 func (h *handler) Close() error {
 	h.h.storePool.Put(h.store)
+	if t, ok := trace.FromContext(h.context); ok {
+		t.LazyPrintf("store released")
+		t.Finish()
+	}
 	h.store = nil
 	h.place = nil
+	h.context = nil
 	h.params = httprequest.Params{}
 	h.h.handlerPool.Put(h)
 	return nil
@@ -110,7 +128,7 @@ func (h *handler) Close() error {
 // so can be used to automatically derive the list of endpoints to add to
 // the router.
 func (h *Handler) apiHandler(p httprequest.Params) (*apiHandler, error) {
-	hnd, err := h.getHandler(p)
+	hnd, err := h.getHandler(p, "identity.internal.v1")
 	if err != nil {
 		return nil, errgo.NoteMask(err, "cannot create handler", errgo.Any)
 	}
@@ -130,7 +148,7 @@ type apiHandler struct {
 // so can be used to automatically derive the list of endpoints to add to
 // the router.
 func (h *Handler) dischargeHandler(p httprequest.Params) (*dischargeHandler, error) {
-	hnd, err := h.getHandler(p)
+	hnd, err := h.getHandler(p, "identity.internal.discharge")
 	if err != nil {
 		return nil, errgo.NoteMask(err, "cannot create handler", errgo.Any)
 	}
