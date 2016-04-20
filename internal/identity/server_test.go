@@ -7,7 +7,10 @@ import (
 	"net/http"
 
 	"github.com/juju/httprequest"
+	"github.com/juju/idmclient/params"
+	"github.com/juju/loggo"
 	"github.com/juju/testing"
+	jc "github.com/juju/testing/checkers"
 	"github.com/juju/testing/httptesting"
 	"github.com/julienschmidt/httprouter"
 	gc "gopkg.in/check.v1"
@@ -130,6 +133,38 @@ func (s *serverSuite) TestServerHasAccessControlAllowHeaders(c *gc.C) {
 	c.Assert(rec.Code, gc.Equals, http.StatusOK)
 	c.Assert(len(rec.HeaderMap["Access-Control-Allow-Origin"]), gc.Equals, 1)
 	c.Assert(rec.HeaderMap["Access-Control-Allow-Origin"][0], gc.Equals, "*")
+}
+
+func (s *serverSuite) TestServerPanicRecovery(c *gc.C) {
+	w := new(loggo.TestWriter)
+	loggo.RegisterWriter("test", w, loggo.TRACE)
+	db := s.Session.DB("foo")
+	impl := map[string]identity.NewAPIHandlerFunc{
+		"/a": func(*store.Pool, identity.ServerParams) ([]httprequest.Handler, error) {
+			return []httprequest.Handler{{
+				Method: "GET",
+				Path:   "/a",
+				Handle: func(w http.ResponseWriter, req *http.Request, p httprouter.Params) {
+					panic("test panic")
+				},
+			}}, nil
+		},
+	}
+
+	h, err := identity.New(db, identity.ServerParams{
+		PrivateAddr: "localhost",
+	}, impl)
+	c.Assert(err, gc.IsNil)
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Handler:      h,
+		URL:          "/a",
+		ExpectStatus: http.StatusInternalServerError,
+		ExpectBody: params.Error{
+			Code:    "panic",
+			Message: "test panic",
+		},
+	})
+	c.Assert(w.Log(), jc.LogMatches, []jc.SimpleMessage{{loggo.ERROR, `PANIC!: test panic\n.*`}})
 }
 
 func assertServesVersion(c *gc.C, h http.Handler, vers string) {

@@ -3,7 +3,9 @@
 package identity
 
 import (
+	"fmt"
 	"net/http"
+	"runtime/debug"
 	"time"
 
 	"github.com/juju/httprequest"
@@ -81,6 +83,15 @@ type Server struct {
 
 // ServeHTTP implements http.Handler.
 func (srv *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	defer func() {
+		if v := recover(); v != nil {
+			logger.Errorf("PANIC!: %v\n%s", v, debug.Stack())
+			httprequest.WriteJSON(w, http.StatusInternalServerError, params.Error{
+				Code:    "panic",
+				Message: fmt.Sprintf("%v", v),
+			})
+		}
+	}()
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Access-Control-Allow-Headers", "Bakery-Protocol-Version, Macaroons, X-Requested-With, Content-Type")
 	w.Header().Set("Access-Control-Cache-Max-Age", "600")
