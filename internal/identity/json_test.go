@@ -7,7 +7,9 @@ import (
 
 	"github.com/juju/httprequest"
 	"github.com/juju/idmclient/params"
+	"github.com/juju/loggo"
 	jujutesting "github.com/juju/testing"
+	jc "github.com/juju/testing/checkers"
 	"github.com/juju/testing/httptesting"
 	"github.com/julienschmidt/httprouter"
 	gc "gopkg.in/check.v1"
@@ -53,6 +55,8 @@ func (s *jsonSuite) TestHandleErrors(c *gc.C) {
 }
 
 func (s *jsonSuite) TestHandleErrorsInternalServerError(c *gc.C) {
+	w := new(loggo.TestWriter)
+	loggo.RegisterWriter("test", w, loggo.TRACE)
 	s.mux.Handle("GET", "/error/", identity.ErrorMapper.HandleErrors(func(httprequest.Params) error {
 		return errgo.New("bad wolf")
 	}))
@@ -64,6 +68,7 @@ func (s *jsonSuite) TestHandleErrorsInternalServerError(c *gc.C) {
 			Message: "bad wolf",
 		},
 	})
+	c.Assert(w.Log(), jc.LogMatches, []jc.SimpleMessage{{loggo.ERROR, `Internal Server Error: bad wolf \(.*\)`}})
 }
 
 func (s *jsonSuite) TestHandleErrorsSuccess(c *gc.C) {

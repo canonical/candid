@@ -44,6 +44,11 @@ func errToResp(err error) (int, interface{}) {
 	case params.ErrServiceUnavailable:
 		status = http.StatusServiceUnavailable
 	}
+
+	if status == http.StatusInternalServerError {
+		logger.Errorf("Internal Server Error: %s (%s)", err, errgo.Details(err))
+	}
+
 	return status, errorBody
 }
 
