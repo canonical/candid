@@ -46,6 +46,8 @@ func main() {
 			fmt.Fprintf(os.Stderr, "cannot configure loggers: %v", err)
 			os.Exit(1)
 		}
+	} else {
+		loggo.GetLogger("").SetLogLevel(loggo.INFO)
 	}
 	if err := serve(flag.Arg(0)); err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
