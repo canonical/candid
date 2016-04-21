@@ -3,6 +3,7 @@
 package store
 
 import (
+	"sort"
 	"strings"
 	"time"
 
@@ -302,6 +303,7 @@ func (s *Store) UpsertIdentity(doc *mongodoc.Identity) error {
 			logger.Warningf("failed to fetch list of groups from launchpad for %q: %s", doc.Email, err)
 		}
 	}
+	doc.Groups = uniqueStrings(doc.Groups)
 	query := bson.D{{"username", doc.Username}}
 	if doc.ExternalID != "" {
 		if doc.Owner != "" {
@@ -469,4 +471,24 @@ type poolMeetingStore struct {
 
 func (s *poolMeetingStore) Close() {
 	s.pool.putSession(s.session)
+}
+
+// uniqueStrings removes all duplicates from the supplied
+// string slice, updating the slice in place.
+// The values will be in lexicographic order.
+func uniqueStrings(ss []string) []string {
+	if len(ss) < 2 {
+		return ss
+	}
+	sort.Strings(ss)
+	prev := ss[0]
+	out := ss[:1]
+	for _, s := range ss[1:] {
+		if s == prev {
+			continue
+		}
+		out = append(out, s)
+		prev = s
+	}
+	return out
 }

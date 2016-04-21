@@ -62,6 +62,17 @@ func (s *usersSuite) TestUser(c *gc.C) {
 			&key.Public,
 		},
 	})
+	s.createUser(c, &params.User{
+		Username:   "jbloggs7",
+		ExternalID: "http://example.com/jbloggs7",
+		Email:      "jbloggs7@example.com",
+		FullName:   "Joe Bloggs VII",
+		IDPGroups: []string{
+			"test",
+			"test2",
+			"test2",
+		},
+	})
 	tests := []struct {
 		about        string
 		url          string
@@ -480,6 +491,24 @@ func (s *usersSuite) TestUser(c *gc.C) {
 			Code:    params.ErrForbidden,
 			Message: `admin@idm cannot create user "agent@admin@idm@bad" (suffix must be "@admin@idm")`,
 		},
+	}, {
+		about:        "user with duplicate groups",
+		url:          apiURL("u/jbloggs7"),
+		method:       "GET",
+		username:     adminUsername,
+		password:     adminPassword,
+		expectStatus: http.StatusOK,
+		expectBody: params.User{
+			Username:   "jbloggs7",
+			ExternalID: "http://example.com/jbloggs7",
+			Email:      "jbloggs7@example.com",
+			FullName:   "Joe Bloggs VII",
+			GravatarID: "4b5b372b2f8dde66ad32d3c63c1894b2",
+			IDPGroups: []string{
+				"test",
+				"test2",
+			},
+		},
 	}}
 	for i, test := range tests {
 		c.Logf("%d. %s", i, test.about)
@@ -810,6 +839,17 @@ func (s *usersSuite) TestUserIDPGroups(c *gc.C) {
 			"test2",
 		},
 	})
+	s.createUser(c, &params.User{
+		Username:   "test5",
+		ExternalID: "http://example.com/test5",
+		Email:      "test5@example.com",
+		FullName:   "Test User V",
+		IDPGroups: []string{
+			"test",
+			"test2",
+			"test2",
+		},
+	})
 	tests := []struct {
 		about        string
 		url          string
@@ -848,6 +888,13 @@ func (s *usersSuite) TestUserIDPGroups(c *gc.C) {
 			Code:    "not found",
 			Message: `user "test4" not found: not found`,
 		},
+	}, {
+		about:        "user with duplicate group",
+		url:          apiURL("u/test5/idpgroups"),
+		username:     adminUsername,
+		password:     adminPassword,
+		expectStatus: http.StatusOK,
+		expectBody:   []string{"test", "test2"},
 	}}
 	for i, test := range tests {
 		c.Logf("%d. %s", i, test.about)
@@ -900,6 +947,17 @@ func (s *usersSuite) TestUserGroups(c *gc.C) {
 			store.GroupListGroup,
 		},
 	})
+	s.createUser(c, &params.User{
+		Username:   "test5",
+		ExternalID: "http://example.com/test5",
+		Email:      "test5@example.com",
+		FullName:   "Test User V",
+		IDPGroups: []string{
+			"test",
+			"test2",
+			"test2",
+		},
+	})
 	tests := []struct {
 		about        string
 		url          string
@@ -946,6 +1004,12 @@ func (s *usersSuite) TestUserGroups(c *gc.C) {
 		url:          apiURL("u/test/groups"),
 		expectStatus: http.StatusProxyAuthRequired,
 		expectBody:   DischargeRequiredBody,
+	}, {
+		about:        "user with duplicate group",
+		url:          apiURL("u/test5/groups"),
+		username:     "test5",
+		expectStatus: http.StatusOK,
+		expectBody:   []string{"test", "test2"},
 	}}
 	for i, test := range tests {
 		c.Logf("%d. %s", i, test.about)
