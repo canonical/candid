@@ -249,6 +249,43 @@ func (s *storeSuite) TestUpsertIdentity(c *gc.C) {
 	}
 }
 
+func (s *storeSuite) TestUpsertIdentityDedupeGroups(c *gc.C) {
+	store := s.pool.GetNoLimit()
+	defer s.pool.Put(store)
+
+	// Add interactive user.
+	id := &mongodoc.Identity{
+		Username:   "test",
+		ExternalID: "http://example.com/test",
+		Email:      "test@example.com",
+		FullName:   "Test User",
+		Groups: []string{
+			"test",
+			"test2",
+			"test2",
+		},
+	}
+	err := store.UpsertIdentity(id)
+	c.Assert(err, gc.IsNil)
+
+	expect := &mongodoc.Identity{
+		Username:   "test",
+		UUID:       id.UUID,
+		ExternalID: "http://example.com/test",
+		Email:      "test@example.com",
+		FullName:   "Test User",
+		Groups: []string{
+			"test",
+			"test2",
+		},
+	}
+
+	var doc mongodoc.Identity
+	err = store.DB.Identities().Find(bson.D{{"username", "test"}}).One(&doc)
+	c.Assert(err, gc.IsNil)
+	c.Assert(&doc, jc.DeepEquals, expect)
+}
+
 func (s *storeSuite) TestCollections(c *gc.C) {
 	store := s.pool.GetNoLimit()
 	defer s.pool.Put(store)
