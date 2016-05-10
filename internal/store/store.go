@@ -289,39 +289,43 @@ func (s *Store) ensureIndexes() error {
 	return nil
 }
 
-// UpsertIdentity adds or updates an identity to the identities collection.
-// UpsertIdentity will only update an existing entry when both the UserName and
+// InsertIdentity adds an identity to the identities collection.
+// InsertIdentity will only insert an existing entry when both the UserName and
 // ExternalID match the destination record. If the Identity clashes with an existing
 // Identity then an error is returned with the cause params.ErrAlreadyExists.
-func (s *Store) UpsertIdentity(doc *mongodoc.Identity) error {
+func (s *Store) InsertIdentity(doc *mongodoc.Identity) error {
 	doc.UUID = uuid.NewSHA1(IdentityNamespace, []byte(doc.Username)).String()
-	if strings.HasPrefix(doc.ExternalID, "https://login.ubuntu.com/+id/") {
-		groups, err := s.getLaunchpadGroups(doc.Email)
-		if err == nil {
-			doc.Groups = append(doc.Groups, groups...)
-		} else {
-			logger.Warningf("failed to fetch list of groups from launchpad for %q: %s", doc.Email, err)
-		}
-	}
 	doc.Groups = uniqueStrings(doc.Groups)
-	query := bson.D{{"username", doc.Username}}
-	if doc.ExternalID != "" {
-		if doc.Owner != "" {
-			return errgo.New("both external_id and owner specified")
-		}
-		query = append(query, bson.DocElem{"external_id", doc.ExternalID})
-	} else if doc.Owner != "" {
-		query = append(query, bson.DocElem{"owner", doc.Owner})
-	} else {
+	if doc.ExternalID != "" && doc.Owner != "" {
+		return errgo.New("both external_id and owner specified")
+	}
+	if doc.ExternalID == "" && doc.Owner == "" {
 		return errgo.New("no external_id or owner specified")
 	}
-
-	_, err := s.DB.Identities().Upsert(query, doc)
+	err := s.DB.Identities().Insert(doc)
 	if mgo.IsDup(err) {
 		return errgo.WithCausef(nil, params.ErrAlreadyExists, "cannot add user: duplicate username or external_id")
 	}
 	if err != nil {
 		return errgo.Mask(err)
+	}
+	return nil
+}
+
+// UpdateGroups updates the groups of a user.
+// If the user is not found then an error is returned with the cause params.ErrNotFound.
+func (s *Store) UpdateGroups(doc *mongodoc.Identity) error {
+	if strings.HasPrefix(doc.ExternalID, "https://login.ubuntu.com/+id/") {
+		lpgroups, err := s.getLaunchpadGroups(doc.Email)
+		if err == nil {
+			doc.Groups = append(doc.Groups, lpgroups...)
+		} else {
+			logger.Warningf("failed to fetch list of groups from launchpad for %q: %s", doc.Email, err)
+		}
+	}
+	err := s.UpdateIdentity(params.Username(doc.Username), bson.D{{"$set", bson.D{{"groups", uniqueStrings(doc.Groups)}}}})
+	if err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
 	return nil
 }

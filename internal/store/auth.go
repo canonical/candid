@@ -18,8 +18,9 @@ import (
 )
 
 const (
-	AdminGroup     = "admin@idm"
-	GroupListGroup = "grouplist@idm"
+	AdminGroup        = "admin@idm"
+	SSHKeyGetterGroup = "sshkeygetter@idm"
+	GroupListGroup    = "grouplist@idm"
 )
 
 // CheckAdminCredentials checks if the request has credentials that match the

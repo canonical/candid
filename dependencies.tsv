@@ -3,7 +3,7 @@ github.com/gorilla/handlers	git	a24b39a6a2c8a7af2fe664dd4573205c99904035	2015-04
 github.com/juju/errors	git	1b5e39b83d1835fa480e0c2ddefb040ee82d58b3	2015-09-16T12:56:42Z
 github.com/juju/httpprof	git	14bf14c307672fd2456bdbf35d19cf0ccd3cf565	2014-12-17T16:00:36Z
 github.com/juju/httprequest	git	3d72385a5c19cf70e983c8cb888769a2d9efe2ea	2016-04-20T11:37:53Z
-github.com/juju/idmclient	git	98ac3e5ba9acebc7f946ec6478a783836507dd7f	2016-04-13T13:29:21Z
+github.com/juju/idmclient	git	f0530d4a08de80b1c9f2a024351ca569737c8747	2016-05-11T11:48:14Z
 github.com/juju/loggo	git	8477fc936adf0e382d680310047ca27e128a309a	2015-05-27T03:58:39Z
 github.com/juju/names	git	8a0aa0963bbacdc790914892e9ff942e94d6f795	2016-03-30T15:05:33Z
 github.com/juju/schema	git	1e25943f8c6fd6815282d6f1ac87091d21e14e19	2016-03-01T11:16:46Z

@@ -89,9 +89,15 @@ func (h *handler) upsertAgent(r *http.Request, u *params.SetUserRequest) error {
 		return errgo.Mask(err, errgo.Is(params.ErrForbidden))
 	}
 	doc := identityFromSetUserParams(u)
-	if err := h.store.UpsertIdentity(doc); err != nil {
-		return errgo.NoteMask(err, "cannot store identity", errgo.Is(params.ErrAlreadyExists))
+
+	err = h.store.UpdateGroups(doc)
+	if errgo.Cause(err) == params.ErrNotFound {
+		err := h.store.InsertIdentity(doc)
+		if err != nil {
+			return errgo.NoteMask(err, "cannot store identity", errgo.Is(params.ErrAlreadyExists))
+		}
 	}
+
 	return nil
 }
 
@@ -107,8 +113,12 @@ func (h *apiHandler) upsertUser(r *http.Request, u *params.SetUserRequest) error
 	if doc.ExternalID == "" {
 		return errgo.WithCausef(nil, params.ErrBadRequest, `external_id not specified`)
 	}
-	if err := h.store.UpsertIdentity(doc); err != nil {
-		return errgo.NoteMask(err, "cannot store identity", errgo.Is(params.ErrAlreadyExists))
+	err := h.store.UpdateGroups(doc)
+	if errgo.Cause(err) == params.ErrNotFound {
+		err := h.store.InsertIdentity(doc)
+		if err != nil {
+			return errgo.NoteMask(err, "cannot store identity", errgo.Is(params.ErrAlreadyExists))
+		}
 	}
 	return nil
 }
@@ -178,6 +188,50 @@ func (h *apiHandler) UserIDPGroups(p httprequest.Params, r *params.UserIDPGroups
 		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
 	return id.Groups, nil
+}
+
+// UserSSHKeys serves the /u/$username/sshkeys endpoint, and returns
+// the list of ssh keys associated with the user.
+func (h *apiHandler) UserSSHKeys(p httprequest.Params, r *params.UserSSHKeysRequest) (params.UserSSHKeysResponse, error) {
+	acl := []string{store.AdminGroup, store.SSHKeyGetterGroup, string(r.Username)}
+	if err := h.store.CheckACL(opGetUserSSHKey, p.Request, acl); err != nil {
+		return params.UserSSHKeysResponse{}, errgo.Mask(err, errgo.Any)
+	}
+	id, err := h.store.GetIdentity(r.Username)
+	if err != nil {
+		return params.UserSSHKeysResponse{}, errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	}
+	return params.UserSSHKeysResponse{
+		SSHKeys: id.SSHKeys,
+	}, nil
+}
+
+// AddSSHKey serves the /u/$username/sshkeys put endpoint, and add a ssh key to
+// the list of ssh keys associated with the user.
+func (h *apiHandler) AddSSHKey(p httprequest.Params, r *params.AddSSHKeyRequest) error {
+	acl := []string{store.AdminGroup, string(r.Username)}
+	if err := h.store.CheckACL(opSetUserSSHKey, p.Request, acl); err != nil {
+		return errgo.Mask(err, errgo.Any)
+	}
+	err := h.store.UpdateIdentity(r.Username, bson.D{{"$addToSet", bson.M{"ssh_keys": r.SSHKey}}})
+	if err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	}
+	return nil
+}
+
+// RemoveSSHKey serves the /u/$username/sshkeys delete endpoint, and remove an
+// ssh key the list of ssh keys associated with the user.
+func (h *apiHandler) RemoveSSHKey(p httprequest.Params, r *params.RemoveSSHKeyRequest) error {
+	acl := []string{store.AdminGroup, string(r.Username)}
+	if err := h.store.CheckACL(opSetUserSSHKey, p.Request, acl); err != nil {
+		return errgo.Mask(err, errgo.Any)
+	}
+	err := h.store.UpdateIdentity(r.Username, bson.D{{"$pull", bson.M{"ssh_keys": r.SSHKey}}})
+	if err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	}
+	return nil
 }
 
 // UserToken serves a token, in the form of a macaroon, identifying
@@ -321,6 +375,7 @@ func userFromIdentity(id *mongodoc.Identity) (*params.User, error) {
 		IDPGroups:  id.Groups,
 		Owner:      params.Username(id.Owner),
 		PublicKeys: publicKeys,
+		SSHKeys:    id.SSHKeys,
 	}, nil
 }
 

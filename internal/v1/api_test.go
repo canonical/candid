@@ -117,7 +117,7 @@ func (s *apiSuite) assertMacaroon(c *gc.C, ms macaroon.Slice, check bakery.First
 	c.Assert(err, gc.IsNil)
 }
 
-func (s *apiSuite) createUser(c *gc.C, user *params.User) (uuid string) {
+func (s *apiSuite) createUser(c *gc.C, user *params.User) string {
 	store := s.pool.GetNoLimit()
 	defer s.pool.Put(store)
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
@@ -145,7 +145,7 @@ func (s *apiSuite) createUser(c *gc.C, user *params.User) (uuid string) {
 func (s *apiSuite) createIdentity(c *gc.C, doc *mongodoc.Identity) (uuid string) {
 	store := s.pool.GetNoLimit()
 	defer s.pool.Put(store)
-	err := store.UpsertIdentity(doc)
+	err := store.InsertIdentity(doc)
 	c.Assert(err, gc.IsNil)
 	return doc.UUID
 }

@@ -24,6 +24,8 @@ const (
 	opCreateAgent   checkers.OperationChecker = "create-agent"
 	opCreateUser    checkers.OperationChecker = "create-user"
 	opGetUser       checkers.OperationChecker = "get-user"
+	opGetUserSSHKey checkers.OperationChecker = "get-user-ssh-key"
+	opSetUserSSHKey checkers.OperationChecker = "set-user-ssh-key"
 	opGetUserGroups checkers.OperationChecker = "get-user-groups"
 )
 

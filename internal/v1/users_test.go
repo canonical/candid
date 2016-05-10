@@ -100,44 +100,6 @@ func (s *usersSuite) TestUser(c *gc.C) {
 		password:     adminPassword,
 		expectStatus: http.StatusOK,
 	}, {
-		about:  "update existing user",
-		url:    apiURL("u/jbloggs2"),
-		method: "PUT",
-		body: marshal(c, params.User{
-			Username:   "jbloggs2",
-			ExternalID: "http://example.com/jbloggs2",
-			Email:      "jbloggs2@example.com",
-			FullName:   "Joe Bloggs II",
-			IDPGroups: []string{
-				"test",
-				"test2",
-			},
-		}),
-		username:     adminUsername,
-		password:     adminPassword,
-		expectStatus: http.StatusOK,
-	}, {
-		about:  "update existing username with different user",
-		url:    apiURL("u/jbloggs2"),
-		method: "PUT",
-		body: marshal(c, params.User{
-			Username:   "jbloggs2",
-			ExternalID: "http://example.com/joe.bloggs2",
-			Email:      "jbloggs2@example.com",
-			FullName:   "Joe Bloggs II",
-			IDPGroups: []string{
-				"test",
-				"test2",
-			},
-		}),
-		username:     adminUsername,
-		password:     adminPassword,
-		expectStatus: http.StatusForbidden,
-		expectBody: params.Error{
-			Code:    "already exists",
-			Message: `cannot store identity: cannot add user: duplicate username or external_id`,
-		},
-	}, {
 		about:  "reuse external_id",
 		url:    apiURL("u/jbloggs5"),
 		method: "PUT",
@@ -532,6 +494,61 @@ func (s *usersSuite) TestUser(c *gc.C) {
 	}
 }
 
+func (s *usersSuite) TestUpdateGroupsForUser(c *gc.C) {
+	s.createUser(c, &params.User{
+		Username:   "jbloggs2",
+		ExternalID: "http://example.com/jbloggs2",
+		Email:      "jbloggs2@example.com",
+		FullName:   "Joe Bloggs II",
+		IDPGroups: []string{
+			"test",
+		},
+	})
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Handler: s.srv,
+		URL:     apiURL("u/jbloggs2"),
+		Method:  "PUT",
+		Header: http.Header{
+			"Content-Type": []string{"application/json"},
+		},
+		Body: marshal(c, params.User{
+			Username:   "jbloggs2",
+			ExternalID: "http://example.com/jbloggs2",
+			Email:      "jbloggs2@example.com",
+			FullName:   "Joe Bloggs II",
+			IDPGroups: []string{
+				"test",
+				"test2",
+			},
+		}),
+		Username:     adminUsername,
+		Password:     adminPassword,
+		ExpectStatus: http.StatusOK,
+	})
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Handler: s.srv,
+		URL:     apiURL("u/jbloggs2"),
+		Method:  "GET",
+		Header: http.Header{
+			"Content-Type": []string{"application/json"},
+		},
+		Username:     adminUsername,
+		Password:     adminPassword,
+		ExpectStatus: http.StatusOK,
+		ExpectBody: params.User{
+			Username:   "jbloggs2",
+			ExternalID: "http://example.com/jbloggs2",
+			Email:      "jbloggs2@example.com",
+			FullName:   "Joe Bloggs II",
+			GravatarID: "b1337cf8d58e2e2be9b6a5356cfc268b",
+			IDPGroups: []string{
+				"test",
+				"test2",
+			},
+		},
+	})
+}
+
 func (s *usersSuite) TestCreateUserWritesToDatabase(c *gc.C) {
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Handler: s.srv,
@@ -759,6 +776,134 @@ func (s *usersSuite) TestUserToken(c *gc.C) {
 		})
 		test.checkResponse(c, resp)
 	}
+}
+
+func (s *usersSuite) TestSSHKeys(c *gc.C) {
+	s.createUser(c, &params.User{
+		Username:   "jbloggs",
+		ExternalID: "http://example.com/jbloggs",
+		Email:      "jbloggs@example.com",
+		FullName:   "Joe Bloggs",
+		IDPGroups: []string{
+			"test",
+		},
+	})
+	// Check there is no ssh key for the user.
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Handler:  s.srv,
+		URL:      apiURL("u/jbloggs/ssh-keys"),
+		Method:   "GET",
+		Username: adminUsername,
+		Password: adminPassword,
+		Header: http.Header{
+			"Content-Type": []string{"application/json"},
+		},
+		ExpectStatus: http.StatusOK,
+		ExpectBody:   params.UserSSHKeysResponse{},
+	})
+	// Add ssh keys to the user.
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Handler: s.srv,
+		URL:     apiURL("u/jbloggs/ssh-keys"),
+		Method:  "PUT",
+		Header: http.Header{
+			"Content-Type": []string{"application/json"},
+		},
+		Username:     adminUsername,
+		Password:     adminPassword,
+		Body:         marshal(c, "36ASDER56"),
+		ExpectStatus: http.StatusOK,
+	})
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Handler:  s.srv,
+		URL:      apiURL("u/jbloggs/ssh-keys"),
+		Method:   "PUT",
+		Username: adminUsername,
+		Password: adminPassword,
+		Header: http.Header{
+			"Content-Type": []string{"application/json"},
+		},
+		Body:         marshal(c, "22ERT56DG"),
+		ExpectStatus: http.StatusOK,
+	})
+	// Check it is present.
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Handler: s.srv,
+		URL:     apiURL("u/jbloggs/ssh-keys"),
+		Method:  "GET",
+		Header: http.Header{
+			"Content-Type": []string{"application/json"},
+		},
+		Username:     adminUsername,
+		Password:     adminPassword,
+		ExpectStatus: http.StatusOK,
+		ExpectBody: params.UserSSHKeysResponse{
+			SSHKeys: []string{
+				"36ASDER56",
+				"22ERT56DG",
+			},
+		},
+	})
+	// Remove one ssh key.
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Handler:  s.srv,
+		URL:      apiURL("u/jbloggs/ssh-keys"),
+		Method:   "DELETE",
+		Username: adminUsername,
+		Password: adminPassword,
+		Header: http.Header{
+			"Content-Type": []string{"application/json"},
+		},
+		Body:         marshal(c, "22ERT56DG"),
+		ExpectStatus: http.StatusOK,
+	})
+	// Check we only get one.
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Handler:  s.srv,
+		URL:      apiURL("u/jbloggs/ssh-keys"),
+		Method:   "GET",
+		Username: adminUsername,
+		Password: adminPassword,
+		Header: http.Header{
+			"Content-Type": []string{"application/json"},
+		},
+		ExpectStatus: http.StatusOK,
+		ExpectBody: params.UserSSHKeysResponse{
+			SSHKeys: []string{
+				"36ASDER56",
+			},
+		},
+	})
+	// Delete an unknown ssh key just do nothing silently.
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Handler:  s.srv,
+		URL:      apiURL("u/jbloggs/ssh-keys"),
+		Method:   "DELETE",
+		Username: adminUsername,
+		Password: adminPassword,
+		Header: http.Header{
+			"Content-Type": []string{"application/json"},
+		},
+		Body:         marshal(c, "22ERT56DG"),
+		ExpectStatus: http.StatusOK,
+	})
+	// Check we only get one.
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Handler:  s.srv,
+		URL:      apiURL("u/jbloggs/ssh-keys"),
+		Method:   "GET",
+		Username: adminUsername,
+		Password: adminPassword,
+		Header: http.Header{
+			"Content-Type": []string{"application/json"},
+		},
+		ExpectStatus: http.StatusOK,
+		ExpectBody: params.UserSSHKeysResponse{
+			SSHKeys: []string{
+				"36ASDER56",
+			},
+		},
+	})
 }
 
 func (s *usersSuite) TestVerifyUserToken(c *gc.C) {
