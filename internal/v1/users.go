@@ -89,10 +89,8 @@ func (h *handler) upsertAgent(r *http.Request, u *params.SetUserRequest) error {
 		return errgo.Mask(err, errgo.Is(params.ErrForbidden))
 	}
 	doc := identityFromSetUserParams(u)
-	if err := h.store.UpsertIdentity(doc); err != nil {
-		return errgo.NoteMask(err, "cannot store identity", errgo.Is(params.ErrAlreadyExists))
-	}
-	return nil
+
+	return h.updateGroupsOrInsertIdentity(doc)
 }
 
 func (h *apiHandler) upsertUser(r *http.Request, u *params.SetUserRequest) error {
@@ -107,10 +105,27 @@ func (h *apiHandler) upsertUser(r *http.Request, u *params.SetUserRequest) error
 	if doc.ExternalID == "" {
 		return errgo.WithCausef(nil, params.ErrBadRequest, `external_id not specified`)
 	}
-	if err := h.store.UpsertIdentity(doc); err != nil {
-		return errgo.NoteMask(err, "cannot store identity", errgo.Is(params.ErrAlreadyExists))
+	return h.updateGroupsOrInsertIdentity(doc)
+}
+
+func (h *handler) updateGroupsOrInsertIdentity(doc *mongodoc.Identity) error {
+	groups, err := h.store.GetLaunchpadGroups(doc.ExternalID, doc.Email)
+	if err != nil {
+		logger.Warningf("failed to fetch list of groups from launchpad for %q: %s", doc.Email, err)
 	}
-	return nil
+	groups = append(doc.Groups, groups...)
+	err = h.store.SetGroups(doc.Username, groups)
+	if err == nil {
+		return nil
+	}
+	if errgo.Cause(err) == params.ErrNotFound {
+		err := h.store.InsertIdentity(doc)
+		if err != nil {
+			return errgo.NoteMask(err, "cannot store identity", errgo.Is(params.ErrAlreadyExists))
+		}
+		return nil
+	}
+	return errgo.Mask(err)
 }
 
 func identityFromSetUserParams(u *params.SetUserRequest) *mongodoc.Identity {
@@ -178,6 +193,58 @@ func (h *apiHandler) UserIDPGroups(p httprequest.Params, r *params.UserIDPGroups
 		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
 	return id.Groups, nil
+}
+
+// GetSSHKeys serves the /u/$username/sshkeys endpoint, and returns
+// the list of ssh keys associated with the user.
+func (h *apiHandler) GetSSHKeys(p httprequest.Params, r *params.SSHKeysRequest) (params.SSHKeysResponse, error) {
+	acl := []string{store.AdminGroup, store.SSHKeyGetterGroup, string(r.Username)}
+	if err := h.store.CheckACL(opGetUserSSHKey, p.Request, acl); err != nil {
+		return params.SSHKeysResponse{}, errgo.Mask(err, errgo.Any)
+	}
+	id, err := h.store.GetIdentity(r.Username)
+	if err != nil {
+		return params.SSHKeysResponse{}, errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	}
+	return params.SSHKeysResponse{
+		SSHKeys: id.SSHKeys,
+	}, nil
+}
+
+// SetSSHKeys serves the /u/$username/sshkeys put endpoint, and set ssh keys to
+// the list of ssh keys associated with the user. If the add parameter is set to
+// true then it will only add to the current list of ssh keys
+func (h *apiHandler) PutSSHKeys(p httprequest.Params, r *params.PutSSHKeysRequest) error {
+	acl := []string{store.AdminGroup, string(r.Username)}
+	if err := h.store.CheckACL(opSetUserSSHKey, p.Request, acl); err != nil {
+		return errgo.Mask(err, errgo.Any)
+	}
+	if r.Body.Add {
+		err := h.store.UpdateIdentity(r.Username, bson.D{{"$addToSet", bson.D{{"ssh_keys", bson.D{{"$each", r.Body.SSHKeys}}}}}})
+		if err != nil {
+			return errgo.Mask(err, errgo.Is(params.ErrNotFound))
+		}
+		return nil
+	}
+	err := h.store.UpdateIdentity(r.Username, bson.D{{"$set", bson.D{{"ssh_keys", r.Body.SSHKeys}}}})
+	if err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	}
+	return nil
+}
+
+// DeleteSSHKeys serves the /u/$username/sshkeys delete endpoint, and remove
+// ssh keys from the list of ssh keys associated with the user.
+func (h *apiHandler) DeleteSSHKeys(p httprequest.Params, r *params.DeleteSSHKeysRequest) error {
+	acl := []string{store.AdminGroup, string(r.Username)}
+	if err := h.store.CheckACL(opSetUserSSHKey, p.Request, acl); err != nil {
+		return errgo.Mask(err, errgo.Any)
+	}
+	err := h.store.UpdateIdentity(r.Username, bson.D{{"$pull", bson.D{{"ssh_keys", bson.D{{"$in", r.Body.SSHKeys}}}}}})
+	if err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	}
+	return nil
 }
 
 // UserToken serves a token, in the form of a macaroon, identifying
@@ -321,6 +388,7 @@ func userFromIdentity(id *mongodoc.Identity) (*params.User, error) {
 		IDPGroups:  id.Groups,
 		Owner:      params.Username(id.Owner),
 		PublicKeys: publicKeys,
+		SSHKeys:    id.SSHKeys,
 	}, nil
 }
 

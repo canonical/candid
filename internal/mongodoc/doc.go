@@ -36,6 +36,9 @@ type Identity struct {
 	// Groups holds a list of group names to which the user belongs.
 	Groups []string
 
+	// SSHKeys holds a list of ssh keys owned by the user.
+	SSHKeys []string `bson:"ssh_keys,omitempty"`
+
 	// PublicKeys contains a list of public keys associated with this account.
 	PublicKeys []PublicKey `bson:"public_keys,omitempty"`
 
