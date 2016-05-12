@@ -799,7 +799,7 @@ func (s *usersSuite) TestSSHKeys(c *gc.C) {
 			"Content-Type": []string{"application/json"},
 		},
 		ExpectStatus: http.StatusOK,
-		ExpectBody:   params.UserSSHKeysResponse{},
+		ExpectBody:   params.SSHKeysResponse{},
 	})
 	// Add ssh keys to the user.
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
@@ -809,21 +809,12 @@ func (s *usersSuite) TestSSHKeys(c *gc.C) {
 		Header: http.Header{
 			"Content-Type": []string{"application/json"},
 		},
-		Username:     adminUsername,
-		Password:     adminPassword,
-		Body:         marshal(c, "36ASDER56"),
-		ExpectStatus: http.StatusOK,
-	})
-	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
-		Handler:  s.srv,
-		URL:      apiURL("u/jbloggs/ssh-keys"),
-		Method:   "PUT",
 		Username: adminUsername,
 		Password: adminPassword,
-		Header: http.Header{
-			"Content-Type": []string{"application/json"},
-		},
-		Body:         marshal(c, "22ERT56DG"),
+		Body: marshal(c, params.PutSSHKeysBody{
+			SSHKeys: []string{"36ASDER56", "22ERT56DG", "56ASDFASDF32"},
+			Add:     false,
+		}),
 		ExpectStatus: http.StatusOK,
 	})
 	// Check it is present.
@@ -837,14 +828,15 @@ func (s *usersSuite) TestSSHKeys(c *gc.C) {
 		Username:     adminUsername,
 		Password:     adminPassword,
 		ExpectStatus: http.StatusOK,
-		ExpectBody: params.UserSSHKeysResponse{
+		ExpectBody: params.SSHKeysResponse{
 			SSHKeys: []string{
 				"36ASDER56",
 				"22ERT56DG",
+				"56ASDFASDF32",
 			},
 		},
 	})
-	// Remove one ssh key.
+	// Remove some ssh keys.
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Handler:  s.srv,
 		URL:      apiURL("u/jbloggs/ssh-keys"),
@@ -854,7 +846,9 @@ func (s *usersSuite) TestSSHKeys(c *gc.C) {
 		Header: http.Header{
 			"Content-Type": []string{"application/json"},
 		},
-		Body:         marshal(c, "22ERT56DG"),
+		Body: marshal(c, params.DeleteSSHKeysBody{
+			SSHKeys: []string{"22ERT56DG", "56ASDFASDF32"},
+		}),
 		ExpectStatus: http.StatusOK,
 	})
 	// Check we only get one.
@@ -868,7 +862,7 @@ func (s *usersSuite) TestSSHKeys(c *gc.C) {
 			"Content-Type": []string{"application/json"},
 		},
 		ExpectStatus: http.StatusOK,
-		ExpectBody: params.UserSSHKeysResponse{
+		ExpectBody: params.SSHKeysResponse{
 			SSHKeys: []string{
 				"36ASDER56",
 			},
@@ -884,7 +878,9 @@ func (s *usersSuite) TestSSHKeys(c *gc.C) {
 		Header: http.Header{
 			"Content-Type": []string{"application/json"},
 		},
-		Body:         marshal(c, "22ERT56DG"),
+		Body: marshal(c, params.DeleteSSHKeysBody{
+			[]string{"22ERT56DG"},
+		}),
 		ExpectStatus: http.StatusOK,
 	})
 	// Check we only get one.
@@ -898,9 +894,43 @@ func (s *usersSuite) TestSSHKeys(c *gc.C) {
 			"Content-Type": []string{"application/json"},
 		},
 		ExpectStatus: http.StatusOK,
-		ExpectBody: params.UserSSHKeysResponse{
+		ExpectBody: params.SSHKeysResponse{
 			SSHKeys: []string{
 				"36ASDER56",
+			},
+		},
+	})
+	// Append one ssh key.
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Handler: s.srv,
+		URL:     apiURL("u/jbloggs/ssh-keys"),
+		Method:  "PUT",
+		Header: http.Header{
+			"Content-Type": []string{"application/json"},
+		},
+		Username: adminUsername,
+		Password: adminPassword,
+		Body: marshal(c, params.PutSSHKeysBody{
+			SSHKeys: []string{"90SDFGS45"},
+			Add:     true,
+		}),
+		ExpectStatus: http.StatusOK,
+	})
+	// Check we get two.
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Handler:  s.srv,
+		URL:      apiURL("u/jbloggs/ssh-keys"),
+		Method:   "GET",
+		Username: adminUsername,
+		Password: adminPassword,
+		Header: http.Header{
+			"Content-Type": []string{"application/json"},
+		},
+		ExpectStatus: http.StatusOK,
+		ExpectBody: params.SSHKeysResponse{
+			SSHKeys: []string{
+				"36ASDER56",
+				"90SDFGS45",
 			},
 		},
 	})

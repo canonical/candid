@@ -312,22 +312,28 @@ func (s *Store) InsertIdentity(doc *mongodoc.Identity) error {
 	return nil
 }
 
-// UpdateGroups updates the groups of a user.
+// SetGroups sets the groups of a user.
 // If the user is not found then an error is returned with the cause params.ErrNotFound.
-func (s *Store) UpdateGroups(doc *mongodoc.Identity) error {
-	if strings.HasPrefix(doc.ExternalID, "https://login.ubuntu.com/+id/") {
-		lpgroups, err := s.getLaunchpadGroups(doc.Email)
-		if err == nil {
-			doc.Groups = append(doc.Groups, lpgroups...)
-		} else {
-			logger.Warningf("failed to fetch list of groups from launchpad for %q: %s", doc.Email, err)
-		}
-	}
-	err := s.UpdateIdentity(params.Username(doc.Username), bson.D{{"$set", bson.D{{"groups", uniqueStrings(doc.Groups)}}}})
+func (s *Store) SetGroups(username string, groups []string) error {
+	err := s.UpdateIdentity(params.Username(username), bson.D{{"$set", bson.D{{"groups", uniqueStrings(groups)}}}})
 	if err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
 	return nil
+}
+
+// GetLaunchpadGroups gets the groups from Launchpad if the user is a launchpad user
+// otherwise an empty array.
+func (s *Store) GetLaunchGroups(doc *mongodoc.Identity) ([]string, error) {
+	if strings.HasPrefix(doc.ExternalID, "https://login.ubuntu.com/+id/") {
+		lpgroups, err := s.getLaunchpadGroups(doc.Email)
+		if err == nil {
+			return lpgroups, nil
+		} else {
+			return []string{}, errgo.Mask(err)
+		}
+	}
+	return []string{}, nil
 }
 
 // getLaunchpadGroups tries to fetch the list of teams the user

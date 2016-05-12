@@ -90,15 +90,23 @@ func (h *handler) upsertAgent(r *http.Request, u *params.SetUserRequest) error {
 	}
 	doc := identityFromSetUserParams(u)
 
-	err = h.store.UpdateGroups(doc)
+	groups, err := h.store.GetLaunchGroups(doc)
+	if err != nil {
+		logger.Warningf("failed to fetch list of groups from launchpad for %q: %s", doc.Email, err)
+	}
+	groups = append(doc.Groups, groups...)
+	err = h.store.SetGroups(doc.Username, groups)
+	if err == nil {
+		return nil
+	}
 	if errgo.Cause(err) == params.ErrNotFound {
 		err := h.store.InsertIdentity(doc)
 		if err != nil {
 			return errgo.NoteMask(err, "cannot store identity", errgo.Is(params.ErrAlreadyExists))
 		}
+		return nil
 	}
-
-	return nil
+	return errgo.Mask(err)
 }
 
 func (h *apiHandler) upsertUser(r *http.Request, u *params.SetUserRequest) error {
@@ -113,14 +121,23 @@ func (h *apiHandler) upsertUser(r *http.Request, u *params.SetUserRequest) error
 	if doc.ExternalID == "" {
 		return errgo.WithCausef(nil, params.ErrBadRequest, `external_id not specified`)
 	}
-	err := h.store.UpdateGroups(doc)
+	groups, err := h.store.GetLaunchGroups(doc)
+	if err != nil {
+		logger.Warningf("failed to fetch list of groups from launchpad for %q: %s", doc.Email, err)
+	}
+	groups = append(doc.Groups, groups...)
+	err = h.store.SetGroups(doc.Username, groups)
+	if err == nil {
+		return nil
+	}
 	if errgo.Cause(err) == params.ErrNotFound {
 		err := h.store.InsertIdentity(doc)
 		if err != nil {
 			return errgo.NoteMask(err, "cannot store identity", errgo.Is(params.ErrAlreadyExists))
 		}
+		return nil
 	}
-	return nil
+	return errgo.Mask(err)
 }
 
 func identityFromSetUserParams(u *params.SetUserRequest) *mongodoc.Identity {
@@ -190,44 +207,52 @@ func (h *apiHandler) UserIDPGroups(p httprequest.Params, r *params.UserIDPGroups
 	return id.Groups, nil
 }
 
-// UserSSHKeys serves the /u/$username/sshkeys endpoint, and returns
+// GetSSHKeys serves the /u/$username/sshkeys endpoint, and returns
 // the list of ssh keys associated with the user.
-func (h *apiHandler) UserSSHKeys(p httprequest.Params, r *params.UserSSHKeysRequest) (params.UserSSHKeysResponse, error) {
+func (h *apiHandler) GetSSHKeys(p httprequest.Params, r *params.SSHKeysRequest) (params.SSHKeysResponse, error) {
 	acl := []string{store.AdminGroup, store.SSHKeyGetterGroup, string(r.Username)}
 	if err := h.store.CheckACL(opGetUserSSHKey, p.Request, acl); err != nil {
-		return params.UserSSHKeysResponse{}, errgo.Mask(err, errgo.Any)
+		return params.SSHKeysResponse{}, errgo.Mask(err, errgo.Any)
 	}
 	id, err := h.store.GetIdentity(r.Username)
 	if err != nil {
-		return params.UserSSHKeysResponse{}, errgo.Mask(err, errgo.Is(params.ErrNotFound))
+		return params.SSHKeysResponse{}, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
-	return params.UserSSHKeysResponse{
+	return params.SSHKeysResponse{
 		SSHKeys: id.SSHKeys,
 	}, nil
 }
 
-// AddSSHKey serves the /u/$username/sshkeys put endpoint, and add a ssh key to
-// the list of ssh keys associated with the user.
-func (h *apiHandler) AddSSHKey(p httprequest.Params, r *params.AddSSHKeyRequest) error {
+// SetSSHKeys serves the /u/$username/sshkeys put endpoint, and set ssh keys to
+// the list of ssh keys associated with the user. If the add parameter is set to
+// true then it will only add to the current list of ssh keys
+func (h *apiHandler) PutSSHKeys(p httprequest.Params, r *params.PutSSHKeysRequest) error {
 	acl := []string{store.AdminGroup, string(r.Username)}
 	if err := h.store.CheckACL(opSetUserSSHKey, p.Request, acl); err != nil {
 		return errgo.Mask(err, errgo.Any)
 	}
-	err := h.store.UpdateIdentity(r.Username, bson.D{{"$addToSet", bson.M{"ssh_keys": r.SSHKey}}})
+	if r.Body.Add {
+		err := h.store.UpdateIdentity(r.Username, bson.D{{"$addToSet", bson.D{{"ssh_keys", bson.D{{"$each", r.Body.SSHKeys}}}}}})
+		if err != nil {
+			return errgo.Mask(err, errgo.Is(params.ErrNotFound))
+		}
+		return nil
+	}
+	err := h.store.UpdateIdentity(r.Username, bson.D{{"$set", bson.D{{"ssh_keys", r.Body.SSHKeys}}}})
 	if err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
 	return nil
 }
 
-// RemoveSSHKey serves the /u/$username/sshkeys delete endpoint, and remove an
-// ssh key the list of ssh keys associated with the user.
-func (h *apiHandler) RemoveSSHKey(p httprequest.Params, r *params.RemoveSSHKeyRequest) error {
+// DeleteSSHKeys serves the /u/$username/sshkeys delete endpoint, and remove
+// ssh keys from the list of ssh keys associated with the user.
+func (h *apiHandler) DeleteSSHKeys(p httprequest.Params, r *params.DeleteSSHKeysRequest) error {
 	acl := []string{store.AdminGroup, string(r.Username)}
 	if err := h.store.CheckACL(opSetUserSSHKey, p.Request, acl); err != nil {
 		return errgo.Mask(err, errgo.Any)
 	}
-	err := h.store.UpdateIdentity(r.Username, bson.D{{"$pull", bson.M{"ssh_keys": r.SSHKey}}})
+	err := h.store.UpdateIdentity(r.Username, bson.D{{"$pull", bson.D{{"ssh_keys", bson.D{{"$in", r.Body.SSHKeys}}}}}})
 	if err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}

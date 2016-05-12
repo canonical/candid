@@ -148,12 +148,21 @@ func (c *idpHandler) FindUserByName(name params.Username) (*params.User, error) 
 // UpdateUser implements idp.Context.UpdateUser.
 func (c *idpHandler) UpdateUser(u *params.User) error {
 	id := identityFromUser(u)
-	err := c.store.UpdateGroups(id)
-	if errgo.Cause(err) == params.ErrNotFound {
-		err := c.store.InsertIdentity(id)
-		if err != nil {
-			return errgo.Mask(err, errgo.Is(params.ErrAlreadyExists))
+	groups, err := c.store.GetLaunchGroups(id)
+	if err != nil {
+		logger.Warningf("failed to fetch list of groups from launchpad for %q: %s", id.Email, err)
+	}
+	groups = append(id.Groups, groups...)
+	err = c.store.SetGroups(id.Username, groups)
+	if err != nil {
+		if errgo.Cause(err) == params.ErrNotFound {
+			err := c.store.InsertIdentity(id)
+			if err != nil {
+				return errgo.NoteMask(err, "cannot store identity", errgo.Is(params.ErrAlreadyExists))
+			}
+			return nil
 		}
+		return errgo.Mask(err)
 	}
 	return nil
 }

@@ -340,7 +340,7 @@ func (s *storeSuite) TestUpdateGroups(c *gc.C) {
 
 	for i, test := range updateGroupsIdentityTests {
 		c.Logf("%d: %s", i, test.about)
-		err := store.UpdateGroups(test.identity)
+		err := store.SetGroups(test.identity.Username, test.identity.Groups)
 		if test.expectErr != "" {
 			c.Assert(err, gc.ErrorMatches, test.expectErr)
 			continue
@@ -353,7 +353,7 @@ func (s *storeSuite) TestUpdateGroups(c *gc.C) {
 	}
 }
 
-func (s *storeSuite) TestUpdateGroupsDedupeGroups(c *gc.C) {
+func (s *storeSuite) TestSetGroupsDedupeGroups(c *gc.C) {
 	store := s.pool.GetNoLimit()
 	defer s.pool.Put(store)
 
@@ -369,8 +369,7 @@ func (s *storeSuite) TestUpdateGroupsDedupeGroups(c *gc.C) {
 	}
 	err := store.InsertIdentity(id)
 	c.Assert(err, gc.IsNil)
-	id.Groups = []string{"test", "test2", "test2"}
-	err = store.UpdateGroups(id)
+	err = store.SetGroups(id.Username, []string{"test", "test2", "test2"})
 	c.Assert(err, gc.IsNil)
 
 	expect := &mongodoc.Identity{
@@ -517,17 +516,7 @@ func (s *storeSuite) TestUpdateGroupsDoesntEraseSSHKeys(c *gc.C) {
 	id, err := store.GetIdentity(params.Username("test"))
 	c.Assert(id.SSHKeys, gc.DeepEquals, []string{"345ADASD34", "6745SDADSA"})
 
-	err = store.UpdateGroups(&mongodoc.Identity{
-		Username:   "test",
-		ExternalID: "http://example.com/test",
-		Email:      "test@example.com",
-		FullName:   "Test User",
-		Groups: []string{
-			"test",
-			"test2",
-		},
-		SSHKeys: []string{"345ADASD34", "6745SDADSA"},
-	})
+	err = store.SetGroups("test", []string{"test", "test2"})
 	c.Assert(err, gc.IsNil)
 
 	id, err = store.GetIdentity(params.Username("test"))
@@ -574,15 +563,15 @@ func (s *storeSuite) TestRetrieveLaunchpadGroups(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 
 	// Update group from an identity to be fetched from launchpad.
-	err = store.UpdateGroups(&mongodoc.Identity{
+	groups, err := store.GetLaunchGroups(&mongodoc.Identity{
 		Username:   "test",
 		ExternalID: "https://login.ubuntu.com/+id/test",
 		Email:      "test@example.com",
 		FullName:   "Test User",
-		Groups: []string{
-			"test",
-		},
 	})
+	c.Assert(err, gc.IsNil)
+	groups = append([]string{"test"}, groups...)
+	err = store.SetGroups("test", groups)
 	c.Assert(err, gc.IsNil)
 
 	// Get the identity from the store
