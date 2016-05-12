@@ -90,23 +90,7 @@ func (h *handler) upsertAgent(r *http.Request, u *params.SetUserRequest) error {
 	}
 	doc := identityFromSetUserParams(u)
 
-	groups, err := h.store.GetLaunchGroups(doc)
-	if err != nil {
-		logger.Warningf("failed to fetch list of groups from launchpad for %q: %s", doc.Email, err)
-	}
-	groups = append(doc.Groups, groups...)
-	err = h.store.SetGroups(doc.Username, groups)
-	if err == nil {
-		return nil
-	}
-	if errgo.Cause(err) == params.ErrNotFound {
-		err := h.store.InsertIdentity(doc)
-		if err != nil {
-			return errgo.NoteMask(err, "cannot store identity", errgo.Is(params.ErrAlreadyExists))
-		}
-		return nil
-	}
-	return errgo.Mask(err)
+	return h.updateGroupsOrInsertIdentity(doc)
 }
 
 func (h *apiHandler) upsertUser(r *http.Request, u *params.SetUserRequest) error {
@@ -121,7 +105,11 @@ func (h *apiHandler) upsertUser(r *http.Request, u *params.SetUserRequest) error
 	if doc.ExternalID == "" {
 		return errgo.WithCausef(nil, params.ErrBadRequest, `external_id not specified`)
 	}
-	groups, err := h.store.GetLaunchGroups(doc)
+	return h.updateGroupsOrInsertIdentity(doc)
+}
+
+func (h *handler) updateGroupsOrInsertIdentity(doc *mongodoc.Identity) error {
+	groups, err := h.store.GetLaunchpadGroups(doc.ExternalID, doc.Email)
 	if err != nil {
 		logger.Warningf("failed to fetch list of groups from launchpad for %q: %s", doc.Email, err)
 	}

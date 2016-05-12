@@ -324,9 +324,9 @@ func (s *Store) SetGroups(username string, groups []string) error {
 
 // GetLaunchpadGroups gets the groups from Launchpad if the user is a launchpad user
 // otherwise an empty array.
-func (s *Store) GetLaunchGroups(doc *mongodoc.Identity) ([]string, error) {
-	if strings.HasPrefix(doc.ExternalID, "https://login.ubuntu.com/+id/") {
-		lpgroups, err := s.getLaunchpadGroups(doc.Email)
+func (s *Store) GetLaunchpadGroups(externalId, email string) ([]string, error) {
+	if strings.HasPrefix(externalId, "https://login.ubuntu.com/+id/") {
+		lpgroups, err := s.getLaunchpadGroups(email)
 		if err == nil {
 			return lpgroups, nil
 		} else {

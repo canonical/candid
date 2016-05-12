@@ -148,7 +148,7 @@ func (c *idpHandler) FindUserByName(name params.Username) (*params.User, error) 
 // UpdateUser implements idp.Context.UpdateUser.
 func (c *idpHandler) UpdateUser(u *params.User) error {
 	id := identityFromUser(u)
-	groups, err := c.store.GetLaunchGroups(id)
+	groups, err := c.store.GetLaunchpadGroups(id.ExternalID, id.Email)
 	if err != nil {
 		logger.Warningf("failed to fetch list of groups from launchpad for %q: %s", id.Email, err)
 	}

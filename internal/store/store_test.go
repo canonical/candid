@@ -563,12 +563,7 @@ func (s *storeSuite) TestRetrieveLaunchpadGroups(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 
 	// Update group from an identity to be fetched from launchpad.
-	groups, err := store.GetLaunchGroups(&mongodoc.Identity{
-		Username:   "test",
-		ExternalID: "https://login.ubuntu.com/+id/test",
-		Email:      "test@example.com",
-		FullName:   "Test User",
-	})
+	groups, err := store.GetLaunchpadGroups("https://login.ubuntu.com/+id/test", "test@example.com")
 	c.Assert(err, gc.IsNil)
 	groups = append([]string{"test"}, groups...)
 	err = store.SetGroups("test", groups)
