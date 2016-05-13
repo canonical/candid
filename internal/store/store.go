@@ -322,6 +322,16 @@ func (s *Store) SetGroups(username string, groups []string) error {
 	return nil
 }
 
+// SetPublicKeys sets the public keys of a user.
+// If the user is not found then an error is returned with the cause params.ErrNotFound.
+func (s *Store) SetPublicKeys(username string, publickeys []mongodoc.PublicKey) error {
+	err := s.UpdateIdentity(params.Username(username), bson.D{{"$set", bson.D{{"public_keys", publickeys}}}})
+	if err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	}
+	return nil
+}
+
 // GetLaunchpadGroups gets the groups from Launchpad if the user is a launchpad user
 // otherwise an empty array.
 func (s *Store) GetLaunchpadGroups(externalId, email string) ([]string, error) {

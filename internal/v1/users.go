@@ -92,7 +92,11 @@ func (h *handler) upsertAgent(r *http.Request, u *params.SetUserRequest) error {
 	}
 	doc := identityFromSetUserParams(u)
 
-	return h.updateGroupsOrInsertIdentity(doc)
+	err = h.updateGroupsOrInsertIdentity(doc)
+	if err != nil {
+		return err
+	}
+	return h.store.SetPublicKeys(doc.Username, doc.PublicKeys)
 }
 
 func (h *apiHandler) upsertUser(r *http.Request, u *params.SetUserRequest) error {
