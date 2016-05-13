@@ -602,6 +602,77 @@ func (s *usersSuite) TestUpdateInsertNewUserSetGroupsFromLaunchpad(c *gc.C) {
 	})
 }
 
+func (s *usersSuite) TestUpdateAgentSetPublicKeys(c *gc.C) {
+	key, err := bakery.GenerateKey()
+	c.Assert(err, gc.IsNil)
+	s.createUser(c, &params.User{
+		Username: "agent@" + store.AdminGroup,
+		Owner:    store.AdminGroup,
+		PublicKeys: []*bakery.PublicKey{
+			&key.Public,
+		},
+	})
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Handler: s.srv,
+		URL:     apiURL("u/agent@" + store.AdminGroup),
+		Method:  "GET",
+		Header: http.Header{
+			"Content-Type": []string{"application/json"},
+		},
+		Username:     adminUsername,
+		Password:     adminPassword,
+		ExpectStatus: http.StatusOK,
+		ExpectBody: params.User{
+			Username: "agent@" + store.AdminGroup,
+			Owner:    store.AdminGroup,
+			PublicKeys: []*bakery.PublicKey{
+				&key.Public,
+			},
+			IDPGroups: []string{},
+		},
+	})
+	key, err = bakery.GenerateKey()
+	c.Assert(err, gc.IsNil)
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Handler: s.srv,
+		URL:     apiURL("u/agent@" + store.AdminGroup),
+		Method:  "PUT",
+		Header: http.Header{
+			"Content-Type": []string{"application/json"},
+		},
+		Body: marshal(c, params.User{
+			Username: "agent@" + store.AdminGroup,
+			Owner:    store.AdminGroup,
+			PublicKeys: []*bakery.PublicKey{
+				&key.Public,
+			},
+			IDPGroups: []string{},
+		}),
+		Username:     adminUsername,
+		Password:     adminPassword,
+		ExpectStatus: http.StatusOK,
+	})
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Handler: s.srv,
+		URL:     apiURL("u/agent@" + store.AdminGroup),
+		Method:  "GET",
+		Header: http.Header{
+			"Content-Type": []string{"application/json"},
+		},
+		Username:     adminUsername,
+		Password:     adminPassword,
+		ExpectStatus: http.StatusOK,
+		ExpectBody: params.User{
+			Username: "agent@" + store.AdminGroup,
+			Owner:    store.AdminGroup,
+			PublicKeys: []*bakery.PublicKey{
+				&key.Public,
+			},
+			IDPGroups: []string{},
+		},
+	})
+}
+
 func (s *usersSuite) TestCreateUserWritesToDatabase(c *gc.C) {
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Handler: s.srv,
