@@ -113,8 +113,8 @@ func (h *handler) updateGroupsOrInsertIdentity(doc *mongodoc.Identity) error {
 	if err != nil {
 		logger.Warningf("failed to fetch list of groups from launchpad for %q: %s", doc.Email, err)
 	}
-	groups = append(doc.Groups, groups...)
-	err = h.store.SetGroups(doc.Username, groups)
+	doc.Groups = append(doc.Groups, groups...)
+	err = h.store.SetGroups(doc.Username, doc.Groups)
 	if err == nil {
 		return nil
 	}
