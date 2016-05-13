@@ -63,18 +63,40 @@ func (h *apiHandler) User(p httprequest.Params, r *params.UserRequest) (*params.
 }
 
 func (h *apiHandler) SetUser(p httprequest.Params, u *params.SetUserRequest) error {
-	if u.User.Owner == "" {
-		// If there is no owner specified then it is an interactive user being created
-		// by storefront.
-		return h.upsertUser(p.Request, u)
+	isUser := u.Owner == ""
+	if isUser {
+		if err := h.checkSetUserParams(p.Request, u); err != nil {
+			return errgo.Mask(err, errgo.Any)
+		}
+		groups, err := storeGetLaunchpadGroups(h.store, u.ExternalID, u.Email)
+		if err != nil {
+			logger.Warningf("failed to fetch list of groups from launchpad for %q: %s", u.Email, err)
+		}
+		u.IDPGroups = append(u.IDPGroups, groups...)
+	} else {
+		if err := h.checkSetAgentParams(p.Request, u); err != nil {
+			return errgo.Mask(err, errgo.Any)
+		}
 	}
-	return h.upsertAgent(p.Request, u)
+	err := h.store.SetGroups(string(u.Username), u.IDPGroups)
+	if err == nil {
+		keys := make([]mongodoc.PublicKey, len(u.PublicKeys))
+		for i, pk := range u.PublicKeys {
+			keys[i].Key = pk.Key[:]
+		}
+		return h.store.SetPublicKeys(string(u.Username), keys)
+	}
+	if errgo.Cause(err) != params.ErrNotFound {
+		return errgo.Mask(err)
+	}
+	doc := identityFromSetUserParams(u)
+	if err := h.store.InsertIdentity(doc); err != nil {
+		return errgo.NoteMask(err, "cannot store identity", errgo.Is(params.ErrAlreadyExists))
+	}
+	return nil
 }
 
-func (h *handler) upsertAgent(r *http.Request, u *params.SetUserRequest) error {
-	if u.User.Owner == "" {
-		return errgo.WithCausef(nil, params.ErrBadRequest, "owner not specified")
-	}
+func (h *apiHandler) checkSetAgentParams(r *http.Request, u *params.SetUserRequest) error {
 	err := h.store.CheckACL(opCreateAgent, r, []string{
 		store.AdminGroup,
 		"+create-agent@" + string(u.User.Owner),
@@ -90,45 +112,20 @@ func (h *handler) upsertAgent(r *http.Request, u *params.SetUserRequest) error {
 	if err := h.checkRequestHasAllGroups(r, u.User.IDPGroups); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrForbidden))
 	}
-	doc := identityFromSetUserParams(u)
-
-	return h.updateGroupsOrInsertIdentity(doc)
+	return nil
 }
 
-func (h *apiHandler) upsertUser(r *http.Request, u *params.SetUserRequest) error {
+func (h *apiHandler) checkSetUserParams(r *http.Request, u *params.SetUserRequest) error {
 	if err := h.store.CheckACL(opCreateUser, r, []string{store.AdminGroup}); err != nil {
 		return errgo.Mask(err, errgo.Any)
 	}
-
 	if blacklistUsernames[u.Username] {
 		return errgo.WithCausef(nil, params.ErrForbidden, "username %q is reserved", u.Username)
 	}
-	doc := identityFromSetUserParams(u)
-	if doc.ExternalID == "" {
+	if u.ExternalID == "" {
 		return errgo.WithCausef(nil, params.ErrBadRequest, `external_id not specified`)
 	}
-	return h.updateGroupsOrInsertIdentity(doc)
-}
-
-func (h *handler) updateGroupsOrInsertIdentity(doc *mongodoc.Identity) error {
-
-	groups, err := storeGetLaunchpadGroups(h.store, doc.ExternalID, doc.Email)
-	if err != nil {
-		logger.Warningf("failed to fetch list of groups from launchpad for %q: %s", doc.Email, err)
-	}
-	doc.Groups = append(doc.Groups, groups...)
-	err = h.store.SetGroups(doc.Username, doc.Groups)
-	if err == nil {
-		return nil
-	}
-	if errgo.Cause(err) == params.ErrNotFound {
-		err := h.store.InsertIdentity(doc)
-		if err != nil {
-			return errgo.NoteMask(err, "cannot store identity", errgo.Is(params.ErrAlreadyExists))
-		}
-		return nil
-	}
-	return errgo.Mask(err)
+	return nil
 }
 
 func identityFromSetUserParams(u *params.SetUserRequest) *mongodoc.Identity {

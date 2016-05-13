@@ -353,6 +353,82 @@ func (s *storeSuite) TestUpdateGroups(c *gc.C) {
 	}
 }
 
+var updatePublicKeysIdentityTests = []struct {
+	about     string
+	identity  *mongodoc.Identity
+	expectErr string
+}{{
+	about: "update existing agent",
+	identity: &mongodoc.Identity{
+		Username:   "existing-agent",
+		ExternalID: "",
+		Email:      "existing@example.com",
+		FullName:   "Existing User",
+		Groups: []string{
+			"test",
+			"test2",
+		},
+		Owner: "owner",
+		PublicKeys: []mongodoc.PublicKey{
+			{Key: []byte("0000000000000000000000000000000")},
+			{Key: []byte("1111111111111111111111111111111")},
+		},
+	},
+}, {
+	about: "update a non existing agent",
+	identity: &mongodoc.Identity{
+		Username:   "non-existing-agent",
+		ExternalID: "",
+		Email:      "existing@example.com",
+		FullName:   "Existing User",
+		Groups: []string{
+			"test",
+			"test2",
+		},
+		Owner: "owner",
+		PublicKeys: []mongodoc.PublicKey{
+			{Key: []byte("0000000000000000000000000000000")},
+		},
+	},
+	expectErr: "user \"non-existing-agent\" not found: not found",
+}}
+
+func (s *storeSuite) TestUpdatePublicKeys(c *gc.C) {
+	store := s.pool.GetNoLimit()
+	defer s.pool.Put(store)
+
+	// Add existing agent user
+	err := store.InsertIdentity(&mongodoc.Identity{
+		Username:   "existing-agent",
+		ExternalID: "",
+		Email:      "existing@example.com",
+		FullName:   "Existing User",
+		Groups: []string{
+			"test",
+			"test2",
+		},
+		Owner: "owner",
+		PublicKeys: []mongodoc.PublicKey{
+			{Key: []byte("0000000000000000000000000000000")},
+		},
+	})
+	c.Assert(err, gc.IsNil)
+
+	for i, test := range updatePublicKeysIdentityTests {
+		c.Logf("%d: %s", i, test.about)
+		err := store.SetPublicKeys(test.identity.Username, test.identity.PublicKeys)
+		if test.expectErr != "" {
+			c.Assert(err, gc.ErrorMatches, test.expectErr)
+			continue
+		}
+		c.Assert(err, gc.IsNil)
+		doc, err := store.GetIdentity(params.Username(test.identity.Username))
+		c.Assert(err, gc.IsNil)
+		doc.UUID = ""
+		c.Assert(doc, jc.DeepEquals, test.identity)
+	}
+}
+
 func (s *storeSuite) TestSetGroupsDedupeGroups(c *gc.C) {
 	store := s.pool.GetNoLimit()
 	defer s.pool.Put(store)
