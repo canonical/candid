@@ -28,6 +28,8 @@ var blacklistUsernames = map[params.Username]bool{
 	store.AdminGroup: true,
 }
 
+var storeGetLaunchpadGroups = (*store.Store).GetLaunchpadGroups
+
 // QueryUsers serves the /u endpoint. See http://tinyurl.com/lu3mmr9 for
 // details.
 func (h *apiHandler) QueryUsers(p httprequest.Params, r *params.QueryUsersRequest) ([]string, error) {
@@ -109,7 +111,8 @@ func (h *apiHandler) upsertUser(r *http.Request, u *params.SetUserRequest) error
 }
 
 func (h *handler) updateGroupsOrInsertIdentity(doc *mongodoc.Identity) error {
-	groups, err := h.store.GetLaunchpadGroups(doc.ExternalID, doc.Email)
+
+	groups, err := storeGetLaunchpadGroups(h.store, doc.ExternalID, doc.Email)
 	if err != nil {
 		logger.Warningf("failed to fetch list of groups from launchpad for %q: %s", doc.Email, err)
 	}

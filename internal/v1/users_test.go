@@ -23,6 +23,7 @@ import (
 
 	"github.com/CanonicalLtd/blues-identity/internal/mongodoc"
 	"github.com/CanonicalLtd/blues-identity/internal/store"
+	"github.com/CanonicalLtd/blues-identity/internal/v1"
 )
 
 type usersSuite struct {
@@ -544,6 +545,58 @@ func (s *usersSuite) TestUpdateGroupsForUser(c *gc.C) {
 			IDPGroups: []string{
 				"test",
 				"test2",
+			},
+		},
+	})
+}
+
+func (s *usersSuite) TestUpdateInsertNewUserSetGroupsFromLaunchpad(c *gc.C) {
+
+	s.PatchValue(v1.StoreGetLaunchpadGroups, func(s *store.Store, externalId, email string) ([]string, error) {
+		return []string{"test3"}, nil
+	})
+
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Handler: s.srv,
+		URL:     apiURL("u/jbloggs2"),
+		Method:  "PUT",
+		Header: http.Header{
+			"Content-Type": []string{"application/json"},
+		},
+		Body: marshal(c, params.User{
+			Username:   "jbloggs2",
+			ExternalID: "https://login.ubuntu.com/+id/test",
+			Email:      "jbloggs2@example.com",
+			FullName:   "Joe Bloggs II",
+			IDPGroups: []string{
+				"test",
+				"test2",
+			},
+		}),
+		Username:     adminUsername,
+		Password:     adminPassword,
+		ExpectStatus: http.StatusOK,
+	})
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Handler: s.srv,
+		URL:     apiURL("u/jbloggs2"),
+		Method:  "GET",
+		Header: http.Header{
+			"Content-Type": []string{"application/json"},
+		},
+		Username:     adminUsername,
+		Password:     adminPassword,
+		ExpectStatus: http.StatusOK,
+		ExpectBody: params.User{
+			Username:   "jbloggs2",
+			ExternalID: "https://login.ubuntu.com/+id/test",
+			Email:      "jbloggs2@example.com",
+			FullName:   "Joe Bloggs II",
+			GravatarID: "b1337cf8d58e2e2be9b6a5356cfc268b",
+			IDPGroups: []string{
+				"test",
+				"test2",
+				"test3",
 			},
 		},
 	})
