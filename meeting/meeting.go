@@ -14,6 +14,7 @@ import (
 
 	"github.com/juju/httprequest"
 	"github.com/juju/loggo"
+	"github.com/juju/utils/clock"
 	"github.com/julienschmidt/httprouter"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/tomb.v2"
@@ -41,6 +42,10 @@ var (
 	// This caters for the case where a given server has restarted
 	// without removing its existing entries.
 	reallyOldExpiryDuration = 7 * 24 * time.Hour
+
+	// Clock holds the clock implementation used by the meeting package.
+	// This is exported so it can be changed for testing purposes.
+	Clock clock.Clock = clock.WallClock
 )
 
 // Store defines the backing store required by the
@@ -58,7 +63,7 @@ type Store interface {
 	// Remove removes the entry with the given id.
 	// It should not return an error if the entry has already
 	// been removed.
-	Remove(id string) error
+	Remove(id string) (time.Time, error)
 
 	// RemoveOld removes entries with the given address that were created
 	// earlier than the given time. It returns any ids removed.
@@ -77,6 +82,7 @@ type Server struct {
 	localAddr string
 	listener  net.Listener
 	handler   *handler
+	metrics   Metrics
 
 	mu    sync.Mutex
 	items map[string]*item
@@ -95,6 +101,11 @@ type Place struct {
 	srv   *Server
 }
 
+type Metrics interface {
+	RequestCompleted(startTime time.Time)
+	RequestsExpired(count int)
+}
+
 // NewServer returns a new rendezvous server that listens on the given
 // address. When a store is required by a server request,
 // it will be acquired by calling getStore and closed after the
@@ -102,12 +113,11 @@ type Place struct {
 //
 // Note that listenAddr must also be sufficient for other
 // servers to use to contact this one.
-func NewServer(getStore func() Store, listenAddr string) (*Server, error) {
-	return newServer(getStore, listenAddr, true)
+func NewServer(getStore func() Store, m Metrics, listenAddr string) (*Server, error) {
+	return newServer(getStore, m, listenAddr, true)
 }
 
-func newServer(getStore func() Store, listenAddr string, runGC bool) (*Server, error) {
-	// TODO start garbage collection goroutine
+func newServer(getStore func() Store, m Metrics, listenAddr string, runGC bool) (*Server, error) {
 	listener, err := net.Listen("tcp", net.JoinHostPort(listenAddr, "0"))
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot start listener")
@@ -118,6 +128,7 @@ func newServer(getStore func() Store, listenAddr string, runGC bool) (*Server, e
 		listener:  listener,
 		localAddr: listener.Addr().String(),
 		items:     make(map[string]*item),
+		metrics:   m,
 	}
 	srv.handler = &handler{
 		srv: srv,
@@ -147,7 +158,7 @@ func (srv *Server) Close() {
 func (srv *Server) gc() error {
 	dying := false
 	for {
-		err := srv.runGC(dying, time.Now())
+		err := srv.runGC(dying, Clock.Now())
 		if err != nil {
 			logger.Errorf("meeting GC: %v", err)
 		}
@@ -158,7 +169,7 @@ func (srv *Server) gc() error {
 		// so we are always guaranteed a GC when the server starts
 		// up.
 		select {
-		case <-time.After(pollInterval):
+		case <-Clock.After(pollInterval):
 		case <-srv.tomb.Dying():
 			dying = true
 		}
@@ -186,13 +197,17 @@ func (srv *Server) runGC(dying bool, now time.Time) error {
 			delete(srv.items, id)
 		}
 		srv.mu.Unlock()
+		srv.metrics.RequestsExpired(len(ids))
 	}
 	if err != nil {
 		return errgo.Notef(err, "cannot remove old entries")
 	}
-	_, err = store.RemoveOld("", time.Now().Add(-reallyOldExpiryDuration))
+	ids, err = store.RemoveOld("", now.Add(-reallyOldExpiryDuration))
 	if err != nil {
 		return errgo.Notef(err, "cannot remove really old entries")
+	}
+	if len(ids) > 0 {
+		srv.metrics.RequestsExpired(len(ids))
 	}
 	return nil
 }
@@ -221,7 +236,7 @@ func (srv *Server) localWait(id string, getStore func() Store) (data0, data1 []b
 	expired := false
 	select {
 	case <-item.c:
-	case <-time.After(expiryDuration):
+	case <-Clock.After(expiryDuration):
 		expired = true
 	}
 	// Note that we get the Store *after* waiting, so we
@@ -231,8 +246,12 @@ func (srv *Server) localWait(id string, getStore func() Store) (data0, data1 []b
 	srv.mu.Lock()
 	defer srv.mu.Unlock()
 	delete(srv.items, id)
-	if err := store.Remove(id); err != nil {
+	t, err := store.Remove(id)
+	if err != nil {
 		logger.Errorf("cannot remove rendezvous %q: %v", id, err)
+	}
+	if !t.IsZero() {
+		srv.metrics.RequestCompleted(t)
 	}
 	if expired {
 		return nil, nil, errgo.Newf("rendezvous has expired after %v", expiryDuration)

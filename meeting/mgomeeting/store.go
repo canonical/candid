@@ -80,12 +80,19 @@ func (s store) Get(id string) (address string, err error) {
 }
 
 // Remove implements meeting.Store.Remove.
-func (s store) Remove(id string) error {
-	err := s.coll.RemoveId(id)
-	if err != nil && err != mgo.ErrNotFound {
-		return errgo.Mask(err)
+func (s store) Remove(id string) (time.Time, error) {
+	var entry doc
+	change := mgo.Change{
+		Remove: true,
 	}
-	return nil
+	_, err := s.coll.FindId(id).Apply(change, &entry)
+	if err == mgo.ErrNotFound {
+		return time.Time{}, nil
+	}
+	if err != nil && err != mgo.ErrNotFound {
+		return time.Time{}, errgo.Mask(err)
+	}
+	return entry.Created, nil
 }
 
 // RemoveOld implements meeting.Store.RemoveOld.

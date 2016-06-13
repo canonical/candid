@@ -12,6 +12,7 @@ import (
 	"github.com/juju/idmclient/params"
 	"github.com/juju/loggo"
 	"github.com/julienschmidt/httprouter"
+	"github.com/prometheus/client_golang/prometheus"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
 	"gopkg.in/mgo.v2"
@@ -63,6 +64,7 @@ func New(db *mgo.Database, sp ServerParams, versions map[string]NewAPIHandlerFun
 	srv.router.MethodNotAllowed = http.HandlerFunc(srv.methodNotAllowed)
 
 	srv.router.Handle("OPTIONS", "/*path", srv.options)
+	srv.router.Handler("GET", "/metrics", prometheus.Handler())
 	for name, newAPI := range versions {
 		handlers, err := newAPI(pool, sp)
 		if err != nil {
@@ -169,6 +171,4 @@ func (s *Server) methodNotAllowed(w http.ResponseWriter, req *http.Request) {
 }
 
 // options handles every OPTIONS request and always succeeds.
-func (s *Server) options(http.ResponseWriter, *http.Request, httprouter.Params) {
-	return
-}
+func (s *Server) options(http.ResponseWriter, *http.Request, httprouter.Params) {}

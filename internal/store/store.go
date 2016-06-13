@@ -1,8 +1,9 @@
-// Copyright 2014 Canonical Ltd.
+// Copyright 2014-2016 Canonical Ltd.
 
 package store
 
 import (
+	"math"
 	"sort"
 	"strings"
 	"time"
@@ -10,6 +11,7 @@ import (
 	"github.com/juju/idmclient/params"
 	"github.com/juju/loggo"
 	"github.com/pborman/uuid"
+	"github.com/prometheus/client_golang/prometheus"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery/mgostorage"
@@ -60,9 +62,53 @@ type StoreParams struct {
 	PrivateAddr string
 }
 
+type LimitPool interface {
+	Close()
+	Get(time.Duration) (limitpool.Item, error)
+	GetNoLimit() limitpool.Item
+	Stats() limitpool.Stats
+	Put(limitpool.Item)
+}
+
+func NewMonitoredPool(gauge prometheus.Gauge, limit int, new func() limitpool.Item) *monitoredPool {
+	monitoredNew := func() limitpool.Item {
+		gauge.Inc()
+		return new()
+	}
+	pool := limitpool.NewPool(limit, monitoredNew)
+	return &monitoredPool{
+		Pool:    pool,
+		m_items: gauge,
+	}
+}
+
+type monitoredPool struct {
+	*limitpool.Pool
+	m_items prometheus.Gauge
+}
+
+func (p *monitoredPool) Get(t time.Duration) (limitpool.Item, error) {
+	i, err := p.Pool.Get(t)
+	if err == nil {
+		p.m_items.Dec()
+	}
+	return i, err
+}
+
+func (p *monitoredPool) GetNoLimit() limitpool.Item {
+	i := p.Pool.GetNoLimit()
+	p.m_items.Dec()
+	return i
+}
+
+func (p *monitoredPool) Put(i limitpool.Item) {
+	p.Pool.Put(i)
+	p.m_items.Inc()
+}
+
 // Pool provides a pool of *Store objects.
 type Pool struct {
-	sessionPool *limitpool.Pool
+	sessionPool LimitPool
 	storePool   mempool.Pool
 
 	// meetingServer holds the server used to create
@@ -84,13 +130,22 @@ func NewPool(db *mgo.Database, sp StoreParams) (*Pool, error) {
 	if sp.PrivateAddr == "" {
 		return nil, errgo.New("no private address configured")
 	}
-	p.sessionPool = limitpool.NewPool(sp.MaxMgoSessions, p.newSession)
+
+	m_items := prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: "blues_identity",
+		Subsystem: "store",
+		Name:      "mgo_session_pool_size",
+		Help:      "Size of the mongo session pool.",
+	})
+	prometheus.MustRegisterOrGet(m_items)
+
+	p.sessionPool = NewMonitoredPool(m_items, sp.MaxMgoSessions, p.newSession)
 	p.storePool.New = func() interface{} {
 		return p.newStore()
 	}
 	// TODO replace localhost by actual address of server.
 	var err error
-	p.meetingServer, err = meeting.NewServer(p.newMeetingStore, p.params.PrivateAddr)
+	p.meetingServer, err = meeting.NewServer(p.newMeetingStore, newMeetingMetrics(), p.params.PrivateAddr)
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}
@@ -121,6 +176,16 @@ func NewPool(db *mgo.Database, sp StoreParams) (*Pool, error) {
 	if err := p.rootKeys.EnsureIndex(s.DB.Macaroons()); err != nil {
 		return nil, errgo.Notef(err, "cannot ensure indexes")
 	}
+
+	cm := NewCollectionMonitor(map[string]Counter{
+		"identities": db.C("identities"),
+		"macaroons":  db.C("macaroons"),
+		"meeting":    db.C("meeting")})
+	_, err = prometheus.RegisterOrGet(cm)
+	if err != nil {
+		return nil, errgo.Notef(err, "could not register collection monitor")
+	}
+
 	return p, nil
 }
 
@@ -229,6 +294,9 @@ type Store struct {
 
 	// pool holds the pool which created this Store.
 	pool *Pool
+
+	// prometheus summary monitor.
+	m_getlpgroups prometheus.Summary
 }
 
 // newStore returns a new Store instance. When it's
@@ -251,7 +319,47 @@ func (p *Pool) newStore() *Store {
 		// generated before it is called so it should not happen.
 		panic(errgo.Notef(err, "cannot create bakery service"))
 	}
+	s.m_getlpgroups = prometheus.NewSummary(prometheus.SummaryOpts{
+		Namespace: "blues_identity",
+		Subsystem: "launchpad",
+		Name:      "get_launchpad_groups",
+		Help:      "The duration of launchpad login, /people, and super_teams_collection_link requests.",
+	})
 	return s
+}
+
+type meetingMetrics struct {
+	meetingCompleted prometheus.Summary
+	meetingsExpired  prometheus.Counter
+}
+
+func newMeetingMetrics() *meetingMetrics {
+	meetingCompleted := prometheus.NewSummary(prometheus.SummaryOpts{
+		Namespace: "blues_identity",
+		Subsystem: "rendevous",
+		Name:      "meetings_completed_times",
+		Help:      "The time between rendevous creation and its completion.",
+	})
+	prometheus.MustRegisterOrGet(meetingCompleted)
+	meetingsExpired := prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace: "blues_identity",
+		Subsystem: "rendevous",
+		Name:      "meetings_expired_count",
+		Help:      "Count of rendevous which were never completed.",
+	})
+	prometheus.MustRegisterOrGet(meetingsExpired)
+	return &meetingMetrics{
+		meetingCompleted: meetingCompleted,
+		meetingsExpired:  meetingsExpired,
+	}
+}
+
+func (m *meetingMetrics) RequestCompleted(startTime time.Time) {
+	m.meetingCompleted.Observe(float64(time.Since(startTime)) / float64(time.Microsecond))
+}
+
+func (m *meetingMetrics) RequestsExpired(count int) {
+	m.meetingsExpired.Add(float64(count))
 }
 
 // setSession sets the mongo session associated with the Store.
@@ -359,6 +467,7 @@ func (s *Store) GetLaunchpadGroups(externalId, email string) ([]string, error) {
 // getLaunchpadGroups tries to fetch the list of teams the user
 // belongs to in launchpad. Only public teams are supported.
 func (s *Store) getLaunchpadGroups(email string) ([]string, error) {
+	t := time.Now()
 	root, err := lpad.Login(s.pool.params.Launchpad, &lpad.OAuth{Consumer: "blues", Anonymous: true})
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot connect to launchpad")
@@ -385,6 +494,7 @@ func (s *Store) getLaunchpadGroups(email string) ([]string, error) {
 		groups = append(groups, team.StringField("name"))
 		return nil
 	})
+	s.m_getlpgroups.Observe(float64(time.Since(t)) / float64(time.Microsecond))
 	return groups, nil
 }
 
@@ -499,4 +609,52 @@ func uniqueStrings(ss []string) []string {
 		prev = s
 	}
 	return out
+}
+
+type collectionMonitorEntry struct {
+	collection Counter
+	m          prometheus.Gauge
+}
+
+type Counter interface {
+	Count() (int, error)
+}
+
+type collectionMonitor []*collectionMonitorEntry
+
+func NewCollectionMonitor(collections map[string]Counter) collectionMonitor {
+	c := collectionMonitor(make([]*collectionMonitorEntry, len(collections)))
+	var i int
+	for collName, collCounter := range collections {
+		c[i] = &collectionMonitorEntry{
+			collection: collCounter,
+			m: prometheus.NewGauge(prometheus.GaugeOpts{
+				Namespace: "blues_identity_collection",
+				Subsystem: collName,
+				Name:      "count",
+				Help:      "collection size"}),
+		}
+		i++
+	}
+	return c
+}
+
+// Describe implements the prometheus.Collector interface.
+func (cm collectionMonitor) Describe(c chan<- *prometheus.Desc) {
+	for _, entry := range cm {
+		c <- entry.m.Desc()
+	}
+}
+
+// Collect implements the prometheus.Collector interface.
+func (cm collectionMonitor) Collect(c chan<- prometheus.Metric) {
+	for _, entry := range cm {
+		cnt, err := entry.collection.Count()
+		if err != nil {
+			entry.m.Set(math.NaN())
+		} else {
+			entry.m.Set(float64(cnt))
+		}
+		c <- entry.m
+	}
 }

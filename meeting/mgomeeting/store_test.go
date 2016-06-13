@@ -37,11 +37,11 @@ func (s *storeSuite) TestPutGetRemove(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 	c.Assert(addr, gc.Equals, "yaddr")
 
-	err = store.Remove("y")
+	_, err = store.Remove("y")
 	c.Assert(err, gc.IsNil)
 
 	// Check it's idempotent.
-	err = store.Remove("y")
+	_, err = store.Remove("y")
 	c.Assert(err, gc.IsNil)
 
 	addr, err = store.Get("y")
