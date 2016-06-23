@@ -13,7 +13,7 @@ import (
 	"github.com/juju/httprequest"
 	"github.com/juju/idmclient/params"
 	gc "gopkg.in/check.v1"
-	"gopkg.in/macaroon.v1"
+	"gopkg.in/macaroon.v2-unstable"
 
 	"github.com/CanonicalLtd/blues-identity/idp"
 	"github.com/CanonicalLtd/blues-identity/idp/test"
@@ -118,9 +118,9 @@ func (s *loginSuite) assertMacaroon(c *gc.C, jar *testCookieJar, userId string) 
 	cavs := ms[0].Caveats()
 	var found bool
 	for _, cav := range cavs {
-		if strings.HasPrefix(cav.Id, "declared username") {
+		if strings.HasPrefix(string(cav.Id), "declared username") {
 			found = true
-			un := strings.TrimPrefix(cav.Id, "declared username ")
+			un := strings.TrimPrefix(string(cav.Id), "declared username ")
 			c.Assert(un, gc.Equals, userId)
 		}
 	}

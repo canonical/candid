@@ -13,8 +13,8 @@ import (
 	"github.com/juju/httprequest"
 	"github.com/juju/idmclient/params"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v1/bakery/checkers"
-	"gopkg.in/macaroon.v1"
+	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
+	"gopkg.in/macaroon.v2-unstable"
 
 	"github.com/CanonicalLtd/blues-identity/idp"
 )
@@ -29,7 +29,7 @@ const (
 // identity macaroon is generated for the user and an appropriate message
 // will be returned for the login request.
 func LoginUser(c idp.Context, u *params.User) {
-	m, err := c.Bakery().NewMacaroon("", nil, []checkers.Caveat{
+	m, err := c.Bakery().NewMacaroon([]checkers.Caveat{
 		checkers.DeclaredCaveat("username", string(u.Username)),
 		checkers.TimeBeforeCaveat(time.Now().Add(identityMacaroonDuration)),
 	})

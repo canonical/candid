@@ -493,7 +493,7 @@ func (s *storeSuite) TestCollections(c *gc.C) {
 
 	// Check that all created collections are mentioned in Collections.
 	for _, name := range names {
-		if name == "system.indexes" || name == "managedStoredResources" {
+		if name == "system.indexes" || name == "managedStoredResources" || name == "macaroons" {
 			continue
 		}
 		found := false

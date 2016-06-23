@@ -6,8 +6,8 @@ package idp
 import (
 	"github.com/juju/httprequest"
 	"github.com/juju/idmclient/params"
-	"gopkg.in/macaroon-bakery.v1/bakery"
-	"gopkg.in/macaroon.v1"
+	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
+	"gopkg.in/macaroon.v2-unstable"
 	"gopkg.in/mgo.v2"
 )
 

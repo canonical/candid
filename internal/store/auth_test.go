@@ -12,10 +12,10 @@ import (
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v1/bakery"
-	"gopkg.in/macaroon-bakery.v1/bakery/checkers"
-	"gopkg.in/macaroon-bakery.v1/httpbakery"
-	"gopkg.in/macaroon.v1"
+	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
+	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
+	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
+	"gopkg.in/macaroon.v2-unstable"
 
 	"github.com/CanonicalLtd/blues-identity/internal/mongodoc"
 	"github.com/CanonicalLtd/blues-identity/internal/store"
@@ -224,7 +224,7 @@ func (s *authSuite) TestGroupsFromRequest(c *gc.C) {
 	c.Assert(foundThirdParty, gc.Equals, true)
 
 	// Non-existent identity
-	m, err := store.Service.NewMacaroon("", nil, []checkers.Caveat{
+	m, err := store.Service.NewMacaroon([]checkers.Caveat{
 		checkers.DeclaredCaveat("username", "test2"),
 	})
 	c.Assert(err, gc.IsNil)
@@ -243,7 +243,7 @@ func (s *authSuite) TestGroupsFromRequest(c *gc.C) {
 		ExternalID: "https://example.com/test",
 		Groups:     []string{"test-group1", "test-group2"},
 	})
-	m, err = store.Service.NewMacaroon("", nil, []checkers.Caveat{
+	m, err = store.Service.NewMacaroon([]checkers.Caveat{
 		checkers.DeclaredCaveat("username", "test"),
 	})
 	req, err = http.NewRequest("GET", "", nil)
@@ -278,7 +278,7 @@ func (s *authSuite) TestCheckACL(c *gc.C) {
 	// Normal ACL
 	req, err = http.NewRequest("GET", "", nil)
 	c.Assert(err, gc.IsNil)
-	m, err := store.Service.NewMacaroon("", nil, []checkers.Caveat{
+	m, err := store.Service.NewMacaroon([]checkers.Caveat{
 		checkers.DeclaredCaveat("username", "test"),
 	})
 	cookie, err := httpbakery.NewCookie(macaroon.Slice{m})
@@ -294,7 +294,7 @@ func (s *authSuite) TestCheckACL(c *gc.C) {
 	// error getting groups
 	req, err = http.NewRequest("GET", "", nil)
 	c.Assert(err, gc.IsNil)
-	m, err = store.Service.NewMacaroon("", nil, []checkers.Caveat{
+	m, err = store.Service.NewMacaroon([]checkers.Caveat{
 		checkers.DeclaredCaveat("username", "test2"),
 	})
 	cookie, err = httpbakery.NewCookie(macaroon.Slice{m})

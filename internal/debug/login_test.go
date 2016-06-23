@@ -15,7 +15,7 @@ import (
 	"golang.org/x/crypto/nacl/box"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v1/bakery"
+	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
 
 	"github.com/CanonicalLtd/blues-identity/internal/debug"
 )

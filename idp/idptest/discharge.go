@@ -13,9 +13,9 @@ import (
 	"github.com/juju/testing"
 	"github.com/juju/testing/httptesting"
 	gc "gopkg.in/check.v1"
-	"gopkg.in/macaroon-bakery.v1/bakery"
-	"gopkg.in/macaroon-bakery.v1/bakery/checkers"
-	"gopkg.in/macaroon-bakery.v1/httpbakery"
+	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
+	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
+	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
 	"launchpad.net/lpad"
 
 	"github.com/CanonicalLtd/blues-identity"
@@ -133,7 +133,7 @@ func (s *DischargeSuite) AssertDischarge(c *gc.C, visit func(*url.URL) error, ch
 		Locator: s.Locator,
 	})
 	c.Assert(err, gc.IsNil)
-	m, err := b.NewMacaroon("", nil, []checkers.Caveat{{
+	m, err := b.NewMacaroon([]checkers.Caveat{{
 		Location:  DischargeLocation,
 		Condition: "is-authenticated-user",
 	}})
