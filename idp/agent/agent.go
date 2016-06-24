@@ -11,9 +11,9 @@ import (
 	"github.com/juju/idmclient/params"
 	"github.com/juju/loggo"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v1/bakery"
-	"gopkg.in/macaroon-bakery.v1/bakery/checkers"
-	"gopkg.in/macaroon-bakery.v1/httpbakery"
+	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
+	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
+	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
 
 	"github.com/CanonicalLtd/blues-identity/config"
 	"github.com/CanonicalLtd/blues-identity/idp"
@@ -121,7 +121,7 @@ func (a *identityProvider) Handle(c idp.Context) {
 		}
 		logger.Infof("verification error: %s", err)
 	}
-	m, err := ac.Bakery().NewMacaroon("", nil, []checkers.Caveat{
+	m, err := ac.Bakery().NewMacaroon([]checkers.Caveat{
 		checkers.DeclaredCaveat("username", string(login.Username)),
 		bakery.LocalThirdPartyCaveat(login.PublicKey),
 		store.UserHasPublicKeyCaveat(login.Username, login.PublicKey),

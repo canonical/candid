@@ -18,8 +18,8 @@ import (
 
 	"github.com/juju/idmclient"
 	"github.com/juju/idmclient/params"
-	"gopkg.in/macaroon-bakery.v1/bakery"
-	"gopkg.in/macaroon-bakery.v1/httpbakery"
+	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
+	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
 )
 
 var pubKey = flag.String("k", "", "public key of agent")

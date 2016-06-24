@@ -18,11 +18,11 @@ import (
 	"github.com/juju/testing/httptesting"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v1/bakery"
-	"gopkg.in/macaroon-bakery.v1/bakery/checkers"
-	"gopkg.in/macaroon-bakery.v1/httpbakery"
-	"gopkg.in/macaroon-bakery.v1/httpbakery/agent"
-	"gopkg.in/macaroon.v1"
+	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
+	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
+	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
+	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery/agent"
+	"gopkg.in/macaroon.v2-unstable"
 
 	"github.com/CanonicalLtd/blues-identity/idp"
 	agentidp "github.com/CanonicalLtd/blues-identity/idp/agent"
@@ -245,7 +245,7 @@ func (s *dischargeSuite) TestDischargeFromDifferentOriginWhenLoggedIn(c *gc.C) {
 		Locator: s.Locator,
 	})
 	c.Assert(err, gc.IsNil)
-	m, err := b.NewMacaroon("", nil, []checkers.Caveat{{
+	m, err := b.NewMacaroon([]checkers.Caveat{{
 		Location:  idptest.DischargeLocation,
 		Condition: "is-authenticated-user",
 	}})
@@ -429,7 +429,7 @@ func (s *dischargeSuite) TestAdminDischarge(c *gc.C) {
 }
 
 func newMacaroon(c *gc.C, svc *bakery.Service, cav []checkers.Caveat) *macaroon.Macaroon {
-	m, err := svc.NewMacaroon("", nil, cav)
+	m, err := svc.NewMacaroon(cav)
 	c.Assert(err, gc.IsNil)
 	return m
 }
@@ -538,14 +538,14 @@ func (s *dischargeSuite) TestDischargeStatusProxyAuthRequiredResponse(c *gc.C) {
 		Locator: s.Locator,
 	})
 	c.Assert(err, gc.IsNil)
-	m, err := svc.NewMacaroon("", nil, []checkers.Caveat{{
+	m, err := svc.NewMacaroon([]checkers.Caveat{{
 		Location:  idptest.DischargeLocation,
 		Condition: "is-authenticated-user",
 	}})
 
 	cav := m.Caveats()[0]
 	resp, err := s.HTTPClient.PostForm(idptest.DischargeLocation+"/discharge", url.Values{
-		"id":       {cav.Id},
+		"id":       {string(cav.Id)},
 		"location": {cav.Location},
 	})
 	c.Assert(err, gc.IsNil)
@@ -562,14 +562,14 @@ func (s *dischargeSuite) TestDischargeStatusUnauthorizedResponse(c *gc.C) {
 		Locator: s.Locator,
 	})
 	c.Assert(err, gc.IsNil)
-	m, err := svc.NewMacaroon("", nil, []checkers.Caveat{{
+	m, err := svc.NewMacaroon([]checkers.Caveat{{
 		Location:  idptest.DischargeLocation,
 		Condition: "is-authenticated-user",
 	}})
 
 	cav := m.Caveats()[0]
 	values := url.Values{
-		"id":       {cav.Id},
+		"id":       {string(cav.Id)},
 		"location": {cav.Location},
 	}
 

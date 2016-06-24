@@ -11,8 +11,8 @@ import (
 	"github.com/juju/loggo"
 	"github.com/pborman/uuid"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v1/bakery"
-	"gopkg.in/macaroon-bakery.v1/bakery/mgostorage"
+	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
+	"gopkg.in/macaroon-bakery.v2-unstable/bakery/mgostorage"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 	"launchpad.net/lpad"
@@ -69,8 +69,10 @@ type Pool struct {
 	// InteractionRequired rendezvous.
 	meetingServer *meeting.Server
 
-	params StoreParams
-	db     *mgo.Database
+	params   StoreParams
+	db       *mgo.Database
+	service  *bakery.Service
+	rootKeys *mgostorage.RootKeys
 }
 
 // NewPool creates a new Pool. The pool will be sized at sp.MaxMgoSessions.
@@ -100,9 +102,23 @@ func NewPool(db *mgo.Database, sp StoreParams) (*Pool, error) {
 			return nil, errgo.Notef(err, "cannot generate key")
 		}
 	}
+	p.service, err = bakery.NewService(bakery.NewServiceParams{
+		Location: p.params.Location,
+		Key:      p.params.Key,
+		Locator: bakery.PublicKeyLocatorMap{
+			p.params.Location + "/v1/discharger": &p.params.Key.Public,
+		},
+	})
+	if err != nil {
+		return nil, errgo.Notef(err, "cannot create bakery service")
+	}
+	p.rootKeys = mgostorage.NewRootKeys(1000) // TODO(mhilton) make this configurable?
 	s := p.GetNoLimit()
 	defer p.Put(s)
 	if err := s.ensureIndexes(); err != nil {
+		return nil, errgo.Notef(err, "cannot ensure indexes")
+	}
+	if err := p.rootKeys.EnsureIndex(s.DB.Macaroons()); err != nil {
 		return nil, errgo.Notef(err, "cannot ensure indexes")
 	}
 	return p, nil
@@ -211,10 +227,6 @@ type Store struct {
 	// are created.
 	Place *meeting.Place
 
-	// bakeryStore holds the bakery storage that
-	// will be used by Service.
-	bakeryStore bakery.Storage
-
 	// pool holds the pool which created this Store.
 	pool *Pool
 }
@@ -228,7 +240,6 @@ func (p *Pool) newStore() *Store {
 	var err error
 	s.Service, err = bakery.NewService(bakery.NewServiceParams{
 		Location: p.params.Location,
-		Store:    bakeryStore{s},
 		Key:      p.params.Key,
 		Locator: bakery.PublicKeyLocatorMap{
 			p.params.Location + "/v1/discharger": &p.params.Key.Public,
@@ -249,13 +260,12 @@ func (p *Pool) newStore() *Store {
 func (s *Store) setSession(session *mgo.Session) {
 	s.DB.Database = s.pool.db.With(session)
 	s.Place = s.pool.meetingServer.Place(mgomeeting.NewStore(s.DB.Meeting()))
-	ms, err := mgostorage.New(s.DB.Macaroons())
-	if err != nil {
-		// mgostorage.New no longer returns an error, so this
-		// cannot happen.
-		panic(errgo.Notef(err, "cannot create macaroon store"))
-	}
-	s.bakeryStore = ms
+	s.Service = s.pool.service.WithStore(s.pool.rootKeys.NewStorage(
+		s.DB.Macaroons(),
+		mgostorage.Policy{
+			ExpiryDuration: 365 * 24 * time.Hour,
+		},
+	))
 }
 
 func (s *Store) ensureIndexes() error {
@@ -455,28 +465,6 @@ func (s StoreDatabase) Collections() []*mgo.Collection {
 		cs[i] = f(s)
 	}
 	return cs
-}
-
-// bakeryStore implements bakery.Storage by redirecting
-// its storage requests to s.store.bakeryStore.
-//
-// We do this so that we can replace the bakeryStore
-// value without needing to create a new bakery service
-// for every request.
-type bakeryStore struct {
-	store *Store
-}
-
-func (s bakeryStore) Put(location, item string) error {
-	return s.store.bakeryStore.Put(location, item)
-}
-
-func (s bakeryStore) Get(location string) (string, error) {
-	return s.store.bakeryStore.Get(location)
-}
-
-func (s bakeryStore) Del(location string) error {
-	return s.store.bakeryStore.Del(location)
 }
 
 // poolMeetingStore implements meeting.Store by

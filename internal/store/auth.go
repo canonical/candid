@@ -10,9 +10,9 @@ import (
 	"github.com/juju/idmclient/params"
 	"github.com/juju/utils"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v1/bakery"
-	"gopkg.in/macaroon-bakery.v1/bakery/checkers"
-	"gopkg.in/macaroon-bakery.v1/httpbakery"
+	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
+	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
+	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
 
 	"github.com/CanonicalLtd/blues-identity/internal/mongodoc"
 )
@@ -158,19 +158,15 @@ func (s *Store) GroupsFromRequest(c checkers.Checker, req *http.Request) ([]stri
 		return append(identity.Groups, string(identity.Username)), nil
 	}
 	logger.Debugf("no identity found, requesting login")
-	m, err := s.Service.NewMacaroon(
-		"",
-		nil,
-		[]checkers.Caveat{
-			checkers.DenyCaveat("discharge"),
-			checkers.NeedDeclaredCaveat(
-				checkers.Caveat{
-					Location:  s.pool.params.Location + "/v1/discharger",
-					Condition: "is-authenticated-user",
-				},
-				"username"),
-		},
-	)
+	m, err := s.Service.NewMacaroon([]checkers.Caveat{
+		checkers.DenyCaveat("discharge"),
+		checkers.NeedDeclaredCaveat(
+			checkers.Caveat{
+				Location:  s.pool.params.Location + "/v1/discharger",
+				Condition: "is-authenticated-user",
+			},
+			"username"),
+	})
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot create macaroon")
 	}

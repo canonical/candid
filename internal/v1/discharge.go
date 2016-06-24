@@ -10,10 +10,10 @@ import (
 	"github.com/juju/httprequest"
 	"github.com/juju/idmclient/params"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v1/bakery"
-	"gopkg.in/macaroon-bakery.v1/bakery/checkers"
-	"gopkg.in/macaroon-bakery.v1/httpbakery"
-	"gopkg.in/macaroon.v1"
+	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
+	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
+	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
+	"gopkg.in/macaroon.v2-unstable"
 
 	"github.com/CanonicalLtd/blues-identity/internal/mongodoc"
 	"github.com/CanonicalLtd/blues-identity/internal/store"
@@ -32,7 +32,7 @@ type verifiedUserInfo struct {
 // checkThirdPartyCaveat checks the given caveat. This function is called
 // by the httpbakery discharge logic. See httpbakery.AddDischargeHandler
 // for futher details.
-func (h *dischargeHandler) checkThirdPartyCaveat(req *http.Request, cavId, cav string) ([]checkers.Caveat, error) {
+func (h *dischargeHandler) checkThirdPartyCaveat(req *http.Request, ci *bakery.ThirdPartyCaveatInfo) ([]checkers.Caveat, error) {
 	err := h.store.CheckAdminCredentials(req)
 	var username string
 	var doc *mongodoc.Identity
@@ -53,8 +53,8 @@ func (h *dischargeHandler) checkThirdPartyCaveat(req *http.Request, cavId, cav s
 		))
 		if err != nil {
 			return nil, h.needLoginError(&dischargeRequestInfo{
-				CaveatId: cavId,
-				Caveat:   cav,
+				CaveatId: ci.CaveatId,
+				Caveat:   ci.Condition,
 				Origin:   req.Header.Get("Origin"),
 			}, err)
 		}
@@ -66,9 +66,9 @@ func (h *dischargeHandler) checkThirdPartyCaveat(req *http.Request, cavId, cav s
 			return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 		}
 	}
-	cond, args, err := checkers.ParseCaveat(cav)
+	cond, args, err := checkers.ParseCaveat(ci.Condition)
 	if err != nil {
-		return nil, errgo.WithCausef(err, params.ErrBadRequest, "cannot parse caveat %q", cav)
+		return nil, errgo.WithCausef(err, params.ErrBadRequest, "cannot parse caveat %q", ci.Condition)
 	}
 	switch cond {
 	case "is-authenticated-user":
@@ -180,8 +180,8 @@ func (h *dischargeHandler) Wait(p httprequest.Params, w *waitRequest) (*waitResp
 	}
 	cookie.Name = "macaroon-identity"
 	p.Request.AddCookie(cookie)
-	checker := bakery.ThirdPartyCheckerFunc(func(cavId, cav string) ([]checkers.Caveat, error) {
-		return h.checkThirdPartyCaveat(p.Request, cavId, cav)
+	checker := bakery.ThirdPartyCheckerFunc(func(ci *bakery.ThirdPartyCaveatInfo) ([]checkers.Caveat, error) {
+		return h.checkThirdPartyCaveat(p.Request, ci)
 	})
 	m, err := h.store.Service.Discharge(checker, reqInfo.CaveatId)
 	if err != nil {
@@ -226,11 +226,11 @@ type dischargeResponse struct {
 func (h *dischargeHandler) Discharge(p httprequest.Params, r *dischargeRequest) (*dischargeResponse, error) {
 	m, err := h.store.Service.Discharge(
 		bakery.ThirdPartyCheckerFunc(
-			func(cavId, cav string) ([]checkers.Caveat, error) {
-				return h.checkThirdPartyCaveat(p.Request, cavId, cav)
+			func(ci *bakery.ThirdPartyCaveatInfo) ([]checkers.Caveat, error) {
+				return h.checkThirdPartyCaveat(p.Request, ci)
 			},
 		),
-		r.ID,
+		[]byte(r.ID),
 	)
 	if err != nil {
 		return nil, errgo.NoteMask(err, "cannot discharge", errgo.Any)

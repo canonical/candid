@@ -15,10 +15,10 @@ import (
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/testing/httptesting"
 	gc "gopkg.in/check.v1"
-	"gopkg.in/macaroon-bakery.v1/bakery"
-	"gopkg.in/macaroon-bakery.v1/bakery/checkers"
-	"gopkg.in/macaroon-bakery.v1/httpbakery"
-	"gopkg.in/macaroon.v1"
+	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
+	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
+	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
+	"gopkg.in/macaroon.v2-unstable"
 	"gopkg.in/mgo.v2/bson"
 
 	"github.com/CanonicalLtd/blues-identity/internal/mongodoc"
@@ -1071,7 +1071,7 @@ func (s *usersSuite) TestVerifyUserToken(c *gc.C) {
 		},
 	})
 	m := s.getToken(c, "jbloggs")
-	badm, err := macaroon.New([]byte{}, "no such macaroon", "loc")
+	badm, err := macaroon.New([]byte{}, []byte("no such macaroon"), "loc")
 	c.Assert(err, gc.IsNil)
 	tests := []struct {
 		about        string
@@ -1317,7 +1317,7 @@ func (s *usersSuite) TestUserGroups(c *gc.C) {
 		if test.password != "" {
 			un = test.username
 		} else if test.username != "" {
-			m, err := st.Service.NewMacaroon("", nil, []checkers.Caveat{
+			m, err := st.Service.NewMacaroon([]checkers.Caveat{
 				checkers.DeclaredCaveat("username", test.username),
 			})
 			c.Assert(err, gc.IsNil)
@@ -1577,7 +1577,7 @@ func (s *usersSuite) TestMultipleEndpointAccess(c *gc.C) {
 		Groups:   []string{"g3", "g4"},
 	})
 	client := httpbakery.NewClient()
-	m, err := store.Service.NewMacaroon("", nil, []checkers.Caveat{
+	m, err := store.Service.NewMacaroon([]checkers.Caveat{
 		checkers.DeclaredCaveat("username", "jbloggs1"),
 	})
 	c.Assert(err, gc.IsNil)

@@ -15,10 +15,10 @@ import (
 	"github.com/juju/testing"
 	"github.com/juju/testing/httptesting"
 	gc "gopkg.in/check.v1"
-	"gopkg.in/macaroon-bakery.v1/bakery"
-	"gopkg.in/macaroon-bakery.v1/bakery/checkers"
-	"gopkg.in/macaroon-bakery.v1/httpbakery"
-	"gopkg.in/macaroon.v1"
+	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
+	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
+	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
+	"gopkg.in/macaroon.v2-unstable"
 	"gopkg.in/yaml.v2"
 
 	"github.com/CanonicalLtd/blues-identity/config"
@@ -153,7 +153,7 @@ func (s *agentSuite) TestHandleWithUsableMacaroon(c *gc.C) {
 			PublicKey: &key.Public,
 		}),
 	}
-	m, err := s.store.Service.NewMacaroon("", nil, []checkers.Caveat{})
+	m, err := s.store.Service.NewMacaroon([]checkers.Caveat{})
 	c.Assert(err, gc.IsNil)
 	cookie, err := httpbakery.NewCookie(macaroon.Slice{m})
 	c.Assert(err, gc.IsNil)
@@ -189,7 +189,7 @@ func (s *agentSuite) TestHandleWithUnsableMacaroon(c *gc.C) {
 			PublicKey: &key.Public,
 		}),
 	}
-	m, err := s.store.Service.NewMacaroon("", nil, []checkers.Caveat{checkers.DenyCaveat("discharge")})
+	m, err := s.store.Service.NewMacaroon([]checkers.Caveat{checkers.DenyCaveat("discharge")})
 	c.Assert(err, gc.IsNil)
 	cookie, err := httpbakery.NewCookie(macaroon.Slice{m})
 	c.Assert(err, gc.IsNil)
@@ -238,7 +238,7 @@ func (s *agentSuite) TestHandleWithShortcutUsableMacaroon(c *gc.C) {
 	}
 	tc.Request, err = http.NewRequest("", "", nil)
 	c.Assert(err, gc.IsNil)
-	m, err := s.store.Service.NewMacaroon("", nil, []checkers.Caveat{})
+	m, err := s.store.Service.NewMacaroon([]checkers.Caveat{})
 	c.Assert(err, gc.IsNil)
 	cookie, err := httpbakery.NewCookie(macaroon.Slice{m})
 	c.Assert(err, gc.IsNil)
@@ -267,7 +267,7 @@ func (s *agentSuite) TestHandleShortcutWithUnsableMacaroon(c *gc.C) {
 	}
 	tc.Request, err = http.NewRequest("", "/login", nil)
 	c.Assert(err, gc.IsNil)
-	m, err := s.store.Service.NewMacaroon("", nil, []checkers.Caveat{checkers.DenyCaveat("discharge")})
+	m, err := s.store.Service.NewMacaroon([]checkers.Caveat{checkers.DenyCaveat("discharge")})
 	c.Assert(err, gc.IsNil)
 	cookie, err := httpbakery.NewCookie(macaroon.Slice{m})
 	c.Assert(err, gc.IsNil)

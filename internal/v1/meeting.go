@@ -6,14 +6,14 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"gopkg.in/macaroon-bakery.v1/httpbakery"
-	"gopkg.in/macaroon.v1"
+	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
+	"gopkg.in/macaroon.v2-unstable"
 
 	"github.com/CanonicalLtd/blues-identity/meeting"
 )
 
 type dischargeRequestInfo struct {
-	CaveatId string
+	CaveatId []byte
 	Caveat   string
 	Origin   string
 }
