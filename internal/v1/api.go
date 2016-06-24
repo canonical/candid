@@ -10,6 +10,7 @@ import (
 	"golang.org/x/net/trace"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
+	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
 
 	"github.com/CanonicalLtd/blues-identity/idp"
 	"github.com/CanonicalLtd/blues-identity/internal/identity"
@@ -34,6 +35,21 @@ func NewAPIHandler(p *store.Pool, params identity.ServerParams) ([]httprequest.H
 	h := New(p, params)
 	handlers := identity.ErrorMapper.Handlers(h.apiHandler)
 	handlers = append(handlers, identity.ErrorMapper.Handlers(h.dischargeHandler)...)
+	d := httpbakery.NewDischarger(httpbakery.DischargerParams{
+		Checker:         thirdPartyCaveatChecker{h},
+		Key:             params.Key,
+		ErrorToResponse: identity.ErrorMapper,
+	})
+	for _, h := range d.Handlers() {
+		handlers = append(handlers, h)
+
+		// also add the discharger endpoint at the legacy location.
+		handlers = append(handlers, httprequest.Handler{
+			Method: h.Method,
+			Path:   "/v1/discharger" + h.Path,
+			Handle: h.Handle,
+		})
+	}
 	handlers = append(handlers, h.idpHandlers()...)
 	return handlers, nil
 }
@@ -150,7 +166,7 @@ type apiHandler struct {
 // so can be used to automatically derive the list of endpoints to add to
 // the router.
 func (h *Handler) dischargeHandler(p httprequest.Params) (*dischargeHandler, error) {
-	hnd, err := h.getHandler(p, "identity.internal.discharge")
+	hnd, err := h.getHandler(p, p.Request.URL.Path)
 	if err != nil {
 		return nil, errgo.NoteMask(err, "cannot create handler", errgo.Any)
 	}

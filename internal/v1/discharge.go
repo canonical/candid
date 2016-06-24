@@ -29,10 +29,33 @@ type verifiedUserInfo struct {
 	Groups   []string
 }
 
+// thirdPartyCaveatChecker implements an
+// httpbakery.ThirdPartyCaveatChecker for the identity service.
+type thirdPartyCaveatChecker struct {
+	handler *Handler
+}
+
+// CheckThirdPartyCaveat implements httpbakery.ThirdPartyCaveatChecker.
+// It acquires a handler before checking the caveat, so that we have a
+// database connection for the purpose.
+func (c thirdPartyCaveatChecker) CheckThirdPartyCaveat(req *http.Request, ci *bakery.ThirdPartyCaveatInfo) ([]checkers.Caveat, error) {
+	h, err := c.handler.getHandler(
+		httprequest.Params{
+			Request: req,
+		},
+		req.URL.Path,
+	)
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
+	defer h.Close()
+	return checkThirdPartyCaveat(h, req, ci)
+}
+
 // checkThirdPartyCaveat checks the given caveat. This function is called
-// by the httpbakery discharge logic. See httpbakery.AddDischargeHandler
+// by the httpbakery discharge logic. See httpbakery.DischargeHandler
 // for futher details.
-func (h *dischargeHandler) checkThirdPartyCaveat(req *http.Request, ci *bakery.ThirdPartyCaveatInfo) ([]checkers.Caveat, error) {
+func checkThirdPartyCaveat(h *handler, req *http.Request, ci *bakery.ThirdPartyCaveatInfo) ([]checkers.Caveat, error) {
 	err := h.store.CheckAdminCredentials(req)
 	var username string
 	var doc *mongodoc.Identity
@@ -52,7 +75,7 @@ func (h *dischargeHandler) checkThirdPartyCaveat(req *http.Request, ci *bakery.T
 			checkers.OperationChecker("discharge"),
 		))
 		if err != nil {
-			return nil, h.needLoginError(&dischargeRequestInfo{
+			return nil, needLoginError(h, &dischargeRequestInfo{
 				CaveatId: ci.CaveatId,
 				Caveat:   ci.Condition,
 				Origin:   req.Header.Get("Origin"),
@@ -72,9 +95,9 @@ func (h *dischargeHandler) checkThirdPartyCaveat(req *http.Request, ci *bakery.T
 	}
 	switch cond {
 	case "is-authenticated-user":
-		return h.checkAuthenticatedUser(doc)
+		return checkAuthenticatedUser(doc)
 	case "is-member-of":
-		return h.checkMemberOfGroup(doc, args)
+		return checkMemberOfGroup(doc, args)
 	default:
 		return nil, checkers.ErrCaveatNotRecognized
 	}
@@ -82,7 +105,7 @@ func (h *dischargeHandler) checkThirdPartyCaveat(req *http.Request, ci *bakery.T
 
 // checkAuthenticatedUser checks a third-party caveat for "is-authenticated-user". Currently the discharge
 // macaroon will only be created for users with admin credentials.
-func (h *dischargeHandler) checkAuthenticatedUser(user *mongodoc.Identity) ([]checkers.Caveat, error) {
+func checkAuthenticatedUser(user *mongodoc.Identity) ([]checkers.Caveat, error) {
 	return []checkers.Caveat{
 		checkers.DeclaredCaveat("uuid", user.UUID),
 		checkers.DeclaredCaveat("username", user.Username),
@@ -91,7 +114,7 @@ func (h *dischargeHandler) checkAuthenticatedUser(user *mongodoc.Identity) ([]ch
 }
 
 // checkMemberOfGroup checks if user is member of any of the specified groups.
-func (h *dischargeHandler) checkMemberOfGroup(user *mongodoc.Identity, targetGroups string) ([]checkers.Caveat, error) {
+func checkMemberOfGroup(user *mongodoc.Identity, targetGroups string) ([]checkers.Caveat, error) {
 	groups := strings.Fields(targetGroups)
 	for _, userGroup := range user.Groups {
 		for _, g := range groups {
@@ -106,7 +129,7 @@ func (h *dischargeHandler) checkMemberOfGroup(user *mongodoc.Identity, targetGro
 // needLoginError returns an error suitable for returning
 // from a discharge request that can only be satisfied
 // if the user logs in.
-func (h *dischargeHandler) needLoginError(info *dischargeRequestInfo, why error) error {
+func needLoginError(h *handler, info *dischargeRequestInfo, why error) error {
 	// TODO(rog) If the user is already logged in (username != ""),
 	// we should perhaps just return an error here.
 	waitId, err := h.place.NewRendezvous(info)
@@ -181,7 +204,7 @@ func (h *dischargeHandler) Wait(p httprequest.Params, w *waitRequest) (*waitResp
 	cookie.Name = "macaroon-identity"
 	p.Request.AddCookie(cookie)
 	checker := bakery.ThirdPartyCheckerFunc(func(ci *bakery.ThirdPartyCaveatInfo) ([]checkers.Caveat, error) {
-		return h.checkThirdPartyCaveat(p.Request, ci)
+		return checkThirdPartyCaveat(h.handler, p.Request, ci)
 	})
 	m, err := h.store.Service.Discharge(checker, reqInfo.CaveatId)
 	if err != nil {
@@ -205,61 +228,4 @@ func (h *dischargeHandler) Wait(p httprequest.Params, w *waitRequest) (*waitResp
 		Macaroon:       m,
 		DischargeToken: login.IdentityMacaroon,
 	}, nil
-}
-
-// dischargeRequest is a request to create a macaroon that discharges the
-// supplied third-party caveat. Discharging caveats will normally be
-// handled by the bakery it would be unusual to use this type directly in
-// client software.
-type dischargeRequest struct {
-	httprequest.Route `httprequest:"POST /discharge"`
-	ID                string `httprequest:"id,form"`
-}
-
-// dischargeResponse contains macaroon that discharges a third-party
-// caveat. Discharging caveats will normally be handled by the bakery it
-// would be unusual to use this type directly in client software.
-type dischargeResponse struct {
-	Macaroon *macaroon.Macaroon `json:",omitempty"`
-}
-
-func (h *dischargeHandler) Discharge(p httprequest.Params, r *dischargeRequest) (*dischargeResponse, error) {
-	m, err := h.store.Service.Discharge(
-		bakery.ThirdPartyCheckerFunc(
-			func(ci *bakery.ThirdPartyCaveatInfo) ([]checkers.Caveat, error) {
-				return h.checkThirdPartyCaveat(p.Request, ci)
-			},
-		),
-		[]byte(r.ID),
-	)
-	if err != nil {
-		return nil, errgo.NoteMask(err, "cannot discharge", errgo.Any)
-	}
-	return &dischargeResponse{m}, nil
-}
-
-type legacyDischargeRequest struct {
-	httprequest.Route `httprequest:"POST /v1/discharger/discharge"`
-	dischargeRequest
-}
-
-// LegacyDischarge is the same as Discharge but served at the old
-// location (/v1/discharger/discharge).
-func (h *dischargeHandler) LegacyDischarge(p httprequest.Params, r *legacyDischargeRequest) (*dischargeResponse, error) {
-	return h.Discharge(p, &r.dischargeRequest)
-}
-
-func (h *dischargeHandler) PublicKey(*params.PublicKeyRequest) (*params.PublicKeyResponse, error) {
-	return &params.PublicKeyResponse{PublicKey: h.store.Service.PublicKey()}, nil
-}
-
-type legacyPublicKeyRequest struct {
-	httprequest.Route `httprequest:"GET /v1/discharger/publickey"`
-	params.PublicKeyRequest
-}
-
-// LegacyPublicKey is the same as PublicKey but served at the old
-// location (/v1/discharger/publickey).
-func (h *dischargeHandler) LegacyPublicKey(p *legacyPublicKeyRequest) (*params.PublicKeyResponse, error) {
-	return h.PublicKey(&p.PublicKeyRequest)
 }
