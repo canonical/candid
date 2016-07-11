@@ -8,3 +8,4 @@ var (
 )
 
 type WaitResponse waitResponse
+type DischargeTokenForUserResponse dischargeTokenForUserResponse

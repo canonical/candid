@@ -19,6 +19,12 @@ import (
 	"github.com/CanonicalLtd/blues-identity/internal/store"
 )
 
+const (
+	// identityMacaroonDuration is the length of time for which an
+	// identity macaroon is valid.
+	identityMacaroonDuration = 6 * time.Hour
+)
+
 // verifiedUserInfo holds information provided by an
 // external identity provider from a successful user login.
 type verifiedUserInfo struct {
@@ -227,5 +233,42 @@ func (h *dischargeHandler) Wait(p httprequest.Params, w *waitRequest) (*waitResp
 	return &waitResponse{
 		Macaroon:       m,
 		DischargeToken: login.IdentityMacaroon,
+	}, nil
+}
+
+// dischargeTokenForUserRequest is the request sent to get a discharge token for a user.
+// This is only allowed for admin.
+type dischargeTokenForUserRequest struct {
+	httprequest.Route `httprequest:"GET /v1/discharge-token-for-user"`
+	Username          params.Username `httprequest:"username,form"`
+}
+
+// dischargeTokenForUserResponse holds the response for the discharge token for user endpoint
+// containing a discharge token for the user requested.
+type dischargeTokenForUserResponse struct {
+	DischargeToken *macaroon.Macaroon
+}
+
+// DischargeTokenForUser serves an HTTP endpoint that will create a discharge token for a user, if the
+// origination has admin credentials only.
+func (h *dischargeHandler) DischargeTokenForUser(p httprequest.Params, r *dischargeTokenForUserRequest) (dischargeTokenForUserResponse, error) {
+	err := h.store.CheckAdminCredentials(p.Request)
+	if err != nil {
+		return dischargeTokenForUserResponse{}, errgo.WithCausef(err, params.ErrUnauthorized, "")
+	}
+	username := string(r.Username)
+	_, err = h.store.GetIdentity(params.Username(username))
+	if err != nil {
+		return dischargeTokenForUserResponse{}, errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	}
+	m, err := h.store.Service.NewMacaroon([]checkers.Caveat{
+		checkers.DeclaredCaveat("username", username),
+		checkers.TimeBeforeCaveat(time.Now().Add(identityMacaroonDuration)),
+	})
+	if err != nil {
+		return dischargeTokenForUserResponse{}, errgo.NoteMask(err, "cannot create discharge token", errgo.Any)
+	}
+	return dischargeTokenForUserResponse{
+		DischargeToken: m,
 	}, nil
 }
