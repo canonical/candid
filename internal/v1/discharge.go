@@ -15,14 +15,15 @@ import (
 	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
 	"gopkg.in/macaroon.v2-unstable"
 
+	"github.com/CanonicalLtd/blues-identity/idp/idputil"
 	"github.com/CanonicalLtd/blues-identity/internal/mongodoc"
 	"github.com/CanonicalLtd/blues-identity/internal/store"
 )
 
 const (
-	// identityMacaroonDuration is the length of time for which an
-	// identity macaroon is valid.
-	identityMacaroonDuration = 6 * time.Hour
+	// dischargeTokenDuration is the length of time for which a
+	// discharge token is valid.
+	dischargeTokenDuration = 6 * time.Hour
 )
 
 // verifiedUserInfo holds information provided by an
@@ -256,15 +257,12 @@ func (h *dischargeHandler) DischargeTokenForUser(p httprequest.Params, r *discha
 	if err != nil {
 		return dischargeTokenForUserResponse{}, errgo.WithCausef(err, params.ErrUnauthorized, "")
 	}
-	username := string(r.Username)
-	_, err = h.store.GetIdentity(params.Username(username))
+	_, err = h.store.GetIdentity(params.Username(r.Username))
 	if err != nil {
 		return dischargeTokenForUserResponse{}, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
-	m, err := h.store.Service.NewMacaroon([]checkers.Caveat{
-		checkers.DeclaredCaveat("username", username),
-		checkers.TimeBeforeCaveat(time.Now().Add(identityMacaroonDuration)),
-	})
+
+	m, err := idputil.CreateMacaroon(h.store.Service, string(r.Username), dischargeTokenDuration)
 	if err != nil {
 		return dischargeTokenForUserResponse{}, errgo.NoteMask(err, "cannot create discharge token", errgo.Any)
 	}

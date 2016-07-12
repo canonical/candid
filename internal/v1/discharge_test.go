@@ -300,14 +300,34 @@ func (s *dischargeSuite) TestDischargeAgentShortcut(c *gc.C) {
 	))
 }
 
-func (s *dischargeSuite) TestAdminDischargeTokenForUser(c *gc.C) {
+func (s *dischargeSuite) TestAdminDischargeTokenForUserNotFound(c *gc.C) {
 	req, err := http.NewRequest("GET", idptest.DischargeLocation+"/v1/discharge-token-for-user?username=jbloggs", nil)
 	req.SetBasicAuth(adminUsername, adminPassword)
 	resp, err := s.HTTPClient.Do(req)
 	c.Assert(err, gc.IsNil)
 	defer resp.Body.Close()
 	c.Assert(resp.StatusCode, gc.Equals, http.StatusNotFound)
-	err = s.IDMClient.SetUser(
+}
+
+func (s *dischargeSuite) TestAdminDischargeTokenForUserNoUser(c *gc.C) {
+	req, err := http.NewRequest("GET", idptest.DischargeLocation+"/v1/discharge-token-for-user", nil)
+	req.SetBasicAuth(adminUsername, adminPassword)
+	resp, err := s.HTTPClient.Do(req)
+	c.Assert(err, gc.IsNil)
+	defer resp.Body.Close()
+	c.Assert(resp.StatusCode, gc.Equals, http.StatusBadRequest)
+}
+
+func (s *dischargeSuite) TestAdminDischargeTokenForUserNotAdmin(c *gc.C) {
+	req, err := http.NewRequest("GET", idptest.DischargeLocation+"/v1/discharge-token-for-user?username=jbloggs", nil)
+	resp, err := s.HTTPClient.Do(req)
+	c.Assert(err, gc.IsNil)
+	defer resp.Body.Close()
+	c.Assert(resp.StatusCode, gc.Equals, http.StatusUnauthorized)
+}
+
+func (s *dischargeSuite) TestAdminDischargeTokenForUser(c *gc.C) {
+	err := s.IDMClient.SetUser(
 		&params.SetUserRequest{
 			Username: "jbloggs",
 			User: params.User{
@@ -322,9 +342,9 @@ func (s *dischargeSuite) TestAdminDischargeTokenForUser(c *gc.C) {
 		},
 	)
 	c.Assert(err, gc.IsNil)
-	req, err = http.NewRequest("GET", idptest.DischargeLocation+"/v1/discharge-token-for-user?username=jbloggs", nil)
+	req, err := http.NewRequest("GET", idptest.DischargeLocation+"/v1/discharge-token-for-user?username=jbloggs", nil)
 	req.SetBasicAuth(adminUsername, adminPassword)
-	resp, err = s.HTTPClient.Do(req)
+	resp, err := s.HTTPClient.Do(req)
 	c.Assert(err, gc.IsNil)
 	defer resp.Body.Close()
 	c.Assert(resp.StatusCode, gc.Equals, http.StatusOK)
