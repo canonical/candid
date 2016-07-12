@@ -82,7 +82,7 @@ func (s *DischargeSuite) SetUpTest(c *gc.C) {
 	var err error
 	s.serverKey, err = bakery.GenerateKey()
 	c.Assert(err, gc.IsNil)
-	db := s.Session.DB("idptest")
+	db := s.Session.Copy().DB("idptest")
 	s.srv, err = identity.NewServer(db, identity.ServerParams{
 		AuthUsername:      authUsername,
 		AuthPassword:      authPassword,

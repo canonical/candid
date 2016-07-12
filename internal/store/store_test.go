@@ -30,7 +30,7 @@ var _ = gc.Suite(&storeSuite{})
 func (s *storeSuite) SetUpTest(c *gc.C) {
 	s.IsolatedMgoSuite.SetUpTest(c)
 	var err error
-	s.pool, err = store.NewPool(s.Session.DB("store-tests"), store.StoreParams{
+	s.pool, err = store.NewPool(s.Session.Copy().DB("store-tests"), store.StoreParams{
 		MaxMgoSessions: 10,
 		PrivateAddr:    "localhost",
 	})
@@ -615,7 +615,7 @@ func (s *storeSuite) TestRetrieveLaunchpadGroups(c *gc.C) {
 	}))
 	defer lp.Close()
 	pool, err := store.NewPool(
-		s.Session.DB("store-launchpad-tests"),
+		s.Session.Copy().DB("store-launchpad-tests"),
 		store.StoreParams{
 			Launchpad:   lpad.APIBase(lp.URL),
 			PrivateAddr: "localhost",
@@ -656,7 +656,7 @@ func (s *storeSuite) TestRetrieveLaunchpadGroups(c *gc.C) {
 }
 
 func (s *storeSuite) TestGetStoreFromPool(c *gc.C) {
-	p, err := store.NewPool(s.Session.DB("store-launchpad-tests"),
+	p, err := store.NewPool(s.Session.Copy().DB("store-launchpad-tests"),
 		store.StoreParams{
 			MaxMgoSessions: 2,
 			PrivateAddr:    "localhost",
@@ -677,7 +677,7 @@ func (s *storeSuite) TestGetStoreFromPool(c *gc.C) {
 }
 
 func (s *storeSuite) TestGetStoreFromPoolLimit(c *gc.C) {
-	p, err := store.NewPool(s.Session.DB("store-launchpad-tests"),
+	p, err := store.NewPool(s.Session.Copy().DB("store-launchpad-tests"),
 		store.StoreParams{
 			MaxMgoSessions: 1,
 			RequestTimeout: 100 * time.Millisecond,
@@ -694,7 +694,7 @@ func (s *storeSuite) TestGetStoreFromPoolLimit(c *gc.C) {
 }
 
 func (s *storeSuite) TestGetStoreFromPoolPutBeforeTimeout(c *gc.C) {
-	p, err := store.NewPool(s.Session.DB("store-launchpad-tests"),
+	p, err := store.NewPool(s.Session.Copy().DB("store-launchpad-tests"),
 		store.StoreParams{
 			MaxMgoSessions: 1,
 			RequestTimeout: time.Second,

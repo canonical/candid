@@ -50,7 +50,7 @@ func (s *serverSuite) TestVersions(c *gc.C) {
 }
 
 func (s *serverSuite) TestNewServerWithVersions(c *gc.C) {
-	h, err := identity.NewServer(s.Session.DB("foo"),
+	h, err := identity.NewServer(s.Session.Copy().DB("foo"),
 		identity.ServerParams{
 			MaxMgoSessions: 300,
 			PrivateAddr:    "localhost",
