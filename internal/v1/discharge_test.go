@@ -300,6 +300,62 @@ func (s *dischargeSuite) TestDischargeAgentShortcut(c *gc.C) {
 	))
 }
 
+func (s *dischargeSuite) TestAdminDischargeTokenForUserNotFound(c *gc.C) {
+	req, err := http.NewRequest("GET", idptest.DischargeLocation+"/v1/discharge-token-for-user?username=jbloggs", nil)
+	req.SetBasicAuth(adminUsername, adminPassword)
+	resp, err := s.HTTPClient.Do(req)
+	c.Assert(err, gc.IsNil)
+	defer resp.Body.Close()
+	c.Assert(resp.StatusCode, gc.Equals, http.StatusNotFound)
+}
+
+func (s *dischargeSuite) TestAdminDischargeTokenForUserNoUser(c *gc.C) {
+	req, err := http.NewRequest("GET", idptest.DischargeLocation+"/v1/discharge-token-for-user", nil)
+	req.SetBasicAuth(adminUsername, adminPassword)
+	resp, err := s.HTTPClient.Do(req)
+	c.Assert(err, gc.IsNil)
+	defer resp.Body.Close()
+	c.Assert(resp.StatusCode, gc.Equals, http.StatusBadRequest)
+}
+
+func (s *dischargeSuite) TestAdminDischargeTokenForUserNotAdmin(c *gc.C) {
+	req, err := http.NewRequest("GET", idptest.DischargeLocation+"/v1/discharge-token-for-user?username=jbloggs", nil)
+	resp, err := s.HTTPClient.Do(req)
+	c.Assert(err, gc.IsNil)
+	defer resp.Body.Close()
+	c.Assert(resp.StatusCode, gc.Equals, http.StatusUnauthorized)
+}
+
+func (s *dischargeSuite) TestAdminDischargeTokenForUser(c *gc.C) {
+	err := s.IDMClient.SetUser(
+		&params.SetUserRequest{
+			Username: "jbloggs",
+			User: params.User{
+				Username:   "jbloggs",
+				ExternalID: "http://example.com/jbloggs",
+				Email:      "jbloggs@example.com",
+				FullName:   "Joe Bloggs",
+				IDPGroups: []string{
+					"test",
+				},
+			},
+		},
+	)
+	c.Assert(err, gc.IsNil)
+	req, err := http.NewRequest("GET", idptest.DischargeLocation+"/v1/discharge-token-for-user?username=jbloggs", nil)
+	req.SetBasicAuth(adminUsername, adminPassword)
+	resp, err := s.HTTPClient.Do(req)
+	c.Assert(err, gc.IsNil)
+	defer resp.Body.Close()
+	c.Assert(resp.StatusCode, gc.Equals, http.StatusOK)
+	body, err := ioutil.ReadAll(resp.Body)
+	c.Assert(err, gc.IsNil)
+	var data v1.DischargeTokenForUserResponse
+	err = json.Unmarshal(body, &data)
+	c.Assert(err, gc.IsNil)
+	c.Assert(string(data.DischargeToken.Caveats()[0].Id), gc.Equals, "declared username jbloggs")
+}
+
 func (s *dischargeSuite) TestAdminDischarge(c *gc.C) {
 	err := s.IDMClient.SetUser(
 		&params.SetUserRequest{

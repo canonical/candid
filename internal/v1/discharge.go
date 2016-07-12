@@ -15,8 +15,15 @@ import (
 	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
 	"gopkg.in/macaroon.v2-unstable"
 
+	"github.com/CanonicalLtd/blues-identity/idp/idputil"
 	"github.com/CanonicalLtd/blues-identity/internal/mongodoc"
 	"github.com/CanonicalLtd/blues-identity/internal/store"
+)
+
+const (
+	// dischargeTokenDuration is the length of time for which a
+	// discharge token is valid.
+	dischargeTokenDuration = 6 * time.Hour
 )
 
 // verifiedUserInfo holds information provided by an
@@ -227,5 +234,39 @@ func (h *dischargeHandler) Wait(p httprequest.Params, w *waitRequest) (*waitResp
 	return &waitResponse{
 		Macaroon:       m,
 		DischargeToken: login.IdentityMacaroon,
+	}, nil
+}
+
+// dischargeTokenForUserRequest is the request sent to get a discharge token for a user.
+// This is only allowed for admin.
+type dischargeTokenForUserRequest struct {
+	httprequest.Route `httprequest:"GET /v1/discharge-token-for-user"`
+	Username          params.Username `httprequest:"username,form"`
+}
+
+// dischargeTokenForUserResponse holds the response for the discharge token for user endpoint
+// containing a discharge token for the user requested.
+type dischargeTokenForUserResponse struct {
+	DischargeToken *macaroon.Macaroon
+}
+
+// DischargeTokenForUser serves an HTTP endpoint that will create a discharge token for a user, if the
+// origination has admin credentials only.
+func (h *dischargeHandler) DischargeTokenForUser(p httprequest.Params, r *dischargeTokenForUserRequest) (dischargeTokenForUserResponse, error) {
+	err := h.store.CheckAdminCredentials(p.Request)
+	if err != nil {
+		return dischargeTokenForUserResponse{}, errgo.WithCausef(err, params.ErrUnauthorized, "")
+	}
+	_, err = h.store.GetIdentity(params.Username(r.Username))
+	if err != nil {
+		return dischargeTokenForUserResponse{}, errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	}
+
+	m, err := idputil.CreateMacaroon(h.store.Service, string(r.Username), dischargeTokenDuration)
+	if err != nil {
+		return dischargeTokenForUserResponse{}, errgo.NoteMask(err, "cannot create discharge token", errgo.Any)
+	}
+	return dischargeTokenForUserResponse{
+		DischargeToken: m,
 	}, nil
 }
