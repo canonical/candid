@@ -15,6 +15,7 @@ import (
 	"github.com/CanonicalLtd/blues-identity/idp"
 	"github.com/CanonicalLtd/blues-identity/internal/identity"
 	"github.com/CanonicalLtd/blues-identity/internal/mempool"
+	"github.com/CanonicalLtd/blues-identity/internal/monitoring"
 	"github.com/CanonicalLtd/blues-identity/internal/store"
 )
 
@@ -152,11 +153,19 @@ func (h *Handler) apiHandler(p httprequest.Params) (*apiHandler, error) {
 	}
 	return &apiHandler{
 		handler: hnd,
+		monReq:  monitoring.NewRequest(&p),
 	}, nil
 }
 
 type apiHandler struct {
 	*handler
+	monReq monitoring.Request
+}
+
+func (h *apiHandler) Close() error {
+	err := h.handler.Close()
+	h.monReq.ObserveMetric()
+	return err
 }
 
 // dischargeHandler creates a per-request handler for endpoints relating
@@ -172,11 +181,19 @@ func (h *Handler) dischargeHandler(p httprequest.Params) (*dischargeHandler, err
 	}
 	return &dischargeHandler{
 		handler: hnd,
+		monReq:  monitoring.NewRequest(&p),
 	}, nil
 }
 
 type dischargeHandler struct {
 	*handler
+	monReq monitoring.Request
+}
+
+func (h *dischargeHandler) Close() error {
+	err := h.handler.Close()
+	h.monReq.ObserveMetric()
+	return err
 }
 
 var errNotImplemented = errgo.Newf("method not implemented")

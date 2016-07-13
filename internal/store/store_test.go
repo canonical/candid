@@ -6,16 +6,20 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"time"
 
 	"github.com/juju/idmclient/params"
 	"github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"
+	"github.com/prometheus/client_golang/prometheus"
+	prom "github.com/prometheus/client_model/go"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/mgo.v2/bson"
 	"launchpad.net/lpad"
 
+	"github.com/CanonicalLtd/blues-identity/internal/limitpool"
 	"github.com/CanonicalLtd/blues-identity/internal/mongodoc"
 	"github.com/CanonicalLtd/blues-identity/internal/store"
 )
@@ -714,4 +718,92 @@ func (s *storeSuite) TestGetStoreFromPoolPutBeforeTimeout(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 	defer p.Put(s2)
 	c.Assert(s2.DB.Session, gc.Equals, s1Session)
+}
+
+type gauge struct {
+	sync.Mutex
+	prometheus.Gauge
+
+	value int
+}
+
+func (g *gauge) Inc() {
+	g.Lock()
+	g.value++
+	g.Unlock()
+}
+
+func (g *gauge) Dec() {
+	g.Lock()
+	g.value--
+	g.Unlock()
+}
+
+func (g *gauge) GetValue() int {
+	g.Lock()
+	defer g.Unlock()
+	return g.value
+}
+
+type monitoredPoolSuite struct {
+	gauge *gauge
+	pool  store.LimitPool
+}
+
+type nopCloser struct{}
+
+func (*nopCloser) Close() {}
+
+var _ = gc.Suite(&monitoredPoolSuite{})
+
+func (s *monitoredPoolSuite) SetUpTest(c *gc.C) {
+	s.gauge = &gauge{}
+	s.pool = store.NewMonitoredPool(s.gauge, 3, func() limitpool.Item { return &nopCloser{} })
+}
+
+func (s *monitoredPoolSuite) TestGetIncrements(c *gc.C) {
+	c.Assert(s.gauge.GetValue(), gc.Equals, 0)
+	i, err := s.pool.Get(time.Second)
+	c.Assert(err, gc.IsNil)
+	c.Assert(s.gauge.GetValue(), gc.Equals, 0)
+	s.pool.Put(i)
+	c.Assert(s.gauge.GetValue(), gc.Equals, 1)
+}
+
+func (s *monitoredPoolSuite) TestGetNoLimitIncrements(c *gc.C) {
+	c.Assert(s.gauge.GetValue(), gc.Equals, 0)
+	i := s.pool.GetNoLimit()
+	c.Assert(s.gauge.GetValue(), gc.Equals, 0)
+	s.pool.Put(i)
+	c.Assert(s.gauge.GetValue(), gc.Equals, 1)
+}
+
+type collectionMonitorSuite struct{}
+
+var _ = gc.Suite(&collectionMonitorSuite{})
+
+type mockCounter struct {
+	value int
+}
+
+func (c *mockCounter) Count() (int, error) {
+	return c.value, nil
+}
+
+func (s *collectionMonitorSuite) TestMonitorCollect(c *gc.C) {
+	cnt := &mockCounter{value: 5}
+	coll := store.NewCollectionMonitor(map[string]store.Counter{
+		"sample": cnt,
+	})
+	ch := make(chan prometheus.Metric, 1)
+	coll.Collect(ch)
+	var m prometheus.Metric
+	select {
+	case m = <-ch:
+	default:
+		c.Error("no metric received from collector")
+	}
+	var value prom.Metric
+	m.Write(&value)
+	c.Assert(value.GetGauge().GetValue(), gc.Equals, 5.0)
 }

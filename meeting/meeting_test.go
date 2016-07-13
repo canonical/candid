@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/juju/testing"
+	"github.com/juju/utils/clock"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
 
@@ -16,12 +17,30 @@ import (
 
 type suite struct {
 	testing.IsolationSuite
+	// clock holds the mock clock used by the meeting package.
+	clock *testing.Clock
 }
 
 var _ = gc.Suite(&suite{})
 
+var epoch = parseTime("2016-01-01T12:00:00Z")
+
+func (s *suite) SetUpTest(c *gc.C) {
+	s.IsolationSuite.SetUpTest(c)
+	// Set up the clock mockery.
+	s.clock = testing.NewClock(epoch)
+}
+
+func parseTime(s string) time.Time {
+	t, err := time.Parse(time.RFC3339, s)
+	if err != nil {
+		panic(err)
+	}
+	return t
+}
+
 func fakeStoreGet(count *int32) (meeting.Store, error) {
-	return newFakeStore(count), nil
+	return newFakeStore(count, nil), nil
 }
 
 // storeGetter returns a function that always returns the given store.
@@ -36,10 +55,16 @@ func storeGetter(store meeting.Store, count *int32) func() meeting.Store {
 	}
 }
 
-func (*suite) TestRendezvousWaitBeforeDone(c *gc.C) {
+type nilMetrics struct{}
+
+func (nilMetrics) RequestCompleted(startTime time.Time) {}
+func (nilMetrics) RequestsExpired(count int)            {}
+
+func (s *suite) TestRendezvousWaitBeforeDone(c *gc.C) {
+	s.PatchValue(&meeting.Clock, s.clock)
 	count := int32(0)
-	store := newFakeStore(&count)
-	srv, err := meeting.NewServer(storeGetter(store, &count), "localhost")
+	store := newFakeStore(&count, s.clock)
+	srv, err := meeting.NewServer(storeGetter(store, &count), nilMetrics{}, "localhost")
 	c.Assert(err, gc.IsNil)
 	defer srv.Close()
 
@@ -58,7 +83,7 @@ func (*suite) TestRendezvousWaitBeforeDone(c *gc.C) {
 		close(waitDone)
 	}()
 
-	time.Sleep(10 * time.Millisecond)
+	s.clock.Advance(10 * time.Millisecond)
 	err = m.Done(id, []byte("second data"))
 	c.Assert(err, gc.IsNil)
 	select {
@@ -76,10 +101,11 @@ func (*suite) TestRendezvousWaitBeforeDone(c *gc.C) {
 	c.Assert(count, gc.Equals, int32(0))
 }
 
-func (*suite) TestRendezvousDoneBeforeWait(c *gc.C) {
+func (s *suite) TestRendezvousDoneBeforeWait(c *gc.C) {
+	s.PatchValue(&meeting.Clock, s.clock)
 	count := int32(0)
-	store := newFakeStore(&count)
-	srv, err := meeting.NewServer(storeGetter(store, &count), "localhost")
+	store := newFakeStore(&count, s.clock)
+	srv, err := meeting.NewServer(storeGetter(store, &count), nilMetrics{}, "localhost")
 	c.Assert(err, gc.IsNil)
 	defer srv.Close()
 
@@ -109,16 +135,17 @@ func (*suite) TestRendezvousDoneBeforeWait(c *gc.C) {
 	c.Assert(count, gc.Equals, int32(0))
 }
 
-func (*suite) TestRendezvousDifferentPlaces(c *gc.C) {
+func (s *suite) TestRendezvousDifferentPlaces(c *gc.C) {
+	s.PatchValue(&meeting.Clock, s.clock)
 	count := int32(0)
-	store := newFakeStore(&count)
-	srv1, err := meeting.NewServer(storeGetter(store, &count), "localhost")
+	store := newFakeStore(&count, s.clock)
+	srv1, err := meeting.NewServer(storeGetter(store, &count), nilMetrics{}, "localhost")
 	c.Assert(err, gc.IsNil)
 	defer srv1.Close()
-	srv2, err := meeting.NewServer(storeGetter(store, &count), "localhost")
+	srv2, err := meeting.NewServer(storeGetter(store, &count), nilMetrics{}, "localhost")
 	c.Assert(err, gc.IsNil)
 	defer srv2.Close()
-	srv3, err := meeting.NewServer(storeGetter(store, &count), "localhost")
+	srv3, err := meeting.NewServer(storeGetter(store, &count), nilMetrics{}, "localhost")
 	c.Assert(err, gc.IsNil)
 	defer srv3.Close()
 
@@ -139,6 +166,7 @@ func (*suite) TestRendezvousDifferentPlaces(c *gc.C) {
 
 		close(waitDone)
 	}()
+	s.clock.Advance(10 * time.Millisecond)
 	m3 := srv3.Place(store)
 	err = m3.Done(id, []byte("second data"))
 	c.Assert(err, gc.IsNil)
@@ -158,11 +186,12 @@ func (*suite) TestRendezvousDifferentPlaces(c *gc.C) {
 	c.Assert(count, gc.Equals, int32(0))
 }
 
-func (*suite) TestEntriesRemovedOnClose(c *gc.C) {
-	store := newFakeStore(nil)
-	srv1, err := meeting.NewServer(storeGetter(store, nil), "localhost")
+func (s *suite) TestEntriesRemovedOnClose(c *gc.C) {
+	s.PatchValue(&meeting.Clock, s.clock)
+	store := newFakeStore(nil, s.clock)
+	srv1, err := meeting.NewServer(storeGetter(store, nil), nilMetrics{}, "localhost")
 	c.Assert(err, gc.IsNil)
-	srv2, err := meeting.NewServer(storeGetter(store, nil), "localhost")
+	srv2, err := meeting.NewServer(storeGetter(store, nil), nilMetrics{}, "localhost")
 	c.Assert(err, gc.IsNil)
 
 	m1 := srv1.Place(store)
@@ -183,11 +212,11 @@ func (*suite) TestEntriesRemovedOnClose(c *gc.C) {
 	c.Assert(store.itemCount(), gc.Equals, 0)
 }
 
-func (*suite) TestRunGCNotDying(c *gc.C) {
-	store := newFakeStore(nil)
-	srv1, err := meeting.NewServerNoGC(storeGetter(store, nil), "localhost")
+func (s *suite) TestRunGCNotDying(c *gc.C) {
+	store := newFakeStore(nil, s.clock)
+	srv1, err := meeting.NewServerNoGC(storeGetter(store, nil), nilMetrics{}, "localhost")
 	c.Assert(err, gc.IsNil)
-	srv2, err := meeting.NewServerNoGC(storeGetter(store, nil), "localhost")
+	srv2, err := meeting.NewServerNoGC(storeGetter(store, nil), nilMetrics{}, "localhost")
 	c.Assert(err, gc.IsNil)
 
 	m1 := srv1.Place(store)
@@ -238,12 +267,12 @@ func (*suite) TestRunGCNotDying(c *gc.C) {
 	}
 }
 
-func (*suite) TestPartialRemoveOldFailure(c *gc.C) {
+func (s *suite) TestPartialRemoveOldFailure(c *gc.C) {
 	// RemoveOld can fail with ids and an error. If it
 	// does so, the database and the server should remain
 	// consistent.
-	store := partialRemoveStore{newFakeStore(nil)}
-	srv, err := meeting.NewServerNoGC(storeGetter(store, nil), "localhost")
+	store := partialRemoveStore{newFakeStore(nil, s.clock)}
+	srv, err := meeting.NewServerNoGC(storeGetter(store, nil), nilMetrics{}, "localhost")
 	c.Assert(err, gc.IsNil)
 	m := srv.Place(store)
 
@@ -289,7 +318,7 @@ func (s partialRemoveStore) RemoveOld(addr string, olderThan time.Time) ([]strin
 
 func (*suite) TestPutFailure(c *gc.C) {
 	store := putErrorStore{}
-	srv, err := meeting.NewServer(storeGetter(store, nil), "localhost")
+	srv, err := meeting.NewServer(storeGetter(store, nil), nilMetrics{}, "localhost")
 	c.Assert(err, gc.IsNil)
 	defer srv.Close()
 	m := srv.Place(store)
@@ -301,8 +330,8 @@ func (*suite) TestPutFailure(c *gc.C) {
 
 func (s *suite) TestWaitTimeout(c *gc.C) {
 	s.PatchValue(meeting.ExpiryDuration, 100*time.Millisecond)
-	store := newFakeStore(nil)
-	srv, err := meeting.NewServerNoGC(storeGetter(store, nil), "localhost")
+	store := newFakeStore(nil, s.clock)
+	srv, err := meeting.NewServerNoGC(storeGetter(store, nil), nilMetrics{}, "localhost")
 	c.Assert(err, gc.IsNil)
 
 	m := srv.Place(store)
@@ -311,6 +340,81 @@ func (s *suite) TestWaitTimeout(c *gc.C) {
 	_, _, err = m.Wait(id)
 	c.Logf("err: %#v", err)
 	c.Assert(err, gc.ErrorMatches, "rendezvous has expired after 100ms")
+}
+
+func (s *suite) TestRequestCompletedCalled(c *gc.C) {
+	s.PatchValue(&meeting.Clock, s.clock)
+	store := newFakeStore(nil, s.clock)
+	tm := newTestMetrics()
+	srv, err := meeting.NewServer(storeGetter(store, nil), tm, "localhost")
+	c.Assert(err, gc.IsNil)
+	defer srv.Close()
+
+	m := srv.Place(store)
+	id, err := m.NewRendezvous(nil)
+	c.Assert(err, gc.IsNil)
+	c.Assert(id, gc.Not(gc.Equals), "")
+
+	waitDone := make(chan struct{})
+	go func() {
+		_, _, err := m.Wait(id)
+		c.Check(err, gc.IsNil)
+		c.Check(tm.completedCallCount, gc.Equals, 1)
+
+		close(waitDone)
+	}()
+
+	s.clock.Advance(10 * time.Millisecond)
+	err = m.Done(id, nil)
+	c.Assert(err, gc.IsNil)
+	select {
+	case <-waitDone:
+	case <-time.After(2 * time.Second):
+		c.Errorf("timed out waiting for rendezvous")
+	}
+
+	// Check that item has now been deleted.
+	_, _, err = m.Wait(id)
+	c.Assert(err, gc.ErrorMatches, `rendezvous ".*" not found`)
+}
+
+func (s *suite) TestRequestsExpiredCalled(c *gc.C) {
+	s.PatchValue(&meeting.Clock, s.clock)
+	store := newFakeStore(nil, s.clock)
+	tm := newTestMetrics()
+	srv, err := meeting.NewServer(storeGetter(store, nil), tm, "localhost")
+	c.Assert(err, gc.IsNil)
+
+	m := srv.Place(store)
+	for i := 0; i < 3; i++ {
+		_, err := m.NewRendezvous(nil)
+		c.Assert(err, gc.IsNil)
+	}
+	srv.Close()
+	c.Assert(tm.expiredCallCount, gc.Equals, 1)
+	c.Assert(tm.expiredCallValues, gc.DeepEquals, []int{3})
+
+}
+
+type testMetrics struct {
+	completedCallCount int
+	expiredCallCount   int
+	expiredCallValues  []int
+}
+
+func newTestMetrics() *testMetrics {
+	return &testMetrics{
+		expiredCallValues: []int{},
+	}
+}
+
+func (m *testMetrics) RequestCompleted(startTime time.Time) {
+	m.completedCallCount++
+}
+
+func (m *testMetrics) RequestsExpired(count int) {
+	m.expiredCallCount++
+	m.expiredCallValues = append(m.expiredCallValues, count)
 }
 
 type putErrorStore struct {
@@ -329,6 +433,7 @@ func (putErrorStore) Close() {
 }
 
 type fakeStore struct {
+	clock   clock.Clock
 	count   *int32
 	mu      sync.Mutex
 	entries map[string]*fakeStoreEntry
@@ -342,11 +447,15 @@ type fakeStoreEntry struct {
 // newFakeStore returns an in memory store implementation.
 // If count is non-nil, will atomically decrement it whenever the
 // store is closed.
-func newFakeStore(count *int32) *fakeStore {
+func newFakeStore(count *int32, clck clock.Clock) *fakeStore {
 	if count == nil {
 		count = new(int32)
 	}
+	if clck == nil {
+		clck = clock.WallClock
+	}
 	return &fakeStore{
+		clock:   clck,
 		count:   count,
 		entries: make(map[string]*fakeStoreEntry),
 	}
@@ -370,7 +479,7 @@ func (s *fakeStore) Put(id, addr string) error {
 	defer s.mu.Unlock()
 	s.entries[id] = &fakeStoreEntry{
 		addr:         addr,
-		creationTime: time.Now(),
+		creationTime: s.clock.Now(),
 	}
 	return nil
 }
@@ -386,11 +495,11 @@ func (s *fakeStore) Get(id string) (address string, err error) {
 }
 
 // Remove implements Store.Remove.
-func (s *fakeStore) Remove(id string) error {
+func (s *fakeStore) Remove(id string) (time.Time, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	delete(s.entries, id)
-	return nil
+	return epoch, nil
 }
 
 // RemoveOld implements Store.RemoveOld.
