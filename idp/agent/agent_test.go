@@ -41,7 +41,7 @@ func (s *agentSuite) SetUpTest(c *gc.C) {
 	s.IsolatedMgoSuite.SetUpTest(c)
 	s.idp = agent.IdentityProvider
 	var err error
-	s.pool, err = store.NewPool(s.Session.DB("testing"), store.StoreParams{
+	s.pool, err = store.NewPool(s.Session.Copy().DB("testing"), store.StoreParams{
 		PrivateAddr: "localhost",
 	})
 	c.Assert(err, gc.IsNil)

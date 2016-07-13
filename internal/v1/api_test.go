@@ -57,7 +57,7 @@ func (s *apiSuite) SetUpTest(c *gc.C) {
 
 	key, err := bakery.GenerateKey()
 	c.Assert(err, gc.IsNil)
-	s.srv, s.pool = newServer(c, s.Session, key, s.idps)
+	s.srv, s.pool = newServer(c, s.Session.Copy(), key, s.idps)
 	s.keyPair = key
 	s.server = httptest.NewServer(s.srv)
 	s.PatchValue(&http.DefaultTransport, httptesting.URLRewritingTransport{

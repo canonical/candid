@@ -34,7 +34,7 @@ func (s *authSuite) SetUpTest(c *gc.C) {
 	s.IsolatedMgoSuite.SetUpTest(c)
 	var err error
 	s.pool, err = store.NewPool(
-		s.Session.DB("idm-test"),
+		s.Session.Copy().DB("idm-test"),
 		store.StoreParams{
 			AuthUsername: "test-admin",
 			AuthPassword: "open sesame",

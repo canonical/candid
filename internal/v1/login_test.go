@@ -43,6 +43,10 @@ func (s *loginSuite) TearDownTest(c *gc.C) {
 	s.apiSuite.TearDownTest(c)
 }
 
+func (s *loginSuite) TearDownSuite(c *gc.C) {
+	s.apiSuite.TearDownSuite(c)
+}
+
 func (s *loginSuite) TestInteractiveLogin(c *gc.C) {
 	jar := &testCookieJar{}
 	client := &http.Client{
