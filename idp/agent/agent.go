@@ -121,9 +121,10 @@ func (a *identityProvider) Handle(c idp.Context) {
 		}
 		logger.Infof("verification error: %s", err)
 	}
-	m, err := ac.Bakery().NewMacaroon([]checkers.Caveat{
+	vers := httpbakery.RequestVersion(c.Params().Request)
+	m, err := ac.Bakery().NewMacaroon(vers, []checkers.Caveat{
 		checkers.DeclaredCaveat("username", string(login.Username)),
-		bakery.LocalThirdPartyCaveat(login.PublicKey),
+		bakery.LocalThirdPartyCaveat(login.PublicKey, vers),
 		store.UserHasPublicKeyCaveat(login.Username, login.PublicKey),
 		checkers.TimeBeforeCaveat(time.Now().Add(agentMacaroonDuration)),
 	})

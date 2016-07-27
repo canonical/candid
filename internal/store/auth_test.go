@@ -218,13 +218,13 @@ func (s *authSuite) TestGroupsFromRequest(c *gc.C) {
 		if cav.Location == "" {
 			continue
 		}
-		c.Assert(cav.Location, gc.Equals, identityLocation+"/v1/discharger")
+		c.Assert(cav.Location, gc.Equals, identityLocation)
 		foundThirdParty = true
 	}
 	c.Assert(foundThirdParty, gc.Equals, true)
 
 	// Non-existent identity
-	m, err := store.Service.NewMacaroon([]checkers.Caveat{
+	m, err := store.Service.NewMacaroon(bakery.LatestVersion, []checkers.Caveat{
 		checkers.DeclaredCaveat("username", "test2"),
 	})
 	c.Assert(err, gc.IsNil)
@@ -243,7 +243,7 @@ func (s *authSuite) TestGroupsFromRequest(c *gc.C) {
 		ExternalID: "https://example.com/test",
 		Groups:     []string{"test-group1", "test-group2"},
 	})
-	m, err = store.Service.NewMacaroon([]checkers.Caveat{
+	m, err = store.Service.NewMacaroon(bakery.LatestVersion, []checkers.Caveat{
 		checkers.DeclaredCaveat("username", "test"),
 	})
 	req, err = http.NewRequest("GET", "", nil)
@@ -278,7 +278,7 @@ func (s *authSuite) TestCheckACL(c *gc.C) {
 	// Normal ACL
 	req, err = http.NewRequest("GET", "", nil)
 	c.Assert(err, gc.IsNil)
-	m, err := store.Service.NewMacaroon([]checkers.Caveat{
+	m, err := store.Service.NewMacaroon(bakery.LatestVersion, []checkers.Caveat{
 		checkers.DeclaredCaveat("username", "test"),
 	})
 	cookie, err := httpbakery.NewCookie(macaroon.Slice{m})
@@ -294,7 +294,7 @@ func (s *authSuite) TestCheckACL(c *gc.C) {
 	// error getting groups
 	req, err = http.NewRequest("GET", "", nil)
 	c.Assert(err, gc.IsNil)
-	m, err = store.Service.NewMacaroon([]checkers.Caveat{
+	m, err = store.Service.NewMacaroon(bakery.LatestVersion, []checkers.Caveat{
 		checkers.DeclaredCaveat("username", "test2"),
 	})
 	cookie, err = httpbakery.NewCookie(macaroon.Slice{m})

@@ -143,7 +143,6 @@ func NewPool(db *mgo.Database, sp StoreParams) (*Pool, error) {
 	p.storePool.New = func() interface{} {
 		return p.newStore()
 	}
-	// TODO replace localhost by actual address of server.
 	var err error
 	p.meetingServer, err = meeting.NewServer(p.newMeetingStore, newMeetingMetrics(), p.params.PrivateAddr)
 	if err != nil {
@@ -157,12 +156,15 @@ func NewPool(db *mgo.Database, sp StoreParams) (*Pool, error) {
 			return nil, errgo.Notef(err, "cannot generate key")
 		}
 	}
+	locator := bakery.NewThirdPartyLocatorStore()
+	locator.AddInfo(p.params.Location, bakery.ThirdPartyInfo{
+		PublicKey: p.params.Key.Public,
+		Version:   bakery.LatestVersion,
+	})
 	p.service, err = bakery.NewService(bakery.NewServiceParams{
 		Location: p.params.Location,
 		Key:      p.params.Key,
-		Locator: bakery.PublicKeyLocatorMap{
-			p.params.Location + "/v1/discharger": &p.params.Key.Public,
-		},
+		Locator:  locator,
 	})
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot create bakery service")
@@ -304,20 +306,6 @@ type Store struct {
 func (p *Pool) newStore() *Store {
 	s := &Store{
 		pool: p,
-	}
-	var err error
-	s.Service, err = bakery.NewService(bakery.NewServiceParams{
-		Location: p.params.Location,
-		Key:      p.params.Key,
-		Locator: bakery.PublicKeyLocatorMap{
-			p.params.Location + "/v1/discharger": &p.params.Key.Public,
-		},
-	})
-	if err != nil {
-		// bakery.NewService only returns an error if the key
-		// cannot be created. The key will always have been
-		// generated before it is called so it should not happen.
-		panic(errgo.Notef(err, "cannot create bakery service"))
 	}
 	s.m_getlpgroups = prometheus.NewSummary(prometheus.SummaryOpts{
 		Namespace: "blues_identity",

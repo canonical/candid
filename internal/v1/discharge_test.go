@@ -245,7 +245,7 @@ func (s *dischargeSuite) TestDischargeFromDifferentOriginWhenLoggedIn(c *gc.C) {
 		Locator: s.Locator,
 	})
 	c.Assert(err, gc.IsNil)
-	m, err := b.NewMacaroon([]checkers.Caveat{{
+	m, err := b.NewMacaroon(bakery.LatestVersion, []checkers.Caveat{{
 		Location:  idptest.DischargeLocation,
 		Condition: "is-authenticated-user",
 	}})
@@ -485,7 +485,7 @@ func (s *dischargeSuite) TestAdminDischarge(c *gc.C) {
 }
 
 func newMacaroon(c *gc.C, svc *bakery.Service, cav []checkers.Caveat) *macaroon.Macaroon {
-	m, err := svc.NewMacaroon(cav)
+	m, err := svc.NewMacaroon(bakery.LatestVersion, cav)
 	c.Assert(err, gc.IsNil)
 	return m
 }
@@ -594,7 +594,7 @@ func (s *dischargeSuite) TestDischargeStatusProxyAuthRequiredResponse(c *gc.C) {
 		Locator: s.Locator,
 	})
 	c.Assert(err, gc.IsNil)
-	m, err := svc.NewMacaroon([]checkers.Caveat{{
+	m, err := svc.NewMacaroon(bakery.LatestVersion, []checkers.Caveat{{
 		Location:  idptest.DischargeLocation,
 		Condition: "is-authenticated-user",
 	}})
@@ -618,7 +618,7 @@ func (s *dischargeSuite) TestDischargeStatusUnauthorizedResponse(c *gc.C) {
 		Locator: s.Locator,
 	})
 	c.Assert(err, gc.IsNil)
-	m, err := svc.NewMacaroon([]checkers.Caveat{{
+	m, err := svc.NewMacaroon(bakery.LatestVersion, []checkers.Caveat{{
 		Location:  idptest.DischargeLocation,
 		Condition: "is-authenticated-user",
 	}})
@@ -647,16 +647,12 @@ func (s *dischargeSuite) TestDischargeLegacyLocation(c *gc.C) {
 		User:   s.user,
 	}
 	s.BakeryClient.VisitWebPage = visitor.Interactive
-	pk, err := s.Locator.PublicKeyForLocation(idptest.DischargeLocation)
-	c.Assert(err, gc.IsNil)
 	svc, err := bakery.NewService(bakery.NewServiceParams{
-		Locator: bakery.PublicKeyLocatorMap{
-			idptest.DischargeLocation + "/v1/discharger": pk,
-		},
+		Locator: s.Locator,
 	})
 	c.Assert(err, gc.IsNil)
 	ms, err := s.BakeryClient.DischargeAll(newMacaroon(c, svc, []checkers.Caveat{{
-		Location:  idptest.DischargeLocation + "/v1/discharger",
+		Location:  idptest.DischargeLocation,
 		Condition: "is-authenticated-user",
 	}}))
 	c.Assert(err, gc.IsNil)
@@ -669,27 +665,27 @@ func (s *dischargeSuite) TestDischargeLegacyLocation(c *gc.C) {
 }
 
 func (s *dischargeSuite) TestPublicKeyLegacyLocation(c *gc.C) {
-	pk, err := s.Locator.PublicKeyForLocation(idptest.DischargeLocation)
+	info, err := s.Locator.ThirdPartyInfo(idptest.DischargeLocation)
 	c.Assert(err, gc.IsNil)
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		URL:          idptest.DischargeLocation + "/v1/discharger/publickey",
 		Do:           s.HTTPClient.Do,
 		ExpectStatus: http.StatusOK,
 		ExpectBody: map[string]*bakery.PublicKey{
-			"PublicKey": pk,
+			"PublicKey": &info.PublicKey,
 		},
 	})
 }
 
 func (s *dischargeSuite) TestPublicKey(c *gc.C) {
-	pk, err := s.Locator.PublicKeyForLocation(idptest.DischargeLocation)
+	info, err := s.Locator.ThirdPartyInfo(idptest.DischargeLocation)
 	c.Assert(err, gc.IsNil)
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		URL:          idptest.DischargeLocation + "/publickey",
 		Do:           s.HTTPClient.Do,
 		ExpectStatus: http.StatusOK,
 		ExpectBody: map[string]*bakery.PublicKey{
-			"PublicKey": pk,
+			"PublicKey": &info.PublicKey,
 		},
 	})
 }

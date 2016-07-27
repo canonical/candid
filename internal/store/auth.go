@@ -158,11 +158,11 @@ func (s *Store) GroupsFromRequest(c checkers.Checker, req *http.Request) ([]stri
 		return append(identity.Groups, string(identity.Username)), nil
 	}
 	logger.Debugf("no identity found, requesting login")
-	m, err := s.Service.NewMacaroon([]checkers.Caveat{
+	m, err := s.Service.NewMacaroon(httpbakery.RequestVersion(req), []checkers.Caveat{
 		checkers.DenyCaveat("discharge"),
 		checkers.NeedDeclaredCaveat(
 			checkers.Caveat{
-				Location:  s.pool.params.Location + "/v1/discharger",
+				Location:  s.pool.params.Location,
 				Condition: "is-authenticated-user",
 			},
 			"username"),
