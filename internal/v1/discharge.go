@@ -262,7 +262,7 @@ func (h *dischargeHandler) DischargeTokenForUser(p httprequest.Params, r *discha
 		return dischargeTokenForUserResponse{}, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
 
-	m, err := idputil.CreateMacaroon(h.store.Service, string(r.Username), dischargeTokenDuration)
+	m, err := idputil.CreateMacaroon(h.store.Service, string(r.Username), dischargeTokenDuration, p.Request)
 	if err != nil {
 		return dischargeTokenForUserResponse{}, errgo.NoteMask(err, "cannot create discharge token", errgo.Any)
 	}

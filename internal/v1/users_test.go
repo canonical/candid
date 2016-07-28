@@ -1071,7 +1071,7 @@ func (s *usersSuite) TestVerifyUserToken(c *gc.C) {
 		},
 	})
 	m := s.getToken(c, "jbloggs")
-	badm, err := macaroon.New([]byte{}, []byte("no such macaroon"), "loc")
+	badm, err := macaroon.New([]byte{}, []byte("no such macaroon"), "loc", macaroon.LatestVersion)
 	c.Assert(err, gc.IsNil)
 	tests := []struct {
 		about        string
@@ -1317,7 +1317,7 @@ func (s *usersSuite) TestUserGroups(c *gc.C) {
 		if test.password != "" {
 			un = test.username
 		} else if test.username != "" {
-			m, err := st.Service.NewMacaroon([]checkers.Caveat{
+			m, err := st.Service.NewMacaroon(bakery.LatestVersion, []checkers.Caveat{
 				checkers.DeclaredCaveat("username", test.username),
 			})
 			c.Assert(err, gc.IsNil)
@@ -1577,7 +1577,7 @@ func (s *usersSuite) TestMultipleEndpointAccess(c *gc.C) {
 		Groups:   []string{"g3", "g4"},
 	})
 	client := httpbakery.NewClient()
-	m, err := store.Service.NewMacaroon([]checkers.Caveat{
+	m, err := store.Service.NewMacaroon(bakery.LatestVersion, []checkers.Caveat{
 		checkers.DeclaredCaveat("username", "jbloggs1"),
 	})
 	c.Assert(err, gc.IsNil)

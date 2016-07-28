@@ -69,7 +69,7 @@ type DischargeSuite struct {
 
 	// Locator contains a bakery.PublicKeyLocator that can locate the
 	// public key for DischargeLocation.
-	Locator bakery.PublicKeyLocator
+	Locator bakery.ThirdPartyLocator
 
 	serverKey *bakery.KeyPair
 	srv       identity.HandlerCloser
@@ -113,9 +113,12 @@ func (s *DischargeSuite) SetUpTest(c *gc.C) {
 		AuthUsername: authUsername,
 		AuthPassword: authPassword,
 	})
-	s.Locator = bakery.PublicKeyLocatorMap{
-		DischargeLocation: &s.serverKey.Public,
-	}
+	locator := bakery.NewThirdPartyLocatorStore()
+	locator.AddInfo(DischargeLocation, bakery.ThirdPartyInfo{
+		PublicKey: s.serverKey.Public,
+		Version:   bakery.LatestVersion,
+	})
+	s.Locator = locator
 }
 
 func (s *DischargeSuite) TearDownTest(c *gc.C) {
@@ -133,7 +136,7 @@ func (s *DischargeSuite) AssertDischarge(c *gc.C, visit func(*url.URL) error, ch
 		Locator: s.Locator,
 	})
 	c.Assert(err, gc.IsNil)
-	m, err := b.NewMacaroon([]checkers.Caveat{{
+	m, err := b.NewMacaroon(bakery.LatestVersion, []checkers.Caveat{{
 		Location:  DischargeLocation,
 		Condition: "is-authenticated-user",
 	}})

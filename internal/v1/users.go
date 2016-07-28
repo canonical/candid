@@ -15,6 +15,7 @@ import (
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
+	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
 	"gopkg.in/macaroon.v2-unstable"
 	"gopkg.in/mgo.v2/bson"
 
@@ -257,11 +258,12 @@ func (h *apiHandler) UserToken(p httprequest.Params, r *params.UserTokenRequest)
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
-	m, err := h.store.Service.NewMacaroon([]checkers.Caveat{
-		checkers.DeclaredCaveat("uuid", id.UUID),
-		checkers.DeclaredCaveat("username", id.Username),
-		checkers.TimeBeforeCaveat(time.Now().Add(24 * time.Hour)),
-	})
+	m, err := h.store.Service.NewMacaroon(httpbakery.RequestVersion(p.Request),
+		[]checkers.Caveat{
+			checkers.DeclaredCaveat("uuid", id.UUID),
+			checkers.DeclaredCaveat("username", id.Username),
+			checkers.TimeBeforeCaveat(time.Now().Add(24 * time.Hour)),
+		})
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot mint macaroon")
 	}
