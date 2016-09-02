@@ -35,5 +35,5 @@ func NewRequest(p *httprequest.Params) Request {
 }
 
 func (r Request) ObserveMetric() {
-	requestDuration.WithLabelValues(r.params.PathPattern).Observe(float64(time.Since(r.startTime)) / float64(time.Microsecond))
+	requestDuration.WithLabelValues(r.params.PathPattern).Observe(float64(time.Since(r.startTime)) / float64(time.Second))
 }
