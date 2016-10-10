@@ -4,17 +4,21 @@
 package config
 
 import (
+	"crypto/tls"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"strings"
 	"time"
 
+	"github.com/juju/loggo"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/yaml.v2"
 
 	"github.com/CanonicalLtd/blues-identity/idp"
 )
+
+var logger = loggo.GetLogger("identity.config")
 
 // Config holds the configuration parameters for the identity service.
 type Config struct {
@@ -31,6 +35,25 @@ type Config struct {
 	IdentityProviders []IdentityProvider `yaml:"identity-providers"`
 	PrivateAddr       string             `yaml:"private-addr"`
 	DebugTeams        []string           `yaml:"debug-teams"`
+	TLSCert           string             `yaml:"tls-cert"`
+	TLSKey            string             `yaml:"tls-key"`
+}
+
+func (c *Config) TLSConfig() *tls.Config {
+	if c.TLSCert == "" || c.TLSKey == "" {
+		return nil
+	}
+
+	cert, err := tls.X509KeyPair([]byte(c.TLSCert), []byte(c.TLSKey))
+	if err != nil {
+		logger.Errorf("cannot create certificate: %s", err)
+		return nil
+	}
+	return &tls.Config{
+		Certificates: []tls.Certificate{
+			cert,
+		},
+	}
 }
 
 func (c *Config) validate() error {
