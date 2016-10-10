@@ -122,7 +122,17 @@ func serve(confPath string) error {
 	}
 
 	logger.Infof("starting the identity server")
-	return http.ListenAndServe(conf.APIAddr, server)
+
+	httpServer := &http.Server{
+		Addr:      conf.APIAddr,
+		Handler:   server,
+		TLSConfig: conf.TLSConfig(),
+	}
+
+	if conf.TLSConfig() != nil {
+		return httpServer.ListenAndServeTLS("", "")
+	}
+	return httpServer.ListenAndServe()
 }
 
 var defaultIDPs = []idp.IdentityProvider{
