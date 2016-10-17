@@ -123,6 +123,12 @@ func checkAuthenticatedUser(user *mongodoc.Identity) ([]checkers.Caveat, error) 
 // checkMemberOfGroup checks if user is member of any of the specified groups.
 func checkMemberOfGroup(user *mongodoc.Identity, targetGroups string) ([]checkers.Caveat, error) {
 	groups := strings.Fields(targetGroups)
+	for _, g := range groups {
+		// A user is always a member of their own group.
+		if g == user.Username {
+			return nil, nil
+		}
+	}
 	for _, userGroup := range user.Groups {
 		for _, g := range groups {
 			if userGroup == g {
