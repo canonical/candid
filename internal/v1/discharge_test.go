@@ -534,6 +534,20 @@ func (s *dischargeSuite) TestDischargeMemberOf(c *gc.C) {
 		expectError    string
 		expectDeclared checkers.Declared
 	}{{
+		about: "test-user is member of group test-user",
+		m: newMacaroon(c, svc, []checkers.Caveat{{
+			Location:  idptest.DischargeLocation,
+			Condition: "is-member-of test-user",
+		}}),
+		expectDeclared: checkers.Declared{},
+	}, {
+		about: "test-user is member of group test-user with multiple groups",
+		m: newMacaroon(c, svc, []checkers.Caveat{{
+			Location:  idptest.DischargeLocation,
+			Condition: "is-member-of test-user testX testY",
+		}}),
+		expectDeclared: checkers.Declared{},
+	}, {
 		about: "test membership in single group - matches",
 		m: newMacaroon(c, svc, []checkers.Caveat{{
 			Location:  idptest.DischargeLocation,
@@ -584,6 +598,38 @@ func (s *dischargeSuite) TestDischargeMemberOf(c *gc.C) {
 			c.Assert(d, jc.DeepEquals, test.expectDeclared)
 		}
 	}
+}
+
+func (s *dischargeSuite) TestDischargeXMemberOfX(c *gc.C) {
+	// if the user is X member of no group, we must still
+	// discharge is-member-of X.
+	visitor := test.WebPageVisitor{
+		Client: s.HTTPRequestClient,
+		User: &params.User{
+			Username:   "test-user",
+			ExternalID: "http://example.com/test-user",
+			Email:      "test-user@example.com",
+			FullName:   "Test User III",
+			IDPGroups:  []string{},
+		},
+	}
+	s.BakeryClient.VisitWebPage = visitor.Interactive
+	// Create the service which will issue the third party caveat.
+	svc, err := bakery.NewService(bakery.NewServiceParams{
+		Locator: s.Locator,
+	})
+	c.Assert(err, gc.IsNil)
+
+	ms, err := s.BakeryClient.DischargeAll(newMacaroon(c, svc, []checkers.Caveat{{
+		Location:  idptest.DischargeLocation,
+		Condition: "is-member-of test-user",
+	}}))
+	c.Assert(err, gc.IsNil)
+	d := checkers.InferDeclared(ms)
+	err = svc.Check(ms, checkers.New(d, checkers.TimeBefore))
+	c.Assert(err, gc.IsNil)
+	c.Assert(d, jc.DeepEquals, checkers.Declared{})
+
 }
 
 // This test is not sending the bakery protocol version so it will use the default
