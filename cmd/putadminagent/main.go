@@ -14,7 +14,6 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"strings"
 
 	"github.com/juju/idmclient"
 	"github.com/juju/idmclient/params"
@@ -55,26 +54,19 @@ func main() {
 	if flag.NArg() < 1 {
 		flag.Usage()
 	}
-	auth := os.Getenv("JUJU_IDM_AUTH")
-	if auth == "" {
-		fatalf("$JUJU_IDM_AUTH not set")
-	}
-	authParts := strings.SplitN(auth, ":", 2)
-	if len(authParts) < 2 || authParts[0] == "" {
-		fatalf("invalid $JUJU_IDM_AUTH %q; need <user>:<password>", auth)
-	}
 	location := os.Getenv("JUJU_IDM")
 	if location == "" {
 		location = "http://api.jujugui.org/identity"
 	}
 	agentName := flag.Arg(0)
 	groups := flag.Args()[1:]
-	idm := idmclient.New(idmclient.NewParams{
-		BaseURL:      location,
-		Client:       httpbakery.NewClient(),
-		AuthUsername: authParts[0],
-		AuthPassword: authParts[1],
+	idm, err := idmclient.New(idmclient.NewParams{
+		BaseURL: location,
+		Client:  httpbakery.NewClient(),
 	})
+	if err != nil {
+		fatalf("cannot create client: %v", err)
+	}
 	var key bakery.PublicKey
 	if *pubKey != "" {
 		if err := key.UnmarshalText([]byte(*pubKey)); err != nil {
