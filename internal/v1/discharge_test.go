@@ -54,21 +54,19 @@ func (s *dischargeSuite) SetUpTest(c *gc.C) {
 }
 
 func (s *dischargeSuite) TestInteractiveDischarge(c *gc.C) {
-	visitor := &test.WebPageVisitor{
-		Client: s.HTTPRequestClient,
-		User:   s.user,
+	visitor := &test.Visitor{
+		User: s.user,
 	}
-	s.AssertDischarge(c, visitor.Interactive, checkers.New(
+	s.AssertDischarge(c, visitor, checkers.New(
 		checkers.TimeBefore,
 	))
 }
 
 func (s *dischargeSuite) TestNonInteractiveDischarge(c *gc.C) {
-	visitor := &test.WebPageVisitor{
-		Client: s.HTTPRequestClient,
-		User:   s.user,
+	visitor := &test.Visitor{
+		User: s.user,
 	}
-	s.AssertDischarge(c, visitor.NonInteractive, checkers.New(
+	s.AssertDischarge(c, httpbakery.NewMultiVisitor(visitor), checkers.New(
 		checkers.TimeBefore,
 	))
 }
@@ -79,13 +77,12 @@ func (s *dischargeSuite) TestDischargeUsernameLookup(c *gc.C) {
 		User:     *s.user,
 	})
 	c.Assert(err, gc.IsNil)
-	visitor := &test.WebPageVisitor{
-		Client: s.HTTPRequestClient,
+	visitor := &test.Visitor{
 		User: &params.User{
 			Username: s.user.Username,
 		},
 	}
-	s.AssertDischarge(c, visitor.Interactive, checkers.New(
+	s.AssertDischarge(c, visitor, checkers.New(
 		checkers.TimeBefore,
 	))
 }
@@ -96,23 +93,21 @@ func (s *dischargeSuite) TestDischargeExternalIDLookup(c *gc.C) {
 		User:     *s.user,
 	})
 	c.Assert(err, gc.IsNil)
-	visitor := &test.WebPageVisitor{
-		Client: s.HTTPRequestClient,
+	visitor := &test.Visitor{
 		User: &params.User{
 			ExternalID: s.user.ExternalID,
 		},
 	}
-	s.AssertDischarge(c, visitor.Interactive, checkers.New(
+	s.AssertDischarge(c, visitor, checkers.New(
 		checkers.TimeBefore,
 	))
 }
 
 func (s *dischargeSuite) TestDischargeWhenLoggedIn(c *gc.C) {
-	visitor := &test.WebPageVisitor{
-		Client: s.HTTPRequestClient,
-		User:   s.user,
+	visitor := &test.Visitor{
+		User: s.user,
 	}
-	s.AssertDischarge(c, visitor.Interactive, checkers.New(
+	s.AssertDischarge(c, visitor, checkers.New(
 		checkers.TimeBefore,
 	))
 	s.AssertDischarge(c, noVisit, checkers.New(
@@ -127,16 +122,15 @@ func (s *dischargeSuite) TestDischargeWhenLoggedIn(c *gc.C) {
 }
 
 func (s *dischargeSuite) TestWaitReturnsDischargeToken(c *gc.C) {
-	visitor := &test.WebPageVisitor{
-		Client: s.HTTPRequestClient,
-		User:   s.user,
+	visitor := &test.Visitor{
+		User: s.user,
 	}
 	transport := &responseBodyRecordingTransport{
 		c:         c,
 		transport: s.BakeryClient.Transport,
 	}
 	s.BakeryClient.Transport = transport
-	s.AssertDischarge(c, visitor.Interactive, checkers.New(
+	s.AssertDischarge(c, visitor, checkers.New(
 		checkers.TimeBefore,
 	))
 	u, _ := url.Parse(idptest.DischargeLocation)
@@ -228,11 +222,10 @@ func (t *responseBodyRecordingTransport) RoundTrip(req *http.Request) (*http.Res
 }
 
 func (s *dischargeSuite) TestDischargeFromDifferentOriginWhenLoggedIn(c *gc.C) {
-	visitor := &test.WebPageVisitor{
-		Client: s.HTTPRequestClient,
-		User:   s.user,
+	visitor := &test.Visitor{
+		User: s.user,
 	}
-	s.AssertDischarge(c, visitor.Interactive, checkers.New(
+	s.AssertDischarge(c, visitor, checkers.New(
 		checkers.TimeBefore,
 	))
 	s.AssertDischarge(c, noVisit, checkers.New(
@@ -250,7 +243,7 @@ func (s *dischargeSuite) TestDischargeFromDifferentOriginWhenLoggedIn(c *gc.C) {
 		Condition: "is-authenticated-user",
 	}})
 	c.Assert(err, gc.IsNil)
-	s.BakeryClient.VisitWebPage = noVisit
+	s.BakeryClient.WebPageVisitor = noVisit
 	s.BakeryClient.Transport = originTransport{s.BakeryClient.Transport, "somewhere"}
 	_, err = s.BakeryClient.DischargeAll(m)
 	c.Assert(err, gc.ErrorMatches, `cannot get discharge from "https://idp.test": cannot start interactive session: unexpected call to visit`)
@@ -272,7 +265,11 @@ func (t originTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	return t.transport.RoundTrip(&req1)
 }
 
-func noVisit(*url.URL) error {
+var noVisit = noVisitor{}
+
+type noVisitor struct{}
+
+func (noVisitor) VisitWebPage(_ *httpbakery.Client, _ map[string]*url.URL) error {
 	return errors.New("unexpected call to visit")
 }
 
@@ -508,8 +505,7 @@ func (m *requestModifier) RoundTrip(r *http.Request) (*http.Response, error) {
 }
 
 func (s *dischargeSuite) TestDischargeMemberOf(c *gc.C) {
-	visitor := test.WebPageVisitor{
-		Client: s.HTTPRequestClient,
+	visitor := test.Visitor{
 		User: &params.User{
 			Username:   "test-user",
 			ExternalID: "http://example.com/test-user",
@@ -521,7 +517,7 @@ func (s *dischargeSuite) TestDischargeMemberOf(c *gc.C) {
 			},
 		},
 	}
-	s.BakeryClient.VisitWebPage = visitor.Interactive
+	s.BakeryClient.WebPageVisitor = visitor
 	// Create the service which will issue the third party caveat.
 	svc, err := bakery.NewService(bakery.NewServiceParams{
 		Locator: s.Locator,
@@ -603,8 +599,7 @@ func (s *dischargeSuite) TestDischargeMemberOf(c *gc.C) {
 func (s *dischargeSuite) TestDischargeXMemberOfX(c *gc.C) {
 	// if the user is X member of no group, we must still
 	// discharge is-member-of X.
-	visitor := test.WebPageVisitor{
-		Client: s.HTTPRequestClient,
+	visitor := test.Visitor{
 		User: &params.User{
 			Username:   "test-user",
 			ExternalID: "http://example.com/test-user",
@@ -613,7 +608,7 @@ func (s *dischargeSuite) TestDischargeXMemberOfX(c *gc.C) {
 			IDPGroups:  []string{},
 		},
 	}
-	s.BakeryClient.VisitWebPage = visitor.Interactive
+	s.BakeryClient.WebPageVisitor = visitor
 	// Create the service which will issue the third party caveat.
 	svc, err := bakery.NewService(bakery.NewServiceParams{
 		Locator: s.Locator,
@@ -688,11 +683,10 @@ func (s *dischargeSuite) TestDischargeStatusUnauthorizedResponse(c *gc.C) {
 }
 
 func (s *dischargeSuite) TestDischargeLegacyLocation(c *gc.C) {
-	visitor := &test.WebPageVisitor{
-		Client: s.HTTPRequestClient,
-		User:   s.user,
+	visitor := &test.Visitor{
+		User: s.user,
 	}
-	s.BakeryClient.VisitWebPage = visitor.Interactive
+	s.BakeryClient.WebPageVisitor = visitor
 	svc, err := bakery.NewService(bakery.NewServiceParams{
 		Locator: s.Locator,
 	})
@@ -743,11 +737,10 @@ func (s *dischargeSuite) TestIdentityCookieParameters(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 	jar := new(testCookieJar)
 	s.BakeryClient.Client.Jar = jar
-	visitor := test.WebPageVisitor{
-		Client: s.HTTPRequestClient,
-		User:   s.user,
+	visitor := test.Visitor{
+		User: s.user,
 	}
-	s.BakeryClient.VisitWebPage = visitor.Interactive
+	s.BakeryClient.WebPageVisitor = visitor
 	m := newMacaroon(c, svc, []checkers.Caveat{{
 		Location:  idptest.DischargeLocation,
 		Condition: "is-authenticated-user",

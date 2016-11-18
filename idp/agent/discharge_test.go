@@ -17,7 +17,6 @@ import (
 	"github.com/CanonicalLtd/blues-identity/idp"
 	"github.com/CanonicalLtd/blues-identity/idp/agent"
 	"github.com/CanonicalLtd/blues-identity/idp/idptest"
-	"github.com/CanonicalLtd/blues-identity/idp/idputil"
 )
 
 type dischargeSuite struct {
@@ -73,11 +72,10 @@ func (s *dischargeSuite) TestLegacyAgentDischarge(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 	s.BakeryClient.Key = s.agentKey
 	s.AssertDischarge(c,
-		agentVisit(c,
-			s.BakeryClient,
+		httpbakery.NewMultiVisitor(&agentVisitor{
 			"test@admin@idm",
 			&s.agentKey.Public,
-		),
+		}),
 		checkers.New(
 			checkers.TimeBefore,
 		),
@@ -90,24 +88,27 @@ type agentLoginRequest struct {
 	params.AgentLogin `httprequest:",body"`
 }
 
-func agentVisit(c *gc.C, client *httpbakery.Client, username string, pk *bakery.PublicKey) func(u *url.URL) error {
-	return func(u *url.URL) error {
-		cl := &httprequest.Client{
-			Doer: client,
-		}
-		var loginMethods params.LoginMethods
-		if err := idputil.GetLoginMethods(cl, u, &loginMethods); err != nil {
-			return errgo.Mask(err)
-		}
-		req := &agentLoginRequest{
-			AgentLogin: params.AgentLogin{
-				Username:  params.Username(username),
-				PublicKey: pk,
-			},
-		}
-		if err := cl.CallURL(loginMethods.Agent, req, nil); err != nil {
-			return errgo.Mask(err)
-		}
-		return nil
+type agentVisitor struct {
+	username params.Username
+	pk       *bakery.PublicKey
+}
+
+func (v *agentVisitor) VisitWebPage(client *httpbakery.Client, m map[string]*url.URL) error {
+	agentURL, ok := m["agent"]
+	if !ok {
+		return httpbakery.ErrMethodNotSupported
 	}
+	cl := &httprequest.Client{
+		Doer: client,
+	}
+	req := &agentLoginRequest{
+		AgentLogin: params.AgentLogin{
+			Username:  v.username,
+			PublicKey: v.pk,
+		},
+	}
+	if err := cl.CallURL(agentURL.String(), req, nil); err != nil {
+		return errgo.Mask(err)
+	}
+	return nil
 }

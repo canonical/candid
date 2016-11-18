@@ -12,6 +12,7 @@ import (
 	"github.com/juju/httprequest"
 	"github.com/juju/idmclient/params"
 	"gopkg.in/errgo.v1"
+	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
 
 	"github.com/CanonicalLtd/blues-identity/config"
 	"github.com/CanonicalLtd/blues-identity/idp"
@@ -107,12 +108,7 @@ func (idp *identityProvider) Handle(c idp.Context) {
 	}
 }
 
-// WebPageVisitor implements the login protocol required for the test
-// identity provider.
-type WebPageVisitor struct {
-	// Client is a client to use for the login.
-	Client *httprequest.Client
-
+type Visitor struct {
 	// User contains the user to log in as. User may be fully defined
 	// in which case the user is added to the database or can be a
 	// Username or ExternalID. If the latter two cases the database
@@ -120,42 +116,44 @@ type WebPageVisitor struct {
 	User *params.User
 }
 
+func (v Visitor) VisitWebPage(client *httpbakery.Client, urls map[string]*url.URL) error {
+	cl := &httprequest.Client{
+		Doer: client,
+	}
+	if u, ok := urls["test"]; ok {
+		return v.nonInteractive(cl, u)
+	}
+	return v.interactive(cl, urls[httpbakery.UserInteractionMethod])
+}
+
 // Interactive is a web page visit function that performs an interactive
 // login.
-func (v WebPageVisitor) Interactive(u *url.URL) error {
+func (v Visitor) interactive(client *httprequest.Client, u *url.URL) error {
 	var resp testInteractiveLoginResponse
-	if err := v.Client.Get(u.String(), &resp); err != nil {
+	if err := client.Get(u.String(), &resp); err != nil {
 		return errgo.Mask(err)
 	}
-	if err := v.doLogin(resp.URL); err != nil {
+	if err := v.doLogin(client, resp.URL); err != nil {
 		return errgo.Mask(err)
 	}
 	return nil
 }
 
-type testLoginMethods struct {
-	Test string `json:"test"`
-}
-
 // NonInteractive is a web page visit function that performs an
 // non-interactive login.
-func (v WebPageVisitor) NonInteractive(u *url.URL) error {
-	var lm testLoginMethods
-	if err := idputil.GetLoginMethods(v.Client, u, &lm); err != nil {
-		return errgo.Mask(err)
-	}
-	if err := v.doLogin(lm.Test); err != nil {
+func (v Visitor) nonInteractive(client *httprequest.Client, u *url.URL) error {
+	if err := v.doLogin(client, u.String()); err != nil {
 		return errgo.Mask(err)
 	}
 	return nil
 }
 
 // doLogin performs the common part of the login.
-func (v WebPageVisitor) doLogin(url string) error {
+func (v Visitor) doLogin(client *httprequest.Client, url string) error {
 	req := &testLoginRequest{
 		User: v.User,
 	}
-	if err := v.Client.CallURL(url, req, nil); err != nil {
+	if err := client.CallURL(url, req, nil); err != nil {
 		return errgo.Mask(err)
 	}
 	return nil

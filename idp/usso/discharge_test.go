@@ -55,7 +55,7 @@ func (s *dischargeSuite) TestInteractiveDischarge(c *gc.C) {
 		Groups:   []string{"test1", "test2"},
 	})
 	s.MockUSSO.SetLoginUser("test")
-	s.AssertDischarge(c, s.visitWebPage, checkers.New(
+	s.AssertDischarge(c, idptest.VisitorFunc(s.visitWebPage), checkers.New(
 		checkers.TimeBefore,
 	))
 }

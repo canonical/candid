@@ -73,7 +73,7 @@ func (s *dischargeSuite) SetUpTest(c *gc.C) {
 }
 
 func (s *dischargeSuite) TestInteractiveDischarge(c *gc.C) {
-	s.AssertDischarge(c, s.visitInteractive, checkers.New(
+	s.AssertDischarge(c, idptest.VisitorFunc(s.visitInteractive), checkers.New(
 		checkers.TimeBefore,
 	))
 }
@@ -143,7 +143,7 @@ func (h keystoneFormFiller) Fill(f envschemaform.Form) (map[string]interface{}, 
 }
 
 func (s *dischargeSuite) TestTokenDischarge(c *gc.C) {
-	s.AssertDischarge(c, s.visitToken, checkers.New(
+	s.AssertDischarge(c, idptest.VisitorFunc(s.visitToken), checkers.New(
 		checkers.TimeBefore,
 	))
 }

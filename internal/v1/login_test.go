@@ -5,14 +5,13 @@ package v1_test
 import (
 	"encoding/base64"
 	"encoding/json"
-	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"strings"
 
-	"github.com/juju/httprequest"
 	"github.com/juju/idmclient/params"
 	gc "gopkg.in/check.v1"
+	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
 	"gopkg.in/macaroon.v2-unstable"
 
 	"github.com/CanonicalLtd/blues-identity/idp"
@@ -49,11 +48,8 @@ func (s *loginSuite) TearDownSuite(c *gc.C) {
 
 func (s *loginSuite) TestInteractiveLogin(c *gc.C) {
 	jar := &testCookieJar{}
-	client := &http.Client{
-		Jar: jar,
-	}
-	visitor := test.WebPageVisitor{
-		Client: &httprequest.Client{Doer: client},
+	client := httpbakery.NewClient()
+	visitor := test.Visitor{
 		User: &params.User{
 			Username:   "test",
 			ExternalID: "http://example.com/+id/test",
@@ -62,20 +58,17 @@ func (s *loginSuite) TestInteractiveLogin(c *gc.C) {
 			IDPGroups:  []string{"test1", "test2"},
 		},
 	}
-	u, err := url.Parse(location + "/v1/login")
+	u, err := url.Parse(location + "/v1/idp/test/login")
 	c.Assert(err, gc.IsNil)
-	err = visitor.Interactive(u)
+	err = visitor.VisitWebPage(client, map[string]*url.URL{httpbakery.UserInteractionMethod: u})
 	c.Assert(err, gc.IsNil)
 	c.Assert(jar.cookies, gc.HasLen, 0)
 }
 
 func (s *loginSuite) TestNonInteractiveLogin(c *gc.C) {
 	jar := &testCookieJar{}
-	client := &http.Client{
-		Jar: jar,
-	}
-	visitor := test.WebPageVisitor{
-		Client: &httprequest.Client{Doer: client},
+	client := httpbakery.NewClient()
+	visitor := test.Visitor{
 		User: &params.User{
 			Username:   "test",
 			ExternalID: "http://example.com/+id/test",
@@ -84,25 +77,22 @@ func (s *loginSuite) TestNonInteractiveLogin(c *gc.C) {
 			IDPGroups:  []string{"test1", "test2"},
 		},
 	}
-	u, err := url.Parse(location + "/v1/login")
+	u, err := url.Parse(location + "/v1/idp/test/login")
 	c.Assert(err, gc.IsNil)
-	err = visitor.NonInteractive(u)
+	err = visitor.VisitWebPage(client, map[string]*url.URL{"test": u})
 	c.Assert(err, gc.IsNil)
 	c.Assert(jar.cookies, gc.HasLen, 0)
 }
 
 func (s *loginSuite) TestLoginFailure(c *gc.C) {
 	jar := &testCookieJar{}
-	client := &http.Client{
-		Jar: jar,
+	client := httpbakery.NewClient()
+	visitor := test.Visitor{
+		User: &params.User{},
 	}
-	visitor := test.WebPageVisitor{
-		Client: &httprequest.Client{Doer: client},
-		User:   &params.User{},
-	}
-	u, err := url.Parse(location + "/v1/login")
+	u, err := url.Parse(location + "/v1/idp/test/login")
 	c.Assert(err, gc.IsNil)
-	err = visitor.Interactive(u)
+	err = visitor.VisitWebPage(client, map[string]*url.URL{httpbakery.UserInteractionMethod: u})
 	c.Assert(err, gc.ErrorMatches, `POST .*: httprequest: user "" not found: not found`)
 	c.Assert(jar.cookies, gc.HasLen, 0)
 }

@@ -10,13 +10,12 @@ import (
 	"github.com/juju/httprequest"
 	"github.com/juju/idmclient/params"
 	gc "gopkg.in/check.v1"
-	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
+	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
 
 	"github.com/CanonicalLtd/blues-identity/idp"
 	"github.com/CanonicalLtd/blues-identity/idp/agent"
 	"github.com/CanonicalLtd/blues-identity/idp/idptest"
-	"github.com/CanonicalLtd/blues-identity/idp/idputil"
 	"github.com/CanonicalLtd/blues-identity/idp/usso/internal/mockusso"
 	"github.com/CanonicalLtd/blues-identity/idp/usso/ussooauth"
 )
@@ -92,36 +91,41 @@ func (s *dischargeSuite) TestDischarge(c *gc.C) {
 		Token:  "test-token",
 		Secret: "secret2",
 	}
-	s.AssertDischarge(c, s.oauthVisit(c), checkers.New(
+	visitor := httpbakery.NewMultiVisitor(&oauthVisitor{
+		c,
+		s.client,
+		s.token,
+	})
+	s.AssertDischarge(c, visitor, checkers.New(
 		checkers.TimeBefore,
 	))
 }
 
+type oauthVisitor struct {
+	c      *gc.C
+	client *oauth.Client
+	token  *oauth.Credentials
+}
+
 // oauthVisit returns a visit function that will sign a response to the return_to url
 // with the oauth credentials provided.
-func (s *dischargeSuite) oauthVisit(c *gc.C) func(*url.URL) error {
-	return func(u *url.URL) error {
-		var lm params.LoginMethods
-		if err := idputil.GetLoginMethods(s.HTTPRequestClient, u, &lm); err != nil {
-			return errgo.Mask(err)
-		}
-		uOAuth, err := url.Parse(lm.UbuntuSSOOAuth)
-		if err != nil {
-			return err
-		}
-		q := uOAuth.Query()
-		uOAuth.RawQuery = ""
-		resp, err := s.client.Get(s.HTTPClient, s.token, uOAuth.String(), q)
-		if err != nil {
-			return err
-		}
-		defer resp.Body.Close()
-		if resp.StatusCode == http.StatusOK {
-			return nil
-		}
-		var perr params.Error
-		err = httprequest.UnmarshalJSONResponse(resp, &perr)
-		c.Assert(err, gc.IsNil)
-		return &perr
+func (v *oauthVisitor) VisitWebPage(c *httpbakery.Client, m map[string]*url.URL) error {
+	uOAuth, ok := m["usso_oauth"]
+	if !ok {
+		return httpbakery.ErrMethodNotSupported
 	}
+	q := uOAuth.Query()
+	uOAuth.RawQuery = ""
+	resp, err := v.client.Get(c.Client, v.token, uOAuth.String(), q)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusOK {
+		return nil
+	}
+	var perr params.Error
+	err = httprequest.UnmarshalJSONResponse(resp, &perr)
+	v.c.Assert(err, gc.IsNil)
+	return &perr
 }

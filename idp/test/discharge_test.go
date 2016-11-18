@@ -6,6 +6,7 @@ import (
 	"github.com/juju/idmclient/params"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
+	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
 
 	"github.com/CanonicalLtd/blues-identity/idp"
 	"github.com/CanonicalLtd/blues-identity/idp/idptest"
@@ -14,7 +15,7 @@ import (
 
 type dischargeSuite struct {
 	idptest.DischargeSuite
-	visitor test.WebPageVisitor
+	visitor test.Visitor
 }
 
 var _ = gc.Suite(&dischargeSuite{})
@@ -24,8 +25,7 @@ func (s *dischargeSuite) SetUpTest(c *gc.C) {
 		test.IdentityProvider,
 	}
 	s.DischargeSuite.SetUpTest(c)
-	s.visitor = test.WebPageVisitor{
-		Client: s.HTTPRequestClient,
+	s.visitor = test.Visitor{
 		User: &params.User{
 			Username:   "test",
 			ExternalID: "https://example.com/+id/test",
@@ -34,13 +34,13 @@ func (s *dischargeSuite) SetUpTest(c *gc.C) {
 }
 
 func (s *dischargeSuite) TestInteractiveDischarge(c *gc.C) {
-	s.AssertDischarge(c, s.visitor.Interactive, checkers.New(
+	s.AssertDischarge(c, s.visitor, checkers.New(
 		checkers.TimeBefore,
 	))
 }
 
 func (s *dischargeSuite) TestNonInteractiveDischarge(c *gc.C) {
-	s.AssertDischarge(c, s.visitor.NonInteractive, checkers.New(
+	s.AssertDischarge(c, httpbakery.NewMultiVisitor(s.visitor), checkers.New(
 		checkers.TimeBefore,
 	))
 }

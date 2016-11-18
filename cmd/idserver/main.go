@@ -23,6 +23,7 @@ import (
 	"github.com/CanonicalLtd/blues-identity/idp/agent"
 	_ "github.com/CanonicalLtd/blues-identity/idp/keystone"
 	"github.com/CanonicalLtd/blues-identity/idp/usso"
+	_ "github.com/CanonicalLtd/blues-identity/idp/usso/ussodischarge"
 	"github.com/CanonicalLtd/blues-identity/idp/usso/ussooauth"
 )
 
