@@ -137,7 +137,7 @@ func (s *serverSuite) TestServerHasAccessControlAllowHeaders(c *gc.C) {
 
 func (s *serverSuite) TestServerPanicRecovery(c *gc.C) {
 	w := new(loggo.TestWriter)
-	loggo.RegisterWriter("test", w, loggo.TRACE)
+	loggo.RegisterWriter("test", w)
 	db := s.Session.DB("foo")
 	impl := map[string]identity.NewAPIHandlerFunc{
 		"/a": func(*store.Pool, identity.ServerParams) ([]httprequest.Handler, error) {

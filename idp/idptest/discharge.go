@@ -73,6 +73,8 @@ type DischargeSuite struct {
 
 	serverKey *bakery.KeyPair
 	srv       identity.HandlerCloser
+
+	adminAgentKey *bakery.KeyPair
 }
 
 // SetUpTest creates a new identity server and serves it. It configures a
@@ -82,17 +84,20 @@ func (s *DischargeSuite) SetUpTest(c *gc.C) {
 	var err error
 	s.serverKey, err = bakery.GenerateKey()
 	c.Assert(err, gc.IsNil)
+	s.adminAgentKey, err = bakery.GenerateKey()
+	c.Assert(err, gc.IsNil)
 	db := s.Session.Copy().DB("idptest")
 	s.srv, err = identity.NewServer(db, identity.ServerParams{
-		AuthUsername:      authUsername,
-		AuthPassword:      authPassword,
-		Key:               s.serverKey,
-		Launchpad:         lpad.Production,
-		Location:          DischargeLocation,
-		MaxMgoSessions:    100,
-		RequestTimeout:    time.Second,
-		PrivateAddr:       "localhost",
-		IdentityProviders: s.IDPs,
+		AuthUsername:        authUsername,
+		AuthPassword:        authPassword,
+		Key:                 s.serverKey,
+		Launchpad:           lpad.Production,
+		Location:            DischargeLocation,
+		MaxMgoSessions:      100,
+		RequestTimeout:      time.Second,
+		PrivateAddr:         "localhost",
+		IdentityProviders:   s.IDPs,
+		AdminAgentPublicKey: &s.adminAgentKey.Public,
 	}, identity.V1)
 	c.Assert(err, gc.IsNil)
 	s.Server = httptest.NewServer(s.srv)
@@ -107,12 +112,15 @@ func (s *DischargeSuite) SetUpTest(c *gc.C) {
 	s.HTTPRequestClient = &httprequest.Client{
 		Doer: s.BakeryClient,
 	}
-	s.IDMClient = idmclient.New(idmclient.NewParams{
-		BaseURL:      s.Server.URL,
-		Client:       s.BakeryClient,
-		AuthUsername: authUsername,
-		AuthPassword: authPassword,
+	bc := httpbakery.NewClient()
+	bc.Client.Transport = s.RoundTripper
+	bc.Key = s.adminAgentKey
+	s.IDMClient, err = idmclient.New(idmclient.NewParams{
+		BaseURL:       DischargeLocation,
+		Client:        bc,
+		AgentUsername: "admin@idm",
 	})
+	c.Assert(err, gc.IsNil)
 	locator := bakery.NewThirdPartyLocatorStore()
 	locator.AddInfo(DischargeLocation, bakery.ThirdPartyInfo{
 		PublicKey: s.serverKey.Public,

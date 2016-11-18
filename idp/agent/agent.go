@@ -88,8 +88,8 @@ func (a *identityProvider) Handle(c idp.Context) {
 	}
 	p := ac.Params()
 	var login agentLoginRequest
-	if ac.AgentLogin().Username != "" {
-		login.AgentLogin = ac.AgentLogin()
+	if al := ac.AgentLogin(); al.Username != "" {
+		login.AgentLogin = al
 	} else {
 		if err := httprequest.Unmarshal(p, &login); err != nil {
 			ac.LoginFailure(errgo.NoteMask(err, "cannot unmarshal request", errgo.Any))

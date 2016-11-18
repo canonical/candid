@@ -60,6 +60,9 @@ type StoreParams struct {
 	// for communication between identity servers. Note that this
 	// should not contain a port.
 	PrivateAddr string
+
+	// AdminAgentPublicKey contains the public key of the admin agent.
+	AdminAgentPublicKey *bakery.PublicKey
 }
 
 type LimitPool interface {

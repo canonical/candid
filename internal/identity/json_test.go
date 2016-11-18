@@ -56,7 +56,7 @@ func (s *jsonSuite) TestHandleErrors(c *gc.C) {
 
 func (s *jsonSuite) TestHandleErrorsInternalServerError(c *gc.C) {
 	w := new(loggo.TestWriter)
-	loggo.RegisterWriter("test", w, loggo.TRACE)
+	loggo.RegisterWriter("test", w)
 	s.mux.Handle("GET", "/error/", identity.ErrorMapper.HandleErrors(func(httprequest.Params) error {
 		return errgo.New("bad wolf")
 	}))

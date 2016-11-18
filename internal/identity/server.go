@@ -37,14 +37,15 @@ func New(db *mgo.Database, sp ServerParams, versions map[string]NewAPIHandlerFun
 
 	// Create the identities store.
 	pool, err := store.NewPool(db, store.StoreParams{
-		AuthUsername:   sp.AuthUsername,
-		AuthPassword:   sp.AuthPassword,
-		Key:            sp.Key,
-		Location:       sp.Location,
-		Launchpad:      sp.Launchpad,
-		MaxMgoSessions: sp.MaxMgoSessions,
-		RequestTimeout: sp.RequestTimeout,
-		PrivateAddr:    sp.PrivateAddr,
+		AuthUsername:        sp.AuthUsername,
+		AuthPassword:        sp.AuthPassword,
+		Key:                 sp.Key,
+		Location:            sp.Location,
+		Launchpad:           sp.Launchpad,
+		MaxMgoSessions:      sp.MaxMgoSessions,
+		RequestTimeout:      sp.RequestTimeout,
+		PrivateAddr:         sp.PrivateAddr,
+		AdminAgentPublicKey: sp.AdminAgentPublicKey,
 	})
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot make store")
@@ -145,6 +146,9 @@ type ServerParams struct {
 	// DebugTeams contains the set of launchpad teams that may access
 	// the restricted debug endpoints.
 	DebugTeams []string
+
+	// AdminAgentPublicKey contains the public key of the admin agent.
+	AdminAgentPublicKey *bakery.PublicKey
 }
 
 //notFound is the handler that is called when a handler cannot be found

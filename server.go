@@ -78,6 +78,9 @@ type ServerParams struct {
 	// DebugTeams contains the set of launchpad teams that may access
 	// the restricted debug endpoints.
 	DebugTeams []string
+
+	// AdminAgentPublicKey contains the public key of the admin agent.
+	AdminAgentPublicKey *bakery.PublicKey
 }
 
 // NewServer returns a new handler that handles identity service requests and
