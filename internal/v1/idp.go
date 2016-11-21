@@ -133,7 +133,7 @@ func (c *idpHandler) FindUserByExternalId(id string) (*params.User, error) {
 		}
 		return nil, errgo.Mask(err)
 	}
-	return userFromIdentity(&identity)
+	return userFromIdentity(c.store, &identity)
 }
 
 // FindUserByName implements idp.Context.FindUserByName.
@@ -142,27 +142,23 @@ func (c *idpHandler) FindUserByName(name params.Username) (*params.User, error) 
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
-	return userFromIdentity(id)
+	return userFromIdentity(c.store, id)
 }
 
 // UpdateUser implements idp.Context.UpdateUser.
 func (c *idpHandler) UpdateUser(u *params.User) error {
 	id := identityFromUser(u)
-	groups, err := c.store.GetLaunchpadGroups(id.ExternalID, id.Email)
-	if err != nil {
-		logger.Warningf("failed to fetch list of groups from launchpad for %q: %s", id.Email, err)
+	onInsert := make(bson.D, 0, 3)
+	if id.Groups != nil {
+		onInsert = append(onInsert, bson.DocElem{"groups", id.Groups})
+		id.Groups = nil
 	}
-	groups = append(id.Groups, groups...)
-	err = c.store.SetGroups(id.Username, groups)
-	if err != nil {
-		if errgo.Cause(err) == params.ErrNotFound {
-			err := c.store.InsertIdentity(id)
-			if err != nil {
-				return errgo.NoteMask(err, "cannot store identity", errgo.Is(params.ErrAlreadyExists))
-			}
-			return nil
-		}
-		return errgo.Mask(err)
+	if id.SSHKeys != nil {
+		onInsert = append(onInsert, bson.DocElem{"ssh_keys", id.SSHKeys})
+		id.SSHKeys = nil
+	}
+	if err := c.store.UpsertIdentity(id, onInsert); err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrAlreadyExists))
 	}
 	return nil
 }

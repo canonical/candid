@@ -10,6 +10,7 @@ import (
 
 	"github.com/juju/idmclient/params"
 	"github.com/juju/loggo"
+	"github.com/juju/utils/cache"
 	"github.com/pborman/uuid"
 	"github.com/prometheus/client_golang/prometheus"
 	"gopkg.in/errgo.v1"
@@ -118,17 +119,19 @@ type Pool struct {
 	// InteractionRequired rendezvous.
 	meetingServer *meeting.Server
 
-	params   StoreParams
-	db       *mgo.Database
-	service  *bakery.Service
-	rootKeys *mgostorage.RootKeys
+	params         StoreParams
+	db             *mgo.Database
+	service        *bakery.Service
+	rootKeys       *mgostorage.RootKeys
+	launchpadCache *cache.Cache
 }
 
 // NewPool creates a new Pool. The pool will be sized at sp.MaxMgoSessions.
 func NewPool(db *mgo.Database, sp StoreParams) (*Pool, error) {
 	p := &Pool{
-		db:     db,
-		params: sp,
+		db:             db,
+		params:         sp,
+		launchpadCache: cache.New(10 * time.Minute),
 	}
 	if sp.PrivateAddr == "" {
 		return nil, errgo.New("no private address configured")
@@ -398,11 +401,14 @@ func (s *Store) ensureIndexes() error {
 	return nil
 }
 
-// InsertIdentity adds an identity to the identities collection.
-// InsertIdentity will only insert an existing entry when both the UserName and
-// ExternalID match the destination record. If the Identity clashes with an existing
-// Identity then an error is returned with the cause params.ErrAlreadyExists.
-func (s *Store) InsertIdentity(doc *mongodoc.Identity) error {
+// UpsertIdentity creates, or updates, the identity described in the
+// given document. The document with the provided username and external
+// ID, or username and owner will be upserted. The email, gravatar ID and
+// fullname will always be set to the values in the given document.
+// Groups, SSH keys, public keys and extra info will only be set if they
+// have non-nil values. Any field value pairs specified in onInsert will
+// be added to the identity only if a new identity document is created.
+func (s *Store) UpsertIdentity(doc *mongodoc.Identity, onInsert bson.D) error {
 	doc.UUID = uuid.NewSHA1(IdentityNamespace, []byte(doc.Username)).String()
 	doc.Groups = uniqueStrings(doc.Groups)
 	if doc.ExternalID != "" && doc.Owner != "" {
@@ -411,7 +417,36 @@ func (s *Store) InsertIdentity(doc *mongodoc.Identity) error {
 	if doc.ExternalID == "" && doc.Owner == "" {
 		return errgo.New("no external_id or owner specified")
 	}
-	err := s.DB.Identities().Insert(doc)
+	query := make(bson.D, 3)
+	query[0] = bson.DocElem{"_id", doc.UUID}
+	query[1] = bson.DocElem{"username", doc.Username}
+	if doc.ExternalID != "" {
+		query[2] = bson.DocElem{"external_id", doc.ExternalID}
+	} else {
+		query[2] = bson.DocElem{"owner", doc.Owner}
+	}
+	set := make(bson.D, 3, 7)
+	set[0] = bson.DocElem{"email", doc.Email}
+	set[1] = bson.DocElem{"gravatarid", doc.GravatarID}
+	set[2] = bson.DocElem{"fullname", doc.FullName}
+	if doc.Groups != nil {
+		set = append(set, bson.DocElem{"groups", doc.Groups})
+	}
+	if doc.SSHKeys != nil {
+		set = append(set, bson.DocElem{"ssh_keys", doc.SSHKeys})
+	}
+	if doc.PublicKeys != nil {
+		set = append(set, bson.DocElem{"public_keys", doc.PublicKeys})
+	}
+	if doc.ExtraInfo != nil {
+		set = append(set, bson.DocElem{"extrainfo", doc.ExtraInfo})
+	}
+	update := make(bson.D, 1, 2)
+	update[0] = bson.DocElem{"$set", set}
+	if len(onInsert) > 0 {
+		update = append(update, bson.DocElem{"$setOnInsert", onInsert})
+	}
+	_, err := s.DB.Identities().Upsert(query, update)
 	if mgo.IsDup(err) {
 		return errgo.WithCausef(nil, params.ErrAlreadyExists, "cannot add user: duplicate username or external_id")
 	}
@@ -443,40 +478,32 @@ func (s *Store) SetPublicKeys(username string, publickeys []mongodoc.PublicKey) 
 
 // GetLaunchpadGroups gets the groups from Launchpad if the user is a launchpad user
 // otherwise an empty array.
-func (s *Store) GetLaunchpadGroups(externalId, email string) ([]string, error) {
-	if strings.HasPrefix(externalId, "https://login.ubuntu.com/+id/") {
-		lpgroups, err := s.getLaunchpadGroups(email)
-		if err == nil {
-			return lpgroups, nil
-		} else {
-			return []string{}, errgo.Mask(err)
-		}
+func (s *Store) GetLaunchpadGroups(externalId string) ([]string, error) {
+	if !strings.HasPrefix(externalId, "https://login.ubuntu.com/+id/") {
+		return nil, nil
 	}
-	return []string{}, nil
+	groups, err := s.pool.launchpadCache.Get(externalId, func() (interface{}, error) {
+		return s.getLaunchpadGroups(externalId)
+	})
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
+	return groups.([]string), nil
 }
 
 // getLaunchpadGroups tries to fetch the list of teams the user
 // belongs to in launchpad. Only public teams are supported.
-func (s *Store) getLaunchpadGroups(email string) ([]string, error) {
+func (s *Store) getLaunchpadGroups(externalId string) ([]string, error) {
 	t := time.Now()
 	root, err := lpad.Login(s.pool.params.Launchpad, &lpad.OAuth{Consumer: "blues", Anonymous: true})
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot connect to launchpad")
 	}
-	people, err := root.FindPeople(email)
+	user, err := getLaunchpadPersonByOpenID(root, externalId)
 	if err != nil {
-		return nil, errgo.Notef(err, "cannot find user %q", email)
+		return nil, errgo.Notef(err, "cannot find user %s", externalId)
 	}
-	if people.TotalSize() != 1 {
-		return nil, errgo.Newf("cannot find user %q", email)
-	}
-	var user *lpad.Person
-	people.For(func(p *lpad.Person) error {
-		user = p
-		return nil
-	})
-	teams := user.Link("super_teams_collection_link")
-	teams, err = teams.Get(nil)
+	teams, err := user.Link("super_teams_collection_link").Get(nil)
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot get team list for launchpad user %q", user.Name())
 	}
@@ -487,6 +514,14 @@ func (s *Store) getLaunchpadGroups(email string) ([]string, error) {
 	})
 	s.m_getlpgroups.Observe(float64(time.Since(t)) / float64(time.Microsecond))
 	return groups, nil
+}
+
+func getLaunchpadPersonByOpenID(root *lpad.Root, externalId string) (*lpad.Person, error) {
+	v, err := root.Location("/people").Get(lpad.Params{"ws.op": " getByOpenIDIdentifier", "identifier": externalId})
+	if err != nil {
+		return nil, errgo.Notef(err, "cannot find user %s", externalId)
+	}
+	return &lpad.Person{v}, nil
 }
 
 // GetIdentity retrieves the identity with the given username. If the

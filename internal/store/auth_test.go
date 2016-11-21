@@ -53,7 +53,7 @@ func (s *authSuite) TearDownTest(c *gc.C) {
 func (s *authSuite) createIdentity(c *gc.C, doc *mongodoc.Identity) (uuid string) {
 	store := s.pool.GetNoLimit()
 	defer s.pool.Put(store)
-	err := store.InsertIdentity(doc)
+	err := store.UpsertIdentity(doc, nil)
 	c.Assert(err, gc.IsNil)
 	return doc.UUID
 }
