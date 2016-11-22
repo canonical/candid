@@ -640,6 +640,7 @@ func (cm collectionMonitor) Collect(c chan<- prometheus.Metric) {
 		cnt, err := entry.collection.Count()
 		if err != nil {
 			entry.m.Set(math.NaN())
+			logger.Debugf("collectionMonitor Collect could not get collection count for %s: %s", entry.m.Desc(), err)
 		} else {
 			entry.m.Set(float64(cnt))
 		}
