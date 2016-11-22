@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"sort"
 	"strings"
 	"time"
 
@@ -60,45 +61,55 @@ func (h *apiHandler) User(p httprequest.Params, r *params.UserRequest) (*params.
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
-	return userFromIdentity(id)
+	return userFromIdentity(h.store, id)
 }
 
+// SetUser creates or updates the user with the given username. If the
+// user already exists then any IDPGroups or SSHKeys specified in the
+// request will be ignored. See SetUserGroups, ModifyUserGroups,
+// SetSSHKeys and DeleteSSHKeys if you wish to manipulate these for a
+// user.
 func (h *apiHandler) SetUser(p httprequest.Params, u *params.SetUserRequest) error {
-	isUser := u.Owner == ""
-	if isUser {
-		if err := h.checkSetUserParams(p.Request, u); err != nil {
-			return errgo.Mask(err, errgo.Any)
-		}
-		groups, err := storeGetLaunchpadGroups(h.store, u.ExternalID, u.Email)
-		if err != nil {
-			logger.Warningf("failed to fetch list of groups from launchpad for %q: %s", u.Email, err)
-		}
-		u.IDPGroups = append(u.IDPGroups, groups...)
-	} else {
-		if err := h.checkSetAgentParams(p.Request, u); err != nil {
-			return errgo.Mask(err, errgo.Any)
-		}
+	if u.Owner != "" {
+		return h.setAgent(p, u)
 	}
-	err := h.store.SetGroups(string(u.Username), u.IDPGroups)
-	if err == nil {
-		keys := make([]mongodoc.PublicKey, len(u.PublicKeys))
-		for i, pk := range u.PublicKeys {
-			keys[i].Key = pk.Key[:]
-		}
-		return h.store.SetPublicKeys(string(u.Username), keys)
+	if err := h.store.CheckACL(opCreateUser, p.Request, []string{store.AdminGroup}); err != nil {
+		return errgo.Mask(err, errgo.Any)
 	}
-	if errgo.Cause(err) != params.ErrNotFound {
-		return errgo.Mask(err)
+	if blacklistUsernames[u.Username] {
+		return errgo.WithCausef(nil, params.ErrForbidden, "username %q is reserved", u.Username)
 	}
+	if u.ExternalID == "" {
+		return errgo.WithCausef(nil, params.ErrBadRequest, `external_id not specified`)
+	}
+
+	// We would like to always set the user information to that
+	// specified in u here, but this endpoint has historically been
+	// used in such a way that this could cause information to be
+	// lost. Groups and SSH keys will not be set unless a new user is
+	// being created.
 	doc := identityFromSetUserParams(u)
-	if err := h.store.InsertIdentity(doc); err != nil {
-		return errgo.NoteMask(err, "cannot store identity", errgo.Is(params.ErrAlreadyExists))
+	onInsert := make(bson.D, 0, 3) // store.UpsertUser will append one item to this array, so we might as well only allocate once.
+	if doc.Groups != nil {
+		onInsert = append(onInsert, bson.DocElem{"groups", doc.Groups})
+		doc.Groups = nil
+	}
+	if doc.SSHKeys != nil {
+		onInsert = append(onInsert, bson.DocElem{"ssh_keys", doc.SSHKeys})
+		doc.SSHKeys = nil
+	}
+	if err := h.store.UpsertIdentity(doc, onInsert); err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrAlreadyExists))
 	}
 	return nil
 }
 
-func (h *apiHandler) checkSetAgentParams(r *http.Request, u *params.SetUserRequest) error {
-	err := h.store.CheckACL(opCreateAgent, r, []string{
+// setAgent implements SetUser for agent users. An agent user is a user
+// with an Owner and no ExternalID. An agent user can only have a subset
+// of the groups to which the owner has access. Note: Currently only
+// admin users can create agents.
+func (h *apiHandler) setAgent(p httprequest.Params, u *params.SetUserRequest) error {
+	err := h.store.CheckACL(opCreateAgent, p.Request, []string{
 		store.AdminGroup,
 		"+create-agent@" + string(u.User.Owner),
 	})
@@ -110,21 +121,13 @@ func (h *apiHandler) checkSetAgentParams(r *http.Request, u *params.SetUserReque
 	}
 	// TODO we will need a mechanism to revoke groups from all agents
 	// belonging to an owner if the owner loses the group.
-	if err := h.checkRequestHasAllGroups(r, u.User.IDPGroups); err != nil {
+	if err := h.checkRequestHasAllGroups(p.Request, u.User.IDPGroups); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrForbidden))
 	}
-	return nil
-}
 
-func (h *apiHandler) checkSetUserParams(r *http.Request, u *params.SetUserRequest) error {
-	if err := h.store.CheckACL(opCreateUser, r, []string{store.AdminGroup}); err != nil {
-		return errgo.Mask(err, errgo.Any)
-	}
-	if blacklistUsernames[u.Username] {
-		return errgo.WithCausef(nil, params.ErrForbidden, "username %q is reserved", u.Username)
-	}
-	if u.ExternalID == "" {
-		return errgo.WithCausef(nil, params.ErrBadRequest, `external_id not specified`)
+	doc := identityFromSetUserParams(u)
+	if err := h.store.UpsertIdentity(doc, nil); err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrAlreadyExists))
 	}
 	return nil
 }
@@ -179,7 +182,35 @@ func (h *apiHandler) UserGroups(p httprequest.Params, r *params.UserGroupsReques
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
-	return id.Groups, nil
+	return userGroups(h.store, id), nil
+}
+
+func userGroups(store *store.Store, id *mongodoc.Identity) []string {
+	lpGroups, err := storeGetLaunchpadGroups(store, id.ExternalID)
+	if err != nil {
+		logger.Errorf("Failed to get launchpad groups for user: %s", err)
+	}
+	return uniqueStrings(append(id.Groups, lpGroups...))
+}
+
+// uniqueStrings removes all duplicates from the supplied
+// string slice, updating the slice in place.
+// The values will be in lexicographic order.
+func uniqueStrings(ss []string) []string {
+	if len(ss) < 2 {
+		return ss
+	}
+	sort.Strings(ss)
+	prev := ss[0]
+	out := ss[:1]
+	for _, s := range ss[1:] {
+		if s == prev {
+			continue
+		}
+		out = append(out, s)
+		prev = s
+	}
+	return out
 }
 
 // UserIDPGroups serves the /u/$username/idpgroups endpoint, and returns
@@ -193,7 +224,7 @@ func (h *apiHandler) UserIDPGroups(p httprequest.Params, r *params.UserIDPGroups
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
-	return id.Groups, nil
+	return userGroups(h.store, id), nil
 }
 
 // GetSSHKeys serves the /u/$username/sshkeys endpoint, and returns
@@ -369,7 +400,7 @@ func checkExtraInfoKey(key string) error {
 	return nil
 }
 
-func userFromIdentity(id *mongodoc.Identity) (*params.User, error) {
+func userFromIdentity(store *store.Store, id *mongodoc.Identity) (*params.User, error) {
 	var publicKeys []*bakery.PublicKey
 	if len(id.PublicKeys) > 0 {
 		publicKeys = make([]*bakery.PublicKey, len(id.PublicKeys))
@@ -387,7 +418,7 @@ func userFromIdentity(id *mongodoc.Identity) (*params.User, error) {
 		FullName:   id.FullName,
 		Email:      id.Email,
 		GravatarID: id.GravatarID,
-		IDPGroups:  id.Groups,
+		IDPGroups:  userGroups(store, id),
 		Owner:      params.Username(id.Owner),
 		PublicKeys: publicKeys,
 		SSHKeys:    id.SSHKeys,

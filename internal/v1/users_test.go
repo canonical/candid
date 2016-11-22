@@ -118,7 +118,7 @@ func (s *usersSuite) TestUser(c *gc.C) {
 		expectStatus: http.StatusForbidden,
 		expectBody: params.Error{
 			Code:    "already exists",
-			Message: `cannot store identity: cannot add user: duplicate username or external_id`,
+			Message: `cannot add user: duplicate username or external_id`,
 		},
 	}, {
 		about:        "known user",
@@ -495,7 +495,7 @@ func (s *usersSuite) TestUser(c *gc.C) {
 	}
 }
 
-func (s *usersSuite) TestUpdateGroupsForUser(c *gc.C) {
+func (s *usersSuite) TestSetUserDoesNotUpdateGroups(c *gc.C) {
 	s.createUser(c, &params.User{
 		Username:   "jbloggs2",
 		ExternalID: "http://example.com/jbloggs2",
@@ -544,15 +544,14 @@ func (s *usersSuite) TestUpdateGroupsForUser(c *gc.C) {
 			GravatarID: "b1337cf8d58e2e2be9b6a5356cfc268b",
 			IDPGroups: []string{
 				"test",
-				"test2",
 			},
 		},
 	})
 }
 
-func (s *usersSuite) TestUpdateInsertNewUserSetGroupsFromLaunchpad(c *gc.C) {
+func (s *usersSuite) TestGetUserGetsGroupsFromLaunchpad(c *gc.C) {
 
-	s.PatchValue(v1.StoreGetLaunchpadGroups, func(s *store.Store, externalId, email string) ([]string, error) {
+	s.PatchValue(v1.StoreGetLaunchpadGroups, func(s *store.Store, externalId string) ([]string, error) {
 		return []string{"test3"}, nil
 	})
 
@@ -628,7 +627,6 @@ func (s *usersSuite) TestUpdateAgentSetPublicKeys(c *gc.C) {
 			PublicKeys: []*bakery.PublicKey{
 				&key.Public,
 			},
-			IDPGroups: []string{},
 		},
 	})
 	key, err = bakery.GenerateKey()
