@@ -4,6 +4,7 @@ package v1_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -1347,6 +1348,220 @@ func (s *usersSuite) getToken(c *gc.C, un string) *macaroon.Macaroon {
 	err := json.Unmarshal(resp.Body.Bytes(), &m)
 	c.Assert(err, gc.IsNil)
 	return &m
+}
+
+var setUserGroupsTests = []struct {
+	about        string
+	username     string
+	password     string
+	startGroups  []string
+	groups       []string
+	expectStatus int
+	expectError  interface{}
+	expectGroups []string
+}{{
+	about:        "set groups",
+	username:     adminUsername,
+	password:     adminPassword,
+	startGroups:  []string{"test1", "test2"},
+	groups:       []string{"test3", "test4"},
+	expectStatus: http.StatusOK,
+	expectGroups: []string{"test3", "test4"},
+}, {
+	about:        "no permission",
+	startGroups:  []string{"test1", "test2"},
+	groups:       []string{"test3", "test4"},
+	expectStatus: http.StatusForbidden,
+	expectError: params.Error{
+		Code:    params.ErrForbidden,
+		Message: "user does not have correct permissions",
+	},
+	expectGroups: []string{"test1", "test2"},
+}, {
+	about:        "no user",
+	username:     adminUsername,
+	password:     adminPassword,
+	startGroups:  nil,
+	groups:       []string{"test3", "test4"},
+	expectStatus: http.StatusNotFound,
+	expectError: params.Error{
+		Code:    params.ErrNotFound,
+		Message: `user "test-2" not found: not found`,
+	},
+}}
+
+func (s *usersSuite) TestSetUserGroups(c *gc.C) {
+	store := s.pool.GetNoLimit()
+	defer s.pool.Put(store)
+	for i, test := range setUserGroupsTests {
+		c.Logf("test %d. %s", i, test.about)
+		username := params.Username(fmt.Sprintf("test-%d", i))
+		if test.startGroups != nil {
+			s.createUser(c, &params.User{
+				Username:   username,
+				ExternalID: "http://example.com/" + string(username),
+				IDPGroups:  test.startGroups,
+			})
+		}
+		var cookies []*http.Cookie
+		if test.username == "" {
+			m, err := store.Service.NewMacaroon(bakery.LatestVersion, []checkers.Caveat{
+				checkers.DeclaredCaveat("username", string(username)),
+			})
+			c.Assert(err, gc.IsNil)
+			cookie, err := httpbakery.NewCookie(macaroon.Slice{m})
+			c.Assert(err, gc.IsNil)
+			cookies = append(cookies, cookie)
+		}
+		httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+			Handler:      s.srv,
+			Method:       "PUT",
+			URL:          apiURL("u/" + string(username) + "/groups"),
+			Username:     test.username,
+			Password:     test.password,
+			JSONBody:     params.Groups{Groups: test.groups},
+			ExpectStatus: test.expectStatus,
+			ExpectBody:   test.expectError,
+			Cookies:      cookies,
+		})
+		if test.expectError != nil {
+			continue
+		}
+		httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+			Handler:    s.srv,
+			URL:        apiURL("u/" + string(username) + "/groups"),
+			Username:   adminUsername,
+			Password:   adminPassword,
+			ExpectBody: test.expectGroups,
+		})
+	}
+}
+
+var modifyUserGroupsTests = []struct {
+	about        string
+	username     string
+	password     string
+	startGroups  []string
+	addGroups    []string
+	removeGroups []string
+	expectStatus int
+	expectError  interface{}
+	expectGroups []string
+}{{
+	about:        "add groups",
+	username:     adminUsername,
+	password:     adminPassword,
+	startGroups:  []string{"test1", "test2"},
+	addGroups:    []string{"test3", "test4"},
+	expectStatus: http.StatusOK,
+	expectGroups: []string{"test1", "test2", "test3", "test4"},
+}, {
+	about:        "remove groups",
+	username:     adminUsername,
+	password:     adminPassword,
+	startGroups:  []string{"test1", "test2"},
+	removeGroups: []string{"test1", "test2"},
+	expectStatus: http.StatusOK,
+	expectGroups: []string{},
+}, {
+	about:        "add and remove groups",
+	username:     adminUsername,
+	password:     adminPassword,
+	startGroups:  []string{"test1", "test2"},
+	addGroups:    []string{"test3", "test4"},
+	removeGroups: []string{"test1", "test2"},
+	expectStatus: http.StatusOK,
+	expectGroups: []string{"test3", "test4"},
+}, {
+	about:        "remove added groups",
+	username:     adminUsername,
+	password:     adminPassword,
+	startGroups:  []string{"test1", "test2"},
+	addGroups:    []string{"test3", "test4"},
+	removeGroups: []string{"test3"},
+	expectStatus: http.StatusOK,
+	expectGroups: []string{"test1", "test2", "test4"},
+}, {
+	about:        "remove groups not a member of",
+	username:     adminUsername,
+	password:     adminPassword,
+	startGroups:  []string{"test1", "test2"},
+	removeGroups: []string{"test5"},
+	expectStatus: http.StatusOK,
+	expectGroups: []string{"test1", "test2"},
+}, {
+	about:        "no permission",
+	startGroups:  []string{"test1", "test2"},
+	addGroups:    []string{"test3", "test4"},
+	removeGroups: []string{"test1", "test2"},
+	expectStatus: http.StatusForbidden,
+	expectError: params.Error{
+		Code:    params.ErrForbidden,
+		Message: "user does not have correct permissions",
+	},
+	expectGroups: []string{"test1", "test2"},
+}, {
+	about:        "no user",
+	username:     adminUsername,
+	password:     adminPassword,
+	startGroups:  nil,
+	addGroups:    []string{"test3", "test4"},
+	removeGroups: []string{"test1", "test2"},
+	expectStatus: http.StatusNotFound,
+	expectError: params.Error{
+		Code:    params.ErrNotFound,
+		Message: `user "test-6" not found: not found`,
+	},
+}}
+
+func (s *usersSuite) TestModifyUserGroups(c *gc.C) {
+	store := s.pool.GetNoLimit()
+	defer s.pool.Put(store)
+	for i, test := range modifyUserGroupsTests {
+		c.Logf("test %d. %s", i, test.about)
+		username := params.Username(fmt.Sprintf("test-%d", i))
+		if test.startGroups != nil {
+			s.createUser(c, &params.User{
+				Username:   username,
+				ExternalID: "http://example.com/" + string(username),
+				IDPGroups:  test.startGroups,
+			})
+		}
+		var cookies []*http.Cookie
+		if test.username == "" {
+			m, err := store.Service.NewMacaroon(bakery.LatestVersion, []checkers.Caveat{
+				checkers.DeclaredCaveat("username", string(username)),
+			})
+			c.Assert(err, gc.IsNil)
+			cookie, err := httpbakery.NewCookie(macaroon.Slice{m})
+			c.Assert(err, gc.IsNil)
+			cookies = append(cookies, cookie)
+		}
+		httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+			Handler:  s.srv,
+			Method:   "POST",
+			URL:      apiURL("u/" + string(username) + "/groups"),
+			Username: test.username,
+			Password: test.password,
+			JSONBody: params.ModifyGroups{
+				Add:    test.addGroups,
+				Remove: test.removeGroups,
+			},
+			ExpectStatus: test.expectStatus,
+			ExpectBody:   test.expectError,
+			Cookies:      cookies,
+		})
+		if test.expectError != nil {
+			continue
+		}
+		httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+			Handler:    s.srv,
+			URL:        apiURL("u/" + string(username) + "/groups"),
+			Username:   adminUsername,
+			Password:   adminPassword,
+			ExpectBody: test.expectGroups,
+		})
+	}
 }
 
 var extraInfoTests = []struct {

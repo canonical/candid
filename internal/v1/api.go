@@ -29,6 +29,7 @@ const (
 	opGetUserSSHKey checkers.OperationChecker = "get-user-ssh-key"
 	opSetUserSSHKey checkers.OperationChecker = "set-user-ssh-key"
 	opGetUserGroups checkers.OperationChecker = "get-user-groups"
+	opSetUserGroups checkers.OperationChecker = "get-user-groups"
 )
 
 // NewAPIHandler is an identity.NewAPIHandlerFunc.
