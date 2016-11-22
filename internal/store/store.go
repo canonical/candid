@@ -456,10 +456,32 @@ func (s *Store) UpsertIdentity(doc *mongodoc.Identity, onInsert bson.D) error {
 	return nil
 }
 
-// SetGroups sets the groups of a user.
-// If the user is not found then an error is returned with the cause params.ErrNotFound.
-func (s *Store) SetGroups(username string, groups []string) error {
-	err := s.UpdateIdentity(params.Username(username), bson.D{{"$set", bson.D{{"groups", uniqueStrings(groups)}}}})
+// SetGroups sets the groups of a user. If the user is not found then an
+// error is returned with the cause params.ErrNotFound.
+func (s *Store) SetGroups(username params.Username, groups []string) error {
+	err := s.UpdateIdentity(username, bson.D{{"$set", bson.D{{"groups", uniqueStrings(groups)}}}})
+	if err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	}
+	return nil
+}
+
+// AddGroups adds the given groups to the given user. If the user is not
+// found then an error is returned with the cause params.ErrNotFound.
+func (s *Store) AddGroups(username params.Username, groups []string) error {
+	err := s.UpdateIdentity(params.Username(username), bson.D{{
+		"$addToSet", bson.D{{"groups", bson.D{{"$each", groups}}}},
+	}})
+	if err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	}
+	return nil
+}
+
+// RemoveGroups adds the given groups to the given user. If the user is not
+// found then an error is returned with the cause params.ErrNotFound.
+func (s *Store) RemoveGroups(username params.Username, groups []string) error {
+	err := s.UpdateIdentity(username, bson.D{{"$pullAll", bson.D{{"groups", groups}}}})
 	if err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}

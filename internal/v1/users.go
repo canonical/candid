@@ -166,7 +166,7 @@ func gravatarHash(s string) string {
 	return fmt.Sprintf("%x", hasher.Sum(nil))
 }
 
-// serveUserGroups serves the /u/$username/groups endpoint, and returns
+// UserGroups serves the GET /u/$username/groups endpoint, and returns
 // the list of groups associated with the user.
 func (h *apiHandler) UserGroups(p httprequest.Params, r *params.UserGroupsRequest) ([]string, error) {
 	// Administrators, users with GroupList permissions and the user
@@ -191,6 +191,45 @@ func userGroups(store *store.Store, id *mongodoc.Identity) []string {
 		logger.Errorf("Failed to get launchpad groups for user: %s", err)
 	}
 	return uniqueStrings(append(id.Groups, lpGroups...))
+}
+
+// SetUserGroups serves the PUT /u/$username/groups endpoint, and sets the
+// list of groups associated with the user.
+func (h *apiHandler) SetUserGroups(p httprequest.Params, r *params.SetUserGroupsRequest) error {
+	// Only administrators can set a user's groups.
+	if err := h.store.CheckACL(
+		opSetUserGroups,
+		p.Request,
+		[]string{store.AdminGroup},
+	); err != nil {
+		return errgo.Mask(err, errgo.Any)
+	}
+	if err := h.store.SetGroups(r.Username, r.Groups.Groups); err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	}
+	return nil
+}
+
+// ModifyUserGroups serves the POST /u/$username/groups endpoint, and
+// updates the list of groups associated with the user. Groups are added
+// to the user before they are removed, so if there is a group name in
+// both lists then it will ultimately be removed from the user.
+func (h *apiHandler) ModifyUserGroups(p httprequest.Params, r *params.ModifyUserGroupsRequest) error {
+	// Only administrators can update a user's groups.
+	if err := h.store.CheckACL(
+		opSetUserGroups,
+		p.Request,
+		[]string{store.AdminGroup},
+	); err != nil {
+		return errgo.Mask(err, errgo.Any)
+	}
+	if err := h.store.AddGroups(r.Username, r.Groups.Add); err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	}
+	if err := h.store.RemoveGroups(r.Username, r.Groups.Remove); err != nil {
+		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	}
+	return nil
 }
 
 // uniqueStrings removes all duplicates from the supplied

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"sort"
 	"sync"
 	"time"
 
@@ -313,7 +314,7 @@ func (s *storeSuite) TestUpsertIdentityDedupeGroups(c *gc.C) {
 	c.Assert(&doc, jc.DeepEquals, expect)
 }
 
-var updateGroupsIdentityTests = []struct {
+var setGroupsTests = []struct {
 	about     string
 	identity  *mongodoc.Identity
 	expectErr string
@@ -364,7 +365,7 @@ var updateGroupsIdentityTests = []struct {
 	expectErr: "user \"non-existing-agent\" not found: not found",
 }}
 
-func (s *storeSuite) TestUpdateGroups(c *gc.C) {
+func (s *storeSuite) TestSetGroups(c *gc.C) {
 	store := s.pool.GetNoLimit()
 	defer s.pool.Put(store)
 
@@ -393,9 +394,9 @@ func (s *storeSuite) TestUpdateGroups(c *gc.C) {
 	}, nil)
 	c.Assert(err, gc.IsNil)
 
-	for i, test := range updateGroupsIdentityTests {
+	for i, test := range setGroupsTests {
 		c.Logf("%d: %s", i, test.about)
-		err := store.SetGroups(test.identity.Username, test.identity.Groups)
+		err := store.SetGroups(params.Username(test.identity.Username), test.identity.Groups)
 		if test.expectErr != "" {
 			c.Assert(err, gc.ErrorMatches, test.expectErr)
 			continue
@@ -405,6 +406,153 @@ func (s *storeSuite) TestUpdateGroups(c *gc.C) {
 		c.Assert(err, gc.IsNil)
 		doc.UUID = ""
 		c.Assert(doc, jc.DeepEquals, test.identity)
+	}
+}
+
+var addGroupsTests = []struct {
+	about        string
+	startGroups  []string
+	addGroups    []string
+	expectGroups []string
+	expectErr    string
+}{{
+	about:        "add groups",
+	startGroups:  []string{"test1", "test2"},
+	addGroups:    []string{"test3", "test4"},
+	expectGroups: []string{"test1", "test2", "test3", "test4"},
+}, {
+	about:        "overlapping groups",
+	startGroups:  []string{"test1", "test2"},
+	addGroups:    []string{"test2", "test3"},
+	expectGroups: []string{"test1", "test2", "test3"},
+}, {
+	about:        "same groups",
+	startGroups:  []string{"test1", "test2"},
+	addGroups:    []string{"test1", "test2"},
+	expectGroups: []string{"test1", "test2"},
+}, {
+	about:        "empty start",
+	startGroups:  []string{},
+	addGroups:    []string{"test1", "test2"},
+	expectGroups: []string{"test1", "test2"},
+}, {
+	about:        "empty add",
+	startGroups:  []string{"test1", "test2"},
+	addGroups:    []string{},
+	expectGroups: []string{"test1", "test2"},
+}, {
+	about:        "add dedupes",
+	startGroups:  []string{"test1", "test2"},
+	addGroups:    []string{"test3", "test3"},
+	expectGroups: []string{"test1", "test2", "test3"},
+}, {
+	about:       "no user",
+	startGroups: nil,
+	addGroups:   []string{"test1", "test2"},
+	expectErr:   `user ".*" not found: not found`,
+}}
+
+func (s *storeSuite) TestAddGroups(c *gc.C) {
+	store := s.pool.GetNoLimit()
+	defer s.pool.Put(store)
+
+	for i, test := range addGroupsTests {
+		c.Logf("%d: %s", i, test.about)
+		username := params.Username(fmt.Sprintf("test-%d", i))
+		if test.startGroups != nil {
+			err := store.UpsertIdentity(&mongodoc.Identity{
+				Username:   string(username),
+				ExternalID: "http://example.com/" + string(username),
+				Groups:     test.startGroups,
+			}, nil)
+			c.Assert(err, gc.IsNil)
+		}
+		err := store.AddGroups(username, test.addGroups)
+		if test.expectErr != "" {
+			c.Assert(err, gc.ErrorMatches, test.expectErr)
+			continue
+		}
+		c.Assert(err, gc.IsNil)
+		doc, err := store.GetIdentity(username)
+		c.Assert(err, gc.IsNil)
+		sort.Strings(doc.Groups)
+		c.Assert(doc.Groups, jc.DeepEquals, test.expectGroups)
+	}
+}
+
+var removeGroupsTests = []struct {
+	about        string
+	startGroups  []string
+	removeGroups []string
+	expectGroups []string
+	expectErr    string
+}{{
+	about:        "remove groups",
+	startGroups:  []string{"test1", "test2"},
+	removeGroups: []string{"test2"},
+	expectGroups: []string{"test1"},
+}, {
+	about:        "overlapping groups",
+	startGroups:  []string{"test1", "test2"},
+	removeGroups: []string{"test2", "test3"},
+	expectGroups: []string{"test1"},
+}, {
+	about:        "all groups",
+	startGroups:  []string{"test1", "test2"},
+	removeGroups: []string{"test1", "test2"},
+	expectGroups: []string{},
+}, {
+	about:        "empty start",
+	startGroups:  []string{},
+	removeGroups: []string{"test1", "test2"},
+	expectGroups: []string{},
+}, {
+	about:        "empty remove",
+	startGroups:  []string{"test1", "test2"},
+	removeGroups: []string{},
+	expectGroups: []string{"test1", "test2"},
+}, {
+	about:        "no groups found remove",
+	startGroups:  []string{"test1", "test2"},
+	removeGroups: []string{"test3", "test4"},
+	expectGroups: []string{"test1", "test2"},
+}, {
+	about:        "remove many",
+	startGroups:  []string{"test1", "test2", "test2"},
+	removeGroups: []string{"test2"},
+	expectGroups: []string{"test1"},
+}, {
+	about:        "no user",
+	startGroups:  nil,
+	removeGroups: []string{"test1", "test2"},
+	expectErr:    `user ".*" not found: not found`,
+}}
+
+func (s *storeSuite) TestRemoveGroups(c *gc.C) {
+	store := s.pool.GetNoLimit()
+	defer s.pool.Put(store)
+
+	for i, test := range removeGroupsTests {
+		c.Logf("%d: %s", i, test.about)
+		username := params.Username(fmt.Sprintf("test-%d", i))
+		if test.startGroups != nil {
+			err := store.UpsertIdentity(&mongodoc.Identity{
+				Username:   string(username),
+				ExternalID: "http://example.com/" + string(username),
+				Groups:     test.startGroups,
+			}, nil)
+			c.Assert(err, gc.IsNil)
+		}
+		err := store.RemoveGroups(username, test.removeGroups)
+		if test.expectErr != "" {
+			c.Assert(err, gc.ErrorMatches, test.expectErr)
+			continue
+		}
+		c.Assert(err, gc.IsNil)
+		doc, err := store.GetIdentity(username)
+		c.Assert(err, gc.IsNil)
+		sort.Strings(doc.Groups)
+		c.Assert(doc.Groups, jc.DeepEquals, test.expectGroups)
 	}
 }
 
@@ -500,7 +648,7 @@ func (s *storeSuite) TestSetGroupsDedupeGroups(c *gc.C) {
 	}
 	err := store.UpsertIdentity(id, nil)
 	c.Assert(err, gc.IsNil)
-	err = store.SetGroups(id.Username, []string{"test", "test2", "test2"})
+	err = store.SetGroups(params.Username(id.Username), []string{"test", "test2", "test2"})
 	c.Assert(err, gc.IsNil)
 
 	expect := &mongodoc.Identity{
