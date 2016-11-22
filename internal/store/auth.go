@@ -119,7 +119,7 @@ func (c UserHasPublicKeyChecker) checkAdminPublicKey(publicKey *bakery.PublicKey
 	if adminKey == nil {
 		return errgo.Newf("public key not valid for user")
 	}
-	if !bytes.Equal(adminKey.Key[:], publicKey.Key[:]) {
+	if *adminKey != *publicKey {
 		return errgo.Newf("public key not valid for user")
 	}
 	if c.Identity != nil {

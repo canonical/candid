@@ -137,9 +137,9 @@ func (s *DischargeSuite) TearDownTest(c *gc.C) {
 
 // AssertDischarge asserts that a discharge sent through s.BakeryClient
 // returns a macaroon that validates successfully against ch. If visit is
-// not nil the n s.BakeryClient.VisitWebPage will be set to visit before
+// not nil then the clients WebPageVisitor will be set to visit before
 // discharging.
-func (s *DischargeSuite) AssertDischarge(c *gc.C, visit func(*url.URL) error, ch checkers.Checker) {
+func (s *DischargeSuite) AssertDischarge(c *gc.C, visitor httpbakery.Visitor, ch checkers.Checker) {
 	b, err := bakery.NewService(bakery.NewServiceParams{
 		Locator: s.Locator,
 	})
@@ -148,9 +148,8 @@ func (s *DischargeSuite) AssertDischarge(c *gc.C, visit func(*url.URL) error, ch
 		Location:  DischargeLocation,
 		Condition: "is-authenticated-user",
 	}})
-	c.Assert(err, gc.IsNil)
-	if visit != nil {
-		s.BakeryClient.VisitWebPage = visit
+	if visitor != nil {
+		defer testing.PatchValue(&s.BakeryClient.WebPageVisitor, visitor).Restore()
 	}
 	ms, err := s.BakeryClient.DischargeAll(m)
 	c.Assert(err, gc.IsNil)
@@ -160,4 +159,10 @@ func (s *DischargeSuite) AssertDischarge(c *gc.C, visit func(*url.URL) error, ch
 		ch,
 	))
 	c.Assert(err, gc.IsNil)
+}
+
+type VisitorFunc func(*url.URL) error
+
+func (f VisitorFunc) VisitWebPage(_ *httpbakery.Client, m map[string]*url.URL) error {
+	return f(m[httpbakery.UserInteractionMethod])
 }
