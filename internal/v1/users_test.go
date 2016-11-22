@@ -820,6 +820,24 @@ func (s *usersSuite) TestQueryUsers(c *gc.C) {
 		}),
 		expectStatus: http.StatusProxyAuthRequired,
 		expectBody:   DischargeRequiredBody,
+	}, {
+		about:        "query email",
+		url:          apiURL("u?email=jbloggs2@example.com"),
+		method:       "GET",
+		body:         nil,
+		username:     adminUsername,
+		password:     adminPassword,
+		expectStatus: http.StatusOK,
+		expectBody:   []string{"jbloggs2"},
+	}, {
+		about:        "query email not found",
+		url:          apiURL("u?email=not-there@example.com"),
+		method:       "GET",
+		body:         nil,
+		username:     adminUsername,
+		password:     adminPassword,
+		expectStatus: http.StatusOK,
+		expectBody:   []string{},
 	}}
 	for i, test := range tests {
 		c.Logf("%d. %s", i, test.about)
@@ -1470,17 +1488,12 @@ var modifyUserGroupsTests = []struct {
 	startGroups:  []string{"test1", "test2"},
 	addGroups:    []string{"test3", "test4"},
 	removeGroups: []string{"test1", "test2"},
-	expectStatus: http.StatusOK,
-	expectGroups: []string{"test3", "test4"},
-}, {
-	about:        "remove added groups",
-	username:     adminUsername,
-	password:     adminPassword,
-	startGroups:  []string{"test1", "test2"},
-	addGroups:    []string{"test3", "test4"},
-	removeGroups: []string{"test3"},
-	expectStatus: http.StatusOK,
-	expectGroups: []string{"test1", "test2", "test4"},
+	expectStatus: http.StatusBadRequest,
+	expectError: params.Error{
+		Code:    params.ErrBadRequest,
+		Message: "cannot add and remove groups in the same operation",
+	},
+	expectGroups: []string{"test1", "test2"},
 }, {
 	about:        "remove groups not a member of",
 	username:     adminUsername,
@@ -1493,7 +1506,6 @@ var modifyUserGroupsTests = []struct {
 	about:        "no permission",
 	startGroups:  []string{"test1", "test2"},
 	addGroups:    []string{"test3", "test4"},
-	removeGroups: []string{"test1", "test2"},
 	expectStatus: http.StatusForbidden,
 	expectError: params.Error{
 		Code:    params.ErrForbidden,
@@ -1506,7 +1518,16 @@ var modifyUserGroupsTests = []struct {
 	password:     adminPassword,
 	startGroups:  nil,
 	addGroups:    []string{"test3", "test4"},
-	removeGroups: []string{"test1", "test2"},
+	expectStatus: http.StatusNotFound,
+	expectError: params.Error{
+		Code:    params.ErrNotFound,
+		Message: `user "test-5" not found: not found`,
+	},
+}, {
+	about:        "no user, and no changes",
+	username:     adminUsername,
+	password:     adminPassword,
+	startGroups:  nil,
 	expectStatus: http.StatusNotFound,
 	expectError: params.Error{
 		Code:    params.ErrNotFound,

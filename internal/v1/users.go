@@ -39,8 +39,15 @@ func (h *apiHandler) QueryUsers(p httprequest.Params, r *params.QueryUsersReques
 		return nil, errgo.Mask(err, errgo.Any)
 	}
 	usernames := make([]string, 0, 1)
+	type userQuery struct {
+		ExternalID string `bson:"external_id,omitempty"`
+		Email      string `bson:"email,omitempty"`
+	}
 	var user mongodoc.Identity
-	it := h.store.DB.Identities().Find(r).Iter()
+	it := h.store.DB.Identities().Find(userQuery{
+		ExternalID: r.ExternalID,
+		Email:      r.Email,
+	}).Iter()
 	for it.Next(&user) {
 		usernames = append(usernames, user.Username)
 	}
@@ -211,10 +218,13 @@ func (h *apiHandler) SetUserGroups(p httprequest.Params, r *params.SetUserGroups
 }
 
 // ModifyUserGroups serves the POST /u/$username/groups endpoint, and
-// updates the list of groups associated with the user. Groups are added
-// to the user before they are removed, so if there is a group name in
-// both lists then it will ultimately be removed from the user.
+// updates the list of groups associated with the user. Groups can be
+// either added or removed in a single query. It is an error to try and
+// both add and remove groups at the same time.
 func (h *apiHandler) ModifyUserGroups(p httprequest.Params, r *params.ModifyUserGroupsRequest) error {
+	if len(r.Groups.Add) > 0 && len(r.Groups.Remove) > 0 {
+		return errgo.WithCausef(nil, params.ErrBadRequest, "cannot add and remove groups in the same operation")
+	}
 	// Only administrators can update a user's groups.
 	if err := h.store.CheckACL(
 		opSetUserGroups,
@@ -223,13 +233,11 @@ func (h *apiHandler) ModifyUserGroups(p httprequest.Params, r *params.ModifyUser
 	); err != nil {
 		return errgo.Mask(err, errgo.Any)
 	}
-	if err := h.store.AddGroups(r.Username, r.Groups.Add); err != nil {
-		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	if len(r.Groups.Add) > 0 {
+		return errgo.Mask(h.store.AddGroups(r.Username, r.Groups.Add), errgo.Is(params.ErrNotFound))
+	} else {
+		return errgo.Mask(h.store.RemoveGroups(r.Username, r.Groups.Remove), errgo.Is(params.ErrNotFound))
 	}
-	if err := h.store.RemoveGroups(r.Username, r.Groups.Remove); err != nil {
-		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
-	}
-	return nil
 }
 
 // uniqueStrings removes all duplicates from the supplied

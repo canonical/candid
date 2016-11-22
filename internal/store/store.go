@@ -478,8 +478,9 @@ func (s *Store) AddGroups(username params.Username, groups []string) error {
 	return nil
 }
 
-// RemoveGroups adds the given groups to the given user. If the user is not
-// found then an error is returned with the cause params.ErrNotFound.
+// RemoveGroups removes the given groups from the given user. If the user
+// is not found then an error is returned with the cause
+// params.ErrNotFound.
 func (s *Store) RemoveGroups(username params.Username, groups []string) error {
 	err := s.UpdateIdentity(username, bson.D{{"$pullAll", bson.D{{"groups", groups}}}})
 	if err != nil {
