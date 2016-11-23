@@ -540,7 +540,7 @@ func (s *Store) getLaunchpadGroups(externalId string) ([]string, error) {
 }
 
 func getLaunchpadPersonByOpenID(root *lpad.Root, externalId string) (*lpad.Person, error) {
-	v, err := root.Location("/people").Get(lpad.Params{"ws.op": " getByOpenIDIdentifier", "identifier": externalId})
+	v, err := root.Location("/people").Get(lpad.Params{"ws.op": "getByOpenIDIdentifier", "identifier": externalId})
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot find user %s", externalId)
 	}
