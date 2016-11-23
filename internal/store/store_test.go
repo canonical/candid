@@ -810,6 +810,9 @@ func (s *storeSuite) TestRetrieveLaunchpadGroups(c *gc.C) {
 		c.Logf("path: %s", r.URL.Path)
 		switch r.URL.Path {
 		case "/people":
+			r.ParseForm()
+			c.Check(r.Form.Get("ws.op"), gc.Equals, "getByOpenIDIdentifier")
+			c.Check(r.Form.Get("identifier"), gc.Equals, "https://login.ubuntu.com/+id/test")
 			w.Header().Set("Content-Type", "application/json")
 			fmt.Fprintf(w, `{"name": "test", "super_teams_collection_link": "%s/test/super_teams"}`, lp.URL)
 		case "/test/super_teams":
