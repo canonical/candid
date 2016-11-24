@@ -73,13 +73,6 @@ func serve(confPath string) error {
 	db := session.DB("identity")
 
 	logger.Infof("setting up the identity server")
-	var keypair bakery.KeyPair
-	if err := keypair.Private.UnmarshalText([]byte(conf.PrivateKey)); err != nil {
-		return errgo.Notef(err, "cannot unmarshal private key")
-	}
-	if err := keypair.Public.UnmarshalText([]byte(conf.PublicKey)); err != nil {
-		return errgo.Notef(err, "cannot unmarshal public key")
-	}
 	idps := defaultIDPs
 	if len(conf.IdentityProviders) > 0 {
 		idps = make([]idp.IdentityProvider, len(conf.IdentityProviders))
@@ -90,16 +83,20 @@ func serve(confPath string) error {
 	srv, err := identity.NewServer(
 		db,
 		identity.ServerParams{
-			AuthUsername:      conf.AuthUsername,
-			AuthPassword:      conf.AuthPassword,
-			Key:               &keypair,
-			Location:          conf.Location,
-			Launchpad:         lpad.Production,
-			MaxMgoSessions:    conf.MaxMgoSessions,
-			RequestTimeout:    conf.RequestTimeout.Duration,
-			IdentityProviders: idps,
-			PrivateAddr:       conf.PrivateAddr,
-			DebugTeams:        conf.DebugTeams,
+			AuthUsername: conf.AuthUsername,
+			AuthPassword: conf.AuthPassword,
+			Key: &bakery.KeyPair{
+				Private: *conf.PrivateKey,
+				Public:  *conf.PublicKey,
+			},
+			Location:            conf.Location,
+			Launchpad:           lpad.Production,
+			MaxMgoSessions:      conf.MaxMgoSessions,
+			RequestTimeout:      conf.RequestTimeout.Duration,
+			IdentityProviders:   idps,
+			PrivateAddr:         conf.PrivateAddr,
+			DebugTeams:          conf.DebugTeams,
+			AdminAgentPublicKey: conf.AdminAgentPublicKey,
 		},
 		identity.V1,
 		identity.Debug,

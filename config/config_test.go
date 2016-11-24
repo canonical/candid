@@ -11,6 +11,7 @@ import (
 	jujutesting "github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
+	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
 
 	"github.com/CanonicalLtd/blues-identity/config"
 	"github.com/CanonicalLtd/blues-identity/idp"
@@ -35,6 +36,7 @@ auth-username: myuser
 auth-password: mypasswd
 private-key: 8PjzjakvIlh3BVFKe8axinRDutF6EDIfjtuf4+JaNow=
 public-key: CIdWcEUN+0OZnKW9KwruRQnQDY/qqzVdD30CijwiWCk=
+admin-agent-public-key: dUnC8p9p3nygtE2h92a47Ooq0rXg0fVSm3YBWou5/UQ=
 location: http://foo.com:1234
 max-mgo-sessions: 10
 request-timeout: 500ms
@@ -118,16 +120,27 @@ func (s *configSuite) TestRead(c *gc.C) {
 	conf.TLSCert = ""
 	conf.TLSKey = ""
 
+	var key bakery.KeyPair
+	err = key.Public.UnmarshalText([]byte("CIdWcEUN+0OZnKW9KwruRQnQDY/qqzVdD30CijwiWCk="))
+	c.Assert(err, gc.IsNil)
+	err = key.Private.UnmarshalText([]byte("8PjzjakvIlh3BVFKe8axinRDutF6EDIfjtuf4+JaNow="))
+	c.Assert(err, gc.IsNil)
+
+	var adminPubKey bakery.PublicKey
+	err = adminPubKey.UnmarshalText([]byte("dUnC8p9p3nygtE2h92a47Ooq0rXg0fVSm3YBWou5/UQ="))
+	c.Assert(err, gc.IsNil)
+
 	c.Assert(conf, jc.DeepEquals, &config.Config{
-		MongoAddr:      "localhost:23456",
-		APIAddr:        "1.2.3.4:5678",
-		AuthUsername:   "myuser",
-		AuthPassword:   "mypasswd",
-		PrivateKey:     "8PjzjakvIlh3BVFKe8axinRDutF6EDIfjtuf4+JaNow=",
-		PublicKey:      "CIdWcEUN+0OZnKW9KwruRQnQDY/qqzVdD30CijwiWCk=",
-		Location:       "http://foo.com:1234",
-		MaxMgoSessions: 10,
-		RequestTimeout: config.DurationString{Duration: 500 * time.Millisecond},
+		MongoAddr:           "localhost:23456",
+		APIAddr:             "1.2.3.4:5678",
+		AuthUsername:        "myuser",
+		AuthPassword:        "mypasswd",
+		PrivateKey:          &key.Private,
+		PublicKey:           &key.Public,
+		AdminAgentPublicKey: &adminPubKey,
+		Location:            "http://foo.com:1234",
+		MaxMgoSessions:      10,
+		RequestTimeout:      config.DurationString{Duration: 500 * time.Millisecond},
 		IdentityProviders: []config.IdentityProvider{{
 			IdentityProvider: IdentityProvider{
 				Params: map[string]string{
