@@ -13,6 +13,7 @@ import (
 
 	"github.com/juju/loggo"
 	"gopkg.in/errgo.v1"
+	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
 	"gopkg.in/yaml.v2"
 
 	"github.com/CanonicalLtd/blues-identity/idp"
@@ -22,21 +23,22 @@ var logger = loggo.GetLogger("identity.config")
 
 // Config holds the configuration parameters for the identity service.
 type Config struct {
-	MongoAddr         string             `yaml:"mongo-addr"`
-	APIAddr           string             `yaml:"api-addr"`
-	AuthUsername      string             `yaml:"auth-username"`
-	AuthPassword      string             `yaml:"auth-password"`
-	PublicKey         string             `yaml:"public-key"`
-	PrivateKey        string             `yaml:"private-key"`
-	Location          string             `yaml:"location"`
-	AccessLog         string             `yaml:"access-log"`
-	MaxMgoSessions    int                `yaml:"max-mgo-sessions"`
-	RequestTimeout    DurationString     `yaml:"request-timeout"`
-	IdentityProviders []IdentityProvider `yaml:"identity-providers"`
-	PrivateAddr       string             `yaml:"private-addr"`
-	DebugTeams        []string           `yaml:"debug-teams"`
-	TLSCert           string             `yaml:"tls-cert"`
-	TLSKey            string             `yaml:"tls-key"`
+	MongoAddr           string             `yaml:"mongo-addr"`
+	APIAddr             string             `yaml:"api-addr"`
+	AuthUsername        string             `yaml:"auth-username"`
+	AuthPassword        string             `yaml:"auth-password"`
+	Location            string             `yaml:"location"`
+	AccessLog           string             `yaml:"access-log"`
+	MaxMgoSessions      int                `yaml:"max-mgo-sessions"`
+	RequestTimeout      DurationString     `yaml:"request-timeout"`
+	IdentityProviders   []IdentityProvider `yaml:"identity-providers"`
+	PrivateAddr         string             `yaml:"private-addr"`
+	DebugTeams          []string           `yaml:"debug-teams"`
+	TLSCert             string             `yaml:"tls-cert"`
+	TLSKey              string             `yaml:"tls-key"`
+	PublicKey           *bakery.PublicKey  `yaml:"public-key"`
+	PrivateKey          *bakery.PrivateKey `yaml:"private-key"`
+	AdminAgentPublicKey *bakery.PublicKey  `yaml:"admin-agent-public-key"`
 }
 
 func (c *Config) TLSConfig() *tls.Config {
@@ -73,10 +75,10 @@ func (c *Config) validate() error {
 	if c.AuthPassword == "" {
 		missing = append(missing, "auth-password")
 	}
-	if c.PrivateKey == "" {
+	if c.PrivateKey == nil {
 		missing = append(missing, "private-key")
 	}
-	if c.PublicKey == "" {
+	if c.PublicKey == nil {
 		missing = append(missing, "public-key")
 	}
 	if c.Location == "" {
