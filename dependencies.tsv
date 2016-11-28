@@ -3,7 +3,9 @@ github.com/garyburd/go-oauth	git	3131beb69b81ff119923bdefbf029318f1f53794	2015-0
 github.com/golang/protobuf	git	34a5f244f1c01cdfee8e60324258cfbb97a42aec	2015-05-26T01:21:09Z
 github.com/gorilla/handlers	git	a24b39a6a2c8a7af2fe664dd4573205c99904035	2015-04-12T18:40:04Z
 github.com/juju/ansiterm	git	b99631de12cf04a906c1d4e4ec54fb86eae5863d	2016-09-07T23:45:32Z
+github.com/juju/cmd	git	1c6973d59b804e4d3c293fbf240f067e73436bc9	2016-08-23T10:31:14Z
 github.com/juju/errors	git	1b5e39b83d1835fa480e0c2ddefb040ee82d58b3	2015-09-16T12:56:42Z
+github.com/juju/gnuflag	git	4e76c56581859c14d9d87e1ddbe29e1c0f10195f	2016-08-09T16:52:14Z
 github.com/juju/httpprof	git	14bf14c307672fd2456bdbf35d19cf0ccd3cf565	2014-12-17T16:00:36Z
 github.com/juju/httprequest	git	0452a5059231d7d6b8d3645bc391ecad8474e5db	2016-07-26T14:44:11Z
 github.com/juju/idmclient	git	2fadeead4e6b89f2d1b8136a809353e57debbdf9	2016-11-22T15:09:28Z
