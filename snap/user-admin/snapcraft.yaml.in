@@ -1,0 +1,24 @@
+name: user-admin
+version: IDM_VERSION
+summary: Manage users in identity servers.
+description: |
+  Manage users in identity servers.
+
+grade: devel # must be 'stable' to release into candidate/stable channels
+confinement: devmode
+
+apps:
+  user-admin:
+    command: bin/user-admin
+    plugs:
+     - home
+     - network
+
+parts:
+  blues-identity:
+    plugin: godeps
+    source: ../..
+    source-type: git
+    go-importpath: github.com/CanonicalLtd/blues-identity
+    snap:
+      - bin/user-admin
