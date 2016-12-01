@@ -1,0 +1,38 @@
+name: idm
+version: IDM_VERSION
+summary: Identity Manager.
+description: |
+  Identity Manager.
+
+grade: devel # must be 'stable' to release into candidate/stable channels
+confinement: strict
+
+apps:
+  idm:
+    command: bin/idm
+    daemon: simple
+    plugs:
+     - network
+     - network-bind
+  admin:
+    command: bin/user-admin
+    plugs:
+     - home
+     - network
+
+parts:
+  blues-identity:
+    plugin: godeps
+    source: ../..
+    source-type: git
+    go-importpath: github.com/CanonicalLtd/blues-identity
+    snap:
+     - bin/idserver
+     - bin/user-admin
+  snap:
+    plugin: dump
+    source: .
+    stage:
+     - "bin/*"
+    snap:
+     - "bin/*"

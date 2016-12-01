@@ -46,6 +46,8 @@ install: version/init.go
 	go install $(INSTALL_FLAGS) -v $(PROJECT)/...
 
 clean:
+	$(MAKE) -C snap/idm clean
+	$(MAKE) -C snap/user-admin clean
 	go clean $(PROJECT)/...
 	-$(RM) version/init.go
 
@@ -90,6 +92,11 @@ create-deps: $(GOPATH)/bin/godeps
 version/init.go: version/init.go.tmpl FORCE
 	gofmt -r "unknownVersion -> Version{GitCommit: \"${GIT_COMMIT}\", Version: \"${GIT_VERSION}\",}" $< > $@
 
+# Generate snaps
+snap:
+	$(MAKE) -C snap/idm
+	$(MAKE) -C snap/user-admin
+
 # Install packages required to develop the identity service and run tests.
 APT_BASED := $(shell command -v apt-get >/dev/null; echo $$?)
 sysdeps:
@@ -102,7 +109,7 @@ endif
 	@echo Installing dependencies
 	sudo apt-get update
 	@sudo apt-get --force-yes install $(strip $(DEPENDENCIES)) \
-	$(shell apt-cache madison juju-mongodb mongodb-server | head -1 | cut -d '|' -f1)
+	$(shell apt-cache madison juju-mongodb mongodb-server snapcraft | head -1 | cut -d '|' -f1)
 else
 	@echo sysdeps runs only on systems with apt-get
 	@echo on OS X with homebrew try: brew install bazaar mongodb
@@ -121,6 +128,6 @@ help:
 	@echo 'make format - Format the source files.'
 	@echo 'make simplify - Format and simplify the source files.'
 
-.PHONY: build check install clean format server simplify sysdeps help FORCE
+.PHONY: build check install clean format server simplify snap sysdeps help FORCE
 
 FORCE:
