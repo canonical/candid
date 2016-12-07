@@ -89,23 +89,8 @@ func (h *apiHandler) SetUser(p httprequest.Params, u *params.SetUserRequest) err
 	if u.ExternalID == "" {
 		return errgo.WithCausef(nil, params.ErrBadRequest, `external_id not specified`)
 	}
-
-	// We would like to always set the user information to that
-	// specified in u here, but this endpoint has historically been
-	// used in such a way that this could cause information to be
-	// lost. Groups and SSH keys will not be set unless a new user is
-	// being created.
 	doc := identityFromSetUserParams(u)
-	onInsert := make(bson.D, 0, 3) // store.UpsertUser will append one item to this array, so we might as well only allocate once.
-	if doc.Groups != nil {
-		onInsert = append(onInsert, bson.DocElem{"groups", doc.Groups})
-		doc.Groups = nil
-	}
-	if doc.SSHKeys != nil {
-		onInsert = append(onInsert, bson.DocElem{"ssh_keys", doc.SSHKeys})
-		doc.SSHKeys = nil
-	}
-	if err := h.store.UpsertIdentity(doc, onInsert); err != nil {
+	if err := h.store.UpsertUser(doc); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrAlreadyExists))
 	}
 	return nil
@@ -133,7 +118,7 @@ func (h *apiHandler) setAgent(p httprequest.Params, u *params.SetUserRequest) er
 	}
 
 	doc := identityFromSetUserParams(u)
-	if err := h.store.UpsertIdentity(doc, nil); err != nil {
+	if err := h.store.UpsertAgent(doc); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrAlreadyExists))
 	}
 	return nil
@@ -244,6 +229,9 @@ func (h *apiHandler) ModifyUserGroups(p httprequest.Params, r *params.ModifyUser
 // string slice, updating the slice in place.
 // The values will be in lexicographic order.
 func uniqueStrings(ss []string) []string {
+	if ss == nil {
+		return []string{}
+	}
 	if len(ss) < 2 {
 		return ss
 	}

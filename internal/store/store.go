@@ -401,59 +401,90 @@ func (s *Store) ensureIndexes() error {
 	return nil
 }
 
-// UpsertIdentity creates, or updates, the identity described in the
-// given document. The document with the provided username and external
-// ID, or username and owner will be upserted. The email, gravatar ID and
-// fullname will always be set to the values in the given document.
-// Groups, SSH keys, public keys and extra info will only be set if they
-// have non-nil values. Any field value pairs specified in onInsert will
-// be added to the identity only if a new identity document is created.
-func (s *Store) UpsertIdentity(doc *mongodoc.Identity, onInsert bson.D) error {
+// UpsertUser creates, or updates, the user identity in the store. The
+// user will have the username, external ID, email, gravitar ID, and full
+// name from the given document. Any groups or SSH Keys in the given
+// document will be added to the set already stored, if any. Extra info
+// fields will be added to those present, overwriting any with identical
+// keys.
+func (s *Store) UpsertUser(doc *mongodoc.Identity) error {
 	doc.UUID = uuid.NewSHA1(IdentityNamespace, []byte(doc.Username)).String()
-	doc.Groups = uniqueStrings(doc.Groups)
-	if doc.ExternalID != "" && doc.Owner != "" {
-		return errgo.New("both external_id and owner specified")
+	if doc.ExternalID == "" {
+		return errgo.New("no external_id specified")
 	}
-	if doc.ExternalID == "" && doc.Owner == "" {
-		return errgo.New("no external_id or owner specified")
+	query := bson.D{{
+		"_id", doc.UUID,
+	}, {
+		"username", doc.Username,
+	}, {
+		"external_id", doc.ExternalID,
+	}}
+
+	set := bson.D{{
+		"email", doc.Email,
+	}, {
+		"gravatarid", doc.GravatarID,
+	}, {
+		"fullname", doc.FullName,
+	}}
+
+	for k, v := range doc.ExtraInfo {
+		set = append(set, bson.DocElem{"extrainfo." + k, v})
 	}
-	query := make(bson.D, 3)
-	query[0] = bson.DocElem{"_id", doc.UUID}
-	query[1] = bson.DocElem{"username", doc.Username}
-	if doc.ExternalID != "" {
-		query[2] = bson.DocElem{"external_id", doc.ExternalID}
-	} else {
-		query[2] = bson.DocElem{"owner", doc.Owner}
+
+	addToSet := make(bson.D, 0, 2)
+	if len(doc.Groups) > 0 {
+		addToSet = append(addToSet, bson.DocElem{"groups", bson.D{{"$each", doc.Groups}}})
 	}
-	set := make(bson.D, 3, 7)
-	set[0] = bson.DocElem{"email", doc.Email}
-	set[1] = bson.DocElem{"gravatarid", doc.GravatarID}
-	set[2] = bson.DocElem{"fullname", doc.FullName}
-	if doc.Groups != nil {
-		set = append(set, bson.DocElem{"groups", doc.Groups})
+	if len(doc.SSHKeys) > 0 {
+		addToSet = append(addToSet, bson.DocElem{"ssh_keys", bson.D{{"$each", doc.SSHKeys}}})
 	}
-	if doc.SSHKeys != nil {
-		set = append(set, bson.DocElem{"ssh_keys", doc.SSHKeys})
+
+	err := s.upsertIdentity(query, set, addToSet)
+	if errgo.Cause(err) == params.ErrAlreadyExists {
+		return errgo.WithCausef(nil, params.ErrAlreadyExists, "cannot add user: duplicate username or external_id")
 	}
-	if doc.PublicKeys != nil {
-		set = append(set, bson.DocElem{"public_keys", doc.PublicKeys})
+	return errgo.Mask(err)
+}
+
+// UpsertAgent creates or updates an agent identity in the store. The
+// agent will have the username, owner, groups and public keys from the
+// given document, all other fields will be ignored.
+func (s *Store) UpsertAgent(doc *mongodoc.Identity) error {
+	doc.UUID = uuid.NewSHA1(IdentityNamespace, []byte(doc.Username)).String()
+	if doc.Owner == "" {
+		return errgo.New("no owner specified")
 	}
-	if doc.ExtraInfo != nil {
-		set = append(set, bson.DocElem{"extrainfo", doc.ExtraInfo})
+	query := bson.D{{
+		"_id", doc.UUID,
+	}, {
+		"username", doc.Username,
+	}, {
+		"owner", doc.Owner,
+	}}
+
+	set := bson.D{{
+		"groups", doc.Groups,
+	}, {
+		"public_keys", doc.PublicKeys,
+	}}
+
+	return errgo.Mask(s.upsertIdentity(query, set, nil))
+}
+
+func (s *Store) upsertIdentity(query, set, addToSet bson.D) error {
+	update := make(bson.D, 0, 2)
+	if len(set) > 0 {
+		update = append(update, bson.DocElem{"$set", set})
 	}
-	update := make(bson.D, 1, 2)
-	update[0] = bson.DocElem{"$set", set}
-	if len(onInsert) > 0 {
-		update = append(update, bson.DocElem{"$setOnInsert", onInsert})
+	if len(addToSet) > 0 {
+		update = append(update, bson.DocElem{"$addToSet", addToSet})
 	}
 	_, err := s.DB.Identities().Upsert(query, update)
 	if mgo.IsDup(err) {
-		return errgo.WithCausef(nil, params.ErrAlreadyExists, "cannot add user: duplicate username or external_id")
+		return errgo.WithCausef(nil, params.ErrAlreadyExists, "")
 	}
-	if err != nil {
-		return errgo.Mask(err)
-	}
-	return nil
+	return errgo.Mask(err)
 }
 
 // SetGroups sets the groups of a user. If the user is not found then an
