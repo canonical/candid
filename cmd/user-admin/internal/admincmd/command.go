@@ -12,6 +12,8 @@ import (
 	"github.com/juju/gnuflag"
 	"github.com/juju/idmclient"
 	"github.com/juju/idmclient/params"
+	"github.com/juju/persistent-cookiejar"
+	"golang.org/x/net/publicsuffix"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
 	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
@@ -77,6 +79,13 @@ func (c *idmCommand) Client(ctxt *cmd.Context) (*idmclient.Client, error) {
 		return c.client, nil
 	}
 	bClient := httpbakery.NewClient()
+	var err error
+	bClient.Client.Jar, err = cookiejar.New(&cookiejar.Options{
+		PublicSuffixList: publicsuffix.List,
+	})
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
 	idmURL := idmURL(c.url)
 	if c.agentFile != "" {
 		a, err := Load(ctxt.AbsPath(c.agentFile))
