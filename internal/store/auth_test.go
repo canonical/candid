@@ -53,8 +53,13 @@ func (s *authSuite) TearDownTest(c *gc.C) {
 func (s *authSuite) createIdentity(c *gc.C, doc *mongodoc.Identity) (uuid string) {
 	store := s.pool.GetNoLimit()
 	defer s.pool.Put(store)
-	err := store.UpsertIdentity(doc, nil)
-	c.Assert(err, gc.IsNil)
+	if doc.ExternalID != "" {
+		err := store.UpsertUser(doc)
+		c.Assert(err, gc.IsNil)
+	} else {
+		err := store.UpsertAgent(doc)
+		c.Assert(err, gc.IsNil)
+	}
 	return doc.UUID
 }
 

@@ -148,16 +148,7 @@ func (c *idpHandler) FindUserByName(name params.Username) (*params.User, error) 
 // UpdateUser implements idp.Context.UpdateUser.
 func (c *idpHandler) UpdateUser(u *params.User) error {
 	id := identityFromUser(u)
-	onInsert := make(bson.D, 0, 3)
-	if id.Groups != nil {
-		onInsert = append(onInsert, bson.DocElem{"groups", id.Groups})
-		id.Groups = nil
-	}
-	if id.SSHKeys != nil {
-		onInsert = append(onInsert, bson.DocElem{"ssh_keys", id.SSHKeys})
-		id.SSHKeys = nil
-	}
-	if err := c.store.UpsertIdentity(id, onInsert); err != nil {
+	if err := c.store.UpsertUser(id); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrAlreadyExists))
 	}
 	return nil

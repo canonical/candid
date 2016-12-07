@@ -77,12 +77,12 @@ func (s *storeSuite) TestNew(c *gc.C) {
 	c.Assert(doc.Groups, gc.DeepEquals, []string{"group1"})
 }
 
-var insertIdentityTests = []struct {
+var upsertUserTests = []struct {
 	about     string
 	identity  *mongodoc.Identity
 	expectErr string
 }{{
-	about: "insert interactive user",
+	about: "insert user",
 	identity: &mongodoc.Identity{
 		Username:   "test",
 		ExternalID: "http://example.com/test",
@@ -123,36 +123,6 @@ var insertIdentityTests = []struct {
 	},
 	expectErr: "cannot add user: duplicate username or external_id",
 }, {
-	about: "insert agent user",
-	identity: &mongodoc.Identity{
-		Username:   "agent",
-		ExternalID: "",
-		Email:      "existing@example.com",
-		FullName:   "Existing User",
-		Groups: []string{
-			"test",
-		},
-		Owner:      "owner",
-		PublicKeys: []mongodoc.PublicKey{{Key: []byte("0000000000000000000000000000000")}},
-	},
-}, {
-	about: "duplicate agent",
-	identity: &mongodoc.Identity{
-		Username:   "existing-agent",
-		ExternalID: "",
-		Email:      "existing@example.com",
-		FullName:   "Existing User",
-		Groups: []string{
-			"test",
-		},
-		Owner: "another owner",
-		PublicKeys: []mongodoc.PublicKey{
-			{Key: []byte("0000000000000000000000000000000")},
-			{Key: []byte("1111111111111111111111111111111")},
-		},
-	},
-	expectErr: "cannot add user: duplicate username or external_id",
-}, {
 	about: "not fully specified",
 	identity: &mongodoc.Identity{
 		Username:   "existing-agent",
@@ -162,38 +132,16 @@ var insertIdentityTests = []struct {
 		Groups: []string{
 			"test",
 		},
-		Owner: "",
-		PublicKeys: []mongodoc.PublicKey{
-			{Key: []byte("0000000000000000000000000000000")},
-			{Key: []byte("1111111111111111111111111111111")},
-		},
 	},
-	expectErr: "no external_id or owner specified",
-}, {
-	about: "external_id and owner",
-	identity: &mongodoc.Identity{
-		Username:   "existing-agent",
-		ExternalID: "http://example.com/existing",
-		Email:      "existing@example.com",
-		FullName:   "Existing User",
-		Groups: []string{
-			"test",
-		},
-		Owner: "owner",
-		PublicKeys: []mongodoc.PublicKey{
-			{Key: []byte("0000000000000000000000000000000")},
-			{Key: []byte("1111111111111111111111111111111")},
-		},
-	},
-	expectErr: "both external_id and owner specified",
+	expectErr: "no external_id specified",
 }}
 
-func (s *storeSuite) TestUpsertIdentity(c *gc.C) {
+func (s *storeSuite) TestUpsertUser(c *gc.C) {
 	store := s.pool.GetNoLimit()
 	defer s.pool.Put(store)
 
 	// Add existing interactive user.
-	err := store.UpsertIdentity(&mongodoc.Identity{
+	err := store.UpsertUser(&mongodoc.Identity{
 		Username:   "existing",
 		ExternalID: "http://example.com/existing",
 		Email:      "existing@example.com",
@@ -201,25 +149,12 @@ func (s *storeSuite) TestUpsertIdentity(c *gc.C) {
 		Groups: []string{
 			"test",
 		},
-	}, nil)
+	})
 	c.Assert(err, gc.IsNil)
 
-	// Add existing agent user
-	err = store.UpsertIdentity(&mongodoc.Identity{
-		Username: "existing-agent",
-		Email:    "existing@example.com",
-		FullName: "Existing User",
-		Groups: []string{
-			"test",
-		},
-		Owner:      "owner",
-		PublicKeys: []mongodoc.PublicKey{{Key: []byte("00000000000000000000000000000000")}},
-	}, nil)
-	c.Assert(err, gc.IsNil)
-
-	for i, test := range insertIdentityTests {
+	for i, test := range upsertUserTests {
 		c.Logf("%d: %s", i, test.about)
-		err := store.UpsertIdentity(test.identity, nil)
+		err := store.UpsertUser(test.identity)
 		if test.expectErr != "" {
 			c.Assert(err, gc.ErrorMatches, test.expectErr)
 			continue
@@ -232,14 +167,88 @@ func (s *storeSuite) TestUpsertIdentity(c *gc.C) {
 	}
 }
 
-func (s *storeSuite) TestUpsertIdentityEmptyUserInformation(c *gc.C) {
+var upsertAgentTests = []struct {
+	about     string
+	identity  *mongodoc.Identity
+	expectErr string
+}{{
+	about: "insert agent",
+	identity: &mongodoc.Identity{
+		Username: "agent",
+		Groups: []string{
+			"test",
+		},
+		Owner:      "owner",
+		PublicKeys: []mongodoc.PublicKey{{Key: []byte("0000000000000000000000000000000")}},
+	},
+}, {
+	about: "duplicate agent",
+	identity: &mongodoc.Identity{
+		Username: "existing-agent",
+		Groups: []string{
+			"test",
+		},
+		Owner: "another owner",
+		PublicKeys: []mongodoc.PublicKey{
+			{Key: []byte("0000000000000000000000000000000")},
+			{Key: []byte("1111111111111111111111111111111")},
+		},
+	},
+	expectErr: "already exists",
+}, {
+	about: "owner not  specified",
+	identity: &mongodoc.Identity{
+		Username: "existing-agent",
+		Groups: []string{
+			"test",
+		},
+		Owner: "",
+		PublicKeys: []mongodoc.PublicKey{
+			{Key: []byte("0000000000000000000000000000000")},
+			{Key: []byte("1111111111111111111111111111111")},
+		},
+	},
+	expectErr: "no owner specified",
+}}
+
+func (s *storeSuite) TestUpsertAgent(c *gc.C) {
+	store := s.pool.GetNoLimit()
+	defer s.pool.Put(store)
+
+	// Add existing agent user
+	err := store.UpsertAgent(&mongodoc.Identity{
+		Username: "existing-agent",
+		Groups: []string{
+			"test",
+		},
+		Owner:      "owner",
+		PublicKeys: []mongodoc.PublicKey{{Key: []byte("00000000000000000000000000000000")}},
+	})
+	c.Assert(err, gc.IsNil)
+
+	for i, test := range upsertAgentTests {
+		c.Logf("%d: %s", i, test.about)
+		err := store.UpsertAgent(test.identity)
+		if test.expectErr != "" {
+			c.Assert(err, gc.ErrorMatches, test.expectErr)
+			continue
+		}
+		c.Assert(err, gc.IsNil)
+		var doc mongodoc.Identity
+		err = store.DB.Identities().Find(bson.D{{"username", test.identity.Username}}).One(&doc)
+		c.Assert(err, gc.IsNil)
+		c.Assert(&doc, jc.DeepEquals, test.identity)
+	}
+}
+
+func (s *storeSuite) TestUpsertUserEmptyUserInformation(c *gc.C) {
 	store := s.pool.GetNoLimit()
 	defer s.pool.Put(store)
 	id := &mongodoc.Identity{
 		Username:   "test",
 		ExternalID: "http://example.com/test",
 	}
-	err := store.UpsertIdentity(id, nil)
+	err := store.UpsertUser(id)
 	c.Assert(err, gc.IsNil)
 	var doc map[string]interface{}
 	err = store.DB.Identities().Find(bson.D{{"username", "test"}}).One(&doc)
@@ -254,30 +263,7 @@ func (s *storeSuite) TestUpsertIdentityEmptyUserInformation(c *gc.C) {
 	})
 }
 
-func (s *storeSuite) TestUpsertIdentityWithOnInsert(c *gc.C) {
-	store := s.pool.GetNoLimit()
-	defer s.pool.Put(store)
-	id := &mongodoc.Identity{
-		Username:   "test",
-		ExternalID: "http://example.com/test",
-	}
-	err := store.UpsertIdentity(id, bson.D{{"groups", []string{"test1", "test2"}}})
-	c.Assert(err, gc.IsNil)
-	var doc map[string]interface{}
-	err = store.DB.Identities().Find(bson.D{{"username", "test"}}).One(&doc)
-	c.Assert(err, gc.IsNil)
-	c.Assert(doc, jc.DeepEquals, map[string]interface{}{
-		"_id":         id.UUID,
-		"username":    "test",
-		"external_id": "http://example.com/test",
-		"email":       "",
-		"gravatarid":  "",
-		"fullname":    "",
-		"groups":      []interface{}{"test1", "test2"},
-	})
-}
-
-func (s *storeSuite) TestUpsertIdentityDedupeGroups(c *gc.C) {
+func (s *storeSuite) TestUpsertUserDedupeGroups(c *gc.C) {
 	store := s.pool.GetNoLimit()
 	defer s.pool.Put(store)
 
@@ -293,7 +279,7 @@ func (s *storeSuite) TestUpsertIdentityDedupeGroups(c *gc.C) {
 			"test2",
 		},
 	}
-	err := store.UpsertIdentity(id, nil)
+	err := store.UpsertUser(id)
 	c.Assert(err, gc.IsNil)
 
 	expect := &mongodoc.Identity{
@@ -333,10 +319,7 @@ var setGroupsTests = []struct {
 }, {
 	about: "update existing agent",
 	identity: &mongodoc.Identity{
-		Username:   "existing-agent",
-		ExternalID: "",
-		Email:      "existing@example.com",
-		FullName:   "Existing User",
+		Username: "existing-agent",
 		Groups: []string{
 			"test",
 			"test2",
@@ -370,7 +353,7 @@ func (s *storeSuite) TestSetGroups(c *gc.C) {
 	defer s.pool.Put(store)
 
 	// Add existing interactive user.
-	err := store.UpsertIdentity(&mongodoc.Identity{
+	err := store.UpsertUser(&mongodoc.Identity{
 		Username:   "existing",
 		ExternalID: "http://example.com/existing",
 		Email:      "existing@example.com",
@@ -378,20 +361,18 @@ func (s *storeSuite) TestSetGroups(c *gc.C) {
 		Groups: []string{
 			"test",
 		},
-	}, nil)
+	})
 	c.Assert(err, gc.IsNil)
 
 	// Add existing agent user
-	err = store.UpsertIdentity(&mongodoc.Identity{
+	err = store.UpsertAgent(&mongodoc.Identity{
 		Username: "existing-agent",
-		Email:    "existing@example.com",
-		FullName: "Existing User",
 		Groups: []string{
 			"test",
 		},
 		Owner:      "owner",
 		PublicKeys: []mongodoc.PublicKey{{Key: []byte("0000000000000000000000000000000")}},
-	}, nil)
+	})
 	c.Assert(err, gc.IsNil)
 
 	for i, test := range setGroupsTests {
@@ -460,11 +441,11 @@ func (s *storeSuite) TestAddGroups(c *gc.C) {
 		c.Logf("%d: %s", i, test.about)
 		username := params.Username(fmt.Sprintf("test-%d", i))
 		if test.startGroups != nil {
-			err := store.UpsertIdentity(&mongodoc.Identity{
+			err := store.UpsertUser(&mongodoc.Identity{
 				Username:   string(username),
 				ExternalID: "http://example.com/" + string(username),
 				Groups:     test.startGroups,
-			}, nil)
+			})
 			c.Assert(err, gc.IsNil)
 		}
 		err := store.AddGroups(username, test.addGroups)
@@ -536,11 +517,11 @@ func (s *storeSuite) TestRemoveGroups(c *gc.C) {
 		c.Logf("%d: %s", i, test.about)
 		username := params.Username(fmt.Sprintf("test-%d", i))
 		if test.startGroups != nil {
-			err := store.UpsertIdentity(&mongodoc.Identity{
+			err := store.UpsertUser(&mongodoc.Identity{
 				Username:   string(username),
 				ExternalID: "http://example.com/" + string(username),
 				Groups:     test.startGroups,
-			}, nil)
+			})
 			c.Assert(err, gc.IsNil)
 		}
 		err := store.RemoveGroups(username, test.removeGroups)
@@ -563,10 +544,7 @@ var updatePublicKeysIdentityTests = []struct {
 }{{
 	about: "update existing agent",
 	identity: &mongodoc.Identity{
-		Username:   "existing-agent",
-		ExternalID: "",
-		Email:      "existing@example.com",
-		FullName:   "Existing User",
+		Username: "existing-agent",
 		Groups: []string{
 			"test",
 			"test2",
@@ -601,11 +579,8 @@ func (s *storeSuite) TestUpdatePublicKeys(c *gc.C) {
 	defer s.pool.Put(store)
 
 	// Add existing agent user
-	err := store.UpsertIdentity(&mongodoc.Identity{
-		Username:   "existing-agent",
-		ExternalID: "",
-		Email:      "existing@example.com",
-		FullName:   "Existing User",
+	err := store.UpsertAgent(&mongodoc.Identity{
+		Username: "existing-agent",
 		Groups: []string{
 			"test",
 			"test2",
@@ -614,7 +589,7 @@ func (s *storeSuite) TestUpdatePublicKeys(c *gc.C) {
 		PublicKeys: []mongodoc.PublicKey{
 			{Key: []byte("0000000000000000000000000000000")},
 		},
-	}, nil)
+	})
 	c.Assert(err, gc.IsNil)
 
 	for i, test := range updatePublicKeysIdentityTests {
@@ -646,7 +621,7 @@ func (s *storeSuite) TestSetGroupsDedupeGroups(c *gc.C) {
 			"test",
 		},
 	}
-	err := store.UpsertIdentity(id, nil)
+	err := store.UpsertUser(id)
 	c.Assert(err, gc.IsNil)
 	err = store.SetGroups(params.Username(id.Username), []string{"test", "test2", "test2"})
 	c.Assert(err, gc.IsNil)
@@ -716,7 +691,7 @@ func (s *storeSuite) TestGetIdentity(c *gc.C) {
 	defer s.pool.Put(store)
 
 	// Add an identity to the store.
-	err := store.UpsertIdentity(&mongodoc.Identity{
+	err := store.UpsertUser(&mongodoc.Identity{
 		Username:   "test",
 		ExternalID: "http://example.com/test",
 		Email:      "test@example.com",
@@ -724,7 +699,7 @@ func (s *storeSuite) TestGetIdentity(c *gc.C) {
 		Groups: []string{
 			"test",
 		},
-	}, nil)
+	})
 	c.Assert(err, gc.IsNil)
 
 	// Get the identity from the store
@@ -747,7 +722,7 @@ func (s *storeSuite) TestUpdateIdentity(c *gc.C) {
 	defer s.pool.Put(store)
 
 	// Add an identity to the store.
-	err := store.UpsertIdentity(&mongodoc.Identity{
+	err := store.UpsertUser(&mongodoc.Identity{
 		Username:   "test",
 		ExternalID: "http://example.com/test",
 		Email:      "test@example.com",
@@ -755,7 +730,7 @@ func (s *storeSuite) TestUpdateIdentity(c *gc.C) {
 		Groups: []string{
 			"test",
 		},
-	}, nil)
+	})
 	c.Assert(err, gc.IsNil)
 
 	// Update the identity in the store
@@ -780,7 +755,7 @@ func (s *storeSuite) TestUpdateGroupsDoesntEraseSSHKeys(c *gc.C) {
 	defer s.pool.Put(store)
 
 	// Add an identity to the store.
-	err := store.UpsertIdentity(&mongodoc.Identity{
+	err := store.UpsertUser(&mongodoc.Identity{
 		Username:   "test",
 		ExternalID: "http://example.com/test",
 		Email:      "test@example.com",
@@ -789,7 +764,7 @@ func (s *storeSuite) TestUpdateGroupsDoesntEraseSSHKeys(c *gc.C) {
 			"test",
 		},
 		SSHKeys: []string{"345ADASD34", "6745SDADSA"},
-	}, nil)
+	})
 	c.Assert(err, gc.IsNil)
 
 	id, err := store.GetIdentity(params.Username("test"))
@@ -834,7 +809,7 @@ func (s *storeSuite) TestRetrieveLaunchpadGroups(c *gc.C) {
 	defer pool.Put(store)
 
 	// Add an identity to the store.
-	err = store.UpsertIdentity(&mongodoc.Identity{
+	err = store.UpsertUser(&mongodoc.Identity{
 		Username:   "test",
 		ExternalID: "https://login.ubuntu.com/+id/test",
 		Email:      "test@example.com",
@@ -842,7 +817,7 @@ func (s *storeSuite) TestRetrieveLaunchpadGroups(c *gc.C) {
 		Groups: []string{
 			"test",
 		},
-	}, nil)
+	})
 	c.Assert(err, gc.IsNil)
 
 	// Update group from an identity to be fetched from launchpad.

@@ -145,8 +145,13 @@ func (s *apiSuite) createUser(c *gc.C, user *params.User) string {
 func (s *apiSuite) createIdentity(c *gc.C, doc *mongodoc.Identity) (uuid string) {
 	store := s.pool.GetNoLimit()
 	defer s.pool.Put(store)
-	err := store.UpsertIdentity(doc, nil)
-	c.Assert(err, gc.IsNil)
+	if doc.Owner != "" {
+		err := store.UpsertAgent(doc)
+		c.Assert(err, gc.IsNil)
+	} else {
+		err := store.UpsertUser(doc)
+		c.Assert(err, gc.IsNil)
+	}
 	return doc.UUID
 }
 

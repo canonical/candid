@@ -496,7 +496,7 @@ func (s *usersSuite) TestUser(c *gc.C) {
 	}
 }
 
-func (s *usersSuite) TestSetUserDoesNotUpdateGroups(c *gc.C) {
+func (s *usersSuite) TestSetUserMergesGroups(c *gc.C) {
 	s.createUser(c, &params.User{
 		Username:   "jbloggs2",
 		ExternalID: "http://example.com/jbloggs2",
@@ -519,7 +519,6 @@ func (s *usersSuite) TestSetUserDoesNotUpdateGroups(c *gc.C) {
 			Email:      "jbloggs2@example.com",
 			FullName:   "Joe Bloggs II",
 			IDPGroups: []string{
-				"test",
 				"test2",
 			},
 		}),
@@ -545,6 +544,53 @@ func (s *usersSuite) TestSetUserDoesNotUpdateGroups(c *gc.C) {
 			GravatarID: "b1337cf8d58e2e2be9b6a5356cfc268b",
 			IDPGroups: []string{
 				"test",
+				"test2",
+			},
+		},
+	})
+}
+
+func (s *usersSuite) TestSetAgentOverwritesGroups(c *gc.C) {
+	s.createUser(c, &params.User{
+		Username: "agent@admin@idm",
+		Owner:    "admin@idm",
+		IDPGroups: []string{
+			"test",
+		},
+	})
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Handler: s.srv,
+		URL:     apiURL("u/agent@admin@idm"),
+		Method:  "PUT",
+		Header: http.Header{
+			"Content-Type": []string{"application/json"},
+		},
+		Body: marshal(c, params.User{
+			Username: "agent@admin@idm",
+			Owner:    "admin@idm",
+			IDPGroups: []string{
+				"test2",
+			},
+		}),
+		Username:     adminUsername,
+		Password:     adminPassword,
+		ExpectStatus: http.StatusOK,
+	})
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Handler: s.srv,
+		URL:     apiURL("u/agent@admin@idm"),
+		Method:  "GET",
+		Header: http.Header{
+			"Content-Type": []string{"application/json"},
+		},
+		Username:     adminUsername,
+		Password:     adminPassword,
+		ExpectStatus: http.StatusOK,
+		ExpectBody: params.User{
+			Username: "agent@admin@idm",
+			Owner:    "admin@idm",
+			IDPGroups: []string{
+				"test2",
 			},
 		},
 	})
@@ -623,8 +669,9 @@ func (s *usersSuite) TestUpdateAgentSetPublicKeys(c *gc.C) {
 		Password:     adminPassword,
 		ExpectStatus: http.StatusOK,
 		ExpectBody: params.User{
-			Username: "agent@" + store.AdminGroup,
-			Owner:    store.AdminGroup,
+			Username:  "agent@" + store.AdminGroup,
+			Owner:     store.AdminGroup,
+			IDPGroups: []string{},
 			PublicKeys: []*bakery.PublicKey{
 				&key.Public,
 			},
