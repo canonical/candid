@@ -45,6 +45,7 @@ func New() cmd.Command {
 	})
 	supercmd.Register(newAddGroupCommand())
 	supercmd.Register(newCreateAdminAgentCommand())
+	supercmd.Register(newFindCommand())
 	supercmd.Register(newRemoveGroupCommand())
 	return supercmd
 }
