@@ -148,6 +148,12 @@ func (c *idpHandler) FindUserByName(name params.Username) (*params.User, error) 
 // UpdateUser implements idp.Context.UpdateUser.
 func (c *idpHandler) UpdateUser(u *params.User) error {
 	id := identityFromUser(u)
+	if id.Owner != "" {
+		if err := c.store.UpsertAgent(id); err != nil {
+			return errgo.Mask(err)
+		}
+		return nil
+	}
 	if err := c.store.UpsertUser(id); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrAlreadyExists))
 	}

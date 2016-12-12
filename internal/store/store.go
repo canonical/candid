@@ -406,7 +406,8 @@ func (s *Store) ensureIndexes() error {
 // name from the given document. Any groups or SSH Keys in the given
 // document will be added to the set already stored, if any. Extra info
 // fields will be added to those present, overwriting any with identical
-// keys.
+// keys. If the given doc has a non-zero last login time the the last
+// login time will be set to the new time.
 func (s *Store) UpsertUser(doc *mongodoc.Identity) error {
 	doc.UUID = uuid.NewSHA1(IdentityNamespace, []byte(doc.Username)).String()
 	if doc.ExternalID == "" {
@@ -427,6 +428,10 @@ func (s *Store) UpsertUser(doc *mongodoc.Identity) error {
 	}, {
 		"fullname", doc.FullName,
 	}}
+
+	if doc.LastLogin != nil && !doc.LastLogin.IsZero() {
+		set = append(set, bson.DocElem{"lastlogin", doc.LastLogin})
+	}
 
 	for k, v := range doc.ExtraInfo {
 		set = append(set, bson.DocElem{"extrainfo." + k, v})
@@ -468,6 +473,10 @@ func (s *Store) UpsertAgent(doc *mongodoc.Identity) error {
 	}, {
 		"public_keys", doc.PublicKeys,
 	}}
+
+	if doc.LastLogin != nil && !doc.LastLogin.IsZero() {
+		set = append(set, bson.DocElem{"lastlogin", doc.LastLogin})
+	}
 
 	return errgo.Mask(s.upsertIdentity(query, set, nil))
 }

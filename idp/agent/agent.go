@@ -106,6 +106,18 @@ func (a *identityProvider) Handle(c idp.Context) {
 			checkers.OperationChecker("discharge"),
 		))
 		if err == nil {
+			if declared["username"] != store.AdminGroup {
+				user, err := ac.FindUserByName(params.Username(declared["username"]))
+				if err == nil {
+					t := time.Now()
+					user.LastLogin = &t
+					err = ac.UpdateUser(user)
+				}
+				if err != nil {
+					ac.LoginFailure(errgo.Notef(err, "cannot update user"))
+					return
+				}
+			}
 			if ac.LoginSuccess(ms) {
 				httprequest.WriteJSON(p.Response, http.StatusOK,
 					params.AgentLoginResponse{

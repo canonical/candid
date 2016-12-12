@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/juju/idmclient/params"
 	jc "github.com/juju/testing/checkers"
@@ -791,4 +792,31 @@ func (j *testCookieJar) SetCookies(u *url.URL, cs []*http.Cookie) {
 
 func (j *testCookieJar) Cookies(u *url.URL) []*http.Cookie {
 	return nil
+}
+
+func (s *dischargeSuite) TestLastDischargeTimeUpdates(c *gc.C) {
+	visitor := &test.Visitor{
+		User: s.user,
+	}
+	s.AssertDischarge(c, visitor, checkers.New(
+		checkers.TimeBefore,
+	))
+	u1, err := s.IDMClient.User(&params.UserRequest{
+		Username: s.user.Username,
+	})
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(u1.LastDischarge.IsZero(), gc.Equals, false)
+
+	// Wait at least one ms so that the discharge time stored in the
+	// database is necessarily different.
+	time.Sleep(time.Millisecond)
+
+	s.AssertDischarge(c, visitor, checkers.New(
+		checkers.TimeBefore,
+	))
+	u2, err := s.IDMClient.User(&params.UserRequest{
+		Username: s.user.Username,
+	})
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(u2.LastDischarge.After(*u1.LastDischarge), gc.Equals, true)
 }

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"sync"
+	"time"
 
 	"github.com/juju/httprequest"
 	"github.com/juju/idmclient/params"
@@ -231,6 +232,8 @@ func AssertLoginSuccess(c *gc.C, tc *TestContext, ch checkers.Checker, u *params
 	c.Assert(declared["username"], gc.Equals, string(u.Username))
 	user, err := tc.FindUserByName(u.Username)
 	c.Assert(err, gc.IsNil)
+	c.Assert(user.LastLogin.After(time.Now().Add(-1*time.Second)), gc.Equals, true)
+	user.LastLogin = nil
 	c.Assert(user, jc.DeepEquals, u)
 }
 

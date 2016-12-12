@@ -448,15 +448,17 @@ func userFromIdentity(store *store.Store, id *mongodoc.Identity) (*params.User, 
 		}
 	}
 	return &params.User{
-		Username:   params.Username(id.Username),
-		ExternalID: id.ExternalID,
-		FullName:   id.FullName,
-		Email:      id.Email,
-		GravatarID: id.GravatarID,
-		IDPGroups:  userGroups(store, id),
-		Owner:      params.Username(id.Owner),
-		PublicKeys: publicKeys,
-		SSHKeys:    id.SSHKeys,
+		Username:      params.Username(id.Username),
+		ExternalID:    id.ExternalID,
+		FullName:      id.FullName,
+		Email:         id.Email,
+		GravatarID:    id.GravatarID,
+		IDPGroups:     userGroups(store, id),
+		Owner:         params.Username(id.Owner),
+		PublicKeys:    publicKeys,
+		SSHKeys:       id.SSHKeys,
+		LastLogin:     id.LastLogin,
+		LastDischarge: id.LastDischarge,
 	}, nil
 }
 
@@ -466,13 +468,15 @@ func identityFromUser(u *params.User) *mongodoc.Identity {
 		keys[i].Key = pk.Key[:]
 	}
 	return &mongodoc.Identity{
-		Username:   string(u.Username),
-		ExternalID: u.ExternalID,
-		Email:      u.Email,
-		GravatarID: gravatarHash(u.Email),
-		FullName:   u.FullName,
-		Groups:     u.IDPGroups,
-		Owner:      string(u.Owner),
-		PublicKeys: keys,
+		Username:      string(u.Username),
+		ExternalID:    u.ExternalID,
+		Email:         u.Email,
+		GravatarID:    gravatarHash(u.Email),
+		FullName:      u.FullName,
+		Groups:        u.IDPGroups,
+		Owner:         string(u.Owner),
+		PublicKeys:    keys,
+		LastLogin:     u.LastLogin,
+		LastDischarge: u.LastDischarge,
 	}
 }

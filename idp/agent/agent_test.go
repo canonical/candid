@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"time"
 
 	"github.com/juju/idmclient/params"
 	"github.com/juju/testing"
@@ -153,7 +154,12 @@ func (s *agentSuite) TestHandleWithUsableMacaroon(c *gc.C) {
 			PublicKey: &key.Public,
 		}),
 	}
-	m, err := s.store.Service.NewMacaroon(bakery.LatestVersion, []checkers.Caveat{})
+	err = tc.UpdateUser(&params.User{
+		Username: "test",
+		Owner:    "admin@idm",
+	})
+	c.Assert(err, gc.IsNil)
+	m, err := s.store.Service.NewMacaroon(bakery.LatestVersion, []checkers.Caveat{checkers.DeclaredCaveat("username", "test")})
 	c.Assert(err, gc.IsNil)
 	cookie, err := httpbakery.NewCookie(macaroon.Slice{m})
 	c.Assert(err, gc.IsNil)
@@ -236,9 +242,14 @@ func (s *agentSuite) TestHandleWithShortcutUsableMacaroon(c *gc.C) {
 			PublicKey: &key.Public,
 		},
 	}
+	err = tc.UpdateUser(&params.User{
+		Username: "test",
+		Owner:    "admin@idm",
+	})
+	c.Assert(err, gc.IsNil)
 	tc.Request, err = http.NewRequest("", "", nil)
 	c.Assert(err, gc.IsNil)
-	m, err := s.store.Service.NewMacaroon(bakery.LatestVersion, []checkers.Caveat{})
+	m, err := s.store.Service.NewMacaroon(bakery.LatestVersion, []checkers.Caveat{checkers.DeclaredCaveat("username", "test")})
 	c.Assert(err, gc.IsNil)
 	cookie, err := httpbakery.NewCookie(macaroon.Slice{m})
 	c.Assert(err, gc.IsNil)
@@ -250,6 +261,10 @@ func (s *agentSuite) TestHandleWithShortcutUsableMacaroon(c *gc.C) {
 	httptesting.AssertJSONResponse(c, tc.Response(), http.StatusOK, params.AgentLoginResponse{
 		AgentLogin: true,
 	})
+	user, err := tc.FindUserByName("test")
+	c.Assert(err, gc.IsNil)
+	c.Assert(user.LastLogin.IsZero(), gc.Equals, false)
+	c.Assert(user.LastLogin.After(time.Now().Add(-1*time.Second)), gc.Equals, true)
 }
 
 func (s *agentSuite) TestHandleShortcutWithUnsableMacaroon(c *gc.C) {

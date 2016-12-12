@@ -14,6 +14,7 @@ import (
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
 	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
 	"gopkg.in/macaroon.v2-unstable"
+	"gopkg.in/mgo.v2/bson"
 
 	"github.com/CanonicalLtd/blues-identity/idp/idputil"
 	"github.com/CanonicalLtd/blues-identity/internal/mongodoc"
@@ -25,16 +26,6 @@ const (
 	// discharge token is valid.
 	dischargeTokenDuration = 6 * time.Hour
 )
-
-// verifiedUserInfo holds information provided by an
-// external identity provider from a successful user login.
-type verifiedUserInfo struct {
-	User     string
-	Nickname string
-	FullName string
-	Email    string
-	Groups   []string
-}
 
 // thirdPartyCaveatChecker implements an
 // httpbakery.ThirdPartyCaveatChecker for the identity service.
@@ -100,14 +91,30 @@ func checkThirdPartyCaveat(h *handler, req *http.Request, ci *bakery.ThirdPartyC
 	if err != nil {
 		return nil, errgo.WithCausef(err, params.ErrBadRequest, "cannot parse caveat %q", ci.Condition)
 	}
+
+	var cavs []checkers.Caveat
 	switch cond {
 	case "is-authenticated-user":
-		return checkAuthenticatedUser(doc)
+		cavs, err = checkAuthenticatedUser(doc)
 	case "is-member-of":
-		return checkMemberOfGroup(doc, args)
+		cavs, err = checkMemberOfGroup(doc, args)
 	default:
-		return nil, checkers.ErrCaveatNotRecognized
+		err = checkers.ErrCaveatNotRecognized
 	}
+	if err != nil {
+		return nil, err
+	}
+	h.updateDischargeTime(params.Username(doc.Username))
+	return cavs, nil
+}
+
+func (h *handler) updateDischargeTime(username params.Username) {
+	err := h.store.UpdateIdentity(username, bson.D{{
+		"$set", bson.D{{
+			"lastdischarge", time.Now(),
+		}},
+	}})
+	logger.Infof("unexpected error updating last discharge time: %s", err)
 }
 
 // checkAuthenticatedUser checks a third-party caveat for "is-authenticated-user". Currently the discharge
