@@ -96,7 +96,7 @@ func (s *tokenSuite) TestKeystoneTokenIdentityProviderHandleBadToken(c *gc.C) {
 		Request:   req,
 	}
 	s.idp.Handle(tc)
-	idptest.AssertLoginFailure(c, tc, `cannot log in: POST .*: invalid credentials`)
+	idptest.AssertLoginFailure(c, tc, `cannot log in: invalid credentials`)
 }
 
 func (s *tokenSuite) TestKeystoneTokenIdentityProviderHandleBadRequest(c *gc.C) {

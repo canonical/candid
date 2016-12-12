@@ -138,7 +138,6 @@ func (idp *identityProvider) Handle(c idp.Context) {
 	// identity cannot be created. It is still possible to log the
 	// user in if the identity already exists.
 	if err != nil {
-		//logger.Warningf("cannot create user: %s", err)
 		user, err = c.FindUserByExternalId(id)
 		if err != nil {
 			c.LoginFailure(errgo.WithCausef(

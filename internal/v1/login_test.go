@@ -93,7 +93,7 @@ func (s *loginSuite) TestLoginFailure(c *gc.C) {
 	u, err := url.Parse(location + "/v1/idp/test/login")
 	c.Assert(err, gc.IsNil)
 	err = visitor.VisitWebPage(client, map[string]*url.URL{httpbakery.UserInteractionMethod: u})
-	c.Assert(err, gc.ErrorMatches, `POST .*: httprequest: user "" not found: not found`)
+	c.Assert(err, gc.ErrorMatches, `user "" not found: not found`)
 	c.Assert(jar.cookies, gc.HasLen, 0)
 }
 

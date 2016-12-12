@@ -2,6 +2,8 @@
 
 package mongodoc
 
+import "time"
+
 // Identity holds the in-database representation of a user in the identities
 // Mongo collection.
 type Identity struct {
@@ -45,6 +47,12 @@ type Identity struct {
 	// ExtraInfo holds additional information about the user that
 	// is required by other parts of the system.
 	ExtraInfo map[string][]byte `bson:",omitempty" json:",omitempty"`
+
+	// LastLoginTime holds the time of the last login for this identity.
+	LastLogin *time.Time `bson:",omitempty"`
+
+	// LastDischargeTime holds the time of the last discharge for this identity.
+	LastDischarge *time.Time `bson:",omitempty"`
 }
 
 // IdentityProvider holds the in-database representation of the an identity provider in the

@@ -31,6 +31,11 @@ const (
 // identity macaroon is generated for the user and an appropriate message
 // will be returned for the login request.
 func LoginUser(c idp.Context, u *params.User) {
+	t := time.Now()
+	u.LastLogin = &t
+	if err := c.UpdateUser(u); err != nil {
+		c.LoginFailure(errgo.Notef(err, "cannot update last login time"))
+	}
 	m, err := CreateMacaroon(c.Bakery(), string(u.Username), identityMacaroonDuration, c.Params().Request)
 	if err != nil {
 		c.LoginFailure(errgo.Notef(err, "cannot create macaroon"))

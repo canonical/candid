@@ -154,7 +154,7 @@ func (s *keystoneSuite) TestKeystoneIdentityProviderHandlePostBadPassword(c *gc.
 		Bakery_:   b,
 	}
 	s.idp.Handle(tc)
-	idptest.AssertLoginFailure(c, tc, `cannot log in: POST .*/v2.0/tokens: invalid credentials`)
+	idptest.AssertLoginFailure(c, tc, `cannot log in: invalid credentials`)
 }
 
 func (s *keystoneSuite) TestKeystoneIdentityProviderHandlePostNoTenants(c *gc.C) {
@@ -176,7 +176,7 @@ func (s *keystoneSuite) TestKeystoneIdentityProviderHandlePostNoTenants(c *gc.C)
 		Bakery_:   b,
 	}
 	s.idp.Handle(tc)
-	idptest.AssertLoginFailure(c, tc, `cannot get tenants: GET .*/v2.0/tenants: bad token`)
+	idptest.AssertLoginFailure(c, tc, `cannot get tenants: bad token`)
 }
 
 func (s *keystoneSuite) TestKeystoneIdentityProviderHandleExistingUser(c *gc.C) {
