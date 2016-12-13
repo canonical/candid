@@ -38,21 +38,38 @@ func (h *apiHandler) QueryUsers(p httprequest.Params, r *params.QueryUsersReques
 	if err := h.checkAdmin(); err != nil {
 		return nil, errgo.Mask(err, errgo.Any)
 	}
-	usernames := make([]string, 0, 1)
-	type userQuery struct {
-		ExternalID string `bson:"external_id,omitempty"`
-		Email      string `bson:"email,omitempty"`
+	query := make(bson.D, 0, 4)
+	if r.ExternalID != "" {
+		query = append(query, bson.DocElem{"external_id", r.ExternalID})
 	}
-	var user mongodoc.Identity
-	it := h.store.DB.Identities().Find(userQuery{
-		ExternalID: r.ExternalID,
-		Email:      r.Email,
-	}).Iter()
-	for it.Next(&user) {
-		usernames = append(usernames, user.Username)
+	if r.Email != "" {
+		query = append(query, bson.DocElem{"email", r.Email})
 	}
-	if err := it.Close(); err != nil {
+	if len(r.LastLoginSince) > 0 {
+		var t time.Time
+		if err := t.UnmarshalText([]byte(r.LastLoginSince)); err != nil {
+			return nil, errgo.Notef(err, "cannot unmarshal last-login-since")
+		}
+		query = append(query, bson.DocElem{"lastlogin", bson.D{{"$gte", t}}})
+	}
+	if len(r.LastDischargeSince) > 0 {
+		var t time.Time
+		if err := t.UnmarshalText([]byte(r.LastDischargeSince)); err != nil {
+			return nil, errgo.Notef(err, "cannot unmarshal last-discharge-since")
+		}
+		query = append(query, bson.DocElem{"lastdischarge", bson.D{{"$gte", t}}})
+	}
+
+	// TODO(mhilton) make sure this endpoint can be queried as a
+	// subset once there are more users.
+
+	var identities []mongodoc.Identity
+	if err := h.store.DB.Identities().Find(query).All(&identities); err != nil {
 		return nil, errgo.Mask(err)
+	}
+	usernames := make([]string, len(identities))
+	for i, id := range identities {
+		usernames[i] = id.Username
 	}
 	return usernames, nil
 }

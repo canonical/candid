@@ -11,6 +11,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/juju/idmclient/params"
 	jc "github.com/juju/testing/checkers"
@@ -764,6 +765,8 @@ func (s *usersSuite) TestQueryUsers(c *gc.C) {
 			"test",
 		},
 	})
+	store.UpdateIdentity("jbloggs2", bson.D{{"$set", bson.D{{"lastlogin", time.Now().AddDate(0, 0, -29)}}}})
+	store.UpdateIdentity("jbloggs2", bson.D{{"$set", bson.D{{"lastdischarge", time.Now().AddDate(0, 0, -14)}}}})
 	tests := []struct {
 		about        string
 		url          string
@@ -879,6 +882,60 @@ func (s *usersSuite) TestQueryUsers(c *gc.C) {
 	}, {
 		about:        "query email not found",
 		url:          apiURL("u?email=not-there@example.com"),
+		method:       "GET",
+		body:         nil,
+		username:     adminUsername,
+		password:     adminPassword,
+		expectStatus: http.StatusOK,
+		expectBody:   []string{},
+	}, {
+		about:        "last login in range",
+		url:          apiURL("u?last-login-since=" + time.Now().AddDate(0, 0, -30).Format(time.RFC3339)),
+		method:       "GET",
+		body:         nil,
+		username:     adminUsername,
+		password:     adminPassword,
+		expectStatus: http.StatusOK,
+		expectBody:   []string{"jbloggs2"},
+	}, {
+		about:        "last login too soon",
+		url:          apiURL("u?last-login-since=" + time.Now().AddDate(0, 0, -28).Format(time.RFC3339)),
+		method:       "GET",
+		body:         nil,
+		username:     adminUsername,
+		password:     adminPassword,
+		expectStatus: http.StatusOK,
+		expectBody:   []string{},
+	}, {
+		about:        "last discharge in range",
+		url:          apiURL("u?last-discharge-since=" + time.Now().AddDate(0, 0, -15).Format(time.RFC3339)),
+		method:       "GET",
+		body:         nil,
+		username:     adminUsername,
+		password:     adminPassword,
+		expectStatus: http.StatusOK,
+		expectBody:   []string{"jbloggs2"},
+	}, {
+		about:        "last discharge too soon",
+		url:          apiURL("u?last-discharge-since=" + time.Now().AddDate(0, 0, -13).Format(time.RFC3339)),
+		method:       "GET",
+		body:         nil,
+		username:     adminUsername,
+		password:     adminPassword,
+		expectStatus: http.StatusOK,
+		expectBody:   []string{},
+	}, {
+		about:        "combined login and discharge (found)",
+		url:          apiURL("u?last-discharge-since=" + time.Now().AddDate(0, 0, -15).Format(time.RFC3339) + "&last-login-since=" + time.Now().AddDate(0, 0, -30).Format(time.RFC3339)),
+		method:       "GET",
+		body:         nil,
+		username:     adminUsername,
+		password:     adminPassword,
+		expectStatus: http.StatusOK,
+		expectBody:   []string{"jbloggs2"},
+	}, {
+		about:        "combined login and discharge (not found)",
+		url:          apiURL("u?last-discharge-since=" + time.Now().AddDate(0, 0, -13).Format(time.RFC3339) + "&last-login-since=" + time.Now().AddDate(0, 0, -30).Format(time.RFC3339)),
 		method:       "GET",
 		body:         nil,
 		username:     adminUsername,

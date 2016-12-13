@@ -3,8 +3,12 @@
 package admincmd_test
 
 import (
+	"encoding/json"
+	"time"
+
 	"github.com/juju/httprequest"
 	"github.com/juju/idmclient/params"
+	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
 )
 
@@ -28,31 +32,70 @@ func (s *findSuite) TestFindEmail(c *gc.C) {
 	c.Assert(stdout, gc.Equals, "bob\n")
 }
 
-func (s *findSuite) TestAddGroupForEmailNotFound(c *gc.C) {
+func (s *findSuite) TestFindEmailNotFound(c *gc.C) {
 	bakeryService := newBakery()
 	runf := s.RunServer(c, []httprequest.Handler{
 		queryUsersHandler(bakeryService, func(req *params.QueryUsersRequest) ([]string, error) {
-			if req.Email == "bob@example.com" {
-				return []string{"bob"}, nil
+			if req.Email == "alice@example.com" {
+				return []string{"alice"}, nil
 			}
 			return []string{}, nil
 		}),
 	})
-	CheckError(
-		c,
-		1,
-		`no user found for email "alice@example.com"`,
-		runf,
-		"find", "-a", "admin.agent", "-e", "alice@example.com",
-	)
+	stdout := CheckSuccess(c, runf, "find", "-a", "admin.agent", "-e", "bob@example.com")
+	c.Assert(stdout, gc.Equals, "")
 }
 
-func (s *findSuite) TestFindNoUser(c *gc.C) {
-	CheckError(
-		c,
-		2,
-		`no user specified, please specify either username or email`,
-		s.Run,
-		"find", "-a", "admin.agent",
-	)
+func (s *findSuite) TestFindNoParameters(c *gc.C) {
+	bakeryService := newBakery()
+	runf := s.RunServer(c, []httprequest.Handler{
+		queryUsersHandler(bakeryService, func(req *params.QueryUsersRequest) ([]string, error) {
+			return []string{"alice", "bob", "charlie"}, nil
+		}),
+	})
+	stdout := CheckSuccess(c, runf, "find", "-a", "admin.agent", "--format", "json")
+	var usernames []string
+	err := json.Unmarshal([]byte(stdout), &usernames)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(usernames, jc.DeepEquals, []string{"alice", "bob", "charlie"})
+}
+
+func (s *findSuite) TestFindLastLoginTime(c *gc.C) {
+	var gotTime time.Time
+	bakeryService := newBakery()
+	runf := s.RunServer(c, []httprequest.Handler{
+		queryUsersHandler(bakeryService, func(req *params.QueryUsersRequest) ([]string, error) {
+			if err := gotTime.UnmarshalText([]byte(req.LastLoginSince)); err != nil {
+				return nil, err
+			}
+			return []string{"alice", "bob", "charlie"}, nil
+		}),
+	})
+	stdout := CheckSuccess(c, runf, "find", "-a", "admin.agent", "--format", "json", "--last-login", "30")
+	var usernames []string
+	err := json.Unmarshal([]byte(stdout), &usernames)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(usernames, jc.DeepEquals, []string{"alice", "bob", "charlie"})
+	t := time.Now().AddDate(0, 0, -30)
+	c.Assert(t.Sub(gotTime), jc.LessThan, time.Second)
+}
+
+func (s *findSuite) TestFindLastDischargeTime(c *gc.C) {
+	var gotTime time.Time
+	bakeryService := newBakery()
+	runf := s.RunServer(c, []httprequest.Handler{
+		queryUsersHandler(bakeryService, func(req *params.QueryUsersRequest) ([]string, error) {
+			if err := gotTime.UnmarshalText([]byte(req.LastDischargeSince)); err != nil {
+				return nil, err
+			}
+			return []string{"alice", "bob", "charlie"}, nil
+		}),
+	})
+	stdout := CheckSuccess(c, runf, "find", "-a", "admin.agent", "--format", "json", "--last-discharge", "20")
+	var usernames []string
+	err := json.Unmarshal([]byte(stdout), &usernames)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(usernames, jc.DeepEquals, []string{"alice", "bob", "charlie"})
+	t := time.Now().AddDate(0, 0, -20)
+	c.Assert(t.Sub(gotTime), jc.LessThan, time.Second)
 }
