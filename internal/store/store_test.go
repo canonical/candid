@@ -68,7 +68,7 @@ func (s *storeSuite) TestNew(c *gc.C) {
 
 	// Retrieve the identity using the store object.
 	var doc mongodoc.Identity
-	err = store.DB.Identities().Find(nil).One(&doc)
+	err = store.DB.Identities().Find(bson.D{{"username", "who"}}).One(&doc)
 	c.Assert(err, gc.IsNil)
 	c.Assert(doc.Username, gc.Equals, "who")
 	c.Assert(doc.ExternalID, gc.Equals, "http://example.com/who")

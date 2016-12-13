@@ -7,7 +7,7 @@ import (
 	"github.com/juju/httprequest"
 	"github.com/juju/idmclient/params"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
-	"gopkg.in/macaroon.v2-unstable"
+	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
 	"gopkg.in/mgo.v2"
 )
 
@@ -31,12 +31,17 @@ type Context interface {
 	// Params gets the params for the current request.
 	Params() httprequest.Params
 
-	// LoginSuccess completes a login request successfully. The
-	// macaroon.Slice contains a macaroon, with third-party
-	// discharges if appropriate, that will be set as a cookie and
-	// used to identify the user when discharging third party
-	// caveats.
-	LoginSuccess(macaroon.Slice) bool
+	// LoginSuccess completes a login request successfully. The user
+	// with the given username will have their last login time
+	// updated in the database. The given caveats will be used to
+	// mint a new identity macaroon for the user. LoginSuccess will
+	// not add any additional caveats to those specified.
+	// LoginSuccess will return true if the login was completed
+	// successfully so that the IDP may return an appropriate success
+	// response to the interracting client. If there was an error
+	// completing the login attempt an error will have automatically
+	// been returned to the client and false will be returned.
+	LoginSuccess(params.Username, []checkers.Caveat) bool
 
 	// LoginFailure fails a login request.
 	LoginFailure(error)

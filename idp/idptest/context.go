@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"sync"
-	"time"
 
 	"github.com/juju/httprequest"
 	"github.com/juju/idmclient/params"
@@ -68,10 +67,11 @@ type TestContext struct {
 	// users.
 	users []params.User
 
-	// macaroon and macaroonSet whether LoginSuccess has been called
+	// caveats and caveatsnSet whether LoginSuccess has been called
 	// and with what value.
-	macaroon    macaroon.Slice
-	macaroonSet bool
+	username   params.Username
+	caveats    []checkers.Caveat
+	caveatsSet bool
 
 	// err and errSet whether LoginFailure has been called and with
 	// what value.
@@ -169,10 +169,10 @@ func (c *TestContext) FindUserByExternalId(id string) (*params.User, error) {
 }
 
 // LoginSuccess implements Context.LoginSuccess.
-func (c *TestContext) LoginSuccess(ms macaroon.Slice) bool {
+func (c *TestContext) LoginSuccess(username params.Username, cavs []checkers.Caveat) bool {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.macaroon, c.macaroonSet = ms, true
+	c.username, c.caveats, c.caveatsSet = username, cavs, true
 	return !c.FailOnLoginSuccess
 }
 
@@ -193,10 +193,10 @@ func (c *TestContext) Response() *httptest.ResponseRecorder {
 // where ms is the macaroon.Slice used to call LoginSuccess. If
 // LoginSuccess was not called then the returned value will be
 // macaroon.Slice{}, false.
-func (c *TestContext) LoginSuccessCall() (macaroon.Slice, bool) {
+func (c *TestContext) LoginSuccessCall() (params.Username, []checkers.Caveat, bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	return c.macaroon, c.macaroonSet
+	return c.username, c.caveats, c.caveatsSet
 }
 
 // LoginFailureCall returns information about the call to LoginFailure.
@@ -215,32 +215,34 @@ func (c *TestContext) LoginFailureCall() (error, bool) {
 func AssertLoginSuccess(c *gc.C, tc *TestContext, ch checkers.Checker, u *params.User) {
 	err, called := tc.LoginFailureCall()
 	c.Assert(called, gc.Equals, false, gc.Commentf("unexpected login failure: %v", err))
-	ms, called := tc.LoginSuccessCall()
+	username, caveats, called := tc.LoginSuccessCall()
 	c.Assert(called, gc.Equals, true)
+	m, err := tc.Bakery_.NewMacaroon(bakery.LatestVersion, caveats)
+	c.Assert(err, gc.IsNil)
+	ms := macaroon.Slice{m}
 	declared := checkers.InferDeclared(ms)
-	cs := []checkers.Checker{
-		declared,
+	var fpc bakery.FirstPartyChecker
+	if ch == nil {
+		fpc = checkers.New(declared)
+	} else {
+		fpc = checkers.New(declared, ch)
 	}
-	if ch != nil {
-		cs = append(cs, ch)
-	}
-	err = tc.Bakery().Check(ms, checkers.New(cs...))
-	c.Assert(err, gc.IsNil, gc.Commentf("cannot validate macaroon: %v", err))
+	err = tc.Bakery_.Check(ms, fpc)
+	c.Assert(err, gc.IsNil)
+
 	if u == nil {
 		return
 	}
-	c.Assert(declared["username"], gc.Equals, string(u.Username))
+	c.Assert(username, gc.Equals, u.Username)
 	user, err := tc.FindUserByName(u.Username)
 	c.Assert(err, gc.IsNil)
-	c.Assert(user.LastLogin.After(time.Now().Add(-1*time.Second)), gc.Equals, true)
-	user.LastLogin = nil
 	c.Assert(user, jc.DeepEquals, u)
 }
 
 // AssertLoginFailure asserts that the result of tc is a login failure
 // with an error message that matches errRegex.
 func AssertLoginFailure(c *gc.C, tc *TestContext, errRegex string) {
-	_, called := tc.LoginSuccessCall()
+	_, _, called := tc.LoginSuccessCall()
 	c.Assert(called, gc.Equals, false)
 	err, called := tc.LoginFailureCall()
 	c.Assert(called, gc.Equals, true)
@@ -252,6 +254,6 @@ func AssertLoginFailure(c *gc.C, tc *TestContext, errRegex string) {
 func AssertLoginInProgress(c *gc.C, tc *TestContext) {
 	err, called := tc.LoginFailureCall()
 	c.Assert(called, gc.Equals, false, gc.Commentf("unexpected login failure: %v", err))
-	_, called = tc.LoginSuccessCall()
+	_, _, called = tc.LoginSuccessCall()
 	c.Assert(called, gc.Equals, false)
 }

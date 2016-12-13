@@ -181,6 +181,9 @@ func NewPool(db *mgo.Database, sp StoreParams) (*Pool, error) {
 	if err := s.ensureIndexes(); err != nil {
 		return nil, errgo.Notef(err, "cannot ensure indexes")
 	}
+	if err := s.ensureAdminUser(sp); err != nil {
+		return nil, errgo.Notef(err, "cannot create admin user")
+	}
 	if err := p.rootKeys.EnsureIndex(s.DB.Macaroons()); err != nil {
 		return nil, errgo.Notef(err, "cannot ensure indexes")
 	}
@@ -399,6 +402,20 @@ func (s *Store) ensureIndexes() error {
 	}
 
 	return nil
+}
+
+func (s *Store) ensureAdminUser(sp StoreParams) error {
+	publicKeys := make([]mongodoc.PublicKey, 0, 1)
+	if sp.AdminAgentPublicKey != nil {
+		publicKeys = append(publicKeys, mongodoc.PublicKey{
+			Key: sp.AdminAgentPublicKey.Key[:],
+		})
+	}
+	return s.UpsertAgent(&mongodoc.Identity{
+		Username:   AdminUsername,
+		Owner:      AdminUsername,
+		PublicKeys: publicKeys,
+	})
 }
 
 // UpsertUser creates, or updates, the user identity in the store. The
