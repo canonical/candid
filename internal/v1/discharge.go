@@ -16,7 +16,6 @@ import (
 	"gopkg.in/macaroon.v2-unstable"
 	"gopkg.in/mgo.v2/bson"
 
-	"github.com/CanonicalLtd/blues-identity/idp/idputil"
 	"github.com/CanonicalLtd/blues-identity/internal/mongodoc"
 	"github.com/CanonicalLtd/blues-identity/internal/store"
 )
@@ -198,17 +197,9 @@ func (h *dischargeHandler) Wait(p httprequest.Params, w *waitRequest) (*waitResp
 	}
 	// Ensure the identity macaroon can only be used from the same
 	// origin as the original discharge request.
-	//
-	// Note: If there is more than one macaroon in the slice it is
-	// conventional that the macaroon already has bound discharges,
-	// and therefore the caveat cannot be added. This currently
-	// doesn't matter because the only IDP that has a third party
-	// caveat is agent login, which does not need origin protection.
-	if len(login.IdentityMacaroon) == 1 {
-		err = login.IdentityMacaroon[0].AddFirstPartyCaveat(checkers.ClientOriginCaveat(reqInfo.Origin).Condition)
-		if err != nil {
-			return nil, errgo.Notef(err, "cannot add origin caveat to identity macaroon")
-		}
+	err = login.IdentityMacaroon[0].AddFirstPartyCaveat(checkers.ClientOriginCaveat(reqInfo.Origin).Condition)
+	if err != nil {
+		return nil, errgo.Notef(err, "cannot add origin caveat to identity macaroon")
 	}
 	// We've now got the newly minted identity macaroon. Now
 	// we want to check the third party caveat against the
@@ -270,12 +261,14 @@ func (h *dischargeHandler) DischargeTokenForUser(p httprequest.Params, r *discha
 	if err != nil {
 		return dischargeTokenForUserResponse{}, errgo.WithCausef(err, params.ErrUnauthorized, "")
 	}
-	_, err = h.store.GetIdentity(params.Username(r.Username))
+	_, err = h.store.GetIdentity(r.Username)
 	if err != nil {
 		return dischargeTokenForUserResponse{}, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
-
-	m, err := idputil.CreateMacaroon(h.store.Service, string(r.Username), dischargeTokenDuration, p.Request)
+	m, err := h.store.Service.NewMacaroon(httpbakery.RequestVersion(p.Request), []checkers.Caveat{
+		checkers.DeclaredCaveat("username", string(r.Username)),
+		checkers.TimeBeforeCaveat(time.Now().Add(dischargeTokenDuration)),
+	})
 	if err != nil {
 		return dischargeTokenForUserResponse{}, errgo.NoteMask(err, "cannot create discharge token", errgo.Any)
 	}

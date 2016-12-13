@@ -56,11 +56,11 @@ func (s *usersSuite) TestUser(c *gc.C) {
 		},
 	})
 	s.createUser(c, &params.User{
-		Username: "agent@" + store.AdminGroup,
+		Username: "agent@" + store.AdminUsername,
 		IDPGroups: []string{
 			"test",
 		},
-		Owner: store.AdminGroup,
+		Owner: store.AdminUsername,
 		PublicKeys: []*bakery.PublicKey{
 			&key.Public,
 		},
@@ -359,13 +359,13 @@ func (s *usersSuite) TestUser(c *gc.C) {
 		},
 	}, {
 		about:  "put agent user",
-		url:    apiURL("u/agent2@" + store.AdminGroup),
+		url:    apiURL("u/agent2@" + store.AdminUsername),
 		method: "PUT",
 		body: marshal(c, params.User{
 			IDPGroups: []string{
 				"test",
 			},
-			Owner: params.Username(store.AdminGroup),
+			Owner: params.Username(store.AdminUsername),
 			PublicKeys: []*bakery.PublicKey{
 				&key.Public,
 			},
@@ -375,17 +375,17 @@ func (s *usersSuite) TestUser(c *gc.C) {
 		expectStatus: http.StatusOK,
 	}, {
 		about:        "get agent user",
-		url:          apiURL("u/agent@" + store.AdminGroup),
+		url:          apiURL("u/agent@" + store.AdminUsername),
 		method:       "GET",
 		username:     adminUsername,
 		password:     adminPassword,
 		expectStatus: http.StatusOK,
 		expectBody: params.User{
-			Username: "agent@" + store.AdminGroup,
+			Username: "agent@" + store.AdminUsername,
 			IDPGroups: []string{
 				"test",
 			},
-			Owner: store.AdminGroup,
+			Owner: store.AdminUsername,
 			PublicKeys: []*bakery.PublicKey{
 				&key.Public,
 			},
@@ -653,15 +653,15 @@ func (s *usersSuite) TestUpdateAgentSetPublicKeys(c *gc.C) {
 	key, err := bakery.GenerateKey()
 	c.Assert(err, gc.IsNil)
 	s.createUser(c, &params.User{
-		Username: "agent@" + store.AdminGroup,
-		Owner:    store.AdminGroup,
+		Username: "agent@" + store.AdminUsername,
+		Owner:    store.AdminUsername,
 		PublicKeys: []*bakery.PublicKey{
 			&key.Public,
 		},
 	})
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Handler: s.srv,
-		URL:     apiURL("u/agent@" + store.AdminGroup),
+		URL:     apiURL("u/agent@" + store.AdminUsername),
 		Method:  "GET",
 		Header: http.Header{
 			"Content-Type": []string{"application/json"},
@@ -670,8 +670,8 @@ func (s *usersSuite) TestUpdateAgentSetPublicKeys(c *gc.C) {
 		Password:     adminPassword,
 		ExpectStatus: http.StatusOK,
 		ExpectBody: params.User{
-			Username:  "agent@" + store.AdminGroup,
-			Owner:     store.AdminGroup,
+			Username:  "agent@" + store.AdminUsername,
+			Owner:     store.AdminUsername,
 			IDPGroups: []string{},
 			PublicKeys: []*bakery.PublicKey{
 				&key.Public,
@@ -682,14 +682,14 @@ func (s *usersSuite) TestUpdateAgentSetPublicKeys(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Handler: s.srv,
-		URL:     apiURL("u/agent@" + store.AdminGroup),
+		URL:     apiURL("u/agent@" + store.AdminUsername),
 		Method:  "PUT",
 		Header: http.Header{
 			"Content-Type": []string{"application/json"},
 		},
 		Body: marshal(c, params.User{
-			Username: "agent@" + store.AdminGroup,
-			Owner:    store.AdminGroup,
+			Username: "agent@" + store.AdminUsername,
+			Owner:    store.AdminUsername,
 			PublicKeys: []*bakery.PublicKey{
 				&key.Public,
 			},
@@ -701,7 +701,7 @@ func (s *usersSuite) TestUpdateAgentSetPublicKeys(c *gc.C) {
 	})
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Handler: s.srv,
-		URL:     apiURL("u/agent@" + store.AdminGroup),
+		URL:     apiURL("u/agent@" + store.AdminUsername),
 		Method:  "GET",
 		Header: http.Header{
 			"Content-Type": []string{"application/json"},
@@ -710,8 +710,8 @@ func (s *usersSuite) TestUpdateAgentSetPublicKeys(c *gc.C) {
 		Password:     adminPassword,
 		ExpectStatus: http.StatusOK,
 		ExpectBody: params.User{
-			Username: "agent@" + store.AdminGroup,
-			Owner:    store.AdminGroup,
+			Username: "agent@" + store.AdminUsername,
+			Owner:    store.AdminUsername,
 			PublicKeys: []*bakery.PublicKey{
 				&key.Public,
 			},
@@ -744,7 +744,7 @@ func (s *usersSuite) TestCreateUserWritesToDatabase(c *gc.C) {
 	store := s.pool.GetNoLimit()
 	defer s.pool.Put(store)
 	var doc mongodoc.Identity
-	err := store.DB.Identities().Find(nil).One(&doc)
+	err := store.DB.Identities().Find(bson.D{{"username", "jbloggs"}}).One(&doc)
 	c.Assert(err, gc.IsNil)
 	c.Assert(doc.Username, gc.Equals, "jbloggs")
 	c.Assert(doc.ExternalID, gc.Equals, "http://example.com/jbloggs")
@@ -754,8 +754,8 @@ func (s *usersSuite) TestCreateUserWritesToDatabase(c *gc.C) {
 }
 
 func (s *usersSuite) TestQueryUsers(c *gc.C) {
-	store := s.pool.GetNoLimit()
-	defer s.pool.Put(store)
+	st := s.pool.GetNoLimit()
+	defer s.pool.Put(st)
 	s.createUser(c, &params.User{
 		Username:   "jbloggs2",
 		ExternalID: "http://example.com/jbloggs2",
@@ -765,8 +765,8 @@ func (s *usersSuite) TestQueryUsers(c *gc.C) {
 			"test",
 		},
 	})
-	store.UpdateIdentity("jbloggs2", bson.D{{"$set", bson.D{{"lastlogin", time.Now().AddDate(0, 0, -29)}}}})
-	store.UpdateIdentity("jbloggs2", bson.D{{"$set", bson.D{{"lastdischarge", time.Now().AddDate(0, 0, -14)}}}})
+	st.UpdateIdentity("jbloggs2", bson.D{{"$set", bson.D{{"lastlogin", time.Now().AddDate(0, 0, -29)}}}})
+	st.UpdateIdentity("jbloggs2", bson.D{{"$set", bson.D{{"lastdischarge", time.Now().AddDate(0, 0, -14)}}}})
 	tests := []struct {
 		about        string
 		url          string
@@ -802,7 +802,7 @@ func (s *usersSuite) TestQueryUsers(c *gc.C) {
 		username:     adminUsername,
 		password:     adminPassword,
 		expectStatus: http.StatusOK,
-		expectBody:   []string{"jbloggs2"},
+		expectBody:   []string{store.AdminUsername, "jbloggs2"},
 	}, {
 		about:        "incorrect method",
 		url:          apiURL("u?external_id=http://example.com/jbloggs"),

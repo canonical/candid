@@ -25,9 +25,9 @@ import (
 )
 
 var blacklistUsernames = map[params.Username]bool{
-	"admin":          true,
-	"everyone":       true,
-	store.AdminGroup: true,
+	"admin":             true,
+	"everyone":          true,
+	store.AdminUsername: true,
 }
 
 var storeGetLaunchpadGroups = (*store.Store).GetLaunchpadGroups
@@ -77,7 +77,7 @@ func (h *apiHandler) QueryUsers(p httprequest.Params, r *params.QueryUsersReques
 // User serves the /u/$username endpoint. See http://tinyurl.com/lrdjwmw
 // for details.
 func (h *apiHandler) User(p httprequest.Params, r *params.UserRequest) (*params.User, error) {
-	acl := []string{store.AdminGroup, string(r.Username)}
+	acl := append(adminACL, string(r.Username))
 	if err := h.store.CheckACL(opGetUser, p.Request, acl); err != nil {
 		return nil, errgo.Mask(err, errgo.Any)
 	}
@@ -97,7 +97,7 @@ func (h *apiHandler) SetUser(p httprequest.Params, u *params.SetUserRequest) err
 	if u.Owner != "" {
 		return h.setAgent(p, u)
 	}
-	if err := h.store.CheckACL(opCreateUser, p.Request, []string{store.AdminGroup}); err != nil {
+	if err := h.store.CheckACL(opCreateUser, p.Request, adminACL); err != nil {
 		return errgo.Mask(err, errgo.Any)
 	}
 	if blacklistUsernames[u.Username] {
@@ -118,10 +118,10 @@ func (h *apiHandler) SetUser(p httprequest.Params, u *params.SetUserRequest) err
 // of the groups to which the owner has access. Note: Currently only
 // admin users can create agents.
 func (h *apiHandler) setAgent(p httprequest.Params, u *params.SetUserRequest) error {
-	err := h.store.CheckACL(opCreateAgent, p.Request, []string{
-		store.AdminGroup,
-		"+create-agent@" + string(u.User.Owner),
-	})
+	err := h.store.CheckACL(opCreateAgent, p.Request, append(
+		adminACL,
+		"+create-agent@"+string(u.User.Owner),
+	))
 	if err != nil {
 		return errgo.Mask(err, errgo.Any)
 	}
@@ -155,7 +155,7 @@ func (h *handler) checkRequestHasAllGroups(r *http.Request, groups []string) err
 Outer:
 	for _, group := range groups {
 		for _, g := range requestGroups {
-			if g == group || g == store.AdminGroup {
+			if g == group || g == store.AdminUsername {
 				continue Outer
 			}
 		}
@@ -183,7 +183,7 @@ func (h *apiHandler) UserGroups(p httprequest.Params, r *params.UserGroupsReques
 	if err := h.store.CheckACL(
 		opGetUserGroups,
 		p.Request,
-		[]string{store.AdminGroup, store.GroupListGroup, string(r.Username)},
+		append(adminACL, store.GroupListGroup, string(r.Username)),
 	); err != nil {
 		return nil, errgo.Mask(err, errgo.Any)
 	}
@@ -209,7 +209,7 @@ func (h *apiHandler) SetUserGroups(p httprequest.Params, r *params.SetUserGroups
 	if err := h.store.CheckACL(
 		opSetUserGroups,
 		p.Request,
-		[]string{store.AdminGroup},
+		adminACL,
 	); err != nil {
 		return errgo.Mask(err, errgo.Any)
 	}
@@ -231,7 +231,7 @@ func (h *apiHandler) ModifyUserGroups(p httprequest.Params, r *params.ModifyUser
 	if err := h.store.CheckACL(
 		opSetUserGroups,
 		p.Request,
-		[]string{store.AdminGroup},
+		adminACL,
 	); err != nil {
 		return errgo.Mask(err, errgo.Any)
 	}
@@ -282,7 +282,7 @@ func (h *apiHandler) UserIDPGroups(p httprequest.Params, r *params.UserIDPGroups
 // GetSSHKeys serves the /u/$username/sshkeys endpoint, and returns
 // the list of ssh keys associated with the user.
 func (h *apiHandler) GetSSHKeys(p httprequest.Params, r *params.SSHKeysRequest) (params.SSHKeysResponse, error) {
-	acl := []string{store.AdminGroup, store.SSHKeyGetterGroup, string(r.Username)}
+	acl := append(adminACL, store.SSHKeyGetterGroup, string(r.Username))
 	if err := h.store.CheckACL(opGetUserSSHKey, p.Request, acl); err != nil {
 		return params.SSHKeysResponse{}, errgo.Mask(err, errgo.Any)
 	}
@@ -299,7 +299,7 @@ func (h *apiHandler) GetSSHKeys(p httprequest.Params, r *params.SSHKeysRequest) 
 // the list of ssh keys associated with the user. If the add parameter is set to
 // true then it will only add to the current list of ssh keys
 func (h *apiHandler) PutSSHKeys(p httprequest.Params, r *params.PutSSHKeysRequest) error {
-	acl := []string{store.AdminGroup, string(r.Username)}
+	acl := append(adminACL, string(r.Username))
 	if err := h.store.CheckACL(opSetUserSSHKey, p.Request, acl); err != nil {
 		return errgo.Mask(err, errgo.Any)
 	}
@@ -320,7 +320,7 @@ func (h *apiHandler) PutSSHKeys(p httprequest.Params, r *params.PutSSHKeysReques
 // DeleteSSHKeys serves the /u/$username/sshkeys delete endpoint, and remove
 // ssh keys from the list of ssh keys associated with the user.
 func (h *apiHandler) DeleteSSHKeys(p httprequest.Params, r *params.DeleteSSHKeysRequest) error {
-	acl := []string{store.AdminGroup, string(r.Username)}
+	acl := append(adminACL, string(r.Username))
 	if err := h.store.CheckACL(opSetUserSSHKey, p.Request, acl); err != nil {
 		return errgo.Mask(err, errgo.Any)
 	}

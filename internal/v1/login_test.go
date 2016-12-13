@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/juju/idmclient/params"
 	gc "gopkg.in/check.v1"
@@ -63,6 +64,11 @@ func (s *loginSuite) TestInteractiveLogin(c *gc.C) {
 	err = visitor.VisitWebPage(client, map[string]*url.URL{httpbakery.UserInteractionMethod: u})
 	c.Assert(err, gc.IsNil)
 	c.Assert(jar.cookies, gc.HasLen, 0)
+	st := s.pool.GetNoLimit()
+	defer st.Close()
+	id, err := st.GetIdentity("test")
+	c.Assert(err, gc.IsNil)
+	c.Assert(id.LastLogin.After(time.Now().Add(-1*time.Second)), gc.Equals, true)
 }
 
 func (s *loginSuite) TestNonInteractiveLogin(c *gc.C) {
@@ -82,6 +88,11 @@ func (s *loginSuite) TestNonInteractiveLogin(c *gc.C) {
 	err = visitor.VisitWebPage(client, map[string]*url.URL{"test": u})
 	c.Assert(err, gc.IsNil)
 	c.Assert(jar.cookies, gc.HasLen, 0)
+	st := s.pool.GetNoLimit()
+	defer st.Close()
+	id, err := st.GetIdentity("test")
+	c.Assert(err, gc.IsNil)
+	c.Assert(id.LastLogin.After(time.Now().Add(-1*time.Second)), gc.Equals, true)
 }
 
 func (s *loginSuite) TestLoginFailure(c *gc.C) {

@@ -14,11 +14,8 @@ import (
 	"github.com/juju/idmclient/params"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
-	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
-	"gopkg.in/macaroon.v2-unstable"
 
 	"github.com/CanonicalLtd/blues-identity/idp"
-	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
 )
 
 const (
@@ -31,17 +28,11 @@ const (
 // identity macaroon is generated for the user and an appropriate message
 // will be returned for the login request.
 func LoginUser(c idp.Context, u *params.User) {
-	t := time.Now()
-	u.LastLogin = &t
-	if err := c.UpdateUser(u); err != nil {
-		c.LoginFailure(errgo.Notef(err, "cannot update last login time"))
+	caveats := []checkers.Caveat{
+		checkers.DeclaredCaveat("username", string(u.Username)),
+		checkers.TimeBeforeCaveat(time.Now().Add(identityMacaroonDuration)),
 	}
-	m, err := CreateMacaroon(c.Bakery(), string(u.Username), identityMacaroonDuration, c.Params().Request)
-	if err != nil {
-		c.LoginFailure(errgo.Notef(err, "cannot create macaroon"))
-		return
-	}
-	if c.LoginSuccess(macaroon.Slice{m}) {
+	if c.LoginSuccess(params.Username(u.Username), caveats) {
 		fmt.Fprintf(c.Params().Response, "login successful as user %s\n", u.Username)
 	}
 }
@@ -58,13 +49,4 @@ func GetLoginMethods(c *httprequest.Client, u *url.URL, v interface{}) error {
 		return errgo.Mask(err)
 	}
 	return nil
-}
-
-// CreateMacaroon generates a new identity macaroon for the user provided
-// with a version appropriate for the client that sent the given request.
-func CreateMacaroon(service *bakery.Service, username string, duration time.Duration, req *http.Request) (*macaroon.Macaroon, error) {
-	return service.NewMacaroon(httpbakery.RequestVersion(req), []checkers.Caveat{
-		checkers.DeclaredCaveat("username", username),
-		checkers.TimeBeforeCaveat(time.Now().Add(duration)),
-	})
 }

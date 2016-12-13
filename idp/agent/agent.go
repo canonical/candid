@@ -14,6 +14,7 @@ import (
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
 	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
+	"gopkg.in/macaroon.v2-unstable"
 
 	"github.com/CanonicalLtd/blues-identity/config"
 	"github.com/CanonicalLtd/blues-identity/idp"
@@ -96,43 +97,32 @@ func (a *identityProvider) Handle(c idp.Context) {
 			return
 		}
 	}
-	for _, ms := range httpbakery.RequestMacaroons(p.Request) {
-		declared := checkers.InferDeclared(ms)
-		err := c.Bakery().Check(ms, checkers.New(
+	_, ms, err := httpbakery.CheckRequestM(
+		c.Bakery(),
+		p.Request,
+		map[string]string{"username": string(login.Username)},
+		checkers.New(
 			store.UserHasPublicKeyChecker{Store: ac.Store()},
 			checkers.TimeBefore,
 			httpbakery.Checkers(p.Request),
-			declared,
 			checkers.OperationChecker("discharge"),
-		))
-		if err == nil {
-			if declared["username"] != store.AdminGroup {
-				user, err := ac.FindUserByName(params.Username(declared["username"]))
-				if err == nil {
-					t := time.Now()
-					user.LastLogin = &t
-					err = ac.UpdateUser(user)
-				}
-				if err != nil {
-					ac.LoginFailure(errgo.Notef(err, "cannot update user"))
-					return
-				}
-			}
-			if ac.LoginSuccess(ms) {
-				httprequest.WriteJSON(p.Response, http.StatusOK,
-					params.AgentLoginResponse{
-						AgentLogin: true,
-					},
-				)
-			}
-			return
+		),
+	)
+	if err == nil {
+		if ac.LoginSuccess(login.Username, firstPartyCaveats(ms)) {
+			httprequest.WriteJSON(p.Response, http.StatusOK,
+				params.AgentLoginResponse{
+					AgentLogin: true,
+				},
+			)
 		}
-		if _, ok := errgo.Cause(err).(*bakery.VerificationError); !ok {
-			ac.LoginFailure(err)
-			return
-		}
-		logger.Infof("verification error: %s", err)
+		return
 	}
+	if _, ok := errgo.Cause(err).(*bakery.VerificationError); !ok {
+		ac.LoginFailure(err)
+		return
+	}
+	logger.Infof("verification error: %s", err)
 	vers := httpbakery.RequestVersion(c.Params().Request)
 	m, err := ac.Bakery().NewMacaroon(vers, []checkers.Caveat{
 		checkers.DeclaredCaveat("username", string(login.Username)),
@@ -153,4 +143,23 @@ func (a *identityProvider) Handle(c idp.Context) {
 	err = httpbakery.NewDischargeRequiredErrorForRequest(m, path, nil, p.Request)
 	err.(*httpbakery.Error).Info.CookieNameSuffix = "identity"
 	httprequest.ErrorMapper(httpbakery.ErrorToResponse).WriteError(p.Response, err)
+}
+
+// TODO(mhilton) firstPartyCaveats might be useful as a bakery function.
+
+// firstPartyCaveats extracts all the first party caveats in the
+// given macaroon slice.
+func firstPartyCaveats(ms macaroon.Slice) []checkers.Caveat {
+	var cavs []checkers.Caveat
+	for _, m := range ms {
+		for _, c := range m.Caveats() {
+			if len(c.VerificationId) > 0 {
+				continue
+			}
+			cavs = append(cavs, checkers.Caveat{
+				Condition: string(c.Id),
+			})
+		}
+	}
+	return cavs
 }

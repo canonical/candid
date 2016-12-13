@@ -32,6 +32,9 @@ const (
 	opSetUserGroups checkers.OperationChecker = "set-user-groups"
 )
 
+// TODO(mhilton) make the admin ACL configurable
+var adminACL = []string{store.AdminUsername}
+
 // NewAPIHandler is an identity.NewAPIHandlerFunc.
 func NewAPIHandler(p *store.Pool, params identity.ServerParams) ([]httprequest.Handler, error) {
 	h := New(p, params)
@@ -111,7 +114,7 @@ type handler struct {
 }
 
 func (h *handler) checkAdmin() error {
-	return h.store.CheckACL(opAdmin, h.params.Request, []string{store.AdminGroup})
+	return h.store.CheckACL(opAdmin, h.params.Request, adminACL)
 }
 
 // requestURL calculates the originally requested URL for the

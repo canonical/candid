@@ -18,7 +18,7 @@ import (
 )
 
 const (
-	AdminGroup        = "admin@idm"
+	AdminUsername     = "admin@idm"
 	SSHKeyGetterGroup = "sshkeygetter@idm"
 	GroupListGroup    = "grouplist@idm"
 )
@@ -88,9 +88,6 @@ func (c UserHasPublicKeyChecker) Check(_, arg string) error {
 	if err != nil {
 		return errgo.Notef(err, "invalid public key %q", parts[1])
 	}
-	if username == AdminGroup {
-		return c.checkAdminPublicKey(&publicKey)
-	}
 	return c.checkUserPublicKey(username, &publicKey)
 }
 
@@ -112,22 +109,6 @@ func (c UserHasPublicKeyChecker) checkUserPublicKey(username params.Username, pu
 		return nil
 	}
 	return errgo.Newf("public key not valid for user")
-}
-
-func (c UserHasPublicKeyChecker) checkAdminPublicKey(publicKey *bakery.PublicKey) error {
-	adminKey := c.Store.pool.params.AdminAgentPublicKey
-	if adminKey == nil {
-		return errgo.Newf("public key not valid for user")
-	}
-	if *adminKey != *publicKey {
-		return errgo.Newf("public key not valid for user")
-	}
-	if c.Identity != nil {
-		*c.Identity = &mongodoc.Identity{
-			Username: "admin@idm",
-		}
-	}
-	return nil
 }
 
 // CheckACL ensures that the logged in user is a member of a group
@@ -158,7 +139,7 @@ func (s *Store) GroupsFromRequest(c checkers.Checker, req *http.Request) ([]stri
 	err := s.CheckAdminCredentials(req)
 	if err == nil {
 		logger.Debugf("admin credentials found.")
-		return []string{AdminGroup}, nil
+		return []string{AdminUsername}, nil
 	}
 	if errgo.Cause(err) != params.ErrNoAdminCredsProvided {
 		logger.Debugf("invalid admin credentials supplied: %s", err)

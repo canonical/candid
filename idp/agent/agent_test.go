@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"time"
 
 	"github.com/juju/idmclient/params"
 	"github.com/juju/testing"
@@ -261,10 +260,6 @@ func (s *agentSuite) TestHandleWithShortcutUsableMacaroon(c *gc.C) {
 	httptesting.AssertJSONResponse(c, tc.Response(), http.StatusOK, params.AgentLoginResponse{
 		AgentLogin: true,
 	})
-	user, err := tc.FindUserByName("test")
-	c.Assert(err, gc.IsNil)
-	c.Assert(user.LastLogin.IsZero(), gc.Equals, false)
-	c.Assert(user.LastLogin.After(time.Now().Add(-1*time.Second)), gc.Equals, true)
 }
 
 func (s *agentSuite) TestHandleShortcutWithUnsableMacaroon(c *gc.C) {

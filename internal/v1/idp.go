@@ -4,6 +4,7 @@ package v1
 
 import (
 	"net/http"
+	"time"
 
 	"golang.org/x/net/trace"
 
@@ -12,6 +13,7 @@ import (
 	"github.com/julienschmidt/httprouter"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
+	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
 	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
 	"gopkg.in/macaroon.v2-unstable"
 	"gopkg.in/mgo.v2"
@@ -87,17 +89,23 @@ func (c *idpHandler) RequestURL() string {
 }
 
 // LoginSuccess implements idp.Context.LoginSuccess.
-func (c *idpHandler) LoginSuccess(ms macaroon.Slice) bool {
+func (c *idpHandler) LoginSuccess(username params.Username, cavs []checkers.Caveat) bool {
 	c.params.Request.ParseForm()
 	waitId := c.params.Request.Form.Get("waitid")
+	m, err := c.store.Service.NewMacaroon(httpbakery.RequestVersion(c.params.Request), cavs)
+	if err != nil {
+		c.LoginFailure(errgo.Notef(err, "cannot mint identity macaroon"))
+		return false
+	}
 	if waitId != "" {
 		if err := c.place.Done(waitId, &loginInfo{
-			IdentityMacaroon: ms,
+			IdentityMacaroon: macaroon.Slice{m},
 		}); err != nil {
 			c.LoginFailure(errgo.Notef(err, "cannot complete rendezvous"))
 			return false
 		}
 	}
+	c.store.UpdateIdentity(username, bson.D{{"$set", bson.D{{"lastlogin", time.Now()}}}})
 	return true
 }
 
