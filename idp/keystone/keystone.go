@@ -151,7 +151,7 @@ const loginPage = `<!doctype html>
 </html>
 `
 
-// doLogin preforms the login with the keystone server.
+// doLogin performs the login with the keystone server.
 func (idp *identityProvider) doLogin(c idp.Context, a keystone.Auth) {
 	resp, err := idp.client.Tokens(&keystone.TokensRequest{
 		Body: keystone.TokensBody{
@@ -193,6 +193,53 @@ func (idp *identityProvider) getGroups(token string) ([]string, error) {
 	groups := make([]string, len(resp.Tenants))
 	for i, t := range resp.Tenants {
 		groups[i] = idp.qualifiedName(t.Name)
+	}
+	return groups, nil
+}
+
+// doLoginV3 performs the login with the keystone (version 3) server.
+func (idp *identityProvider) doLoginV3(c idp.Context, a keystone.AuthV3) {
+	resp, err := idp.client.AuthTokens(&keystone.AuthTokensRequest{
+		Body: keystone.AuthTokensBody{
+			Auth: a,
+		},
+	})
+	if err != nil {
+		c.LoginFailure(errgo.WithCausef(err, params.ErrUnauthorized, "cannot log in"))
+		return
+	}
+	groups, err := idp.getGroupsV3(resp.SubjectToken, resp.Token.User.ID)
+	if err != nil {
+		c.LoginFailure(errgo.Mask(err))
+		return
+	}
+	user := &params.User{
+		Username:   params.Username(idp.qualifiedName(resp.Token.User.Name)),
+		ExternalID: idp.qualifiedName(resp.Token.User.ID),
+		IDPGroups:  groups,
+	}
+
+	if err := c.UpdateUser(user); err != nil {
+		c.LoginFailure(errgo.Notef(err, "cannot update identity"))
+		return
+	}
+	idputil.LoginUser(c, user)
+}
+
+// getGroupsV3 connects to keystone using token and lists groups
+// associated with the user. The group names are suffixing with the
+// domain, if configured.
+func (idp *identityProvider) getGroupsV3(token, user string) ([]string, error) {
+	resp, err := idp.client.UserGroups(&keystone.UserGroupsRequest{
+		AuthToken: token,
+		UserID:    user,
+	})
+	if err != nil {
+		return nil, errgo.Notef(err, "cannot get groups")
+	}
+	groups := make([]string, len(resp.Groups))
+	for i, g := range resp.Groups {
+		groups[i] = idp.qualifiedName(g.Name)
 	}
 	return groups, nil
 }

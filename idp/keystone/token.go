@@ -70,16 +70,3 @@ type token struct {
 		ID     string `json:"id"`
 	} `json:"login"`
 }
-
-type tokenAuthenticationRequest struct {
-	Auth tokenAuth `json:"auth"`
-}
-
-type tokenAuth struct {
-	Token      keystoneToken `json:"token"`
-	TenantName string        `json:"tenantName"`
-}
-
-type keystoneToken struct {
-	ID string `json:"id"`
-}
