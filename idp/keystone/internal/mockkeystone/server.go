@@ -20,9 +20,17 @@ type Server struct {
 	// before the endpoint can be used.
 	TokensFunc func(*keystone.TokensRequest) (*keystone.TokensResponse, error)
 
+	// AuthTokensFunc handles the /v3/auth/tokens endpoint. This must
+	// be set before the endpoint can be used.
+	AuthTokensFunc func(*keystone.AuthTokensRequest) (*keystone.AuthTokensResponse, error)
+
 	// TenantsFunc handles the /v2.0/tenants endpoint. This must be set
 	// before the endpoint can be used.
 	TenantsFunc func(*keystone.TenantsRequest) (*keystone.TenantsResponse, error)
+
+	// UserGroupsFunc handles the /v3/users/:id/groups endpoint. This must be set
+	// before the endpoint can be used.
+	UserGroupsFunc func(*keystone.UserGroupsRequest) (*keystone.UserGroupsResponse, error)
 }
 
 // NewServer creates a new Server for use in tests.
@@ -39,8 +47,10 @@ func NewServer() *Server {
 // handler creates a new handler for a request.
 func (s *Server) handler(httprequest.Params) (*handler, error) {
 	return &handler{
-		tokens:  s.TokensFunc,
-		tenants: s.TenantsFunc,
+		tokens:     s.TokensFunc,
+		authTokens: s.AuthTokensFunc,
+		tenants:    s.TenantsFunc,
+		userGroups: s.UserGroupsFunc,
 	}, nil
 }
 
@@ -58,14 +68,24 @@ var errorMapper httprequest.ErrorMapper = func(err error) (int, interface{}) {
 }
 
 type handler struct {
-	tokens  func(*keystone.TokensRequest) (*keystone.TokensResponse, error)
-	tenants func(*keystone.TenantsRequest) (*keystone.TenantsResponse, error)
+	tokens     func(*keystone.TokensRequest) (*keystone.TokensResponse, error)
+	authTokens func(*keystone.AuthTokensRequest) (*keystone.AuthTokensResponse, error)
+	tenants    func(*keystone.TenantsRequest) (*keystone.TenantsResponse, error)
+	userGroups func(*keystone.UserGroupsRequest) (*keystone.UserGroupsResponse, error)
 }
 
 func (h *handler) Tokens(r *keystone.TokensRequest) (*keystone.TokensResponse, error) {
 	return h.tokens(r)
 }
 
+func (h *handler) AuthTokens(r *keystone.AuthTokensRequest) (*keystone.AuthTokensResponse, error) {
+	return h.authTokens(r)
+}
+
 func (h *handler) Tenants(r *keystone.TenantsRequest) (*keystone.TenantsResponse, error) {
 	return h.tenants(r)
+}
+
+func (h *handler) UserGroups(r *keystone.UserGroupsRequest) (*keystone.UserGroupsResponse, error) {
+	return h.userGroups(r)
 }

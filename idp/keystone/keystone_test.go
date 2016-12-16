@@ -314,3 +314,55 @@ func testTenants(r *keystone.TenantsRequest) (*keystone.TenantsResponse, error) 
 		}},
 	}, nil
 }
+
+func testAuthTokens(req *keystone.AuthTokensRequest) (*keystone.AuthTokensResponse, error) {
+	var id string
+	var username string
+	if req.Body.Auth.Identity.Password != nil {
+		return nil, &keystone.Error{
+			Code:    http.StatusUnauthorized,
+			Message: "password authentication not yet supported.",
+			Title:   "Not Authorized",
+		}
+	} else {
+		if req.Body.Auth.Identity.Token.ID != "789" {
+			return nil, &keystone.Error{
+				Code:    http.StatusUnauthorized,
+				Message: "The request you have made requires authentication.",
+				Title:   "Not Authorized",
+			}
+		}
+		id = "123"
+		username = "testuser"
+	}
+	return &keystone.AuthTokensResponse{
+		SubjectToken: "abcd",
+		Token: keystone.TokenV3{
+			User: keystone.User{
+				ID:   id,
+				Name: username,
+				Domain: &keystone.Domain{
+					ID:   "default",
+					Name: "Default",
+				},
+			},
+		},
+	}, nil
+}
+
+func testUserGroups(req *keystone.UserGroupsRequest) (*keystone.UserGroupsResponse, error) {
+	if req.AuthToken != "abcd" {
+		return nil, &keystone.Error{
+			Code:    http.StatusUnauthorized,
+			Message: "bad token",
+			Title:   "Unauthorized",
+		}
+	}
+	return &keystone.UserGroupsResponse{
+		Groups: []keystone.Group{{
+			ID:       "def",
+			Name:     "abc_group",
+			DomainID: "default",
+		}},
+	}, nil
+}
