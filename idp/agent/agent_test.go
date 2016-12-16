@@ -10,10 +10,12 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"time"
 
 	"github.com/juju/idmclient/params"
 	"github.com/juju/testing"
 	"github.com/juju/testing/httptesting"
+	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
@@ -115,7 +117,7 @@ func (s *agentSuite) TestHandleNoMacaroon(c *gc.C) {
 	tc := &agentContext{
 		TestContext: idptest.TestContext{
 			URLPrefix: "https://idp.test/agent",
-			Bakery_:   s.store.Service,
+			Bakery_:   s.store.Bakery,
 		},
 	}
 	tc.Request = &http.Request{
@@ -140,45 +142,7 @@ func (s *agentSuite) TestHandleWithUsableMacaroon(c *gc.C) {
 	tc := &agentContext{
 		TestContext: idptest.TestContext{
 			URLPrefix: "https://idp.test/agent",
-			Bakery_:   s.store.Service,
-		},
-		store: s.store,
-	}
-	tc.Request = &http.Request{
-		Header: http.Header{
-			"Content-Type": []string{"application/json"},
-		},
-		Body: body(params.AgentLogin{
-			Username:  "test",
-			PublicKey: &key.Public,
-		}),
-	}
-	err = tc.UpdateUser(&params.User{
-		Username: "test",
-		Owner:    "admin@idm",
-	})
-	c.Assert(err, gc.IsNil)
-	m, err := s.store.Service.NewMacaroon(bakery.LatestVersion, []checkers.Caveat{checkers.DeclaredCaveat("username", "test")})
-	c.Assert(err, gc.IsNil)
-	cookie, err := httpbakery.NewCookie(macaroon.Slice{m})
-	c.Assert(err, gc.IsNil)
-	tc.Request.AddCookie(cookie)
-	s.idp.Handle(tc)
-	idptest.AssertLoginSuccess(c, &tc.TestContext, checkers.New(
-		checkers.TimeBefore,
-	), nil)
-	httptesting.AssertJSONResponse(c, tc.Response(), http.StatusOK, params.AgentLoginResponse{
-		AgentLogin: true,
-	})
-}
-
-func (s *agentSuite) TestHandleWithUnsableMacaroon(c *gc.C) {
-	key, err := bakery.GenerateKey()
-	c.Assert(err, gc.IsNil)
-	tc := &agentContext{
-		TestContext: idptest.TestContext{
-			URLPrefix: "https://idp.test/agent",
-			Bakery_:   s.store.Service,
+			Bakery_:   s.store.Bakery,
 		},
 		store: s.store,
 	}
@@ -194,9 +158,66 @@ func (s *agentSuite) TestHandleWithUnsableMacaroon(c *gc.C) {
 			PublicKey: &key.Public,
 		}),
 	}
-	m, err := s.store.Service.NewMacaroon(bakery.LatestVersion, []checkers.Caveat{checkers.DenyCaveat("discharge")})
+	err = tc.UpdateUser(&params.User{
+		Username: "test",
+		Owner:    "admin@idm",
+	})
 	c.Assert(err, gc.IsNil)
-	cookie, err := httpbakery.NewCookie(macaroon.Slice{m})
+	m, err := s.store.Bakery.Oven.NewMacaroon(
+		context.TODO(),
+		bakery.LatestVersion,
+		time.Now().Add(time.Minute),
+		nil,
+		bakery.Op{
+			Entity: "agent-test",
+			Action: "login",
+		},
+	)
+	c.Assert(err, gc.IsNil)
+	cookie, err := httpbakery.NewCookie(s.store.Bakery.Checker.Namespace(), macaroon.Slice{m.M()})
+	c.Assert(err, gc.IsNil)
+	tc.Request.AddCookie(cookie)
+	s.idp.Handle(tc)
+	idptest.AssertLoginSuccess(c, &tc.TestContext, "test")
+	httptesting.AssertJSONResponse(c, tc.Response(), http.StatusOK, params.AgentLoginResponse{
+		AgentLogin: true,
+	})
+}
+
+func (s *agentSuite) TestHandleWithUnsableMacaroon(c *gc.C) {
+	key, err := bakery.GenerateKey()
+	c.Assert(err, gc.IsNil)
+	tc := &agentContext{
+		TestContext: idptest.TestContext{
+			URLPrefix: "https://idp.test/agent",
+			Bakery_:   s.store.Bakery,
+		},
+		store: s.store,
+	}
+	tc.Request = &http.Request{
+		URL: &url.URL{
+			Path: "/",
+		},
+		Header: http.Header{
+			"Content-Type": []string{"application/json"},
+		},
+		Body: body(params.AgentLogin{
+			Username:  "test",
+			PublicKey: &key.Public,
+		}),
+	}
+	m, err := s.store.Bakery.Oven.NewMacaroon(
+		context.TODO(),
+		bakery.LatestVersion,
+		time.Now().Add(time.Minute),
+		[]checkers.Caveat{checkers.AllowCaveat("nothing")},
+		bakery.Op{
+			Entity: "agent-test",
+			Action: "login",
+		},
+	)
+	c.Assert(err, gc.IsNil)
+	cookie, err := httpbakery.NewCookie(s.store.Bakery.Checker.Namespace(), macaroon.Slice{m.M()})
 	c.Assert(err, gc.IsNil)
 	tc.Request.AddCookie(cookie)
 	s.idp.Handle(tc)
@@ -210,7 +231,7 @@ func (s *agentSuite) TestHandleShortcutNoMacaroon(c *gc.C) {
 	tc := &agentContext{
 		TestContext: idptest.TestContext{
 			URLPrefix: "https://idp.test/agent",
-			Bakery_:   s.store.Service,
+			Bakery_:   s.store.Bakery,
 		},
 		agentLogin: params.AgentLogin{
 			Username:  "test",
@@ -234,7 +255,7 @@ func (s *agentSuite) TestHandleWithShortcutUsableMacaroon(c *gc.C) {
 	tc := &agentContext{
 		TestContext: idptest.TestContext{
 			URLPrefix: "https://idp.test/agent",
-			Bakery_:   s.store.Service,
+			Bakery_:   s.store.Bakery,
 		},
 		agentLogin: params.AgentLogin{
 			Username:  "test",
@@ -246,17 +267,23 @@ func (s *agentSuite) TestHandleWithShortcutUsableMacaroon(c *gc.C) {
 		Owner:    "admin@idm",
 	})
 	c.Assert(err, gc.IsNil)
-	tc.Request, err = http.NewRequest("", "", nil)
+	tc.Request, err = http.NewRequest("", "/", nil)
 	c.Assert(err, gc.IsNil)
-	m, err := s.store.Service.NewMacaroon(bakery.LatestVersion, []checkers.Caveat{checkers.DeclaredCaveat("username", "test")})
-	c.Assert(err, gc.IsNil)
-	cookie, err := httpbakery.NewCookie(macaroon.Slice{m})
+	m, err := s.store.Bakery.Oven.NewMacaroon(
+		context.TODO(),
+		bakery.LatestVersion,
+		time.Now().Add(time.Minute),
+		[]checkers.Caveat{checkers.DeclaredCaveat("username", "test")},
+		bakery.Op{
+			Entity: "agent-test",
+			Action: "login",
+		},
+	)
+	cookie, err := httpbakery.NewCookie(s.store.Bakery.Checker.Namespace(), macaroon.Slice{m.M()})
 	c.Assert(err, gc.IsNil)
 	tc.Request.AddCookie(cookie)
 	s.idp.Handle(tc)
-	idptest.AssertLoginSuccess(c, &tc.TestContext, checkers.New(
-		checkers.TimeBefore,
-	), nil)
+	idptest.AssertLoginSuccess(c, &tc.TestContext, "test")
 	httptesting.AssertJSONResponse(c, tc.Response(), http.StatusOK, params.AgentLoginResponse{
 		AgentLogin: true,
 	})
@@ -268,7 +295,7 @@ func (s *agentSuite) TestHandleShortcutWithUnsableMacaroon(c *gc.C) {
 	tc := &agentContext{
 		TestContext: idptest.TestContext{
 			URLPrefix: "https://idp.test/agent",
-			Bakery_:   s.store.Service,
+			Bakery_:   s.store.Bakery,
 		},
 		agentLogin: params.AgentLogin{
 			Username:  "test",
@@ -277,9 +304,18 @@ func (s *agentSuite) TestHandleShortcutWithUnsableMacaroon(c *gc.C) {
 	}
 	tc.Request, err = http.NewRequest("", "/login", nil)
 	c.Assert(err, gc.IsNil)
-	m, err := s.store.Service.NewMacaroon(bakery.LatestVersion, []checkers.Caveat{checkers.DenyCaveat("discharge")})
+	m, err := s.store.Bakery.Oven.NewMacaroon(
+		context.TODO(),
+		bakery.LatestVersion,
+		time.Now().Add(time.Minute),
+		[]checkers.Caveat{checkers.AllowCaveat("nothing")},
+		bakery.Op{
+			Entity: "agent-test",
+			Action: "login",
+		},
+	)
 	c.Assert(err, gc.IsNil)
-	cookie, err := httpbakery.NewCookie(macaroon.Slice{m})
+	cookie, err := httpbakery.NewCookie(s.store.Bakery.Checker.Namespace(), macaroon.Slice{m.M()})
 	c.Assert(err, gc.IsNil)
 	tc.Request.AddCookie(cookie)
 	s.idp.Handle(tc)
@@ -293,8 +329,8 @@ func (s *agentSuite) assertDischargeRequired(c *gc.C, rr *httptest.ResponseRecor
 	err := json.Unmarshal(rr.Body.Bytes(), &herr)
 	c.Assert(err, gc.IsNil)
 	c.Assert(herr.Info.Macaroon, gc.Not(gc.IsNil))
-	c.Assert(herr.Info.CookieNameSuffix, gc.Equals, "identity")
-	_, ok := checkers.ExpiryTime(herr.Info.Macaroon.Caveats())
+	c.Assert(herr.Info.CookieNameSuffix, gc.Equals, "agent-login")
+	_, ok := checkers.ExpiryTime(s.store.Bakery.Checker.Namespace(), herr.Info.Macaroon.M().Caveats())
 	c.Assert(ok, gc.Equals, true)
 }
 

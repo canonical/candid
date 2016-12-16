@@ -8,7 +8,6 @@ import (
 
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
 
 	"github.com/CanonicalLtd/blues-identity/idp"
 	"github.com/CanonicalLtd/blues-identity/idp/idptest"
@@ -55,9 +54,7 @@ func (s *dischargeSuite) TestInteractiveDischarge(c *gc.C) {
 		Groups:   []string{"test1", "test2"},
 	})
 	s.MockUSSO.SetLoginUser("test")
-	s.AssertDischarge(c, idptest.VisitorFunc(s.visitWebPage), checkers.New(
-		checkers.TimeBefore,
-	))
+	s.AssertDischarge(c, idptest.VisitorFunc(s.visitWebPage))
 }
 
 func (s *dischargeSuite) visitWebPage(u *url.URL) error {

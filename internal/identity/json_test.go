@@ -39,7 +39,7 @@ func (s *jsonSuite) TestHandleErrors(c *gc.C) {
 		http.StatusServiceUnavailable: params.ErrServiceUnavailable,
 	} {
 		mux := httprouter.New()
-		mux.Handle("GET", "/error/", identity.ErrorMapper.HandleErrors(func(httprequest.Params) error {
+		mux.Handle("GET", "/error/", identity.ReqServer.HandleErrors(func(httprequest.Params) error {
 			return errgo.WithCausef(nil, paramsErr, "bad wolf")
 		}))
 		httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
@@ -57,7 +57,7 @@ func (s *jsonSuite) TestHandleErrors(c *gc.C) {
 func (s *jsonSuite) TestHandleErrorsInternalServerError(c *gc.C) {
 	w := new(loggo.TestWriter)
 	loggo.RegisterWriter("test", w)
-	s.mux.Handle("GET", "/error/", identity.ErrorMapper.HandleErrors(func(httprequest.Params) error {
+	s.mux.Handle("GET", "/error/", identity.ReqServer.HandleErrors(func(httprequest.Params) error {
 		return errgo.New("bad wolf")
 	}))
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
@@ -72,7 +72,7 @@ func (s *jsonSuite) TestHandleErrorsInternalServerError(c *gc.C) {
 }
 
 func (s *jsonSuite) TestHandleErrorsSuccess(c *gc.C) {
-	s.mux.Handle("GET", "/valid/", identity.ErrorMapper.HandleErrors(func(httprequest.Params) error {
+	s.mux.Handle("GET", "/valid/", identity.ReqServer.HandleErrors(func(httprequest.Params) error {
 		return nil
 	}))
 
@@ -85,10 +85,10 @@ func (s *jsonSuite) TestHandleErrorsSuccess(c *gc.C) {
 
 func (s *jsonSuite) TestHandleJSON(c *gc.C) {
 	// Set up server paths.
-	s.mux.Handle("GET", "/bad-request/", identity.ErrorMapper.HandleJSON(func(httprequest.Params) (interface{}, error) {
+	s.mux.Handle("GET", "/bad-request/", identity.ReqServer.HandleJSON(func(httprequest.Params) (interface{}, error) {
 		return nil, errgo.WithCausef(nil, params.ErrBadRequest, "bad wolf")
 	}))
-	s.mux.Handle("GET", "/valid/", identity.ErrorMapper.HandleJSON(func(httprequest.Params) (interface{}, error) {
+	s.mux.Handle("GET", "/valid/", identity.ReqServer.HandleJSON(func(httprequest.Params) (interface{}, error) {
 		return "success", nil
 	}))
 

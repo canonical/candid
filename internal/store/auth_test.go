@@ -4,18 +4,13 @@ package store_test
 
 import (
 	"net/http"
-	"net/url"
-	"sort"
 
 	"github.com/juju/idmclient/params"
 	"github.com/juju/testing"
-	jc "github.com/juju/testing/checkers"
+	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
-	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
-	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
-	"gopkg.in/macaroon.v2-unstable"
 
 	"github.com/CanonicalLtd/blues-identity/internal/mongodoc"
 	"github.com/CanonicalLtd/blues-identity/internal/store"
@@ -130,9 +125,19 @@ func (s *authSuite) TestCheckAdminCredentials(c *gc.C) {
 	}
 }
 
-func (s *authSuite) TestUserHasPublicKey(c *gc.C) {
+func (s *authSuite) TestUserHasPublicKeyCaveat(c *gc.C) {
 	key, err := bakery.GenerateKey()
 	c.Assert(err, gc.IsNil)
+	cav := store.UserHasPublicKeyCaveat(params.Username("test"), &key.Public)
+	c.Assert(cav.Namespace, gc.Equals, store.CheckersNamespace)
+	c.Assert(cav.Condition, gc.Matches, "user-has-public-key test .*")
+	c.Assert(cav.Location, gc.Equals, "")
+}
+
+func (s *authSuite) TestUserHasPublicKeyChecker(c *gc.C) {
+	key, err := bakery.GenerateKey()
+	c.Assert(err, gc.IsNil)
+
 	s.createIdentity(c, &mongodoc.Identity{
 		Username: "test",
 		Owner:    "admin",
@@ -140,294 +145,179 @@ func (s *authSuite) TestUserHasPublicKey(c *gc.C) {
 			{Key: key.Public.Key[:]},
 		},
 	})
-	cav := store.UserHasPublicKeyCaveat(params.Username("test"), &key.Public)
-	c.Assert(cav.Location, gc.Equals, "")
-	c.Assert(cav.Condition, gc.Matches, "user-has-public-key test .*")
+
+	checker := store.NewChecker()
 
 	st := s.pool.GetNoLimit()
 	defer s.pool.Put(st)
-
-	var doc *mongodoc.Identity
-	check := store.UserHasPublicKeyChecker{
-		Store:    st,
-		Identity: &doc,
+	ctx := store.ContextWithStore(context.Background(), st)
+	checkCaveat := func(cav checkers.Caveat) error {
+		cav = checker.Namespace().ResolveCaveat(cav)
+		return checker.CheckFirstPartyCaveat(ctx, cav.Condition)
 	}
-	c.Assert(check.Condition(), gc.Equals, "user-has-public-key")
-	cond, arg, err := checkers.ParseCaveat(cav.Condition)
-	c.Assert(err, gc.IsNil)
-	err = check.Check(cond, arg)
-	c.Assert(err, gc.IsNil)
-	c.Assert(doc.Username, gc.Equals, "test")
 
+	err = checkCaveat(store.UserHasPublicKeyCaveat(params.Username("test"), &key.Public))
+	c.Assert(err, gc.IsNil)
 	// Unknown username
-	arg = "test2 " + key.Public.String()
-	err = check.Check(cond, arg)
-	c.Assert(err, gc.ErrorMatches, "public key not valid for user")
-
+	err = checkCaveat(store.UserHasPublicKeyCaveat("test2", &key.Public))
+	c.Assert(err, gc.ErrorMatches, "caveat.*not satisfied: public key not valid for user")
 	// Incorrect public key
-	arg = "test " + "A" + key.Public.String()[1:]
-	err = check.Check(cond, arg)
-	c.Assert(err, gc.ErrorMatches, "public key not valid for user")
-
+	err = checkCaveat(store.UserHasPublicKeyCaveat("test2", new(bakery.PublicKey)))
+	c.Assert(err, gc.ErrorMatches, "caveat.*not satisfied: public key not valid for user")
 	// Invalid argument
-	arg = "test"
-	err = check.Check(cond, arg)
-	c.Assert(err, gc.ErrorMatches, "caveat badly formatted")
+	err = checkCaveat(checkers.Caveat{
+		Namespace: store.CheckersNamespace,
+		Condition: "user-has-public-key test",
+	})
+	c.Assert(err, gc.ErrorMatches, "caveat.*not satisfied: caveat badly formatted")
 
 	// Invalid username
-	arg = "= " + key.Public.String()
-	err = check.Check(cond, arg)
-	c.Assert(err, gc.ErrorMatches, `illegal username "="`)
+	err = checkCaveat(store.UserHasPublicKeyCaveat("a=b", new(bakery.PublicKey)))
+	c.Assert(err, gc.ErrorMatches, `caveat.*not satisfied: illegal username "a=b"`)
 
 	// Invalid public key
-	arg = "test " + key.Public.String()[1:]
-	err = check.Check(cond, arg)
-	c.Assert(err, gc.ErrorMatches, `invalid public key ".*": .*`)
+	err = checkCaveat(checkers.Caveat{
+		Namespace: store.CheckersNamespace,
+		Condition: "user-has-public-key test " + key.Public.String()[1:],
+	})
+	c.Assert(err, gc.ErrorMatches, `caveat.*not satisfied: invalid public key ".*": .*`)
 }
 
-func (s *authSuite) TestGroupsFromRequest(c *gc.C) {
-	testChecker := checkers.OperationChecker("test")
-	store := s.pool.GetNoLimit()
-	defer s.pool.Put(store)
-
-	// Get the groups for the admin user
-	req, err := http.NewRequest("GET", "", nil)
-	c.Assert(err, gc.IsNil)
-	req.SetBasicAuth("test-admin", "open sesame")
-	groups, err := store.GroupsFromRequest(testChecker, req)
-	c.Assert(err, gc.IsNil)
-	c.Assert(len(groups), gc.Equals, 1)
-	c.Assert(groups[0], gc.Equals, "admin@idm")
-
-	// Incorrect admin credentials
-	req, err = http.NewRequest("GET", "", nil)
-	c.Assert(err, gc.IsNil)
-	req.SetBasicAuth("test-admin", "open simsim")
-	groups, err = store.GroupsFromRequest(testChecker, req)
-	c.Assert(len(groups), gc.Equals, 0)
-	c.Assert(errgo.Cause(err), gc.Equals, params.ErrUnauthorized)
-
-	// Request with no credentials (discharge required)
-	req, err = http.NewRequest("GET", "http://example.com/v1/test", nil)
-	c.Assert(err, gc.IsNil)
-	groups, err = store.GroupsFromRequest(testChecker, req)
-	c.Assert(len(groups), gc.Equals, 0)
-	herr, ok := err.(*httpbakery.Error)
-	c.Assert(ok, gc.Equals, true, gc.Commentf("unexpected error %s", err))
-	c.Assert(herr.Code, gc.Equals, httpbakery.ErrDischargeRequired)
-	c.Assert(herr.Info.MacaroonPath, gc.Equals, "../")
-	c.Assert(herr.Info.Macaroon, gc.Not(gc.IsNil))
-	c.Assert(herr.Info.CookieNameSuffix, gc.Equals, "idm")
-	var foundThirdParty bool
-	for _, cav := range herr.Info.Macaroon.Caveats() {
-		if cav.Location == "" {
-			continue
-		}
-		c.Assert(cav.Location, gc.Equals, identityLocation)
-		foundThirdParty = true
-	}
-	c.Assert(foundThirdParty, gc.Equals, true)
-
-	// Non-existent identity
-	m, err := store.Service.NewMacaroon(bakery.LatestVersion, []checkers.Caveat{
-		checkers.DeclaredCaveat("username", "test2"),
-	})
-	c.Assert(err, gc.IsNil)
-	req, err = http.NewRequest("GET", "", nil)
-	c.Assert(err, gc.IsNil)
-	cookie, err := httpbakery.NewCookie(macaroon.Slice{m})
-	c.Assert(err, gc.IsNil)
-	req.AddCookie(cookie)
-	groups, err = store.GroupsFromRequest(testChecker, req)
-	c.Assert(len(groups), gc.Equals, 0)
-	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
-
-	// good identity
-	s.createIdentity(c, &mongodoc.Identity{
-		Username:   "test",
-		ExternalID: "https://example.com/test",
-		Groups:     []string{"test-group1", "test-group2"},
-	})
-	m, err = store.Service.NewMacaroon(bakery.LatestVersion, []checkers.Caveat{
-		checkers.DeclaredCaveat("username", "test"),
-	})
-	req, err = http.NewRequest("GET", "", nil)
-	c.Assert(err, gc.IsNil)
-	cookie, err = httpbakery.NewCookie(macaroon.Slice{m})
-	c.Assert(err, gc.IsNil)
-	req.AddCookie(cookie)
-	groups, err = store.GroupsFromRequest(testChecker, req)
-	c.Assert(err, gc.IsNil)
-	sort.Strings(groups)
-	c.Assert(groups, jc.DeepEquals, []string{"test", "test-group1", "test-group2"})
-}
-
-func (s *authSuite) TestCheckACL(c *gc.C) {
-	testChecker := checkers.OperationChecker("test")
-	s.createIdentity(c, &mongodoc.Identity{
-		Username:   "test",
-		ExternalID: "https://example.com/test",
-		Groups:     []string{"test-group1", "test-group2"},
-	})
-
-	store := s.pool.GetNoLimit()
-	defer s.pool.Put(store)
-
-	// Admin ACL
-	req, err := http.NewRequest("GET", "", nil)
-	c.Assert(err, gc.IsNil)
-	req.SetBasicAuth("test-admin", "open sesame")
-	err = store.CheckACL(testChecker, req, []string{"admin@idm"})
-	c.Assert(err, gc.IsNil)
-
-	// Normal ACL
-	req, err = http.NewRequest("GET", "", nil)
-	c.Assert(err, gc.IsNil)
-	m, err := store.Service.NewMacaroon(bakery.LatestVersion, []checkers.Caveat{
-		checkers.DeclaredCaveat("username", "test"),
-	})
-	cookie, err := httpbakery.NewCookie(macaroon.Slice{m})
-	c.Assert(err, gc.IsNil)
-	req.AddCookie(cookie)
-	err = store.CheckACL(testChecker, req, []string{"test-group3", "test-group1"})
-	c.Assert(err, gc.IsNil)
-
-	// No match
-	err = store.CheckACL(testChecker, req, []string{"test-group3", "test-group4"})
-	c.Assert(errgo.Cause(err), gc.Equals, params.ErrForbidden)
-
-	// error getting groups
-	req, err = http.NewRequest("GET", "", nil)
-	c.Assert(err, gc.IsNil)
-	m, err = store.Service.NewMacaroon(bakery.LatestVersion, []checkers.Caveat{
-		checkers.DeclaredCaveat("username", "test2"),
-	})
-	cookie, err = httpbakery.NewCookie(macaroon.Slice{m})
-	c.Assert(err, gc.IsNil)
-	req.AddCookie(cookie)
-	err = store.CheckACL(testChecker, req, []string{"test-group3", "test-group1"})
-	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
-}
-
-func (s *authSuite) TestMacaroonRequired(c *gc.C) {
-	testChecker := checkers.OperationChecker("test")
-	store := s.pool.GetNoLimit()
-	defer s.pool.Put(store)
-
-	// Get the groups for the admin user
-	req, err := http.NewRequest("GET", "http://example.com/v1/test", nil)
-	c.Assert(err, gc.IsNil)
-	_, err = store.GroupsFromRequest(testChecker, req)
-	bakeryError, ok := err.(*httpbakery.Error)
-	c.Assert(ok, gc.Equals, true)
-	c.Assert(bakeryError.Code.Error(), gc.Equals, "macaroon discharge required")
-}
-
-var relativeURLTests = []struct {
-	base        string
-	target      string
-	expect      string
-	expectError string
-}{{
-	expectError: "non-absolute base URL",
-}, {
-	base:        "/foo",
-	expectError: "non-absolute target URL",
-}, {
-	base:        "foo",
-	expectError: "non-absolute base URL",
-}, {
-	base:        "/foo",
-	target:      "foo",
-	expectError: "non-absolute target URL",
-}, {
-	base:   "/foo",
-	target: "/bar",
-	expect: "bar",
-}, {
-	base:   "/foo/",
-	target: "/bar",
-	expect: "../bar",
-}, {
-	base:   "/foo/",
-	target: "/bar/",
-	expect: "../bar/",
-}, {
-	base:   "/foo/bar",
-	target: "/bar/",
-	expect: "../bar/",
-}, {
-	base:   "/foo/bar/",
-	target: "/bar/",
-	expect: "../../bar/",
-}, {
-	base:   "/foo/bar/baz",
-	target: "/foo/targ",
-	expect: "../targ",
-}, {
-	base:   "/foo/bar/baz/frob",
-	target: "/foo/bar/one/two/",
-	expect: "../one/two/",
-}, {
-	base:   "/foo/bar/baz/",
-	target: "/foo/targ",
-	expect: "../../targ",
-}, {
-	base:   "/foo/bar/baz/frob/",
-	target: "/foo/bar/one/two/",
-	expect: "../../one/two/",
-}, {
-	base:   "/foo/bar",
-	target: "/foot/bar",
-	expect: "../foot/bar",
-}, {
-	base:   "/foo/bar/baz/frob",
-	target: "/foo/bar",
-	expect: "../../bar",
-}, {
-	base:   "/foo/bar/baz/frob/",
-	target: "/foo/bar",
-	expect: "../../../bar",
-}, {
-	base:   "/foo/bar/baz/frob/",
-	target: "/foo/bar/",
-	expect: "../../",
-}, {
-	base:   "/foo/bar/baz",
-	target: "/foo/bar/other",
-	expect: "other",
-}, {
-	base:   "/foo/bar/",
-	target: "/foo/bar/",
-	expect: "",
-}, {
-	base:   "/foo/bar",
-	target: "/foo/bar",
-	expect: "bar",
-}, {
-	base:   "/foo/bar/",
-	target: "/foo/bar/",
-	expect: "",
-}}
-
-func (*authSuite) TestRelativeURL(c *gc.C) {
-	for i, test := range relativeURLTests {
-		c.Logf("test %d: %q %q", i, test.base, test.target)
-		// Sanity check the test itself.
-		if test.expectError == "" {
-			baseURL := &url.URL{Path: test.base}
-			expectURL := &url.URL{Path: test.expect}
-			targetURL := baseURL.ResolveReference(expectURL)
-			c.Check(targetURL.Path, gc.Equals, test.target, gc.Commentf("resolve reference failure"))
-		}
-
-		result, err := store.RelativeURLPath(test.base, test.target)
-		if test.expectError != "" {
-			c.Assert(err, gc.ErrorMatches, test.expectError)
-			c.Assert(result, gc.Equals, "")
-		} else {
-			c.Assert(err, gc.IsNil)
-			c.Check(result, gc.Equals, test.expect)
-		}
-	}
-}
+//
+//func (s *authSuite) TestGroupsFromRequest(c *gc.C) {
+//	testChecker := checkers.OperationChecker("test")
+//	store := s.pool.GetNoLimit()
+//	defer s.pool.Put(store)
+//
+//	// Get the groups for the admin user
+//	req, err := http.NewRequest("GET", "", nil)
+//	c.Assert(err, gc.IsNil)
+//	req.SetBasicAuth("test-admin", "open sesame")
+//	groups, err := store.GroupsFromRequest(testChecker, req)
+//	c.Assert(err, gc.IsNil)
+//	c.Assert(len(groups), gc.Equals, 1)
+//	c.Assert(groups[0], gc.Equals, "admin@idm")
+//
+//	// Incorrect admin credentials
+//	req, err = http.NewRequest("GET", "", nil)
+//	c.Assert(err, gc.IsNil)
+//	req.SetBasicAuth("test-admin", "open simsim")
+//	groups, err = store.GroupsFromRequest(testChecker, req)
+//	c.Assert(len(groups), gc.Equals, 0)
+//	c.Assert(errgo.Cause(err), gc.Equals, params.ErrUnauthorized)
+//
+//	// Request with no credentials (discharge required)
+//	req, err = http.NewRequest("GET", "http://example.com/v1/test", nil)
+//	c.Assert(err, gc.IsNil)
+//	groups, err = store.GroupsFromRequest(testChecker, req)
+//	c.Assert(len(groups), gc.Equals, 0)
+//	herr, ok := err.(*httpbakery.Error)
+//	c.Assert(ok, gc.Equals, true, gc.Commentf("unexpected error %s", err))
+//	c.Assert(herr.Code, gc.Equals, httpbakery.ErrDischargeRequired)
+//	c.Assert(herr.Info.MacaroonPath, gc.Equals, "../")
+//	c.Assert(herr.Info.Macaroon, gc.Not(gc.IsNil))
+//	c.Assert(herr.Info.CookieNameSuffix, gc.Equals, "idm")
+//	var foundThirdParty bool
+//	for _, cav := range herr.Info.Macaroon.Caveats() {
+//		if cav.Location == "" {
+//			continue
+//		}
+//		c.Assert(cav.Location, gc.Equals, identityLocation)
+//		foundThirdParty = true
+//	}
+//	c.Assert(foundThirdParty, gc.Equals, true)
+//
+//	// Non-existent identity
+//	m, err := store.Service.NewMacaroon(bakery.LatestVersion, []checkers.Caveat{
+//		checkers.DeclaredCaveat("username", "test2"),
+//	})
+//	c.Assert(err, gc.IsNil)
+//	req, err = http.NewRequest("GET", "", nil)
+//	c.Assert(err, gc.IsNil)
+//	cookie, err := httpbakery.NewCookie(macaroon.Slice{m})
+//	c.Assert(err, gc.IsNil)
+//	req.AddCookie(cookie)
+//	groups, err = store.GroupsFromRequest(testChecker, req)
+//	c.Assert(len(groups), gc.Equals, 0)
+//	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
+//
+//	// good identity
+//	s.createIdentity(c, &mongodoc.Identity{
+//		Username:   "test",
+//		ExternalID: "https://example.com/test",
+//		Groups:     []string{"test-group1", "test-group2"},
+//	})
+//	m, err = store.Service.NewMacaroon(bakery.LatestVersion, []checkers.Caveat{
+//		checkers.DeclaredCaveat("username", "test"),
+//	})
+//	req, err = http.NewRequest("GET", "", nil)
+//	c.Assert(err, gc.IsNil)
+//	cookie, err = httpbakery.NewCookie(macaroon.Slice{m})
+//	c.Assert(err, gc.IsNil)
+//	req.AddCookie(cookie)
+//	groups, err = store.GroupsFromRequest(testChecker, req)
+//	c.Assert(err, gc.IsNil)
+//	sort.Strings(groups)
+//	c.Assert(groups, jc.DeepEquals, []string{"test", "test-group1", "test-group2"})
+//}
+//
+//func (s *authSuite) TestCheckACL(c *gc.C) {
+//	testChecker := checkers.OperationChecker("test")
+//	s.createIdentity(c, &mongodoc.Identity{
+//		Username:   "test",
+//		ExternalID: "https://example.com/test",
+//		Groups:     []string{"test-group1", "test-group2"},
+//	})
+//
+//	store := s.pool.GetNoLimit()
+//	defer s.pool.Put(store)
+//
+//	// Admin ACL
+//	req, err := http.NewRequest("GET", "", nil)
+//	c.Assert(err, gc.IsNil)
+//	req.SetBasicAuth("test-admin", "open sesame")
+//	err = store.CheckACL(testChecker, req, []string{"admin@idm"})
+//	c.Assert(err, gc.IsNil)
+//
+//	// Normal ACL
+//	req, err = http.NewRequest("GET", "", nil)
+//	c.Assert(err, gc.IsNil)
+//	m, err := store.Service.NewMacaroon(bakery.LatestVersion, []checkers.Caveat{
+//		checkers.DeclaredCaveat("username", "test"),
+//	})
+//	cookie, err := httpbakery.NewCookie(macaroon.Slice{m})
+//	c.Assert(err, gc.IsNil)
+//	req.AddCookie(cookie)
+//	err = store.CheckACL(testChecker, req, []string{"test-group3", "test-group1"})
+//	c.Assert(err, gc.IsNil)
+//
+//	// No match
+//	err = store.CheckACL(testChecker, req, []string{"test-group3", "test-group4"})
+//	c.Assert(errgo.Cause(err), gc.Equals, params.ErrForbidden)
+//
+//	// error getting groups
+//	req, err = http.NewRequest("GET", "", nil)
+//	c.Assert(err, gc.IsNil)
+//	m, err = store.Service.NewMacaroon(bakery.LatestVersion, []checkers.Caveat{
+//		checkers.DeclaredCaveat("username", "test2"),
+//	})
+//	cookie, err = httpbakery.NewCookie(macaroon.Slice{m})
+//	c.Assert(err, gc.IsNil)
+//	req.AddCookie(cookie)
+//	err = store.CheckACL(testChecker, req, []string{"test-group3", "test-group1"})
+//	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
+//}
+//
+//func (s *authSuite) TestMacaroonRequired(c *gc.C) {
+//	testChecker := checkers.OperationChecker("test")
+//	store := s.pool.GetNoLimit()
+//	defer s.pool.Put(store)
+//
+//	// Get the groups for the admin user
+//	req, err := http.NewRequest("GET", "http://example.com/v1/test", nil)
+//	c.Assert(err, gc.IsNil)
+//	_, err = store.GroupsFromRequest(testChecker, req)
+//	bakeryError, ok := err.(*httpbakery.Error)
+//	c.Assert(ok, gc.Equals, true)
+//	c.Assert(bakeryError.Code.Error(), gc.Equals, "macaroon discharge required")
+//}

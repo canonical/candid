@@ -5,7 +5,6 @@ package test_test
 import (
 	"github.com/juju/idmclient/params"
 	gc "gopkg.in/check.v1"
-	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
 	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
 
 	"github.com/CanonicalLtd/blues-identity/idp"
@@ -34,13 +33,9 @@ func (s *dischargeSuite) SetUpTest(c *gc.C) {
 }
 
 func (s *dischargeSuite) TestInteractiveDischarge(c *gc.C) {
-	s.AssertDischarge(c, s.visitor, checkers.New(
-		checkers.TimeBefore,
-	))
+	s.AssertDischarge(c, s.visitor)
 }
 
 func (s *dischargeSuite) TestNonInteractiveDischarge(c *gc.C) {
-	s.AssertDischarge(c, httpbakery.NewMultiVisitor(s.visitor), checkers.New(
-		checkers.TimeBefore,
-	))
+	s.AssertDischarge(c, httpbakery.NewMultiVisitor(s.visitor))
 }

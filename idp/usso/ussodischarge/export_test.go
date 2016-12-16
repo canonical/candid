@@ -9,6 +9,8 @@ const (
 	TimeFormat    = timeFormat
 )
 
+var USSOLoginOp = ussoLoginOp
+
 type (
 	USSOCaveatID ussoCaveatID
 	AccountInfo  accountInfo

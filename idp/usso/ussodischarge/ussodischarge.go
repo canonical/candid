@@ -22,10 +22,10 @@ import (
 	"github.com/juju/idmclient/params"
 	"github.com/juju/idmclient/ussodischarge"
 	"github.com/juju/loggo"
+	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
-	"gopkg.in/macaroon.v2-unstable"
 
 	"github.com/CanonicalLtd/blues-identity/config"
 	"github.com/CanonicalLtd/blues-identity/idp"
@@ -35,9 +35,15 @@ import (
 var logger = loggo.GetLogger("identity.idp.usso.ussodischarge")
 
 const (
-	operationName = "usso-discharge-login"
-	timeFormat    = "2006-01-02T15:04:05.000000"
+	operationName        = "usso-discharge-login"
+	timeFormat           = "2006-01-02T15:04:05.000000"
+	ussoMacaroonDuration = time.Hour
 )
+
+var ussoLoginOp = bakery.Op{
+	Entity: "ussologin",
+	Action: "login",
+}
 
 func init() {
 	config.RegisterIDP("usso_macaroon", func(unmarshal func(interface{}) error) (idp.IdentityProvider, error) {
@@ -151,7 +157,7 @@ func (idp identityProvider) handle(c idp.Context) error {
 	p := c.Params()
 	switch p.Request.Method {
 	case "GET":
-		m, err := idp.ussoMacaroon(c.Bakery())
+		m, err := idp.ussoMacaroon(p.Context, c.Bakery().Oven)
 		if err != nil {
 			return err
 		}
@@ -159,7 +165,7 @@ func (idp identityProvider) handle(c idp.Context) error {
 			Macaroon: m,
 		})
 	case "POST":
-		user, err := idp.verifyUSSOMacaroon(c.Bakery(), p)
+		user, err := idp.verifyUSSOMacaroon(p.Context, c.Bakery().Checker, p)
 		if err != nil {
 			return err
 		}
@@ -174,15 +180,13 @@ func (idp identityProvider) handle(c idp.Context) error {
 	return nil
 }
 
-func (idp identityProvider) ussoMacaroon(bs *bakery.Service) (*macaroon.Macaroon, error) {
-	fail := func(err error) (*macaroon.Macaroon, error) {
+func (idp identityProvider) ussoMacaroon(ctx context.Context, oven *bakery.Oven) (*bakery.Macaroon, error) {
+	fail := func(err error) (*bakery.Macaroon, error) {
 		return nil, err
 	}
 	// Mint a macaroon that's only good for USSO discharge and can't
 	// used for normal login.
-	m, err := bs.NewMacaroon(bakery.Version1, []checkers.Caveat{
-		checkers.AllowCaveat(operationName),
-	})
+	m, err := oven.NewMacaroon(ctx, bakery.Version1, time.Now().Add(ussoMacaroonDuration), nil, ussoLoginOp)
 	if err != nil {
 		return fail(errgo.Mask(err))
 	}
@@ -190,7 +194,9 @@ func (idp identityProvider) ussoMacaroon(bs *bakery.Service) (*macaroon.Macaroon
 	if err != nil {
 		return fail(errgo.Notef(err, "cannot create third-party caveat"))
 	}
-	if err := m.AddThirdPartyCaveat(rootKey, caveatID, idp.params.URL); err != nil {
+	// We need to add the third party caveat directly to the underlying
+	// macaroon as it's encoded differently from the bakery convention.
+	if err := m.M().AddThirdPartyCaveat(rootKey, caveatID, idp.params.URL); err != nil {
 		return fail(errgo.Notef(err, "cannot create macaroon"))
 	}
 	return m, nil
@@ -226,18 +232,22 @@ type ussoCaveatID struct {
 	Version int    `json:"version"`
 }
 
-func (idp identityProvider) verifyUSSOMacaroon(bs *bakery.Service, p httprequest.Params) (*params.User, error) {
+func (idp identityProvider) verifyUSSOMacaroon(ctx context.Context, c0 *bakery.Checker, p httprequest.Params) (*params.User, error) {
 	var req ussodischarge.LoginRequest
 	if err := httprequest.Unmarshal(p, &req); err != nil {
 		return nil, errgo.Mask(err)
 	}
+	// Make a copy of the checker so that we can use our USSO-specific first
+	// party caveat checker.
+	c := *c0
 	checker := &ussoCaveatChecker{
-		checker: checkers.New(
-			checkers.OperationChecker(operationName),
-		),
+		fallback:  c.FirstPartyCaveatChecker,
 		namespace: idp.hostname,
 	}
-	if err := bs.Check(req.Login.Macaroons, checker); err != nil {
+	c.FirstPartyCaveatChecker = checker
+
+	_, err := c.Auth(req.Login.Macaroons).Allow(ctx, ussoLoginOp)
+	if err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrBadRequest))
 	}
 	if checker.accountInfo == nil || checker.accountInfo.OpenID == "" {
@@ -252,38 +262,39 @@ func (idp identityProvider) verifyUSSOMacaroon(bs *bakery.Service, p httprequest
 }
 
 type ussoCaveatChecker struct {
-	checker         bakery.FirstPartyChecker
-	namespace       string
-	haveAccountInfo bool
-	accountInfo     *accountInfo
+	namespace   string
+	fallback    bakery.FirstPartyCaveatChecker
+	accountInfo *accountInfo
+}
+
+func (c *ussoCaveatChecker) Namespace() *checkers.Namespace {
+	return nil
 }
 
 // CheckFirstPartyCaveat checks the first party caveats that are added by the
 // USSO discharger.
-func (c *ussoCaveatChecker) CheckFirstPartyCaveat(caveat string) error {
-	condArg := strings.TrimPrefix(caveat, c.namespace+"|")
-	if condArg == caveat {
-		if c.checker == nil {
-			return errgo.WithCausef(nil, checkers.ErrCaveatNotRecognized, "unknown caveat %q", caveat)
-		}
-		return c.checker.CheckFirstPartyCaveat(caveat)
+func (c *ussoCaveatChecker) CheckFirstPartyCaveat(ctx context.Context, caveat string) error {
+	i1 := strings.Index(caveat, "|")
+	if i1 == -1 || caveat[0:i1] != c.namespace {
+		return c.fallback.CheckFirstPartyCaveat(ctx, caveat)
 	}
-	i := strings.Index(condArg, "|")
-	if i < 0 {
-		return errgo.WithCausef(nil, checkers.ErrCaveatNotRecognized, "unknown caveat %q", caveat)
+	i2 := strings.Index(caveat[i1+1:], "|")
+	if i2 == -1 {
+		return errgo.WithCausef(nil, checkers.ErrCaveatNotRecognized, "verification failed (USSO caveat): no argument provided in %q", caveat)
 	}
-	cond, arg := condArg[:i], condArg[i+1:]
+	i2 += i1 + 1
+	cond, arg := caveat[i1+1:i2], caveat[i2+1:]
 	switch cond {
 	case "account":
 		if c.accountInfo != nil {
-			return errgo.WithCausef(nil, params.ErrBadRequest, "%s|account specified multiple times", c.namespace)
+			return ussoCaveatErrorf("account specified multiple times")
 		}
 		buf, err := base64.StdEncoding.DecodeString(arg)
 		if err != nil {
-			return errgo.WithCausef(err, params.ErrBadRequest, "%s|account caveat badly formed", c.namespace)
+			return ussoCaveatErrorf("account caveat badly formed: %v", err)
 		}
 		if err := json.Unmarshal(buf, &c.accountInfo); err != nil {
-			return errgo.WithCausef(err, params.ErrBadRequest, "%s|account caveat badly formed", c.namespace)
+			return ussoCaveatErrorf("account caveat badly formed: %v", err)
 		}
 		return nil
 	case "valid_since":
@@ -297,15 +308,19 @@ func (c *ussoCaveatChecker) CheckFirstPartyCaveat(caveat string) error {
 	case "expires":
 		t, err := time.Parse(timeFormat, arg)
 		if err != nil {
-			return errgo.WithCausef(err, params.ErrBadRequest, "%s|expires caveat badly formed", c.namespace)
+			return ussoCaveatErrorf("expires caveat badly formed: %v", err)
 		}
 		if time.Now().After(t) {
-			return errgo.Newf("%s|expires before current time", c.namespace)
+			return ussoCaveatErrorf("expires before current time")
 		}
 		return nil
 	default:
-		return errgo.WithCausef(nil, checkers.ErrCaveatNotRecognized, "unknown caveat %q (%s)", caveat, cond)
+		return errgo.WithCausef(nil, checkers.ErrCaveatNotRecognized, "verification failed (USSO caveat): unknown caveat %q", cond)
 	}
+}
+
+func ussoCaveatErrorf(f string, a ...interface{}) error {
+	return errgo.Newf("verification failed (USSO caveat): %s", fmt.Sprintf(f, a...))
 }
 
 type accountInfo struct {

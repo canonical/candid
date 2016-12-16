@@ -8,6 +8,7 @@ import (
 
 	"github.com/juju/httprequest"
 	"github.com/julienschmidt/httprouter"
+	"golang.org/x/net/context"
 
 	"github.com/CanonicalLtd/blues-identity/idp/keystone/internal/keystone"
 )
@@ -37,7 +38,7 @@ type Server struct {
 func NewServer() *Server {
 	s := new(Server)
 	router := httprouter.New()
-	for _, h := range errorMapper.Handlers(s.handler) {
+	for _, h := range reqServer.Handlers(s.handler) {
 		router.Handle(h.Method, h.Path, h.Handle)
 	}
 	s.Server = httptest.NewServer(router)
@@ -45,26 +46,28 @@ func NewServer() *Server {
 }
 
 // handler creates a new handler for a request.
-func (s *Server) handler(httprequest.Params) (*handler, error) {
+func (s *Server) handler(p httprequest.Params) (*handler, context.Context, error) {
 	return &handler{
 		tokens:     s.TokensFunc,
 		authTokens: s.AuthTokensFunc,
 		tenants:    s.TenantsFunc,
 		userGroups: s.UserGroupsFunc,
-	}, nil
+	}, p.Context, nil
 }
 
-var errorMapper httprequest.ErrorMapper = func(err error) (int, interface{}) {
-	var resp keystone.ErrorResponse
-	if kerr, ok := err.(*keystone.Error); ok {
-		resp.Error = kerr
-	} else {
-		resp.Error = &keystone.Error{
-			Code:    http.StatusInternalServerError,
-			Message: err.Error(),
+var reqServer = httprequest.Server{
+	ErrorMapper: func(ctx context.Context, err error) (int, interface{}) {
+		var resp keystone.ErrorResponse
+		if kerr, ok := err.(*keystone.Error); ok {
+			resp.Error = kerr
+		} else {
+			resp.Error = &keystone.Error{
+				Code:    http.StatusInternalServerError,
+				Message: err.Error(),
+			}
 		}
-	}
-	return resp.Error.Code, &resp
+		return resp.Error.Code, &resp
+	},
 }
 
 type handler struct {

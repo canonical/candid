@@ -8,6 +8,7 @@ import (
 	"github.com/juju/cmd"
 	"github.com/juju/gnuflag"
 	"github.com/juju/idmclient/params"
+	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
 )
 
@@ -69,7 +70,7 @@ func (c *findCommand) Run(ctxt *cmd.Context) error {
 	if c.lastDischargeDays > 0 {
 		req.LastDischargeSince = daysAgo(c.lastDischargeDays)
 	}
-	usernames, err := client.QueryUsers(&req)
+	usernames, err := client.QueryUsers(context.Background(), &req)
 	if err != nil {
 		return errgo.Mask(err)
 	}

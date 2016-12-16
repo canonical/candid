@@ -12,7 +12,9 @@ import (
 	"github.com/juju/idmclient"
 	"github.com/juju/testing"
 	"github.com/juju/testing/httptesting"
+	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
+	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
 	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
@@ -121,7 +123,7 @@ func (s *DischargeSuite) SetUpTest(c *gc.C) {
 		AgentUsername: "admin@idm",
 	})
 	c.Assert(err, gc.IsNil)
-	locator := bakery.NewThirdPartyLocatorStore()
+	locator := bakery.NewThirdPartyStore()
 	locator.AddInfo(DischargeLocation, bakery.ThirdPartyInfo{
 		PublicKey: s.serverKey.Public,
 		Version:   bakery.LatestVersion,
@@ -139,30 +141,55 @@ func (s *DischargeSuite) TearDownTest(c *gc.C) {
 // returns a macaroon that validates successfully against ch. If visit is
 // not nil then the clients WebPageVisitor will be set to visit before
 // discharging.
-func (s *DischargeSuite) AssertDischarge(c *gc.C, visitor httpbakery.Visitor, ch checkers.Checker) {
-	b, err := bakery.NewService(bakery.NewServiceParams{
-		Locator: s.Locator,
-	})
+func (s *DischargeSuite) AssertDischarge(c *gc.C, visitor httpbakery.Visitor) {
+	ctx := context.TODO()
+	key, err := bakery.GenerateKey()
 	c.Assert(err, gc.IsNil)
-	m, err := b.NewMacaroon(bakery.LatestVersion, []checkers.Caveat{{
-		Location:  DischargeLocation,
-		Condition: "is-authenticated-user",
-	}})
+	b := bakery.New(bakery.BakeryParams{
+		Locator:        s.Locator,
+		Key:            key,
+		IdentityClient: IdentityClient{},
+	})
+	m, err := b.Oven.NewMacaroon(
+		ctx,
+		bakery.LatestVersion,
+		time.Now().Add(time.Minute),
+		[]checkers.Caveat{{
+			Location:  DischargeLocation,
+			Condition: "is-authenticated-user",
+		}},
+		bakery.LoginOp,
+	)
 	if visitor != nil {
 		defer testing.PatchValue(&s.BakeryClient.WebPageVisitor, visitor).Restore()
 	}
-	ms, err := s.BakeryClient.DischargeAll(m)
+	ms, err := s.BakeryClient.DischargeAll(ctx, m)
 	c.Assert(err, gc.IsNil)
-	declared := checkers.InferDeclared(ms)
-	err = b.Check(ms, checkers.New(
-		declared,
-		ch,
-	))
+
+	authInfo, err := b.Checker.Auth(ms).Allow(ctx, bakery.LoginOp)
 	c.Assert(err, gc.IsNil)
+	c.Assert(authInfo.Identity, gc.Not(gc.Equals), nil)
+}
+
+type IdentityClient struct{}
+
+func (c IdentityClient) IdentityFromContext(ctx context.Context) (bakery.Identity, []checkers.Caveat, error) {
+	return nil, []checkers.Caveat{{
+		Location:  DischargeLocation,
+		Condition: "is-authenticated-user",
+	}}, nil
+}
+
+func (c IdentityClient) DeclaredIdentity(declared map[string]string) (bakery.Identity, error) {
+	username, ok := declared["username"]
+	if !ok {
+		return nil, errgo.Newf("no declared user")
+	}
+	return bakery.SimpleIdentity(username), nil
 }
 
 type VisitorFunc func(*url.URL) error
 
-func (f VisitorFunc) VisitWebPage(_ *httpbakery.Client, m map[string]*url.URL) error {
+func (f VisitorFunc) VisitWebPage(ctx context.Context, _ *httpbakery.Client, m map[string]*url.URL) error {
 	return f(m[httpbakery.UserInteractionMethod])
 }

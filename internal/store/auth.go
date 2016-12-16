@@ -6,15 +6,15 @@ import (
 	"bytes"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/juju/idmclient/params"
 	"github.com/juju/utils"
+	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
 	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
-
-	"github.com/CanonicalLtd/blues-identity/internal/mongodoc"
 )
 
 const (
@@ -22,6 +22,74 @@ const (
 	SSHKeyGetterGroup = "sshkeygetter@idm"
 	GroupListGroup    = "grouplist@idm"
 )
+
+const (
+	kindGlobal = "global"
+	kindUser   = "u"
+)
+
+// The following constants define possible operation actions.
+const (
+	ActionRead               = "read"
+	ActionVerify             = "verify"
+	ActionDischargeFor       = "dischargeFor"
+	ActionCreateAgent        = "createAgent"
+	ActionReadAdmin          = "readAdmin"
+	ActionWriteAdmin         = "writeAdmin"
+	ActionReadGroups         = "readGroups"
+	ActionWriteGroups        = "writeGroups"
+	ActionReadSSHKeys        = "readSSHKeys"
+	ActionWriteSSHKeys       = "writeSSHKeys"
+	ActionLogin              = "login"
+	ActionReadDischargeToken = "read-discharge-token"
+)
+
+// TODO(mhilton) make the admin ACL configurable
+var AdminACL = []string{AdminUsername}
+
+func (s *Store) aclForOp(op bakery.Op) ([]string, error) {
+	kind, name := splitEntity(op.Entity)
+	switch kind {
+	case kindGlobal:
+		switch op.Action {
+		case ActionRead:
+			return AdminACL, nil
+		case ActionVerify:
+			return []string{bakery.Everyone}, nil
+		case ActionDischargeFor:
+			return AdminACL, nil
+		case ActionLogin:
+			return []string{bakery.Everyone}, nil
+		}
+	case kindUser:
+		username := name
+		acl := make([]string, 0, len(AdminACL)+2)
+		acl = append(acl, AdminACL...)
+		switch op.Action {
+		case ActionRead:
+			return append(acl, username), nil
+		case ActionCreateAgent:
+			return append(acl, "+create-agent@"+username), nil
+		case ActionReadAdmin:
+			return acl, nil
+		case ActionWriteAdmin:
+			return acl, nil
+		case ActionReadGroups:
+			// Administrators, users with GroupList permissions and the user
+			// themselves can list their groups.
+			return append(acl, username, GroupListGroup), nil
+		case ActionWriteGroups:
+			// Only administrators can set a user's groups.
+			return acl, nil
+		case ActionReadSSHKeys:
+			return append(acl, username, SSHKeyGetterGroup), nil
+		case ActionWriteSSHKeys:
+			return append(acl, username), nil
+		}
+	}
+	logger.Infof("no ACL found for op %#v", op)
+	return nil, nil
+}
 
 // CheckAdminCredentials checks if the request has credentials that match the
 // configured administration credentials for the server. If the credentials match
@@ -49,31 +117,49 @@ func (s *Store) CheckAdminCredentials(req *http.Request) error {
 // the given user is associated with the given public key.
 func UserHasPublicKeyCaveat(user params.Username, pk *bakery.PublicKey) checkers.Caveat {
 	return checkers.Caveat{
-		Condition: "user-has-public-key " + string(user) + " " + pk.String(),
+		Namespace: checkersNamespace,
+		Condition: checkers.Condition(userHasPublicKeyCondition, string(user)+" "+pk.String()),
 	}
 }
 
-// UserHasPublicKeyChecker is a checker for the "user-has-public-key"
-// caveat.
-type UserHasPublicKeyChecker struct {
-	// Store is used to lookup the specified user id.
-	Store *Store
+type storeKey struct{}
 
-	// Identity can be used to save the retrieved identity for
-	// later processing. If Identity is not nil then the retrieved
-	// identity will be stored there, It is the caller's responsibility
-	// to check that this contains the expected identity after
-	// processing.
-	Identity **mongodoc.Identity
+func storeFromContext(ctx context.Context) *Store {
+	store, _ := ctx.Value(storeKey{}).(*Store)
+	return store
 }
 
-// Condition implements checkers.Checker.Condition.
-func (UserHasPublicKeyChecker) Condition() string {
-	return "user-has-public-key"
+func ContextWithStore(ctx context.Context, store *Store) context.Context {
+	return context.WithValue(ctx, storeKey{}, store)
 }
 
-// Check implements checkers.Checker.Check.
-func (c UserHasPublicKeyChecker) Check(_, arg string) error {
+type requestKey struct{}
+
+func requestFromContext(ctx context.Context) *http.Request {
+	req, _ := ctx.Value(requestKey{}).(*http.Request)
+	return req
+}
+
+func contextWithRequest(ctx context.Context, req *http.Request) context.Context {
+	return context.WithValue(ctx, requestKey{}, req)
+}
+
+const checkersNamespace = "jujucharms.com/identity"
+const userHasPublicKeyCondition = "user-has-public-key"
+
+func newChecker() *checkers.Checker {
+	checker := httpbakery.NewChecker()
+	checker.Namespace().Register(checkersNamespace, "")
+	checker.Register(userHasPublicKeyCondition, checkersNamespace, checkUserHasPublicKey)
+	return checker
+}
+
+// checkUserHasPublicKey checks the "user-has-public-key" caveat.
+func checkUserHasPublicKey(ctxt context.Context, cond, arg string) error {
+	store := storeFromContext(ctxt)
+	if store == nil {
+		return errgo.Newf("no store in context")
+	}
 	parts := strings.Fields(arg)
 	if len(parts) != 2 {
 		return errgo.New("caveat badly formatted")
@@ -88,11 +174,7 @@ func (c UserHasPublicKeyChecker) Check(_, arg string) error {
 	if err != nil {
 		return errgo.Notef(err, "invalid public key %q", parts[1])
 	}
-	return c.checkUserPublicKey(username, &publicKey)
-}
-
-func (c UserHasPublicKeyChecker) checkUserPublicKey(username params.Username, publicKey *bakery.PublicKey) error {
-	id, err := c.Store.GetIdentity(username)
+	id, err := store.GetIdentity(username)
 	if err != nil {
 		if errgo.Cause(err) != params.ErrNotFound {
 			return errgo.Mask(err)
@@ -103,126 +185,184 @@ func (c UserHasPublicKeyChecker) checkUserPublicKey(username params.Username, pu
 		if !bytes.Equal(pk.Key, publicKey.Key[:]) {
 			continue
 		}
-		if c.Identity != nil {
-			*c.Identity = id
-		}
 		return nil
 	}
 	return errgo.Newf("public key not valid for user")
 }
 
-// CheckACL ensures that the logged in user is a member of a group
-// specified in the ACL.
-func (s *Store) CheckACL(c checkers.Checker, req *http.Request, acl []string) error {
-	logger.Debugf("attemting to validate request for with acl %#v", acl)
-	groups, err := s.GroupsFromRequest(c, req)
+func (s *Store) Authorize(ctx context.Context, req *http.Request, ops ...bakery.Op) (*bakery.AuthInfo, error) {
+	ctx = ContextWithStore(ctx, s)
+	ctx = contextWithRequest(ctx, req)
+	ctx = httpbakery.ContextWithRequest(ctx, req)
+	authInfo, err := s.Bakery.Checker.Auth(httpbakery.RequestMacaroons(req)...).Allow(ctx, ops...)
 	if err != nil {
-		return err
+		return nil, s.maybeDischargeRequiredError(ctx, req, err)
 	}
-	logger.Debugf("request groups: %#v", groups)
-	for _, g := range groups {
-		for _, a := range acl {
-			if a == g {
-				logger.Debugf("request allowed: requester has group %q", a)
-				return nil
-			}
-		}
-	}
-	logger.Debugf("request denied")
-	return errgo.WithCausef(nil, params.ErrForbidden, "user does not have correct permissions")
+	return authInfo, nil
 }
 
-// GroupsFromRequest gets a list of groups the user belongs to from the request.
-// if the request has the correct Basic authentication credentials for the admin user
-// then it is in the group admin@idm.
-func (s *Store) GroupsFromRequest(c checkers.Checker, req *http.Request) ([]string, error) {
-	err := s.CheckAdminCredentials(req)
-	if err == nil {
-		logger.Debugf("admin credentials found.")
-		return []string{AdminUsername}, nil
+func isDischargeRequiredError(err error) bool {
+	respErr, ok := errgo.Cause(err).(*httpbakery.Error)
+	if !ok {
+		return false
 	}
-	if errgo.Cause(err) != params.ErrNoAdminCredsProvided {
-		logger.Debugf("invalid admin credentials supplied: %s", err)
-		return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
+	return respErr.Code == httpbakery.ErrDischargeRequired
+}
+
+func (s *Store) maybeDischargeRequiredError(ctx context.Context, req *http.Request, checkErr error) error {
+	derr, ok := errgo.Cause(checkErr).(*bakery.DischargeRequiredError)
+	if !ok {
+		return errgo.Mask(checkErr)
 	}
-	var identity *mongodoc.Identity
-	attrs, verr := httpbakery.CheckRequest(s.Service, req, nil, checkers.New(
-		c,
-		UserHasPublicKeyChecker{Store: s, Identity: &identity},
-	))
-	if verr == nil {
-		logger.Debugf("macaroon found for user %q", attrs["username"])
-		if identity == nil || string(identity.Username) != attrs["username"] {
-			var err error
-			identity, err = s.GetIdentity(params.Username(attrs["username"]))
-			if err != nil {
-				return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
-			}
+	m, err := s.Bakery.Oven.NewMacaroon(
+		ctx,
+		httpbakery.RequestVersion(req),
+		time.Now().Add(365*24*time.Hour),
+		derr.Caveats,
+		derr.Ops...,
+	)
+	if err != nil {
+		return errgo.Notef(err, "cannot create macaroon")
+	}
+	mpath, err := utils.RelativeURLPath(req.URL.Path, "/")
+	if err != nil {
+		return errgo.Mask(err)
+	}
+	err = httpbakery.NewDischargeRequiredErrorForRequest(m, mpath, checkErr, req)
+	err.(*httpbakery.Error).Info.CookieNameSuffix = "idm"
+	return err
+}
+
+type identityClient struct {
+	location string
+}
+
+func (c identityClient) IdentityFromContext(ctx context.Context) (bakery.Identity, []checkers.Caveat, error) {
+	req, store := requestFromContext(ctx), storeFromContext(ctx)
+	if store == nil {
+		return nil, nil, errgo.Newf("no store found in context")
+	}
+	if req != nil {
+		err := store.CheckAdminCredentials(req)
+		if err == nil {
+			logger.Infof("admin login success")
+			return Identity(AdminUsername), nil, nil
 		}
-		return append(identity.Groups, string(identity.Username)), nil
+		if errgo.Cause(err) != params.ErrNoAdminCredsProvided {
+			logger.Infof("admin login failed for some reason: %v", err)
+			return nil, nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
+		}
+		logger.Infof("admin login failed - no admin creds provided")
 	}
-	logger.Debugf("no identity found, requesting login")
-	m, err := s.Service.NewMacaroon(httpbakery.RequestVersion(req), []checkers.Caveat{
-		checkers.DenyCaveat("discharge"),
+	return nil, []checkers.Caveat{
 		checkers.NeedDeclaredCaveat(
 			checkers.Caveat{
-				Location:  s.pool.params.Location,
+				Location:  store.pool.params.Location,
 				Condition: "is-authenticated-user",
 			},
-			"username"),
-	})
-	if err != nil {
-		return nil, errgo.Notef(err, "cannot create macaroon")
-	}
-	mpath, err := RelativeURLPath(req.URL.Path, "/")
-	if err != nil {
-		return nil, errgo.Mask(err)
-	}
-	err = httpbakery.NewDischargeRequiredErrorForRequest(m, mpath, verr, req)
-	err.(*httpbakery.Error).Info.CookieNameSuffix = "idm"
-	return nil, err
+			"username",
+		),
+	}, nil
 }
 
-// TODO(mhilton) RelativeURLPath was copy & pasted from charmstore. It
-// should be moved to a shared location and included in both.
-
-// RelativeURLPath returns a relative URL path that is lexically equivalent to
-// targpath when interpreted by url.URL.ResolveReference.
-// On succes, the returned path will always be relative to basePath, even if basePath
-// and targPath share no elements. An error is returned if targPath can't
-// be made relative to basePath (for example when either basePath
-// or targetPath are non-absolute).
-func RelativeURLPath(basePath, targPath string) (string, error) {
-	if !strings.HasPrefix(basePath, "/") {
-		return "", errgo.Newf("non-absolute base URL")
+func (c identityClient) DeclaredIdentity(declared map[string]string) (bakery.Identity, error) {
+	username, ok := declared["username"]
+	if !ok {
+		return nil, errgo.Newf("no declared user")
 	}
-	if !strings.HasPrefix(targPath, "/") {
-		return "", errgo.Newf("non-absolute target URL")
+	return Identity(username), nil
+}
+
+type Identity string
+
+func (id Identity) Id() string {
+	return string(id)
+}
+
+func (id Identity) Domain() string {
+	return ""
+}
+
+// Allow implements TODO
+func (id Identity) Allow(ctx context.Context, acl []string) (bool, error) {
+	logger.Infof("Identity.Allow %q {", acl)
+	defer logger.Infof("}")
+	if ok, isTrivial := trivialAllow(string(id), acl); isTrivial {
+		logger.Infof("trivial %v", ok)
+		return ok, nil
 	}
-	baseParts := strings.Split(basePath, "/")
-	targParts := strings.Split(targPath, "/")
-
-	// For the purposes of dotdot, the last element of
-	// the paths are irrelevant. We save the last part
-	// of the target path for later.
-	lastElem := targParts[len(targParts)-1]
-	baseParts = baseParts[0 : len(baseParts)-1]
-	targParts = targParts[0 : len(targParts)-1]
-
-	// Find the common prefix between the two paths:
-	var i int
-	for ; i < len(baseParts); i++ {
-		if i >= len(targParts) || baseParts[i] != targParts[i] {
-			break
+	store := storeFromContext(ctx)
+	if store == nil {
+		logger.Infof("no store")
+		return false, errgo.New("no store found in context")
+	}
+	groups, err := id.Groups(ctx)
+	if err != nil {
+		logger.Infof("no groups")
+		return false, errgo.Mask(err)
+	}
+	for _, a := range acl {
+		for _, g := range groups {
+			if g == a {
+				logger.Infof("success (group %q)", g)
+				return true, nil
+			}
 		}
 	}
-	dotdotCount := len(baseParts) - i
-	targOnly := targParts[i:]
-	result := make([]string, 0, dotdotCount+len(targOnly)+1)
-	for i := 0; i < dotdotCount; i++ {
-		result = append(result, "..")
+	logger.Infof("not in groups")
+	return false, nil
+}
+
+func (id Identity) Groups(ctx context.Context) ([]string, error) {
+	store := storeFromContext(ctx)
+	if store == nil {
+		return nil, errgo.New("no store found in context")
 	}
-	result = append(result, targOnly...)
-	result = append(result, lastElem)
-	return strings.Join(result, "/"), nil
+	idDoc, err := store.GetIdentity(params.Username(id))
+	if err != nil {
+		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	}
+	lpGroups, err := store.GetLaunchpadGroups(idDoc.ExternalID)
+	if err != nil {
+		logger.Errorf("Failed to get launchpad groups for user: %s", err)
+	}
+	return uniqueStrings(append(idDoc.Groups, lpGroups...)), nil
+}
+
+// trivialAllow reports whether the username should be allowed
+// access to the given ACL based on a superficial inspection
+// of the ACL. If there is a definite answer, it will return
+// a true isTrivial; otherwise it will return (false, false).
+func trivialAllow(username string, acl []string) (allow, isTrivial bool) {
+	if len(acl) == 0 {
+		return false, true
+	}
+	for _, name := range acl {
+		if name == "everyone" || name == username {
+			return true, true
+		}
+	}
+	return false, false
+}
+
+func UserOp(u params.Username, action string) bakery.Op {
+	return op(kindUser+"-"+string(u), action)
+}
+
+func GlobalOp(action string) bakery.Op {
+	return op(kindGlobal, action)
+}
+
+func op(entity, action string) bakery.Op {
+	return bakery.Op{
+		Entity: entity,
+		Action: action,
+	}
+}
+
+func splitEntity(entity string) (string, string) {
+	if i := strings.Index(entity, "-"); i > 0 {
+		return entity[0:i], entity[i+1:]
+	}
+	return entity, ""
 }

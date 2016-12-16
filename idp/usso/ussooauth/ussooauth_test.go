@@ -9,7 +9,6 @@ import (
 	"github.com/juju/idmclient/params"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
-	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
 	"gopkg.in/yaml.v2"
 
 	"github.com/CanonicalLtd/blues-identity/config"
@@ -65,13 +64,11 @@ func (s *ussooauthSuite) TestURL(c *gc.C) {
 }
 
 func (s *ussooauthSuite) TestHandleSuccess(c *gc.C) {
-	b, err := bakery.NewService(bakery.NewServiceParams{})
-	c.Assert(err, gc.IsNil)
 	tc := &idptest.TestContext{
 		URLPrefix: "https://idp.test",
-		Bakery_:   b,
+		Bakery_:   bakery.New(bakery.BakeryParams{}),
 	}
-	err = tc.UpdateUser(&params.User{
+	err := tc.UpdateUser(&params.User{
 		ExternalID: "https://login.ubuntu.com/+id/test",
 		Username:   params.Username("test"),
 		FullName:   "Test User",
@@ -108,7 +105,8 @@ func (s *ussooauthSuite) TestHandleSuccess(c *gc.C) {
 	)
 	c.Assert(err, gc.IsNil)
 	s.idp.Handle(tc)
-	idptest.AssertLoginSuccess(c, tc, checkers.TimeBefore, &params.User{
+	idptest.AssertLoginSuccess(c, tc, "test")
+	idptest.AssertUser(c, tc, &params.User{
 		ExternalID: "https://login.ubuntu.com/+id/test",
 		Username:   params.Username("test"),
 		FullName:   "Test User",

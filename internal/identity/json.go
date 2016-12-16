@@ -7,6 +7,7 @@ import (
 
 	"github.com/juju/httprequest"
 	"github.com/juju/idmclient/params"
+	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
 )
@@ -16,15 +17,17 @@ import (
 const ErrLoginRequired params.ErrorCode = "login required"
 
 var (
-	ErrorMapper = httprequest.ErrorMapper(errToResp)
-	WriteError  = ErrorMapper.WriteError
+	ReqServer = httprequest.Server{
+		ErrorMapper: errToResp,
+	}
+	WriteError = ReqServer.WriteError
 )
 
-func errToResp(err error) (int, interface{}) {
+func errToResp(ctx context.Context, err error) (int, interface{}) {
 	// Allow bakery errors to be returned as the bakery would
 	// like them, so that httpbakery.Client.Do will work.
 	if err, ok := errgo.Cause(err).(*httpbakery.Error); ok {
-		return httpbakery.ErrorToResponse(err)
+		return httpbakery.ErrorToResponse(ctx, err)
 	}
 	errorBody := errorResponseBody(err)
 	status := http.StatusInternalServerError

@@ -13,6 +13,7 @@ import (
 	"github.com/juju/loggo"
 	"github.com/julienschmidt/httprouter"
 	"github.com/prometheus/client_golang/prometheus"
+	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
 	"gopkg.in/mgo.v2"
@@ -154,7 +155,7 @@ type ServerParams struct {
 //notFound is the handler that is called when a handler cannot be found
 //for the requested endpoint.
 func notFound(w http.ResponseWriter, req *http.Request) {
-	ErrorMapper.WriteError(w, errgo.WithCausef(nil, params.ErrNotFound, "not found: %s", req.URL.Path))
+	WriteError(context.TODO(), w, errgo.WithCausef(nil, params.ErrNotFound, "not found: %s", req.URL.Path))
 }
 
 //methodNotAllowed is the handler that is called when a handler cannot
@@ -167,7 +168,7 @@ func (s *Server) methodNotAllowed(w http.ResponseWriter, req *http.Request) {
 			continue
 		}
 		if h, _, _ := s.router.Lookup(method, req.URL.Path); h != nil {
-			ErrorMapper.WriteError(w, errgo.WithCausef(nil, params.ErrMethodNotAllowed, "%s not allowed for %s", req.Method, req.URL.Path))
+			WriteError(context.TODO(), w, errgo.WithCausef(nil, params.ErrMethodNotAllowed, "%s not allowed for %s", req.Method, req.URL.Path))
 			return
 		}
 	}

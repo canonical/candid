@@ -22,7 +22,7 @@ type loginRequest struct {
 // login handles the GET /v1/login endpoint that is used to log in to IdM.
 func (h *dischargeHandler) Login(p httprequest.Params, lr *loginRequest) error {
 	user, key, err := agent.LoginCookie(p.Request)
-	if err == nil && h.agentLogin(user, key) {
+	if err == nil && h.agentLogin(p, user, key) {
 		return nil
 	}
 	if err != nil && errgo.Cause(err) != agent.ErrNoAgentLoginCookie {
@@ -74,7 +74,7 @@ func (h *dischargeHandler) Login(p httprequest.Params, lr *loginRequest) error {
 // provider if an appropriate cookie has been provided in the login
 // request. The return value indicates if an agent identity provider was
 // found and therefore the login attempted.
-func (h *dischargeHandler) agentLogin(user string, key *bakery.PublicKey) bool {
+func (h *dischargeHandler) agentLogin(p httprequest.Params, user string, key *bakery.PublicKey) bool {
 	for _, idp := range h.h.idps {
 		if idp.Name() != "agent" {
 			continue
@@ -84,7 +84,7 @@ func (h *dischargeHandler) agentLogin(user string, key *bakery.PublicKey) bool {
 			store:  h.store,
 			idp:    idp,
 			place:  h.place,
-			params: h.params,
+			params: p,
 			agentLogin: params.AgentLogin{
 				Username:  params.Username(user),
 				PublicKey: key,

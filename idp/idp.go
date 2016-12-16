@@ -4,10 +4,11 @@
 package idp
 
 import (
+	"time"
+
 	"github.com/juju/httprequest"
 	"github.com/juju/idmclient/params"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
-	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
 	"gopkg.in/mgo.v2"
 )
 
@@ -33,22 +34,18 @@ type Context interface {
 
 	// LoginSuccess completes a login request successfully. The user
 	// with the given username will have their last login time
-	// updated in the database. The given caveats will be used to
-	// mint a new identity macaroon for the user. LoginSuccess will
-	// not add any additional caveats to those specified.
+	// updated in the database. A new identity macaroon will be minted
+	// for the user with the given expiry time.
+	//
 	// LoginSuccess will return true if the login was completed
 	// successfully so that the IDP may return an appropriate success
 	// response to the interracting client. If there was an error
-	// completing the login attempt an error will have automatically
+	// completing the login attempt, an error will have automatically
 	// been returned to the client and false will be returned.
-	LoginSuccess(params.Username, []checkers.Caveat) bool
+	LoginSuccess(user params.Username, expiry time.Time) bool
 
 	// LoginFailure fails a login request.
 	LoginFailure(error)
-
-	// Bakery returns a *bakery.Service that the identity provider
-	// should use to mint new macaroons.
-	Bakery() *bakery.Service
 
 	// UpdateUser creates or updates the record for the given user in
 	// the database.
@@ -63,6 +60,8 @@ type Context interface {
 	// Database returns a mgo.Database that the identity provider may use to
 	// store any necessary state data.
 	Database() *mgo.Database
+
+	Bakery() *bakery.Bakery
 }
 
 // IdentityProvider is the interface that is satisfied by all identity providers.

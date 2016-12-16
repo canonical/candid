@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/juju/httprequest"
+	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
 )
 
@@ -33,9 +34,9 @@ func NewClient(url string) *Client {
 // Tokens provides access to the /v2.0/tokens endpoint. See
 // http://developer.openstack.org/api-ref-identity-v2.html#authenticate-v2.0
 // for more information.
-func (c *Client) Tokens(r *TokensRequest) (*TokensResponse, error) {
+func (c *Client) Tokens(ctx context.Context, r *TokensRequest) (*TokensResponse, error) {
 	var resp TokensResponse
-	if err := c.client.Call(r, &resp); err != nil {
+	if err := c.client.Call(ctx, r, &resp); err != nil {
 		return nil, err
 	}
 	return &resp, nil
@@ -44,9 +45,9 @@ func (c *Client) Tokens(r *TokensRequest) (*TokensResponse, error) {
 // Tenants provides access to the /v2.0/tenants endpoint. See
 // http://developer.openstack.org/api-ref-identity-v2.html#listTenants
 // for more information.
-func (c *Client) Tenants(r *TenantsRequest) (*TenantsResponse, error) {
+func (c *Client) Tenants(ctx context.Context, r *TenantsRequest) (*TenantsResponse, error) {
 	var resp TenantsResponse
-	if err := c.client.Call(r, &resp); err != nil {
+	if err := c.client.Call(ctx, r, &resp); err != nil {
 		return nil, err
 	}
 	return &resp, nil
@@ -57,11 +58,11 @@ func (c *Client) Tenants(r *TenantsRequest) (*TenantsResponse, error) {
 // for more information. This uses version 3 of the keystone protocol and
 // therefore cannot be used with older keystone servers that don't
 // support it.
-func (c *Client) AuthTokens(r *AuthTokensRequest) (*AuthTokensResponse, error) {
+func (c *Client) AuthTokens(ctx context.Context, r *AuthTokensRequest) (*AuthTokensResponse, error) {
 	// Initially get the whole http.Response so that we can read the
 	// "X-Subject-Token" header.
 	var resp *http.Response
-	if err := c.client.Call(r, &resp); err != nil {
+	if err := c.client.Call(ctx, r, &resp); err != nil {
 		return nil, err
 	}
 	var authResp AuthTokensResponse
@@ -77,9 +78,9 @@ func (c *Client) AuthTokens(r *AuthTokensRequest) (*AuthTokensResponse, error) {
 // for more information. This uses version 3 of the keystone protocol and
 // therefore cannot be used with older keystone servers that don't
 // support it.
-func (c *Client) UserGroups(r *UserGroupsRequest) (*UserGroupsResponse, error) {
+func (c *Client) UserGroups(ctx context.Context, r *UserGroupsRequest) (*UserGroupsResponse, error) {
 	var resp UserGroupsResponse
-	if err := c.client.Call(r, &resp); err != nil {
+	if err := c.client.Call(ctx, r, &resp); err != nil {
 		return nil, err
 	}
 	return &resp, nil

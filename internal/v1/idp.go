@@ -10,6 +10,7 @@ import (
 	"github.com/juju/idmclient/params"
 	"github.com/julienschmidt/httprouter"
 	"golang.org/x/net/trace"
+	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
@@ -26,9 +27,10 @@ import (
 
 func (h *Handler) newIDPHandler(idp idp.IdentityProvider) httprouter.Handle {
 	return func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
+		ctx := context.TODO()
 		t := trace.New("identity.internal.v1.idp", idp.Name())
 		r.ParseForm()
-		store, err := h.storePool.Get()
+		st, err := h.storePool.Get()
 		if err != nil {
 			// TODO(mhilton) consider logging inside the pool.
 			t.LazyPrintf("cannot get store: %s", err)
@@ -36,26 +38,28 @@ func (h *Handler) newIDPHandler(idp idp.IdentityProvider) httprouter.Handle {
 				t.SetError()
 			}
 			t.Finish()
-			identity.ErrorMapper.WriteError(w, errgo.NoteMask(err, "cannot get store", errgo.Any))
+			identity.ReqServer.WriteError(ctx, w, errgo.NoteMask(err, "cannot get store", errgo.Any))
 			return
 		}
 		defer func() {
-			h.storePool.Put(store)
+			h.storePool.Put(st)
 			t.LazyPrintf("store released")
 			t.Finish()
 		}()
+		ctx = store.ContextWithStore(ctx, st)
 		t.LazyPrintf("store acquired")
 		// TODO have a pool of these?
 		c := &idpHandler{
 			h:     h,
 			idp:   idp,
-			store: store,
+			store: st,
 			params: httprequest.Params{
+				Context:  ctx,
 				Response: w,
 				Request:  r,
 				PathVar:  p,
 			},
-			place: &place{store.Place},
+			place: &place{st.Place},
 		}
 		idp.Handle(c)
 	}
@@ -88,17 +92,25 @@ func (c *idpHandler) RequestURL() string {
 }
 
 // LoginSuccess implements idp.Context.LoginSuccess.
-func (c *idpHandler) LoginSuccess(username params.Username, cavs []checkers.Caveat) bool {
+func (c *idpHandler) LoginSuccess(username params.Username, expiry time.Time) bool {
 	c.params.Request.ParseForm()
 	waitId := c.params.Request.Form.Get("waitid")
-	m, err := c.store.Service.NewMacaroon(httpbakery.RequestVersion(c.params.Request), cavs)
+	m, err := c.store.Bakery.Oven.NewMacaroon(
+		c.params.Context,
+		httpbakery.RequestVersion(c.params.Request),
+		expiry,
+		[]checkers.Caveat{
+			checkers.DeclaredCaveat("username", string(username)),
+		},
+		bakery.LoginOp,
+	)
 	if err != nil {
 		c.LoginFailure(errgo.Notef(err, "cannot mint identity macaroon"))
 		return false
 	}
 	if waitId != "" {
 		if err := c.place.Done(waitId, &loginInfo{
-			IdentityMacaroon: macaroon.Slice{m},
+			IdentityMacaroon: macaroon.Slice{m.M()},
 		}); err != nil {
 			c.LoginFailure(errgo.Notef(err, "cannot complete rendezvous"))
 			return false
@@ -112,18 +124,18 @@ func (c *idpHandler) LoginSuccess(username params.Username, cavs []checkers.Cave
 func (c *idpHandler) LoginFailure(err error) {
 	c.params.Request.ParseForm()
 	waitId := c.params.Request.Form.Get("waitid")
-	_, bakeryErr := httpbakery.ErrorToResponse(err)
+	_, bakeryErr := httpbakery.ErrorToResponse(c.params.Context, err)
 	if waitId != "" {
 		c.place.Done(waitId, &loginInfo{
 			Error: bakeryErr.(*httpbakery.Error),
 		})
 	}
-	identity.WriteError(c.params.Response, err)
+	identity.WriteError(c.params.Context, c.params.Response, err)
 }
 
 // Bakery implements idp.Context.Bakery.
-func (c *idpHandler) Bakery() *bakery.Service {
-	return c.store.Service
+func (c *idpHandler) Bakery() *bakery.Bakery {
+	return c.store.Bakery
 }
 
 // Database implements idp.Context.Database.
@@ -140,7 +152,7 @@ func (c *idpHandler) FindUserByExternalId(id string) (*params.User, error) {
 		}
 		return nil, errgo.Mask(err)
 	}
-	return userFromIdentity(c.store, &identity)
+	return userFromIdentity(c.params.Context, &identity)
 }
 
 // FindUserByName implements idp.Context.FindUserByName.
@@ -149,7 +161,7 @@ func (c *idpHandler) FindUserByName(name params.Username) (*params.User, error) 
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
-	return userFromIdentity(c.store, id)
+	return userFromIdentity(c.params.Context, id)
 }
 
 // UpdateUser implements idp.Context.UpdateUser.

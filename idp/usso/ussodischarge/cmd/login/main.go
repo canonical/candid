@@ -5,10 +5,13 @@ package main
 import (
 	"encoding/json"
 	"flag"
+	"fmt"
 	"log"
+	"time"
 
 	"github.com/juju/httprequest"
 	"github.com/juju/idmclient/ussodischarge"
+	"golang.org/x/net/context"
 	errgo "gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
@@ -25,29 +28,32 @@ var (
 )
 
 func main() {
+	ctx := context.Background()
 	log.SetFlags(log.Flags() | log.Llongfile)
 	flag.Parse()
 	tpl := httpbakery.NewThirdPartyLocator(nil, nil)
 	if *insecure {
 		tpl.AllowInsecure()
 	}
-	bs, err := bakery.NewService(bakery.NewServiceParams{
+	key, err := bakery.GenerateKey()
+	if err != nil {
+		log.Fatal(err)
+	}
+	b := bakery.New(bakery.BakeryParams{
 		Location: "test",
 		Locator:  tpl,
+		Key:      key,
 	})
-	if err != nil {
-		log.Fatalf("cannot create bakery: %s", err)
-	}
-	m, err := bs.NewMacaroon(bakery.LatestVersion, []checkers.Caveat{{
+	m, err := b.Oven.NewMacaroon(ctx, bakery.LatestVersion, time.Now().Add(time.Minute), []checkers.Caveat{{
 		Condition: "is-authenticated-user",
 		Location:  *url,
-	}})
+	}}, bakery.LoginOp)
 	if err != nil {
 		log.Fatalf("cannot make macaroon: %s", err)
 	}
 
 	client := httpbakery.NewClient()
-	lms, err := login(client, *url+"/v1/idp/usso_discharge/login")
+	lms, err := login(ctx, client, *url+"/v1/idp/usso_discharge/login")
 	if err != nil {
 		log.Fatalf("cannot login: %s", err)
 	}
@@ -56,21 +62,19 @@ func main() {
 			return lms, nil
 		}),
 	)
-	ms, err := client.DischargeAll(m)
+	ms, err := client.DischargeAll(ctx, m)
 	if err != nil {
 		log.Fatalf("cannot discharge macaroon: %s", err)
 	}
-	d := checkers.InferDeclared(ms)
-	if err := bs.Check(ms, checkers.New(
-		d,
-		checkers.TimeBefore,
-	)); err != nil {
+	authInfo, err := b.Checker.Auth(ms).Allow(ctx, bakery.LoginOp)
+	if err != nil {
 		log.Fatalf("invalid macaroon discharge: %s", err)
 	}
+	fmt.Printf("success as %v\n", authInfo.Identity.Id())
 }
 
-func login(doer httprequest.Doer, url string) (macaroon.Slice, error) {
-	m, err := ussodischarge.Macaroon(doer, url)
+func login(ctx context.Context, doer httprequest.Doer, url string) (macaroon.Slice, error) {
+	m, err := ussodischarge.Macaroon(ctx, doer, url)
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}
@@ -80,7 +84,7 @@ func login(doer httprequest.Doer, url string) (macaroon.Slice, error) {
 		OTP:      *otp,
 		Doer:     doer,
 	}
-	ms, err := d.DischargeAll(m)
+	ms, err := d.DischargeAll(ctx, m)
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}

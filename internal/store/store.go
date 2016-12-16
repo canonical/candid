@@ -13,9 +13,10 @@ import (
 	"github.com/juju/utils/cache"
 	"github.com/pborman/uuid"
 	"github.com/prometheus/client_golang/prometheus"
+	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
-	"gopkg.in/macaroon-bakery.v2-unstable/bakery/mgostorage"
+	"gopkg.in/macaroon-bakery.v2-unstable/bakery/mgorootkeystore"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 	"launchpad.net/lpad"
@@ -121,9 +122,9 @@ type Pool struct {
 
 	params         StoreParams
 	db             *mgo.Database
-	service        *bakery.Service
-	rootKeys       *mgostorage.RootKeys
+	rootKeys       *mgorootkeystore.RootKeys
 	launchpadCache *cache.Cache
+	bakeryParams   bakery.BakeryParams
 }
 
 // NewPool creates a new Pool. The pool will be sized at sp.MaxMgoSessions.
@@ -162,20 +163,31 @@ func NewPool(db *mgo.Database, sp StoreParams) (*Pool, error) {
 			return nil, errgo.Notef(err, "cannot generate key")
 		}
 	}
-	locator := bakery.NewThirdPartyLocatorStore()
+	locator := bakery.NewThirdPartyStore()
 	locator.AddInfo(p.params.Location, bakery.ThirdPartyInfo{
 		PublicKey: p.params.Key.Public,
 		Version:   bakery.LatestVersion,
 	})
-	p.service, err = bakery.NewService(bakery.NewServiceParams{
-		Location: p.params.Location,
-		Key:      p.params.Key,
-		Locator:  locator,
-	})
-	if err != nil {
-		return nil, errgo.Notef(err, "cannot create bakery service")
+	p.rootKeys = mgorootkeystore.NewRootKeys(1000) // TODO(mhilton) make this configurable?
+
+	p.bakeryParams = bakery.BakeryParams{
+		Checker:        newChecker(),
+		Locator:        locator,
+		Key:            p.params.Key,
+		IdentityClient: identityClient{p.params.Location},
+		Authorizer: bakery.ACLAuthorizer{
+			AllowPublic: true,
+			GetACL: func(ctx context.Context, op bakery.Op) ([]string, error) {
+				store := storeFromContext(ctx)
+				if store == nil {
+					logger.Infof("GetACL found no store")
+					return nil, errgo.Newf("no store found")
+				}
+				return store.aclForOp(op)
+			},
+		},
+		Location: "identity",
 	}
-	p.rootKeys = mgostorage.NewRootKeys(1000) // TODO(mhilton) make this configurable?
 	s := p.GetNoLimit()
 	defer p.Put(s)
 	if err := s.ensureIndexes(); err != nil {
@@ -296,8 +308,8 @@ type Store struct {
 	// DB holds the mongodb-backed identity store.
 	DB StoreDatabase
 
-	// Service holds a *bakery.Service that can be used to make and check macaroons.
-	Service *bakery.Service
+	// Service holds a *bakery.Bakery that can be used to make and check macaroons.
+	Bakery *bakery.Bakery
 
 	// Place holds the place where openid-callback rendezvous
 	// are created.
@@ -365,12 +377,14 @@ func (m *meetingMetrics) RequestsExpired(count int) {
 func (s *Store) setSession(session *mgo.Session) {
 	s.DB.Database = s.pool.db.With(session)
 	s.Place = s.pool.meetingServer.Place(mgomeeting.NewStore(s.DB.Meeting()))
-	s.Service = s.pool.service.WithStore(s.pool.rootKeys.NewStorage(
+	bp := s.pool.bakeryParams
+	bp.RootKeyStore = s.pool.rootKeys.NewStore(
 		s.DB.Macaroons(),
-		mgostorage.Policy{
+		mgorootkeystore.Policy{
 			ExpiryDuration: 365 * 24 * time.Hour,
 		},
-	))
+	)
+	s.Bakery = bakery.New(bp)
 }
 
 func (s *Store) ensureIndexes() error {

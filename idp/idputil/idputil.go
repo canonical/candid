@@ -12,8 +12,8 @@ import (
 
 	"github.com/juju/httprequest"
 	"github.com/juju/idmclient/params"
+	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
 
 	"github.com/CanonicalLtd/blues-identity/idp"
 )
@@ -28,24 +28,20 @@ const (
 // identity macaroon is generated for the user and an appropriate message
 // will be returned for the login request.
 func LoginUser(c idp.Context, u *params.User) {
-	caveats := []checkers.Caveat{
-		checkers.DeclaredCaveat("username", string(u.Username)),
-		checkers.TimeBeforeCaveat(time.Now().Add(identityMacaroonDuration)),
-	}
-	if c.LoginSuccess(params.Username(u.Username), caveats) {
+	if c.LoginSuccess(params.Username(u.Username), time.Now().Add(identityMacaroonDuration)) {
 		fmt.Fprintf(c.Params().Response, "login successful as user %s\n", u.Username)
 	}
 }
 
 // GetLoginMethods uses c to perform a request to get the list of
 // available login methods from u. The result is unmarshalled into v.
-func GetLoginMethods(c *httprequest.Client, u *url.URL, v interface{}) error {
+func GetLoginMethods(ctx context.Context, c *httprequest.Client, u *url.URL, v interface{}) error {
 	req, err := http.NewRequest("GET", u.String(), nil)
 	if err != nil {
 		return errgo.Mask(err)
 	}
 	req.Header.Set("Accept", "application/json")
-	if err := c.Do(req, nil, v); err != nil {
+	if err := c.Do(ctx, req, v); err != nil {
 		return errgo.Mask(err)
 	}
 	return nil

@@ -3,7 +3,6 @@
 package admincmd
 
 import (
-	"net/url"
 	"os"
 	"strings"
 	"sync"
@@ -13,6 +12,7 @@ import (
 	"github.com/juju/idmclient"
 	"github.com/juju/idmclient/params"
 	"github.com/juju/persistent-cookiejar"
+	"golang.org/x/net/context"
 	"golang.org/x/net/publicsuffix"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
@@ -97,11 +97,9 @@ func (c *idmCommand) Client(ctxt *cmd.Context) (*idmclient.Client, error) {
 			Public:  *a.PublicKey,
 			Private: *a.PrivateKey,
 		}
-		u, err := url.Parse(idmURL)
-		if err != nil {
-			return nil, errgo.Notef(err, "invalid IDM URL")
+		if err := agent.SetUpAuth(bClient, idmURL, a.Username); err != nil {
+			return nil, errgo.Notef(err, "cannot set up agent authentication")
 		}
-		agent.SetUpAuth(bClient, u, a.Username)
 	} else {
 		bClient.WebPageVisitor = httpbakery.WebBrowserVisitor
 	}
@@ -175,7 +173,7 @@ func (c *userCommand) lookupUser(ctxt *cmd.Context) (params.Username, error) {
 	if err != nil {
 		return "", errgo.Mask(err)
 	}
-	users, err := client.QueryUsers(&params.QueryUsersRequest{
+	users, err := client.QueryUsers(context.Background(), &params.QueryUsersRequest{
 		Email: c.email,
 	})
 	if err != nil {

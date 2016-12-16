@@ -11,7 +11,6 @@ import (
 	"github.com/juju/idmclient/params"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
-	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
 	"gopkg.in/yaml.v2"
 
 	"github.com/CanonicalLtd/blues-identity/config"
@@ -58,23 +57,18 @@ func (s *tokenV3Suite) TestKeystoneV3TokenIdentityProviderHandle(c *gc.C) {
 	req, err := http.NewRequest("POST", "https://idp.test/login?waitid=1", bytes.NewReader(body))
 	c.Assert(err, gc.IsNil)
 	req.Header.Set("Content-Type", "application/json")
-	b, err := bakery.NewService(bakery.NewServiceParams{})
 	tc := &idptest.TestContext{
 		URLPrefix: "https://idp.test",
-		Bakery_:   b,
+		Bakery_:   bakery.New(bakery.BakeryParams{}),
 		Request:   req,
 	}
 	s.idp.Handle(tc)
-	idptest.AssertLoginSuccess(c, tc,
-		checkers.New(
-			checkers.TimeBefore,
-		),
-		&params.User{
-			Username:   params.Username("testuser@openstack"),
-			ExternalID: "123@openstack",
-			IDPGroups:  []string{"abc_group@openstack"},
-		},
-	)
+	idptest.AssertLoginSuccess(c, tc, "testuser@openstack")
+	idptest.AssertUser(c, tc, &params.User{
+		Username:   params.Username("testuser@openstack"),
+		ExternalID: "123@openstack",
+		IDPGroups:  []string{"abc_group@openstack"},
+	})
 	c.Assert(tc.Response().Body.String(), gc.Equals, "login successful as user testuser@openstack\n")
 }
 
@@ -86,24 +80,22 @@ func (s *tokenV3Suite) TestKeystoneV3TokenIdentityProviderHandleBadToken(c *gc.C
 	req, err := http.NewRequest("POST", "https://idp.test/login?waitid=1", bytes.NewReader(body))
 	c.Assert(err, gc.IsNil)
 	req.Header.Set("Content-Type", "application/json")
-	b, err := bakery.NewService(bakery.NewServiceParams{})
 	tc := &idptest.TestContext{
 		URLPrefix: "https://idp.test",
-		Bakery_:   b,
+		Bakery_:   bakery.New(bakery.BakeryParams{}),
 		Request:   req,
 	}
 	s.idp.Handle(tc)
-	idptest.AssertLoginFailure(c, tc, `cannot log in: The request you have made requires authentication.`)
+	idptest.AssertLoginFailure(c, tc, `cannot log in: Post http.*: The request you have made requires authentication.`)
 }
 
 func (s *tokenV3Suite) TestKeystoneV3TokenIdentityProviderHandleBadRequest(c *gc.C) {
 	req, err := http.NewRequest("POST", "https://idp.test/login?waitid=1", strings.NewReader("{"))
 	c.Assert(err, gc.IsNil)
 	req.Header.Set("Content-Type", "application/json")
-	b, err := bakery.NewService(bakery.NewServiceParams{})
 	tc := &idptest.TestContext{
 		URLPrefix: "https://idp.test",
-		Bakery_:   b,
+		Bakery_:   bakery.New(bakery.BakeryParams{}),
 		Request:   req,
 	}
 	s.idp.Handle(tc)

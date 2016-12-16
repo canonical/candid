@@ -3,7 +3,6 @@
 package admincmd_test
 
 import (
-	"github.com/juju/httprequest"
 	"github.com/juju/idmclient/params"
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
@@ -19,14 +18,13 @@ func (s *removeGroupSuite) TestRemoveGroup(c *gc.C) {
 	var addGroups []string
 	var removeGroups []string
 	var username string
-	bakeryService := newBakery()
-	runf := s.RunServer(c, []httprequest.Handler{
-		modifyGroupsHandler(bakeryService, func(req *params.ModifyUserGroupsRequest) error {
+	runf := s.RunServer(c, &handler{
+		modifyGroups: func(req *params.ModifyUserGroupsRequest) error {
 			username = string(req.Username)
 			addGroups = req.Groups.Add
 			removeGroups = req.Groups.Remove
 			return nil
-		}),
+		},
 	})
 	CheckNoOutput(c, runf, "remove-group", "-a", "admin.agent", "-u", "bob", "test1", "test2")
 	c.Assert(username, gc.Equals, "bob")
@@ -38,20 +36,19 @@ func (s *removeGroupSuite) TestRemoveGroupForEmail(c *gc.C) {
 	var addGroups []string
 	var removeGroups []string
 	var username string
-	bakeryService := newBakery()
-	runf := s.RunServer(c, []httprequest.Handler{
-		modifyGroupsHandler(bakeryService, func(req *params.ModifyUserGroupsRequest) error {
+	runf := s.RunServer(c, &handler{
+		modifyGroups: func(req *params.ModifyUserGroupsRequest) error {
 			username = string(req.Username)
 			addGroups = req.Groups.Add
 			removeGroups = req.Groups.Remove
 			return nil
-		}),
-		queryUsersHandler(bakeryService, func(req *params.QueryUsersRequest) ([]string, error) {
+		},
+		queryUsers: func(req *params.QueryUsersRequest) ([]string, error) {
 			if req.Email == "bob@example.com" {
 				return []string{"bob"}, nil
 			}
 			return []string{}, nil
-		}),
+		},
 	})
 	CheckNoOutput(c, runf, "remove-group", "-a", "admin.agent", "-e", "bob@example.com", "test1", "test2")
 	c.Assert(username, gc.Equals, "bob")
@@ -60,14 +57,13 @@ func (s *removeGroupSuite) TestRemoveGroupForEmail(c *gc.C) {
 }
 
 func (s *removeGroupSuite) TestRemoveGroupForEmailNotFound(c *gc.C) {
-	bakeryService := newBakery()
-	runf := s.RunServer(c, []httprequest.Handler{
-		queryUsersHandler(bakeryService, func(req *params.QueryUsersRequest) ([]string, error) {
+	runf := s.RunServer(c, &handler{
+		queryUsers: func(req *params.QueryUsersRequest) ([]string, error) {
 			if req.Email == "bob@example.com" {
 				return []string{"bob"}, nil
 			}
 			return []string{}, nil
-		}),
+		},
 	})
 	CheckError(
 		c,

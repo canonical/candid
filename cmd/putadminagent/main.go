@@ -17,6 +17,7 @@ import (
 
 	"github.com/juju/idmclient"
 	"github.com/juju/idmclient/params"
+	"golang.org/x/net/context"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
 	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
 )
@@ -44,6 +45,7 @@ NOT FOR PRODUCTION USE!
 const defaultLocation = "http://api.jujugui.org/identity"
 
 func main() {
+	ctx := context.Background()
 	flag.Usage = func() {
 		fmt.Fprint(os.Stderr, usageDoc)
 		flag.PrintDefaults()
@@ -82,7 +84,7 @@ func main() {
 		key = keyPair.Public
 	}
 	username := agentName + "@admin@idm"
-	if err := idm.SetUser(&params.SetUserRequest{
+	if err := idm.SetUser(ctx, &params.SetUserRequest{
 		Username: params.Username(username),
 		User: params.User{
 			Owner:      "admin@idm",

@@ -11,6 +11,7 @@ import (
 	"github.com/juju/idmclient/params"
 	"github.com/juju/loggo"
 	"github.com/juju/utils/debugstatus"
+	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
 
 	"github.com/CanonicalLtd/blues-identity/internal/identity"
@@ -31,7 +32,7 @@ func NewAPIHandler(pool *store.Pool, params identity.ServerParams) ([]httpreques
 		Path:   "/debug/login",
 		Handle: h.login,
 	}}
-	for _, hnd := range identity.ErrorMapper.Handlers(h.handler) {
+	for _, hnd := range identity.ReqServer.Handlers(h.handler) {
 		handlers = append(handlers, hnd)
 	}
 	return handlers, nil
@@ -58,7 +59,7 @@ type debugAPIHandler struct {
 	nonceDB string
 }
 
-func (h *debugAPIHandler) handler(p httprequest.Params) (*handler, error) {
+func (h *debugAPIHandler) handler(p httprequest.Params) (*handler, context.Context, error) {
 	return &handler{
 		Handler: debugstatus.Handler{
 			Version:           debugstatus.Version(version.VersionInfo),
@@ -68,7 +69,7 @@ func (h *debugAPIHandler) handler(p httprequest.Params) (*handler, error) {
 			},
 		},
 		h: h,
-	}, nil
+	}, p.Context, nil
 }
 
 type handler struct {

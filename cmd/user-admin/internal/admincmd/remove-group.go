@@ -5,6 +5,7 @@ package admincmd
 import (
 	"github.com/juju/cmd"
 	"github.com/juju/idmclient/params"
+	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
 )
 
@@ -57,7 +58,7 @@ func (c *removeGroupCommand) Run(ctxt *cmd.Context) error {
 	if err != nil {
 		return errgo.Mask(err)
 	}
-	err = client.ModifyUserGroups(&params.ModifyUserGroupsRequest{
+	err = client.ModifyUserGroups(context.Background(), &params.ModifyUserGroupsRequest{
 		Username: username,
 		Groups: params.ModifyGroups{
 			Remove: c.groups,

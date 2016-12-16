@@ -7,15 +7,15 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"sync"
+	"time"
 
 	"github.com/juju/httprequest"
 	"github.com/juju/idmclient/params"
 	jc "github.com/juju/testing/checkers"
+	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
-	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
-	"gopkg.in/macaroon.v2-unstable"
 	"gopkg.in/mgo.v2"
 )
 
@@ -29,7 +29,7 @@ type TestContext struct {
 	Request *http.Request
 
 	// TestBakery contains the bakery.Service to return to Handle in Bakery().
-	Bakery_ *bakery.Service
+	Bakery_ *bakery.Bakery
 
 	// TestDatabase contains the mgo.Database to return to Handle in Database().
 	Database_ *mgo.Database
@@ -68,10 +68,10 @@ type TestContext struct {
 	users []params.User
 
 	// caveats and caveatsnSet whether LoginSuccess has been called
-	// and with what value.
-	username   params.Username
-	caveats    []checkers.Caveat
-	caveatsSet bool
+	// and with what values.
+	username    params.Username
+	expiry      time.Time
+	usernameSet bool
 
 	// err and errSet whether LoginFailure has been called and with
 	// what value.
@@ -101,13 +101,14 @@ func (c *TestContext) Params() httprequest.Params {
 		c.params = httprequest.Params{
 			Request:  &r,
 			Response: httptest.NewRecorder(),
+			Context:  context.Background(),
 		}
 	}
 	return c.params
 }
 
 // Bakery implements Context.Bakery.
-func (c *TestContext) Bakery() *bakery.Service {
+func (c *TestContext) Bakery() *bakery.Bakery {
 	return c.Bakery_
 }
 
@@ -169,10 +170,10 @@ func (c *TestContext) FindUserByExternalId(id string) (*params.User, error) {
 }
 
 // LoginSuccess implements Context.LoginSuccess.
-func (c *TestContext) LoginSuccess(username params.Username, cavs []checkers.Caveat) bool {
+func (c *TestContext) LoginSuccess(username params.Username, expiry time.Time) bool {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.username, c.caveats, c.caveatsSet = username, cavs, true
+	c.username, c.expiry, c.usernameSet = username, expiry, true
 	return !c.FailOnLoginSuccess
 }
 
@@ -189,14 +190,16 @@ func (c *TestContext) Response() *httptest.ResponseRecorder {
 }
 
 // LoginSuccessCall returns information about the call to LoginSuccess.
-// If LoginSuccess was called then the returned value will be ms, true,
-// where ms is the macaroon.Slice used to call LoginSuccess. If
-// LoginSuccess was not called then the returned value will be
-// macaroon.Slice{}, false.
-func (c *TestContext) LoginSuccessCall() (params.Username, []checkers.Caveat, bool) {
+// If LoginSuccess was called then the returned value will be username, expiry, true,
+// where username and expiry were the arguments used to call
+// LoginSuccess.
+//
+// If LoginSuccess was not called then the returned value will be
+// macaroon.Slice{}, time.Time{}, false.
+func (c *TestContext) LoginSuccessCall() (params.Username, time.Time, bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	return c.username, c.caveats, c.caveatsSet
+	return c.username, c.expiry, c.usernameSet
 }
 
 // LoginFailureCall returns information about the call to LoginFailure.
@@ -209,31 +212,23 @@ func (c *TestContext) LoginFailureCall() (error, bool) {
 	return c.err, c.errSet
 }
 
-// AssertLoginSuccess asserts that the result of tc is a macaroon that
-// validates against ch. If u is not nil then it will also be asserted
-// that the macaroon is for u and that u is stored in tc's database.
-func AssertLoginSuccess(c *gc.C, tc *TestContext, ch checkers.Checker, u *params.User) {
+// AssertLoginSuccess asserts that tc.LoginSuccess has been
+// called with the given username and an expiry time in the future.
+func AssertLoginSuccess(c *gc.C, tc *TestContext, username params.Username) {
 	err, called := tc.LoginFailureCall()
 	c.Assert(called, gc.Equals, false, gc.Commentf("unexpected login failure: %v", err))
-	username, caveats, called := tc.LoginSuccessCall()
+	calledUsername, calledExpiry, called := tc.LoginSuccessCall()
 	c.Assert(called, gc.Equals, true)
-	m, err := tc.Bakery_.NewMacaroon(bakery.LatestVersion, caveats)
-	c.Assert(err, gc.IsNil)
-	ms := macaroon.Slice{m}
-	declared := checkers.InferDeclared(ms)
-	var fpc bakery.FirstPartyChecker
-	if ch == nil {
-		fpc = checkers.New(declared)
-	} else {
-		fpc = checkers.New(declared, ch)
-	}
-	err = tc.Bakery_.Check(ms, fpc)
-	c.Assert(err, gc.IsNil)
 
-	if u == nil {
-		return
+	if now := time.Now(); calledExpiry.Before(now) {
+		c.Error("expiry time %v is before now %v", calledExpiry, now)
 	}
-	c.Assert(username, gc.Equals, u.Username)
+	c.Assert(calledUsername, gc.Equals, username)
+}
+
+// AssertUser asserts that the given user document is stored
+// in tc's database.
+func AssertUser(c *gc.C, tc *TestContext, u *params.User) {
 	user, err := tc.FindUserByName(u.Username)
 	c.Assert(err, gc.IsNil)
 	c.Assert(user, jc.DeepEquals, u)

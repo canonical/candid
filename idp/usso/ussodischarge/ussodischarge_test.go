@@ -16,9 +16,9 @@ import (
 	"github.com/juju/idmclient/params"
 	udclient "github.com/juju/idmclient/ussodischarge"
 	"github.com/juju/testing"
+	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
-	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
 	macaroon "gopkg.in/macaroon.v2-unstable"
 	yaml "gopkg.in/yaml.v2"
 
@@ -31,15 +31,19 @@ import (
 type ussoMacaroonSuite struct {
 	testing.IsolatedMgoSuite
 	idp    idp.IdentityProvider
-	bakery *bakery.Service
+	bakery *bakery.Bakery
 }
 
 var _ = gc.Suite(&ussoMacaroonSuite{})
 
 func (s *ussoMacaroonSuite) SetUpTest(c *gc.C) {
 	s.IsolatedMgoSuite.SetUpTest(c)
-	var err error
-	s.bakery, err = bakery.NewService(bakery.NewServiceParams{})
+	key, err := bakery.GenerateKey()
+	c.Assert(err, gc.Equals, nil)
+
+	s.bakery = bakery.New(bakery.BakeryParams{
+		Key: key,
+	})
 	c.Assert(err, gc.Equals, nil)
 	s.idp, err = ussodischarge.NewIdentityProvider(ussodischarge.Params{
 		URL:    "https://login.staging.ubuntu.com",
@@ -112,30 +116,34 @@ func (s *ussoMacaroonSuite) TestHandleGetSuccess(c *gc.C) {
 	var mresp udclient.MacaroonResponse
 	err = json.Unmarshal(resp.Body.Bytes(), &mresp)
 	c.Assert(err, gc.Equals, nil)
-	m := mresp.Macaroon
+	m := mresp.Macaroon.M()
 	cavs := m.Caveats()
-	c.Assert(string(cavs[0].Id), gc.Equals, "allow "+ussodischarge.OperationName)
-	c.Assert(cavs[0].VerificationId, gc.HasLen, 0)
-	c.Assert(cavs[1].VerificationId, gc.Not(gc.HasLen), 0)
+	var thirdPartyCav macaroon.Caveat
+	for _, cav := range cavs {
+		if len(cav.VerificationId) != 0 {
+			thirdPartyCav = cav
+		}
+	}
+	c.Assert(thirdPartyCav.VerificationId, gc.Not(gc.HasLen), 0)
 	var cid ussodischarge.USSOCaveatID
-	err = json.Unmarshal(cavs[1].Id, &cid)
+	err = json.Unmarshal(thirdPartyCav.Id, &cid)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(cid.Version, gc.Equals, 1)
 	secret, err := base64.StdEncoding.DecodeString(cid.Secret)
 	c.Assert(err, gc.Equals, nil)
 	rk, err := rsa.DecryptOAEP(sha1.New(), nil, testKey, secret, nil)
 	c.Assert(err, gc.Equals, nil)
-	md, err := macaroon.New(rk, cavs[1].Id, "test", macaroon.V1)
+	md, err := macaroon.New(rk, thirdPartyCav.Id, "test", macaroon.V1)
 	c.Assert(err, gc.Equals, nil)
 	md.Bind(m.Signature())
 	ms := macaroon.Slice{m, md}
-	err = s.bakery.Check(ms, checkers.New(checkers.OperationChecker(ussodischarge.OperationName)))
+	authInfo, err := s.bakery.Checker.Auth(ms).Allow(context.TODO(), ussodischarge.USSOLoginOp)
 	c.Assert(err, gc.Equals, nil)
+	c.Assert(authInfo.Identity, gc.Equals, nil)
 }
 
 var postTests = []struct {
 	about        string
-	caveats      []checkers.Caveat
 	account      *ussodischarge.AccountInfo
 	validSince   string
 	lastAuth     string
@@ -144,8 +152,7 @@ var postTests = []struct {
 	expectUser   *params.User
 	expectError  string
 }{{
-	about:   "success",
-	caveats: []checkers.Caveat{checkers.AllowCaveat(ussodischarge.OperationName)},
+	about: "success",
 	account: &ussodischarge.AccountInfo{
 		Username:    "username",
 		OpenID:      "1234567",
@@ -163,21 +170,12 @@ var postTests = []struct {
 	},
 }, {
 	about:       "no account",
-	caveats:     []checkers.Caveat{checkers.AllowCaveat(ussodischarge.OperationName)},
 	validSince:  timeString(-time.Hour),
 	lastAuth:    timeString(-time.Minute),
 	expires:     timeString(time.Hour),
 	expectError: "account information not specified",
 }, {
-	about:       "bad operation",
-	caveats:     []checkers.Caveat{checkers.DenyCaveat(ussodischarge.OperationName)},
-	validSince:  timeString(-time.Hour),
-	lastAuth:    timeString(-time.Minute),
-	expires:     timeString(time.Hour),
-	expectError: `verification failed: caveat "deny usso-discharge-login" not satisfied: usso-discharge-login not allowed`,
-}, {
-	about:   "expires bad format",
-	caveats: []checkers.Caveat{checkers.AllowCaveat(ussodischarge.OperationName)},
+	about: "expires bad format",
 	account: &ussodischarge.AccountInfo{
 		Username:    "username",
 		OpenID:      "1234567",
@@ -187,10 +185,9 @@ var postTests = []struct {
 	validSince:  timeString(-time.Hour),
 	lastAuth:    timeString(-time.Minute),
 	expires:     "never",
-	expectError: `verification failed: login.staging.ubuntu.com\|expires caveat badly formed: parsing time "never" as "2006-01-02T15:04:05.000000": cannot parse "never" as "2006"`,
+	expectError: `verification failed \(USSO caveat\): expires caveat badly formed: parsing time "never" as "2006-01-02T15:04:05.000000": cannot parse "never" as "2006"`,
 }, {
-	about:   "expires  in past",
-	caveats: []checkers.Caveat{checkers.AllowCaveat(ussodischarge.OperationName)},
+	about: "expires in past",
 	account: &ussodischarge.AccountInfo{
 		Username:    "username",
 		OpenID:      "1234567",
@@ -200,10 +197,9 @@ var postTests = []struct {
 	validSince:  timeString(-time.Hour),
 	lastAuth:    timeString(-time.Minute),
 	expires:     timeString(-time.Hour),
-	expectError: `verification failed: login.staging.ubuntu.com\|expires before current time`,
+	expectError: `verification failed \(USSO caveat\): expires before current time`,
 }, {
-	about:   "multiple account info",
-	caveats: []checkers.Caveat{checkers.AllowCaveat(ussodischarge.OperationName)},
+	about: "multiple account info",
 	account: &ussodischarge.AccountInfo{
 		Username:    "username",
 		OpenID:      "1234567",
@@ -214,10 +210,9 @@ var postTests = []struct {
 	lastAuth:     timeString(-time.Minute),
 	expires:      timeString(time.Hour),
 	extraCaveats: []string{`login.staging.ubuntu.com|account|{"username": "failuser"}`},
-	expectError:  `verification failed: login.staging.ubuntu.com\|account specified multiple times`,
+	expectError:  `verification failed \(USSO caveat\): account specified multiple times`,
 }, {
-	about:   "unrecognised caveat",
-	caveats: []checkers.Caveat{checkers.AllowCaveat(ussodischarge.OperationName)},
+	about: "unrecognised caveat",
 	account: &ussodischarge.AccountInfo{
 		Username:    "username",
 		OpenID:      "1234567",
@@ -228,26 +223,23 @@ var postTests = []struct {
 	lastAuth:     timeString(-time.Minute),
 	expires:      timeString(time.Hour),
 	extraCaveats: []string{`login.staging.ubuntu.com|no-such-condition|fail`},
-	expectError:  `verification failed: unknown caveat "login.staging.ubuntu.com\|no-such-condition\|fail" \(no-such-condition\)`,
+	expectError:  `verification failed \(USSO caveat\): unknown caveat "no-such-condition"`,
 }, {
 	about:        "account bad base64",
-	caveats:      []checkers.Caveat{checkers.AllowCaveat(ussodischarge.OperationName)},
 	validSince:   timeString(-time.Hour),
 	lastAuth:     timeString(-time.Minute),
 	expires:      timeString(time.Hour),
 	extraCaveats: []string{`login.staging.ubuntu.com|account|f`},
-	expectError:  `verification failed: login.staging.ubuntu.com\|account caveat badly formed: illegal base64 data at input byte 0`,
+	expectError:  `verification failed \(USSO caveat\): account caveat badly formed: illegal base64 data at input byte 0`,
 }, {
 	about:        "account bad json",
-	caveats:      []checkers.Caveat{checkers.AllowCaveat(ussodischarge.OperationName)},
 	validSince:   timeString(-time.Hour),
 	lastAuth:     timeString(-time.Minute),
 	expires:      timeString(time.Hour),
 	extraCaveats: []string{`login.staging.ubuntu.com|account|fQ==`},
-	expectError:  `verification failed: login.staging.ubuntu.com\|account caveat badly formed: invalid character '}' looking for beginning of value`,
+	expectError:  `verification failed \(USSO caveat\): account caveat badly formed: invalid character '}' looking for beginning of value`,
 }, {
-	about:   "without argument",
-	caveats: []checkers.Caveat{checkers.AllowCaveat(ussodischarge.OperationName)},
+	about: "without argument",
 	account: &ussodischarge.AccountInfo{
 		Username:    "username",
 		OpenID:      "1234567",
@@ -258,14 +250,15 @@ var postTests = []struct {
 	lastAuth:     timeString(-time.Minute),
 	expires:      timeString(time.Hour),
 	extraCaveats: []string{`login.staging.ubuntu.com|no-arg`},
-	expectError:  `verification failed: unknown caveat "login.staging.ubuntu.com\|no-arg"`,
+	expectError:  `verification failed \(USSO caveat\): no argument provided in "login.staging.ubuntu.com|no-arg"`,
 }}
 
 func (s *ussoMacaroonSuite) TestHandlePost(c *gc.C) {
 	for i, test := range postTests {
 		c.Logf("%d. %s", i, test.about)
-		m, err := s.bakery.NewMacaroon(bakery.Version1, test.caveats)
+		bm, err := s.bakery.Oven.NewMacaroon(context.TODO(), bakery.Version1, time.Now().Add(time.Minute), nil, ussodischarge.USSOLoginOp)
 		c.Assert(err, gc.Equals, nil)
+		m := bm.M()
 		if test.account != nil {
 			buf, err := json.Marshal(test.account)
 			c.Assert(err, gc.Equals, nil)
@@ -307,7 +300,8 @@ func (s *ussoMacaroonSuite) TestHandlePost(c *gc.C) {
 			idptest.AssertLoginFailure(c, tc, test.expectError)
 			continue
 		}
-		idptest.AssertLoginSuccess(c, tc, checkers.TimeBefore, test.expectUser)
+		idptest.AssertLoginSuccess(c, tc, test.expectUser.Username)
+		idptest.AssertUser(c, tc, test.expectUser)
 	}
 }
 

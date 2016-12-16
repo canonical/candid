@@ -17,6 +17,7 @@ import (
 	"github.com/juju/idmclient/params"
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/testing/httptesting"
+	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
@@ -29,12 +30,20 @@ import (
 	agentidp "github.com/CanonicalLtd/blues-identity/idp/agent"
 	"github.com/CanonicalLtd/blues-identity/idp/idptest"
 	"github.com/CanonicalLtd/blues-identity/idp/test"
+	"github.com/CanonicalLtd/blues-identity/internal/store"
 	"github.com/CanonicalLtd/blues-identity/internal/v1"
 )
+
+var groupOp = bakery.Op{"group", "group"}
+
+var testContext = context.Background()
 
 type dischargeSuite struct {
 	idptest.DischargeSuite
 	user *params.User
+	// bakery holds a bakery that represents a target
+	// service that can issue macaroons.
+	bakery *bakery.Bakery
 }
 
 var _ = gc.Suite(&dischargeSuite{})
@@ -52,28 +61,31 @@ func (s *dischargeSuite) SetUpTest(c *gc.C) {
 		Email:      "test@example.com",
 		IDPGroups:  []string{"test1", "test2"},
 	}
+	key, err := bakery.GenerateKey()
+	c.Assert(err, gc.IsNil)
+	s.bakery = bakery.New(bakery.BakeryParams{
+		Locator:        s.Locator,
+		Key:            key,
+		IdentityClient: idptest.IdentityClient{},
+	})
 }
 
 func (s *dischargeSuite) TestInteractiveDischarge(c *gc.C) {
 	visitor := &test.Visitor{
 		User: s.user,
 	}
-	s.AssertDischarge(c, visitor, checkers.New(
-		checkers.TimeBefore,
-	))
+	s.AssertDischarge(c, visitor)
 }
 
 func (s *dischargeSuite) TestNonInteractiveDischarge(c *gc.C) {
 	visitor := &test.Visitor{
 		User: s.user,
 	}
-	s.AssertDischarge(c, httpbakery.NewMultiVisitor(visitor), checkers.New(
-		checkers.TimeBefore,
-	))
+	s.AssertDischarge(c, httpbakery.NewMultiVisitor(visitor))
 }
 
 func (s *dischargeSuite) TestDischargeUsernameLookup(c *gc.C) {
-	err := s.IDMClient.SetUser(&params.SetUserRequest{
+	err := s.IDMClient.SetUser(testContext, &params.SetUserRequest{
 		Username: s.user.Username,
 		User:     *s.user,
 	})
@@ -83,13 +95,11 @@ func (s *dischargeSuite) TestDischargeUsernameLookup(c *gc.C) {
 			Username: s.user.Username,
 		},
 	}
-	s.AssertDischarge(c, visitor, checkers.New(
-		checkers.TimeBefore,
-	))
+	s.AssertDischarge(c, visitor)
 }
 
 func (s *dischargeSuite) TestDischargeExternalIDLookup(c *gc.C) {
-	err := s.IDMClient.SetUser(&params.SetUserRequest{
+	err := s.IDMClient.SetUser(testContext, &params.SetUserRequest{
 		Username: s.user.Username,
 		User:     *s.user,
 	})
@@ -99,27 +109,19 @@ func (s *dischargeSuite) TestDischargeExternalIDLookup(c *gc.C) {
 			ExternalID: s.user.ExternalID,
 		},
 	}
-	s.AssertDischarge(c, visitor, checkers.New(
-		checkers.TimeBefore,
-	))
+	s.AssertDischarge(c, visitor)
 }
 
 func (s *dischargeSuite) TestDischargeWhenLoggedIn(c *gc.C) {
 	visitor := &test.Visitor{
 		User: s.user,
 	}
-	s.AssertDischarge(c, visitor, checkers.New(
-		checkers.TimeBefore,
-	))
-	s.AssertDischarge(c, noVisit, checkers.New(
-		checkers.TimeBefore,
-	))
+	s.AssertDischarge(c, visitor)
+	s.AssertDischarge(c, noVisit)
 
 	// Check that we cannot do the same when we're
 	// making the requests from a different origin.
-	s.AssertDischarge(c, noVisit, checkers.New(
-		checkers.TimeBefore,
-	))
+	s.AssertDischarge(c, noVisit)
 }
 
 func (s *dischargeSuite) TestWaitReturnsDischargeToken(c *gc.C) {
@@ -131,9 +133,8 @@ func (s *dischargeSuite) TestWaitReturnsDischargeToken(c *gc.C) {
 		transport: s.BakeryClient.Transport,
 	}
 	s.BakeryClient.Transport = transport
-	s.AssertDischarge(c, visitor, checkers.New(
-		checkers.TimeBefore,
-	))
+	s.AssertDischarge(c, visitor)
+
 	u, _ := url.Parse(idptest.DischargeLocation)
 	mss := cookiesToMacaroons(s.BakeryClient.Jar.Cookies(u))
 	c.Assert(mss, gc.HasLen, 1)
@@ -226,27 +227,16 @@ func (s *dischargeSuite) TestDischargeFromDifferentOriginWhenLoggedIn(c *gc.C) {
 	visitor := &test.Visitor{
 		User: s.user,
 	}
-	s.AssertDischarge(c, visitor, checkers.New(
-		checkers.TimeBefore,
-	))
-	s.AssertDischarge(c, noVisit, checkers.New(
-		checkers.TimeBefore,
-	))
+	s.AssertDischarge(c, visitor)
+	s.AssertDischarge(c, noVisit)
 
 	// Check that we can't discharge using the idm macaroon
 	// when we've got a different origin header.
-	b, err := bakery.NewService(bakery.NewServiceParams{
-		Locator: s.Locator,
-	})
-	c.Assert(err, gc.IsNil)
-	m, err := b.NewMacaroon(bakery.LatestVersion, []checkers.Caveat{{
-		Location:  idptest.DischargeLocation,
-		Condition: "is-authenticated-user",
-	}})
-	c.Assert(err, gc.IsNil)
+	m := s.newMacaroon("is-authenticated-user", bakery.LoginOp)
 	s.BakeryClient.WebPageVisitor = noVisit
 	s.BakeryClient.Transport = originTransport{s.BakeryClient.Transport, "somewhere"}
-	_, err = s.BakeryClient.DischargeAll(m)
+	_, err := s.BakeryClient.DischargeAll(testContext, m)
+	// TODO this error doesn't seem that closely related to the test failure condition.
 	c.Assert(err, gc.ErrorMatches, `cannot get discharge from "https://idp.test": cannot start interactive session: unexpected call to visit`)
 }
 
@@ -270,7 +260,7 @@ var noVisit = noVisitor{}
 
 type noVisitor struct{}
 
-func (noVisitor) VisitWebPage(_ *httpbakery.Client, _ map[string]*url.URL) error {
+func (noVisitor) VisitWebPage(context.Context, *httpbakery.Client, map[string]*url.URL) error {
 	return errors.New("unexpected call to visit")
 }
 
@@ -278,6 +268,7 @@ func (s *dischargeSuite) TestDischargeAgentShortcut(c *gc.C) {
 	key, err := bakery.GenerateKey()
 	c.Assert(err, gc.IsNil)
 	err = s.IDMClient.SetUser(
+		testContext,
 		&params.SetUserRequest{
 			Username: "testagent@admin@idm",
 			User: params.User{
@@ -291,11 +282,23 @@ func (s *dischargeSuite) TestDischargeAgentShortcut(c *gc.C) {
 	)
 	c.Assert(err, gc.IsNil)
 	s.BakeryClient.Key = key
-	u, err := url.Parse(idptest.DischargeLocation)
-	agent.SetUpAuth(s.BakeryClient, u, "testagent@admin@idm")
-	s.AssertDischarge(c, nil, checkers.New(
-		checkers.TimeBefore,
-	))
+	agentSetUpAuth(s.BakeryClient, "testagent@admin@idm")
+
+	s.AssertDischarge(c, nil)
+
+}
+
+func agentSetUpAuth(c *httpbakery.Client, agentName string) {
+	var v agent.Visitor
+	err := v.AddAgent(agent.Agent{
+		URL:      idptest.DischargeLocation,
+		Username: agentName,
+		Key:      c.Key,
+	})
+	if err != nil {
+		panic(err)
+	}
+	c.WebPageVisitor = &v
 }
 
 func (s *dischargeSuite) TestAdminDischargeTokenForUserNotFound(c *gc.C) {
@@ -317,15 +320,16 @@ func (s *dischargeSuite) TestAdminDischargeTokenForUserNoUser(c *gc.C) {
 }
 
 func (s *dischargeSuite) TestAdminDischargeTokenForUserNotAdmin(c *gc.C) {
-	req, err := http.NewRequest("GET", idptest.DischargeLocation+"/v1/discharge-token-for-user?username=jbloggs", nil)
-	resp, err := s.HTTPClient.Do(req)
-	c.Assert(err, gc.IsNil)
-	defer resp.Body.Close()
-	c.Assert(resp.StatusCode, gc.Equals, http.StatusUnauthorized)
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Do:          s.BakeryClient.Do,
+		URL:         idptest.DischargeLocation + "/v1/discharge-token-for-user?username=jbloggs",
+		ExpectError: `cannot get discharge from "https://idp.test": cannot start interactive session: interaction required but not possible`,
+	})
 }
 
 func (s *dischargeSuite) TestAdminDischargeTokenForUser(c *gc.C) {
 	err := s.IDMClient.SetUser(
+		testContext,
 		&params.SetUserRequest{
 			Username: "jbloggs",
 			User: params.User{
@@ -351,11 +355,16 @@ func (s *dischargeSuite) TestAdminDischargeTokenForUser(c *gc.C) {
 	var data v1.DischargeTokenForUserResponse
 	err = json.Unmarshal(body, &data)
 	c.Assert(err, gc.IsNil)
-	c.Assert(string(data.DischargeToken.Caveats()[0].Id), gc.Equals, "declared username jbloggs")
+	// TODO actually check macaroon directly.
+	decl := checkers.InferDeclared(nil, macaroon.Slice{data.DischargeToken.M()})
+	c.Assert(decl, jc.DeepEquals, map[string]string{
+		"username": "jbloggs",
+	})
 }
 
-func (s *dischargeSuite) TestAdminDischarge(c *gc.C) {
+func (s *dischargeSuite) TestDischargeForUser(c *gc.C) {
 	err := s.IDMClient.SetUser(
+		testContext,
 		&params.SetUserRequest{
 			Username: "jbloggs",
 			User: params.User{
@@ -370,47 +379,40 @@ func (s *dischargeSuite) TestAdminDischarge(c *gc.C) {
 		},
 	)
 	c.Assert(err, gc.IsNil)
-	svc, err := bakery.NewService(bakery.NewServiceParams{
-		Locator: s.Locator,
-	})
-	c.Assert(err, gc.IsNil)
 	tests := []struct {
-		about     string
-		m         *macaroon.Macaroon
-		modifier  *requestModifier
-		expectErr string
+		about      string
+		condition  string
+		m          *bakery.Macaroon
+		modifier   *requestModifier
+		expectUser string
+		expectErr  string
 	}{{
-		about: "discharge macaroon",
-		m: newMacaroon(c, svc, []checkers.Caveat{{
-			Location:  idptest.DischargeLocation,
-			Condition: "is-authenticated-user",
-		}}),
+		about:     "discharge macaroon",
+		condition: "is-authenticated-user",
 		modifier: &requestModifier{
 			f: func(r *http.Request) {
 				r.SetBasicAuth(adminUsername, adminPassword)
 				r.URL.RawQuery += "&discharge-for-user=jbloggs"
 			},
 		},
-		expectErr: "",
+		expectUser: "jbloggs",
 	}, {
-		about: "no discharge user",
-		m: newMacaroon(c, svc, []checkers.Caveat{{
-			Location:  idptest.DischargeLocation,
-			Condition: "is-authenticated-user",
-		}}),
+		about:     "no discharge user",
+		condition: "is-authenticated-user",
 		modifier: &requestModifier{
 			f: func(r *http.Request) {
-
 				r.SetBasicAuth(adminUsername, adminPassword)
 			},
 		},
-		expectErr: ".*cannot discharge: username not specified",
+		// Without the discharge-for-user query parameter, the administrator
+		// is just discharging for themselves.
+		// Note that even though we've used "admin" as the basic-auth
+		// user name, the identity server treats it the same
+		// as if it had agent authenticated as the admin agent.
+		expectUser: store.AdminUsername,
 	}, {
-		about: "no authentication",
-		m: newMacaroon(c, svc, []checkers.Caveat{{
-			Location:  idptest.DischargeLocation,
-			Condition: "is-authenticated-user",
-		}}),
+		about:     "no authentication",
+		condition: "is-authenticated-user",
 		modifier: &requestModifier{
 			f: func(r *http.Request) {
 				r.URL.RawQuery += "&discharge-for-user=jbloggs"
@@ -418,11 +420,8 @@ func (s *dischargeSuite) TestAdminDischarge(c *gc.C) {
 		},
 		expectErr: `cannot get discharge from "[^"]*": cannot start interactive session: interaction required but not possible`,
 	}, {
-		about: "unsupported user",
-		m: newMacaroon(c, svc, []checkers.Caveat{{
-			Location:  idptest.DischargeLocation,
-			Condition: "is-authenticated-user",
-		}}),
+		about:     "unsupported user",
+		condition: "is-authenticated-user",
 		modifier: &requestModifier{
 			f: func(r *http.Request) {
 				r.SetBasicAuth(adminUsername, adminPassword)
@@ -431,12 +430,8 @@ func (s *dischargeSuite) TestAdminDischarge(c *gc.C) {
 		},
 		expectErr: `.*cannot discharge: user \"jbloggs2\" not found: not found`,
 	}, {
-		about: "unsupported condition",
-		m: newMacaroon(c, svc, []checkers.Caveat{{
-
-			Location:  idptest.DischargeLocation,
-			Condition: "is-authenticated-group",
-		}}),
+		about:     "unsupported condition",
+		condition: "is-authenticated-group",
 		modifier: &requestModifier{
 			f: func(r *http.Request) {
 				r.SetBasicAuth(adminUsername, adminPassword)
@@ -445,18 +440,17 @@ func (s *dischargeSuite) TestAdminDischarge(c *gc.C) {
 		},
 		expectErr: `.*caveat not recognized`,
 	}, {
-		about: "bad credentials",
-		m: newMacaroon(c, svc, []checkers.Caveat{{
-			Location:  idptest.DischargeLocation,
-			Condition: "is-authenticated-user",
-		}}),
+		about:     "bad credentials",
+		condition: "is-authenticated-user",
 		modifier: &requestModifier{
 			f: func(r *http.Request) {
 				r.SetBasicAuth("not-admin-username", adminPassword)
 				r.URL.RawQuery += "&discharge-for-user=jbloggs2"
 			},
 		},
-		expectErr: `.*third party refused discharge: cannot discharge: unauthorized: invalid credentials`,
+		// The invalid basic-auth credentials are ignored and
+		// the usual interaction-required error is returned.
+		expectErr: `cannot get discharge from "https://idp.test": cannot start interactive session: interaction required but not possible`,
 	}}
 	for i, test := range tests {
 		c.Logf("test %d. %s", i, test.about)
@@ -466,26 +460,51 @@ func (s *dischargeSuite) TestAdminDischarge(c *gc.C) {
 			test.modifier.transport = client.Client.Transport
 			client.Client.Transport = test.modifier
 		}
-		ms, err := client.DischargeAll(test.m)
+		m := s.newMacaroon(test.condition, bakery.LoginOp)
+		ms, err := client.DischargeAll(testContext, m)
 
 		if test.expectErr != "" {
 			c.Assert(err, gc.ErrorMatches, test.expectErr)
 			continue
 		}
 		c.Assert(err, gc.IsNil)
-		d := checkers.InferDeclared(ms)
-		err = svc.Check(ms, checkers.New(
-			d,
-			checkers.TimeBefore,
-		))
-		c.Assert(err, gc.IsNil)
+		s.assertDischarged(c, ms, bakery.LoginOp, test.expectUser)
 	}
 }
 
-func newMacaroon(c *gc.C, svc *bakery.Service, cav []checkers.Caveat) *macaroon.Macaroon {
-	m, err := svc.NewMacaroon(bakery.LatestVersion, cav)
-	c.Assert(err, gc.IsNil)
+// newMacaroon uses s.bakery to mint a new macaroon for the third party caveat condition
+// and operation.
+func (s *dischargeSuite) newMacaroon(thirdPartyCondition string, op bakery.Op) *bakery.Macaroon {
+	m, err := s.bakery.Oven.NewMacaroon(
+		testContext,
+		bakery.LatestVersion,
+		time.Now().Add(time.Minute),
+		[]checkers.Caveat{{
+			Location:  idptest.DischargeLocation,
+			Condition: thirdPartyCondition,
+		}},
+		op,
+	)
+	if err != nil {
+		panic(err)
+	}
 	return m
+}
+
+// assertDischarged asserts that the given macaroon slice
+// is valid the given operation with respect to s.bakery.
+//
+// If user is non-empty, it is expected that the
+// discharge macaroon will have declared the given username,
+// otherwise no identity should have been declared.
+func (s dischargeSuite) assertDischarged(c *gc.C, ms macaroon.Slice, op bakery.Op, user string) {
+	authInfo, err := s.bakery.Checker.Auth(ms).Allow(testContext, op)
+	c.Assert(err, gc.IsNil)
+	if user != "" {
+		c.Assert(authInfo.Identity.Id(), gc.Equals, user)
+	} else {
+		c.Assert(authInfo.Identity, gc.Equals, nil)
+	}
 }
 
 // requestModifier implements an http RoundTripper
@@ -519,80 +538,46 @@ func (s *dischargeSuite) TestDischargeMemberOf(c *gc.C) {
 		},
 	}
 	s.BakeryClient.WebPageVisitor = visitor
-	// Create the service which will issue the third party caveat.
-	svc, err := bakery.NewService(bakery.NewServiceParams{
-		Locator: s.Locator,
-	})
-	c.Assert(err, gc.IsNil)
 
 	tests := []struct {
-		about          string
-		m              *macaroon.Macaroon
-		expectError    string
-		expectDeclared checkers.Declared
+		about       string
+		condition   string
+		expectError string
 	}{{
-		about: "test-user is member of group test-user",
-		m: newMacaroon(c, svc, []checkers.Caveat{{
-			Location:  idptest.DischargeLocation,
-			Condition: "is-member-of test-user",
-		}}),
-		expectDeclared: checkers.Declared{},
+		about:     "test-user is member of group test-user",
+		condition: "is-member-of test-user",
 	}, {
-		about: "test-user is member of group test-user with multiple groups",
-		m: newMacaroon(c, svc, []checkers.Caveat{{
-			Location:  idptest.DischargeLocation,
-			Condition: "is-member-of test-user testX testY",
-		}}),
-		expectDeclared: checkers.Declared{},
+		about:     "test-user is member of group test-user with multiple groups",
+		condition: "is-member-of test-user testX testY",
 	}, {
-		about: "test membership in single group - matches",
-		m: newMacaroon(c, svc, []checkers.Caveat{{
-			Location:  idptest.DischargeLocation,
-			Condition: "is-member-of test",
-		}}),
-		expectDeclared: checkers.Declared{},
+		about:     "test membership in single group - matches",
+		condition: "is-member-of test",
 	}, {
-		about: "test membership in a set of groups",
-		m: newMacaroon(c, svc, []checkers.Caveat{{
-			Location:  idptest.DischargeLocation,
-			Condition: "is-member-of test test2",
-		}}),
-		expectDeclared: checkers.Declared{},
+		about:     "test membership in a set of groups",
+		condition: "is-member-of test test2",
 	}, {
-		about: "test membership in single group - no match",
-		m: newMacaroon(c, svc, []checkers.Caveat{{
-			Location:  idptest.DischargeLocation,
-			Condition: "is-member-of test1",
-		}}),
+		about:       "test membership in single group - no match",
+		condition:   "is-member-of test1",
 		expectError: "third party refused discharge: cannot discharge: user is not a member of required groups",
 	}, {
-		about: "test membership in a set of groups - one group matches",
-		m: newMacaroon(c, svc, []checkers.Caveat{{
-			Location:  idptest.DischargeLocation,
-			Condition: "is-member-of test2 test4",
-		}}),
-		expectDeclared: checkers.Declared{},
+		about:     "test membership in a set of groups - one group matches",
+		condition: "is-member-of test2 test4",
 	}, {
-		about: "test membership in a set of groups fail - no match",
-		m: newMacaroon(c, svc, []checkers.Caveat{{
-			Location:  idptest.DischargeLocation,
-			Condition: "is-member-of test1 test3",
-		}}),
+		about:       "test membership in a set of groups fail - no match",
+		condition:   "is-member-of test1 test3",
 		expectError: "third party refused discharge: cannot discharge: user is not a member of required groups",
 	},
 	}
 
 	for i, test := range tests {
 		c.Logf("%d. %q", i, test.about)
-		ms, err := s.BakeryClient.DischargeAll(test.m)
+		m := s.newMacaroon(test.condition, groupOp)
+		ms, err := s.BakeryClient.DischargeAll(testContext, m)
 		if test.expectError != "" {
 			c.Assert(errgo.Cause(err), gc.ErrorMatches, test.expectError)
 		} else {
 			c.Assert(err, gc.IsNil)
-			d := checkers.InferDeclared(ms)
-			err = svc.Check(ms, checkers.New(d, checkers.TimeBefore))
-			c.Assert(err, gc.IsNil)
-			c.Assert(d, jc.DeepEquals, test.expectDeclared)
+			s.assertDischarged(c, ms, groupOp, "")
 		}
 	}
 }
@@ -610,41 +595,41 @@ func (s *dischargeSuite) TestDischargeXMemberOfX(c *gc.C) {
 		},
 	}
 	s.BakeryClient.WebPageVisitor = visitor
-	// Create the service which will issue the third party caveat.
-	svc, err := bakery.NewService(bakery.NewServiceParams{
-		Locator: s.Locator,
-	})
-	c.Assert(err, gc.IsNil)
 
-	ms, err := s.BakeryClient.DischargeAll(newMacaroon(c, svc, []checkers.Caveat{{
-		Location:  idptest.DischargeLocation,
-		Condition: "is-member-of test-user",
-	}}))
+	m := s.newMacaroon("is-member-of test-user", groupOp)
+	ms, err := s.BakeryClient.DischargeAll(testContext, m)
 	c.Assert(err, gc.IsNil)
-	d := checkers.InferDeclared(ms)
-	err = svc.Check(ms, checkers.New(d, checkers.TimeBefore))
-	c.Assert(err, gc.IsNil)
-	c.Assert(d, jc.DeepEquals, checkers.Declared{})
-
+	s.assertDischarged(c, ms, groupOp, "")
 }
 
 // This test is not sending the bakery protocol version so it will use the default
 // one and return a 407.
 func (s *dischargeSuite) TestDischargeStatusProxyAuthRequiredResponse(c *gc.C) {
-	// Create the service which will issue the third party caveat.
-	svc, err := bakery.NewService(bakery.NewServiceParams{
-		Locator: s.Locator,
-	})
+	// Make a version 1 macaroon so that the caveat is in the macaroon
+	// and it's appropriate for a 407-era macaroon.
+	m, err := s.bakery.Oven.NewMacaroon(
+		testContext,
+		bakery.Version1,
+		time.Now().Add(time.Minute),
+		[]checkers.Caveat{{
+			Location:  idptest.DischargeLocation,
+			Condition: "is-authenticated-user",
+		}},
+		bakery.LoginOp,
+	)
 	c.Assert(err, gc.IsNil)
-	m, err := svc.NewMacaroon(bakery.LatestVersion, []checkers.Caveat{{
-		Location:  idptest.DischargeLocation,
-		Condition: "is-authenticated-user",
-	}})
 
-	cav := m.Caveats()[0]
+	var thirdPartyCaveat macaroon.Caveat
+	for _, cav := range m.M().Caveats() {
+		if cav.VerificationId != nil {
+			thirdPartyCaveat = cav
+			break
+		}
+	}
+	c.Assert(thirdPartyCaveat.Id, gc.Not(gc.Equals), "")
 	resp, err := s.HTTPClient.PostForm(idptest.DischargeLocation+"/discharge", url.Values{
-		"id":       {string(cav.Id)},
-		"location": {cav.Location},
+		"id":       {string(thirdPartyCaveat.Id)},
+		"location": {thirdPartyCaveat.Location},
 	})
 	c.Assert(err, gc.IsNil)
 	defer resp.Body.Close()
@@ -655,20 +640,30 @@ func (s *dischargeSuite) TestDischargeStatusProxyAuthRequiredResponse(c *gc.C) {
 // This test is using the bakery protocol version at value 1 to be able to return a 401
 // instead of a 407
 func (s *dischargeSuite) TestDischargeStatusUnauthorizedResponse(c *gc.C) {
-	// Create the service which will issue the third party caveat.
-	svc, err := bakery.NewService(bakery.NewServiceParams{
-		Locator: s.Locator,
-	})
+	// Make a version 2 macaroon so that the caveat is in the macaroon.
+	m, err := s.bakery.Oven.NewMacaroon(
+		testContext,
+		bakery.Version2,
+		time.Now().Add(time.Minute),
+		[]checkers.Caveat{{
+			Location:  idptest.DischargeLocation,
+			Condition: "is-authenticated-user",
+		}},
+		bakery.LoginOp,
+	)
 	c.Assert(err, gc.IsNil)
-	m, err := svc.NewMacaroon(bakery.LatestVersion, []checkers.Caveat{{
-		Location:  idptest.DischargeLocation,
-		Condition: "is-authenticated-user",
-	}})
 
-	cav := m.Caveats()[0]
+	var thirdPartyCaveat macaroon.Caveat
+	for _, cav := range m.M().Caveats() {
+		if cav.VerificationId != nil {
+			thirdPartyCaveat = cav
+			break
+		}
+	}
+	c.Assert(thirdPartyCaveat.Id, gc.Not(gc.Equals), "")
 	values := url.Values{
-		"id":       {string(cav.Id)},
-		"location": {cav.Location},
+		"id":       {string(thirdPartyCaveat.Id)},
+		"location": {thirdPartyCaveat.Location},
 	}
 
 	req, err := http.NewRequest("POST", idptest.DischargeLocation+"/discharge", strings.NewReader(values.Encode()))
@@ -688,25 +683,14 @@ func (s *dischargeSuite) TestDischargeLegacyLocation(c *gc.C) {
 		User: s.user,
 	}
 	s.BakeryClient.WebPageVisitor = visitor
-	svc, err := bakery.NewService(bakery.NewServiceParams{
-		Locator: s.Locator,
-	})
+	m := s.newMacaroon("is-authenticated-user", bakery.LoginOp)
+	ms, err := s.BakeryClient.DischargeAll(testContext, m)
 	c.Assert(err, gc.IsNil)
-	ms, err := s.BakeryClient.DischargeAll(newMacaroon(c, svc, []checkers.Caveat{{
-		Location:  idptest.DischargeLocation,
-		Condition: "is-authenticated-user",
-	}}))
-	c.Assert(err, gc.IsNil)
-	d := checkers.InferDeclared(ms)
-	err = svc.Check(ms, checkers.New(
-		d,
-		checkers.TimeBefore,
-	))
-	c.Assert(err, gc.IsNil)
+	s.assertDischarged(c, ms, bakery.LoginOp, "test")
 }
 
 func (s *dischargeSuite) TestPublicKeyLegacyLocation(c *gc.C) {
-	info, err := s.Locator.ThirdPartyInfo(idptest.DischargeLocation)
+	info, err := s.Locator.ThirdPartyInfo(testContext, idptest.DischargeLocation)
 	c.Assert(err, gc.IsNil)
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		URL:          idptest.DischargeLocation + "/v1/discharger/publickey",
@@ -719,7 +703,7 @@ func (s *dischargeSuite) TestPublicKeyLegacyLocation(c *gc.C) {
 }
 
 func (s *dischargeSuite) TestPublicKey(c *gc.C) {
-	info, err := s.Locator.ThirdPartyInfo(idptest.DischargeLocation)
+	info, err := s.Locator.ThirdPartyInfo(testContext, idptest.DischargeLocation)
 	c.Assert(err, gc.IsNil)
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		URL:          idptest.DischargeLocation + "/publickey",
@@ -732,27 +716,17 @@ func (s *dischargeSuite) TestPublicKey(c *gc.C) {
 }
 
 func (s *dischargeSuite) TestIdentityCookieParameters(c *gc.C) {
-	svc, err := bakery.NewService(bakery.NewServiceParams{
-		Locator: s.Locator,
-	})
-	c.Assert(err, gc.IsNil)
 	jar := new(testCookieJar)
 	s.BakeryClient.Client.Jar = jar
 	visitor := test.Visitor{
 		User: s.user,
 	}
 	s.BakeryClient.WebPageVisitor = visitor
-	m := newMacaroon(c, svc, []checkers.Caveat{{
-		Location:  idptest.DischargeLocation,
-		Condition: "is-authenticated-user",
-	}})
-	ms, err := s.BakeryClient.DischargeAll(m)
+	m := s.newMacaroon("is-authenticated-user", bakery.LoginOp)
+
+	ms, err := s.BakeryClient.DischargeAll(testContext, m)
 	c.Assert(err, gc.IsNil)
-	d := checkers.InferDeclared(ms)
-	err = svc.Check(ms, checkers.New(
-		d,
-		checkers.TimeBefore,
-	))
+	s.assertDischarged(c, ms, bakery.LoginOp, "test")
 	c.Assert(jar.cookies, gc.HasLen, 1)
 	for k := range jar.cookies {
 		c.Assert(k.name, gc.Equals, "macaroon-identity")
@@ -798,12 +772,13 @@ func (s *dischargeSuite) TestLastDischargeTimeUpdates(c *gc.C) {
 	visitor := &test.Visitor{
 		User: s.user,
 	}
-	s.AssertDischarge(c, visitor, checkers.New(
-		checkers.TimeBefore,
-	))
-	u1, err := s.IDMClient.User(&params.UserRequest{
-		Username: s.user.Username,
-	})
+	s.AssertDischarge(c, visitor)
+
+	u1, err := s.IDMClient.User(
+		testContext,
+		&params.UserRequest{
+			Username: s.user.Username,
+		})
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(u1.LastDischarge.IsZero(), gc.Equals, false)
 
@@ -811,10 +786,9 @@ func (s *dischargeSuite) TestLastDischargeTimeUpdates(c *gc.C) {
 	// database is necessarily different.
 	time.Sleep(time.Millisecond)
 
-	s.AssertDischarge(c, visitor, checkers.New(
-		checkers.TimeBefore,
-	))
-	u2, err := s.IDMClient.User(&params.UserRequest{
+	s.AssertDischarge(c, visitor)
+
+	u2, err := s.IDMClient.User(testContext, &params.UserRequest{
 		Username: s.user.Username,
 	})
 	c.Assert(err, gc.Equals, nil)
