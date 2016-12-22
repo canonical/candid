@@ -81,7 +81,6 @@ func newServer(c *gc.C, session *mgo.Session, key *bakery.KeyPair, teams []strin
 		Key:            sp.Key,
 		Location:       sp.Location,
 		MaxMgoSessions: sp.MaxMgoSessions,
-		Launchpad:      sp.Launchpad,
 		PrivateAddr:    sp.PrivateAddr,
 	})
 	c.Assert(err, gc.IsNil)

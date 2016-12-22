@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/juju/httprequest"
+	"github.com/juju/idmclient"
 	"github.com/juju/idmclient/params"
 	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
@@ -27,8 +28,6 @@ var blacklistUsernames = map[params.Username]bool{
 	"everyone":          true,
 	store.AdminUsername: true,
 }
-
-var storeGetLaunchpadGroups = (*store.Store).GetLaunchpadGroups
 
 // QueryUsers serves the /u endpoint. See http://tinyurl.com/lu3mmr9 for
 // details.
@@ -175,7 +174,19 @@ func (h *apiHandler) UserGroups(p httprequest.Params, r *params.UserGroupsReques
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
+	if groups == nil {
+		groups = []string{}
+	}
 	return groups, nil
+}
+
+// UserIDPGroups serves the /u/$username/idpgroups endpoint, and returns
+// the list of groups associated with the user. This endpoint should no longer be used
+// and is maintained for backwards compatibility purposes only.
+func (h *apiHandler) UserIDPGroups(p httprequest.Params, r *params.UserIDPGroupsRequest) ([]string, error) {
+	return h.UserGroups(p, &params.UserGroupsRequest{
+		Username: r.Username,
+	})
 }
 
 // SetUserGroups serves the PUT /u/$username/groups endpoint, and sets the
@@ -200,20 +211,6 @@ func (h *apiHandler) ModifyUserGroups(p httprequest.Params, r *params.ModifyUser
 	} else {
 		return errgo.Mask(h.store.RemoveGroups(r.Username, r.Groups.Remove), errgo.Is(params.ErrNotFound))
 	}
-}
-
-// UserIDPGroups serves the /u/$username/idpgroups endpoint, and returns
-// the list of groups associated with the user. This endpoint should no longer be used
-// and is maintained for backwards compatibility purposes only.
-func (h *apiHandler) UserIDPGroups(p httprequest.Params, r *params.UserIDPGroupsRequest) ([]string, error) {
-	groups, err := store.Identity(r.Username).Groups(p.Context)
-	if err != nil {
-		return nil, errgo.Mask(err, errgo.Any)
-	}
-	if groups == nil {
-		groups = []string{}
-	}
-	return groups, nil
 }
 
 // GetSSHKeys serves the /u/$username/sshkeys endpoint, and returns
@@ -268,7 +265,7 @@ func (h *apiHandler) UserToken(p httprequest.Params, r *params.UserTokenRequest)
 		httpbakery.RequestVersion(p.Request),
 		time.Now().Add(24*time.Hour),
 		[]checkers.Caveat{
-			checkers.DeclaredCaveat("username", id.Username),
+			idmclient.UserDeclaration(id.Username),
 		},
 		bakery.LoginOp,
 	)

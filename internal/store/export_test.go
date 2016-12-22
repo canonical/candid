@@ -1,5 +1,8 @@
 package store
 
-var NewChecker = newChecker
+var (
+	NewChecker    = newChecker
+	StoreACLForOp = (*Store).aclForOp
+)
 
 const CheckersNamespace = checkersNamespace

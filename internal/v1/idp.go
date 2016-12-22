@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/juju/httprequest"
+	"github.com/juju/idmclient"
 	"github.com/juju/idmclient/params"
 	"github.com/julienschmidt/httprouter"
 	"golang.org/x/net/trace"
@@ -93,6 +94,7 @@ func (c *idpHandler) RequestURL() string {
 
 // LoginSuccess implements idp.Context.LoginSuccess.
 func (c *idpHandler) LoginSuccess(username params.Username, expiry time.Time) bool {
+	logger.Infof("login success, username %q", username)
 	c.params.Request.ParseForm()
 	waitId := c.params.Request.Form.Get("waitid")
 	m, err := c.store.Bakery.Oven.NewMacaroon(
@@ -100,7 +102,7 @@ func (c *idpHandler) LoginSuccess(username params.Username, expiry time.Time) bo
 		httpbakery.RequestVersion(c.params.Request),
 		expiry,
 		[]checkers.Caveat{
-			checkers.DeclaredCaveat("username", string(username)),
+			idmclient.UserDeclaration(string(username)),
 		},
 		bakery.LoginOp,
 	)

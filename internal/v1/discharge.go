@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/juju/httprequest"
+	"github.com/juju/idmclient"
 	"github.com/juju/idmclient/params"
 	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
@@ -55,7 +56,6 @@ func (c thirdPartyCaveatChecker) CheckThirdPartyCaveat(ctx context.Context, req 
 // for futher details.
 func checkThirdPartyCaveat(ctx context.Context, h *handler, req *http.Request, ci *bakery.ThirdPartyCaveatInfo) ([]checkers.Caveat, error) {
 	dischargeForUser := req.Form.Get("discharge-for-user")
-	logger.Infof("checkThirdPartyCaveat discharge-for-user=%q", dischargeForUser)
 	op := bakery.LoginOp
 	if dischargeForUser != "" {
 		op = store.GlobalOp(store.ActionDischargeFor)
@@ -85,13 +85,11 @@ func checkThirdPartyCaveat(ctx context.Context, h *handler, req *http.Request, c
 	switch cond {
 	case "is-authenticated-user":
 		user := dischargeForUser
-		if user != "" {
-
-		} else {
+		if user == "" {
 			user = authInfo.Identity.Id()
 		}
 		cavs = []checkers.Caveat{
-			checkers.DeclaredCaveat("username", user),
+			idmclient.UserDeclaration(user),
 			checkers.TimeBeforeCaveat(time.Now().Add(24 * time.Hour)),
 		}
 	case "is-member-of":
@@ -249,7 +247,7 @@ func (h *dischargeHandler) DischargeTokenForUser(p httprequest.Params, r *discha
 		httpbakery.RequestVersion(p.Request),
 		time.Now().Add(dischargeTokenDuration),
 		[]checkers.Caveat{
-			checkers.DeclaredCaveat("username", string(r.Username)),
+			idmclient.UserDeclaration(string(r.Username)),
 		},
 		bakery.LoginOp,
 	)

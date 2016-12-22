@@ -26,7 +26,6 @@ import (
 
 	"github.com/CanonicalLtd/blues-identity/internal/mongodoc"
 	"github.com/CanonicalLtd/blues-identity/internal/store"
-	"github.com/CanonicalLtd/blues-identity/internal/v1"
 )
 
 type usersSuite struct {
@@ -248,7 +247,7 @@ func (s *usersSuite) TestUser(c *gc.C) {
 		expectStatus: http.StatusUnauthorized,
 		expectBody: params.Error{
 			Code:    "unauthorized",
-			Message: "invalid credentials",
+			Message: "could not determine identity: invalid credentials",
 		},
 	}, {
 		about:    "incorrect password",
@@ -268,7 +267,7 @@ func (s *usersSuite) TestUser(c *gc.C) {
 		expectStatus: http.StatusUnauthorized,
 		expectBody: params.Error{
 			Code:    "unauthorized",
-			Message: "invalid credentials",
+			Message: "could not determine identity: invalid credentials",
 		},
 	}, {
 		about:  "no credentials",
@@ -598,58 +597,6 @@ func (s *usersSuite) TestSetAgentOverwritesGroups(c *gc.C) {
 	})
 }
 
-func (s *usersSuite) TestGetUserGetsGroupsFromLaunchpad(c *gc.C) {
-
-	s.PatchValue(v1.StoreGetLaunchpadGroups, func(s *store.Store, externalId string) ([]string, error) {
-		return []string{"test3"}, nil
-	})
-
-	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
-		Handler: s.srv,
-		URL:     apiURL("u/jbloggs2"),
-		Method:  "PUT",
-		Header: http.Header{
-			"Content-Type": []string{"application/json"},
-		},
-		Body: marshal(c, params.User{
-			Username:   "jbloggs2",
-			ExternalID: "https://login.ubuntu.com/+id/test",
-			Email:      "jbloggs2@example.com",
-			FullName:   "Joe Bloggs II",
-			IDPGroups: []string{
-				"test",
-				"test2",
-			},
-		}),
-		Username:     adminUsername,
-		Password:     adminPassword,
-		ExpectStatus: http.StatusOK,
-	})
-	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
-		Handler: s.srv,
-		URL:     apiURL("u/jbloggs2"),
-		Method:  "GET",
-		Header: http.Header{
-			"Content-Type": []string{"application/json"},
-		},
-		Username:     adminUsername,
-		Password:     adminPassword,
-		ExpectStatus: http.StatusOK,
-		ExpectBody: params.User{
-			Username:   "jbloggs2",
-			ExternalID: "https://login.ubuntu.com/+id/test",
-			Email:      "jbloggs2@example.com",
-			FullName:   "Joe Bloggs II",
-			GravatarID: "b1337cf8d58e2e2be9b6a5356cfc268b",
-			IDPGroups: []string{
-				"test",
-				"test2",
-				"test3",
-			},
-		},
-	})
-}
-
 func (s *usersSuite) TestUpdateAgentSetPublicKeys(c *gc.C) {
 	key, err := bakery.GenerateKey()
 	c.Assert(err, gc.IsNil)
@@ -834,7 +781,7 @@ func (s *usersSuite) TestQueryUsers(c *gc.C) {
 		expectStatus: http.StatusUnauthorized,
 		expectBody: params.Error{
 			Code:    "unauthorized",
-			Message: "invalid credentials",
+			Message: "could not determine identity: invalid credentials",
 		},
 	}, {
 		about:    "incorrect password",
@@ -854,7 +801,7 @@ func (s *usersSuite) TestQueryUsers(c *gc.C) {
 		expectStatus: http.StatusUnauthorized,
 		expectBody: params.Error{
 			Code:    "unauthorized",
-			Message: "invalid credentials",
+			Message: "could not determine identity: invalid credentials",
 		},
 	}, {
 		about:  "no credentials",
@@ -1479,10 +1426,10 @@ var setUserGroupsTests = []struct {
 	about:        "no permission",
 	startGroups:  []string{"test1", "test2"},
 	groups:       []string{"test3", "test4"},
-	expectStatus: http.StatusForbidden,
+	expectStatus: http.StatusUnauthorized,
 	expectError: params.Error{
-		Code:    params.ErrForbidden,
-		Message: "user does not have correct permissions",
+		Code:    params.ErrUnauthorized,
+		Message: "permission denied",
 	},
 	expectGroups: []string{"test1", "test2"},
 }, {
@@ -1511,6 +1458,10 @@ func (s *usersSuite) TestSetUserGroups(c *gc.C) {
 				IDPGroups:  test.startGroups,
 			})
 		}
+		var cookies []*http.Cookie
+		if test.username == "" {
+			cookies = cookiesForUser(store, string(username))
+		}
 		httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 			Handler:      s.srv,
 			Method:       "PUT",
@@ -1520,7 +1471,7 @@ func (s *usersSuite) TestSetUserGroups(c *gc.C) {
 			JSONBody:     params.Groups{Groups: test.groups},
 			ExpectStatus: test.expectStatus,
 			ExpectBody:   test.expectError,
-			Cookies:      cookiesForUser(store, test.username),
+			Cookies:      cookies,
 		})
 		if test.expectError != nil {
 			continue
@@ -1586,10 +1537,10 @@ var modifyUserGroupsTests = []struct {
 	about:        "no permission",
 	startGroups:  []string{"test1", "test2"},
 	addGroups:    []string{"test3", "test4"},
-	expectStatus: http.StatusForbidden,
+	expectStatus: http.StatusUnauthorized,
 	expectError: params.Error{
-		Code:    params.ErrForbidden,
-		Message: "user does not have correct permissions",
+		Code:    params.ErrUnauthorized,
+		Message: "permission denied",
 	},
 	expectGroups: []string{"test1", "test2"},
 }, {
@@ -1628,6 +1579,10 @@ func (s *usersSuite) TestModifyUserGroups(c *gc.C) {
 				IDPGroups:  test.startGroups,
 			})
 		}
+		var cookies []*http.Cookie
+		if test.username == "" {
+			cookies = cookiesForUser(store, string(username))
+		}
 		httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 			Handler:  s.srv,
 			Method:   "POST",
@@ -1640,7 +1595,7 @@ func (s *usersSuite) TestModifyUserGroups(c *gc.C) {
 			},
 			ExpectStatus: test.expectStatus,
 			ExpectBody:   test.expectError,
-			Cookies:      cookiesForUser(store, test.username),
+			Cookies:      cookies,
 		})
 		if test.expectError != nil {
 			continue
@@ -1900,19 +1855,16 @@ func (s *usersSuite) TestMultipleEndpointAccess(c *gc.C) {
 	resp, err = client.Do(req)
 	c.Assert(err, gc.IsNil)
 	defer resp.Body.Close()
-	c.Assert(resp.StatusCode, gc.Equals, http.StatusForbidden)
+	c.Assert(resp.StatusCode, gc.Equals, http.StatusUnauthorized)
 	body, err = ioutil.ReadAll(resp.Body)
 	c.Assert(err, gc.IsNil)
 	c.Assert(string(body), jc.JSONEquals, params.Error{
-		Code:    params.ErrForbidden,
-		Message: "user does not have correct permissions",
+		Code:    params.ErrUnauthorized,
+		Message: "permission denied",
 	})
 }
 
 func cookiesForUser(st *store.Store, username string) []*http.Cookie {
-	if username == "" {
-		return nil
-	}
 	m := macaroonForUser(st, username)
 	cookie, err := httpbakery.NewCookie(st.Bakery.Checker.Namespace(), macaroon.Slice{m.M()})
 	if err != nil {

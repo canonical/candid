@@ -35,14 +35,17 @@ func New(db *mgo.Database, sp ServerParams, versions map[string]NewAPIHandlerFun
 	if len(versions) == 0 {
 		return nil, errgo.Newf("identity server must serve at least one version of the API")
 	}
-
+	var groupGetter store.ExternalGroupGetter
+	if sp.Launchpad != "" {
+		groupGetter = store.NewLaunchpadGroups(sp.Launchpad, 10*time.Minute)
+	}
 	// Create the identities store.
 	pool, err := store.NewPool(db, store.StoreParams{
 		AuthUsername:        sp.AuthUsername,
 		AuthPassword:        sp.AuthPassword,
 		Key:                 sp.Key,
 		Location:            sp.Location,
-		Launchpad:           sp.Launchpad,
+		ExternalGroupGetter: groupGetter,
 		MaxMgoSessions:      sp.MaxMgoSessions,
 		RequestTimeout:      sp.RequestTimeout,
 		PrivateAddr:         sp.PrivateAddr,

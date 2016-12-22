@@ -154,7 +154,7 @@ func (h *handler) Close() error {
 func (h *Handler) apiHandler(p httprequest.Params, arg interface{}) (*apiHandler, context.Context, error) {
 	hnd, ctx, err := h.getAuthorizedHandler(p, "identity.internal.v1", arg)
 	if err != nil {
-		return nil, nil, errgo.NoteMask(err, "cannot create handler", errgo.Any)
+		return nil, nil, errgo.Mask(err, errgo.Any)
 	}
 	return &apiHandler{
 		handler: hnd,
@@ -183,7 +183,7 @@ func (h *Handler) dischargeHandler(p httprequest.Params, arg interface{}) (*disc
 	hnd, ctx, err := h.getAuthorizedHandler(p, p.Request.URL.Path, arg)
 	if err != nil {
 		logger.Infof("cannot get authorized handler for discharge handler (pathpat %q; arg %#v): %v", p.PathPattern, arg, err)
-		return nil, nil, errgo.NoteMask(err, "cannot create handler", errgo.Any)
+		return nil, nil, errgo.Mask(err, errgo.Any)
 	}
 	logger.Infof("got authorized handler ok")
 	return &dischargeHandler{

@@ -18,7 +18,6 @@ import (
 	"gopkg.in/macaroon.v2-unstable"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
-	"launchpad.net/lpad"
 
 	"github.com/CanonicalLtd/blues-identity/idp"
 	"github.com/CanonicalLtd/blues-identity/internal/identity"
@@ -86,7 +85,6 @@ func newServer(c *gc.C, session *mgo.Session, key *bakery.KeyPair, idps []idp.Id
 		Key:               key,
 		Location:          location,
 		MaxMgoSessions:    50,
-		Launchpad:         lpad.Production,
 		IdentityProviders: idps,
 		PrivateAddr:       "localhost",
 	}
@@ -96,7 +94,6 @@ func newServer(c *gc.C, session *mgo.Session, key *bakery.KeyPair, idps []idp.Id
 		Key:            sp.Key,
 		Location:       sp.Location,
 		MaxMgoSessions: sp.MaxMgoSessions,
-		Launchpad:      sp.Launchpad,
 		PrivateAddr:    sp.PrivateAddr,
 	})
 	c.Assert(err, gc.IsNil)

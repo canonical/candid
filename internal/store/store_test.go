@@ -779,7 +779,7 @@ func (s *storeSuite) TestUpdateGroupsDoesntEraseSSHKeys(c *gc.C) {
 	c.Assert(id.Groups, gc.DeepEquals, []string{"test", "test2"})
 }
 
-func (s *storeSuite) TestRetrieveLaunchpadGroups(c *gc.C) {
+func (s *storeSuite) TestGetLaunchpadGroups(c *gc.C) {
 	var lp *httptest.Server
 	lp = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		c.Logf("path: %s", r.URL.Path)
@@ -796,45 +796,11 @@ func (s *storeSuite) TestRetrieveLaunchpadGroups(c *gc.C) {
 		}
 	}))
 	defer lp.Close()
-	pool, err := store.NewPool(
-		s.Session.Copy().DB("store-launchpad-tests"),
-		store.StoreParams{
-			Launchpad:   lpad.APIBase(lp.URL),
-			PrivateAddr: "localhost",
-		},
-	)
-	c.Assert(err, gc.IsNil)
-	defer pool.Close()
-	store := pool.GetNoLimit()
-	defer pool.Put(store)
+	lpGroups := store.NewLaunchpadGroups(lpad.APIBase(lp.URL), 0)
 
-	// Add an identity to the store.
-	err = store.UpsertUser(&mongodoc.Identity{
-		Username:   "test",
-		ExternalID: "https://login.ubuntu.com/+id/test",
-		Email:      "test@example.com",
-		FullName:   "Test User",
-		Groups: []string{
-			"test",
-		},
-	})
+	groups, err := lpGroups.GetGroups("https://login.ubuntu.com/+id/test")
 	c.Assert(err, gc.IsNil)
-
-	// Update group from an identity to be fetched from launchpad.
-	groups, err := store.GetLaunchpadGroups("https://login.ubuntu.com/+id/test")
-	c.Assert(err, gc.IsNil)
-	groups = append([]string{"test"}, groups...)
-	err = store.SetGroups("test", groups)
-	c.Assert(err, gc.IsNil)
-
-	// Get the identity from the store
-	id, err := store.GetIdentity(params.Username("test"))
-	c.Assert(err, gc.IsNil)
-	c.Assert(id.Username, gc.Equals, "test")
-	c.Assert(id.ExternalID, gc.Equals, "https://login.ubuntu.com/+id/test")
-	c.Assert(id.Email, gc.Equals, "test@example.com")
-	c.Assert(id.FullName, gc.Equals, "Test User")
-	c.Assert(id.Groups, gc.DeepEquals, []string{"test", "test1", "test2"})
+	c.Assert(groups, jc.DeepEquals, []string{"test1", "test2"})
 }
 
 func (s *storeSuite) TestGetStoreFromPool(c *gc.C) {

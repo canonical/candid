@@ -37,7 +37,7 @@ var logger = loggo.GetLogger("identity.idp.usso.ussodischarge")
 const (
 	operationName        = "usso-discharge-login"
 	timeFormat           = "2006-01-02T15:04:05.000000"
-	ussoMacaroonDuration = time.Hour
+	ussoMacaroonDuration = 100 * 365 * 24 * time.Hour
 )
 
 var ussoLoginOp = bakery.Op{

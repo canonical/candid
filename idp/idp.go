@@ -47,6 +47,10 @@ type Context interface {
 	// LoginFailure fails a login request.
 	LoginFailure(error)
 
+	// Bakery returns a *bakery.Bakery that the identity provider
+	// should use to mint new macaroons.
+	Bakery() *bakery.Bakery
+
 	// UpdateUser creates or updates the record for the given user in
 	// the database.
 	UpdateUser(*params.User) error
@@ -60,8 +64,6 @@ type Context interface {
 	// Database returns a mgo.Database that the identity provider may use to
 	// store any necessary state data.
 	Database() *mgo.Database
-
-	Bakery() *bakery.Bakery
 }
 
 // IdentityProvider is the interface that is satisfied by all identity providers.

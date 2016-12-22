@@ -132,6 +132,8 @@ func (s *suite) TestRendezvousDoneBeforeWait(c *gc.C) {
 	c.Assert(data1, gc.IsNil)
 	c.Assert(err, gc.ErrorMatches, `rendezvous ".*" not found`)
 
+	// TODO this test sometimes fails with a count of 1.
+	// e.g. http://ci-gce.theblues.io:8080/job/blues-identity/626/console
 	c.Assert(count, gc.Equals, int32(0))
 }
 

@@ -51,17 +51,27 @@ func (s *Store) aclForOp(op bakery.Op) ([]string, error) {
 	kind, name := splitEntity(op.Entity)
 	switch kind {
 	case kindGlobal:
+		if name != "" {
+			return nil, nil
+		}
 		switch op.Action {
 		case ActionRead:
+			// Only admins are allowed to read global information.
+			return AdminACL, nil
+		case ActionDischargeFor:
+			// Only admins are allowed to discharge for other users.
 			return AdminACL, nil
 		case ActionVerify:
+			// Everyone is allowed to verify a macaroon.
 			return []string{bakery.Everyone}, nil
-		case ActionDischargeFor:
-			return AdminACL, nil
 		case ActionLogin:
+			// Everyone is allowed to log in.
 			return []string{bakery.Everyone}, nil
 		}
 	case kindUser:
+		if name == "" {
+			return nil, nil
+		}
 		username := name
 		acl := make([]string, 0, len(AdminACL)+2)
 		acl = append(acl, AdminACL...)
@@ -91,12 +101,12 @@ func (s *Store) aclForOp(op bakery.Op) ([]string, error) {
 	return nil, nil
 }
 
-// CheckAdminCredentials checks if the request has credentials that match the
+// checkAdminCredentials checks if the request has credentials that match the
 // configured administration credentials for the server. If the credentials match
 // nil will be reurned, otherwise the error will describe the failure.
 //
 // If there are no credentials in the request, it returns params.ErrNoAdminCredsProvided.
-func (s *Store) CheckAdminCredentials(req *http.Request) error {
+func (s *Store) checkAdminCredentials(req *http.Request) error {
 	if _, ok := req.Header["Authorization"]; !ok {
 		return params.ErrNoAdminCredsProvided
 	}
@@ -190,8 +200,15 @@ func checkUserHasPublicKey(ctxt context.Context, cond, arg string) error {
 	return errgo.Newf("public key not valid for user")
 }
 
+// Authorize checks that client making the given request is authorized
+// to perform the given operations. It may return an httpbakery error
+// when further checks are required, or params.ErrUnauthorized
+// if the user is authenticated but does not have the required
+// authorization.
 func (s *Store) Authorize(ctx context.Context, req *http.Request, ops ...bakery.Op) (*bakery.AuthInfo, error) {
 	ctx = ContextWithStore(ctx, s)
+	// TODO putting two requests in the same context feels a bit wrong. Perhaps
+	// they should be consolidated somehow.
 	ctx = contextWithRequest(ctx, req)
 	ctx = httpbakery.ContextWithRequest(ctx, req)
 	authInfo, err := s.Bakery.Checker.Auth(httpbakery.RequestMacaroons(req)...).Allow(ctx, ops...)
@@ -201,18 +218,13 @@ func (s *Store) Authorize(ctx context.Context, req *http.Request, ops ...bakery.
 	return authInfo, nil
 }
 
-func isDischargeRequiredError(err error) bool {
-	respErr, ok := errgo.Cause(err).(*httpbakery.Error)
-	if !ok {
-		return false
-	}
-	return respErr.Code == httpbakery.ErrDischargeRequired
-}
-
 func (s *Store) maybeDischargeRequiredError(ctx context.Context, req *http.Request, checkErr error) error {
 	derr, ok := errgo.Cause(checkErr).(*bakery.DischargeRequiredError)
 	if !ok {
-		return errgo.Mask(checkErr)
+		if errgo.Cause(checkErr) == bakery.ErrPermissionDenied {
+			checkErr = errgo.WithCausef(checkErr, params.ErrUnauthorized, "")
+		}
+		return errgo.Mask(checkErr, errgo.Any)
 	}
 	m, err := s.Bakery.Oven.NewMacaroon(
 		ctx,
@@ -237,22 +249,26 @@ type identityClient struct {
 	location string
 }
 
-func (c identityClient) IdentityFromContext(ctx context.Context) (bakery.Identity, []checkers.Caveat, error) {
+func (c identityClient) IdentityFromContext(ctx context.Context) (_ident bakery.Identity, _ []checkers.Caveat, _ error) {
+	logger.Debugf("identity from context %v {", ctx)
+	defer func() {
+		logger.Debugf("} -> ident %#v", _ident)
+	}()
 	req, store := requestFromContext(ctx), storeFromContext(ctx)
 	if store == nil {
 		return nil, nil, errgo.Newf("no store found in context")
 	}
 	if req != nil {
-		err := store.CheckAdminCredentials(req)
+		err := store.checkAdminCredentials(req)
 		if err == nil {
-			logger.Infof("admin login success")
+			logger.Debugf("admin login success as %q", AdminUsername)
 			return Identity(AdminUsername), nil, nil
 		}
 		if errgo.Cause(err) != params.ErrNoAdminCredsProvided {
-			logger.Infof("admin login failed for some reason: %v", err)
+			logger.Debugf("admin login failed for some reason: %v", err)
 			return nil, nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 		}
-		logger.Infof("admin login failed - no admin creds provided")
+		logger.Debugf("admin login failed - no admin creds provided")
 	}
 	return nil, []checkers.Caveat{
 		checkers.NeedDeclaredCaveat(
@@ -283,22 +299,20 @@ func (id Identity) Domain() string {
 	return ""
 }
 
-// Allow implements TODO
+// Allow implements bakery.ACLIdentity.Allow by checking whether the
+// given identity is in any of the required groups or users.
+// It uses the store associated with the context (see ContextWithStore)
+// to retrieve the groups.
 func (id Identity) Allow(ctx context.Context, acl []string) (bool, error) {
-	logger.Infof("Identity.Allow %q {", acl)
-	defer logger.Infof("}")
+	logger.Debugf("Identity.Allow %q, acl %q {", id, acl)
+	defer logger.Debugf("}")
 	if ok, isTrivial := trivialAllow(string(id), acl); isTrivial {
-		logger.Infof("trivial %v", ok)
+		logger.Debugf("trivial %v", ok)
 		return ok, nil
-	}
-	store := storeFromContext(ctx)
-	if store == nil {
-		logger.Infof("no store")
-		return false, errgo.New("no store found in context")
 	}
 	groups, err := id.Groups(ctx)
 	if err != nil {
-		logger.Infof("no groups")
+		logger.Debugf("error getting groups: %v", err)
 		return false, errgo.Mask(err)
 	}
 	for _, a := range acl {
@@ -309,10 +323,13 @@ func (id Identity) Allow(ctx context.Context, acl []string) (bool, error) {
 			}
 		}
 	}
-	logger.Infof("not in groups")
+	logger.Debugf("not in groups")
 	return false, nil
 }
 
+// Groups returns all the groups associated with the user.
+// It uses the store associated with the context (see ContextWithStore)
+// to retrieve the groups.
 func (id Identity) Groups(ctx context.Context) ([]string, error) {
 	store := storeFromContext(ctx)
 	if store == nil {
@@ -322,9 +339,12 @@ func (id Identity) Groups(ctx context.Context) ([]string, error) {
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
-	lpGroups, err := store.GetLaunchpadGroups(idDoc.ExternalID)
-	if err != nil {
-		logger.Errorf("Failed to get launchpad groups for user: %s", err)
+	var lpGroups []string
+	if getter := store.pool.params.ExternalGroupGetter; getter != nil {
+		lpGroups, err = getter.GetGroups(idDoc.ExternalID)
+		if err != nil {
+			logger.Errorf("Failed to get launchpad groups for user: %s", err)
+		}
 	}
 	return uniqueStrings(append(idDoc.Groups, lpGroups...)), nil
 }

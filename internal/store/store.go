@@ -5,12 +5,10 @@ package store
 import (
 	"math"
 	"sort"
-	"strings"
 	"time"
 
 	"github.com/juju/idmclient/params"
 	"github.com/juju/loggo"
-	"github.com/juju/utils/cache"
 	"github.com/pborman/uuid"
 	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/net/context"
@@ -19,7 +17,6 @@ import (
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery/mgorootkeystore"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
-	"launchpad.net/lpad"
 
 	"github.com/CanonicalLtd/blues-identity/internal/limitpool"
 	"github.com/CanonicalLtd/blues-identity/internal/mempool"
@@ -46,9 +43,8 @@ type StoreParams struct {
 	// base URL of the service, without a trailing slash.
 	Location string
 
-	// Launchpad holds the address of the launchpad server to use to
-	// get group information.
-	Launchpad lpad.APIBase
+	// ExternalGroupGetter is used to retrieve external group information.
+	ExternalGroupGetter ExternalGroupGetter
 
 	// MaxMgoSession holds the maximum number of concurrent mgo
 	// sessions.
@@ -65,6 +61,11 @@ type StoreParams struct {
 
 	// AdminAgentPublicKey contains the public key of the admin agent.
 	AdminAgentPublicKey *bakery.PublicKey
+}
+
+// ExternalGroupGetter represents a source of external group information.
+type ExternalGroupGetter interface {
+	GetGroups(externalId string) ([]string, error)
 }
 
 type LimitPool interface {
@@ -120,19 +121,17 @@ type Pool struct {
 	// InteractionRequired rendezvous.
 	meetingServer *meeting.Server
 
-	params         StoreParams
-	db             *mgo.Database
-	rootKeys       *mgorootkeystore.RootKeys
-	launchpadCache *cache.Cache
-	bakeryParams   bakery.BakeryParams
+	params       StoreParams
+	db           *mgo.Database
+	rootKeys     *mgorootkeystore.RootKeys
+	bakeryParams bakery.BakeryParams
 }
 
 // NewPool creates a new Pool. The pool will be sized at sp.MaxMgoSessions.
 func NewPool(db *mgo.Database, sp StoreParams) (*Pool, error) {
 	p := &Pool{
-		db:             db,
-		params:         sp,
-		launchpadCache: cache.New(10 * time.Minute),
+		db:     db,
+		params: sp,
 	}
 	if sp.PrivateAddr == "" {
 		return nil, errgo.New("no private address configured")
@@ -308,7 +307,7 @@ type Store struct {
 	// DB holds the mongodb-backed identity store.
 	DB StoreDatabase
 
-	// Service holds a *bakery.Bakery that can be used to make and check macaroons.
+	// Bakery holds a *bakery.Bakery that can be used to make and check macaroons.
 	Bakery *bakery.Bakery
 
 	// Place holds the place where openid-callback rendezvous
@@ -317,24 +316,14 @@ type Store struct {
 
 	// pool holds the pool which created this Store.
 	pool *Pool
-
-	// prometheus summary monitor.
-	m_getlpgroups prometheus.Summary
 }
 
 // newStore returns a new Store instance. When it's
 // returned, it isn't associated with any mongo session.
 func (p *Pool) newStore() *Store {
-	s := &Store{
+	return &Store{
 		pool: p,
 	}
-	s.m_getlpgroups = prometheus.NewSummary(prometheus.SummaryOpts{
-		Namespace: "blues_identity",
-		Subsystem: "launchpad",
-		Name:      "get_launchpad_groups",
-		Help:      "The duration of launchpad login, /people, and super_teams_collection_link requests.",
-	})
-	return s
 }
 
 type meetingMetrics struct {
@@ -568,54 +557,6 @@ func (s *Store) SetPublicKeys(username string, publickeys []mongodoc.PublicKey) 
 		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
 	return nil
-}
-
-// GetLaunchpadGroups gets the groups from Launchpad if the user is a launchpad user
-// otherwise an empty array.
-func (s *Store) GetLaunchpadGroups(externalId string) ([]string, error) {
-	if !strings.HasPrefix(externalId, "https://login.ubuntu.com/+id/") {
-		return nil, nil
-	}
-	groups, err := s.pool.launchpadCache.Get(externalId, func() (interface{}, error) {
-		return s.getLaunchpadGroups(externalId)
-	})
-	if err != nil {
-		return nil, errgo.Mask(err)
-	}
-	return groups.([]string), nil
-}
-
-// getLaunchpadGroups tries to fetch the list of teams the user
-// belongs to in launchpad. Only public teams are supported.
-func (s *Store) getLaunchpadGroups(externalId string) ([]string, error) {
-	t := time.Now()
-	root, err := lpad.Login(s.pool.params.Launchpad, &lpad.OAuth{Consumer: "blues", Anonymous: true})
-	if err != nil {
-		return nil, errgo.Notef(err, "cannot connect to launchpad")
-	}
-	user, err := getLaunchpadPersonByOpenID(root, externalId)
-	if err != nil {
-		return nil, errgo.Notef(err, "cannot find user %s", externalId)
-	}
-	teams, err := user.Link("super_teams_collection_link").Get(nil)
-	if err != nil {
-		return nil, errgo.Notef(err, "cannot get team list for launchpad user %q", user.Name())
-	}
-	groups := make([]string, 0, teams.TotalSize())
-	teams.For(func(team *lpad.Value) error {
-		groups = append(groups, team.StringField("name"))
-		return nil
-	})
-	s.m_getlpgroups.Observe(float64(time.Since(t)) / float64(time.Microsecond))
-	return groups, nil
-}
-
-func getLaunchpadPersonByOpenID(root *lpad.Root, externalId string) (*lpad.Person, error) {
-	v, err := root.Location("/people").Get(lpad.Params{"ws.op": "getByOpenIDIdentifier", "identifier": externalId})
-	if err != nil {
-		return nil, errgo.Notef(err, "cannot find user %s", externalId)
-	}
-	return &lpad.Person{v}, nil
 }
 
 // GetIdentity retrieves the identity with the given username. If the

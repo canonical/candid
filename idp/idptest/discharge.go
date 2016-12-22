@@ -18,7 +18,6 @@ import (
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
 	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
-	"launchpad.net/lpad"
 
 	"github.com/CanonicalLtd/blues-identity"
 	"github.com/CanonicalLtd/blues-identity/idp"
@@ -93,7 +92,7 @@ func (s *DischargeSuite) SetUpTest(c *gc.C) {
 		AuthUsername:        authUsername,
 		AuthPassword:        authPassword,
 		Key:                 s.serverKey,
-		Launchpad:           lpad.Production,
+		Launchpad:           "https://0.1.2.3/",
 		Location:            DischargeLocation,
 		MaxMgoSessions:      100,
 		RequestTimeout:      time.Second,

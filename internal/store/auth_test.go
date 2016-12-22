@@ -4,13 +4,20 @@ package store_test
 
 import (
 	"net/http"
+	"sort"
+	"time"
 
+	"github.com/juju/idmclient"
 	"github.com/juju/idmclient/params"
 	"github.com/juju/testing"
 	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
+	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
+	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
+	"gopkg.in/macaroon.v2-unstable"
+	"gopkg.in/mgo.v2/bson"
 
 	"github.com/CanonicalLtd/blues-identity/internal/mongodoc"
 	"github.com/CanonicalLtd/blues-identity/internal/store"
@@ -58,7 +65,7 @@ func (s *authSuite) createIdentity(c *gc.C, doc *mongodoc.Identity) (uuid string
 	return doc.UUID
 }
 
-func (s *authSuite) TestCheckAdminCredentials(c *gc.C) {
+func (s *authSuite) TestAuthorizeWithAdminCredentials(c *gc.C) {
 	tests := []struct {
 		about              string
 		header             http.Header
@@ -68,60 +75,59 @@ func (s *authSuite) TestCheckAdminCredentials(c *gc.C) {
 		header: http.Header{
 			"Authorization": []string{"Basic dGVzdC1hZG1pbjpvcGVuIHNlc2FtZQ=="},
 		},
-		expectErrorMessage: "",
 	}, {
 		about: "bad username",
 		header: http.Header{
 			"Authorization": []string{"Basic eGVzdC1hZG1pbjpvcGVuIHNlc2FtZQ=="},
 		},
-		expectErrorMessage: "invalid credentials",
+		expectErrorMessage: "could not determine identity: invalid credentials",
 	}, {
 		about: "bad password",
 		header: http.Header{
 			"Authorization": []string{"Basic dGVzdC1hZG1pbjpvcGVuIHNlc2FtAQ=="},
 		},
-		expectErrorMessage: "invalid credentials",
+		expectErrorMessage: "could not determine identity: invalid credentials",
 	}, {
 		about: "incorrect type",
 		header: http.Header{
 			"Authorization": []string{"Digest dGVzdC1hZG1pbjpvcGVuIHNlc2FtZQ=="},
 		},
-		expectErrorMessage: "unauthorized: invalid or missing HTTP auth header",
+		expectErrorMessage: "could not determine identity: invalid or missing HTTP auth header",
 	}, {
 		about: "empty authorization",
 		header: http.Header{
 			"Authorization": []string{""},
 		},
-		expectErrorMessage: "unauthorized: invalid or missing HTTP auth header",
-	}, {
-		about:              "no authorization",
-		header:             http.Header{},
-		expectErrorMessage: params.ErrNoAdminCredsProvided.Error(),
+		expectErrorMessage: "could not determine identity: invalid or missing HTTP auth header",
 	}, {
 		about: "invalid base64",
 		header: http.Header{
 			"Authorization": []string{"Basic dGVzdC1h<>1pbjpvcGVuIHNlc2FtZQ=="},
 		},
-		expectErrorMessage: "unauthorized: invalid HTTP auth encoding",
+		expectErrorMessage: "could not determine identity: invalid HTTP auth encoding",
 	}, {
 		about: "no colon",
 		header: http.Header{
 			"Authorization": []string{"Basic dGVzdC1hZG1pbg=="},
 		},
-		expectErrorMessage: "unauthorized: invalid HTTP auth contents",
+		expectErrorMessage: "could not determine identity: invalid HTTP auth contents",
 	}}
 	for i, test := range tests {
-		c.Logf("%d. %s", i, test.about)
-		store := s.pool.GetNoLimit()
-		defer s.pool.Put(store)
-		obtained := store.CheckAdminCredentials(&http.Request{
-			Header: test.header,
-		})
-		if test.expectErrorMessage == "" {
-			c.Assert(obtained, gc.Equals, nil)
-		} else {
-			c.Assert(obtained.Error(), gc.Equals, test.expectErrorMessage)
+		c.Logf("test %d. %s", i, test.about)
+		st := s.pool.GetNoLimit()
+		defer s.pool.Put(st)
+		req, _ := http.NewRequest("GET", "/", nil)
+		for attr, val := range test.header {
+			req.Header[attr] = val
 		}
+		authInfo, err := st.Authorize(context.Background(), req, bakery.LoginOp)
+		if test.expectErrorMessage != "" {
+			c.Assert(err, gc.ErrorMatches, test.expectErrorMessage)
+			c.Assert(errgo.Cause(err), gc.Equals, params.ErrUnauthorized)
+			continue
+		}
+		c.Assert(err, gc.Equals, nil)
+		c.Assert(authInfo.Identity, gc.Equals, store.Identity(store.AdminUsername))
 	}
 }
 
@@ -183,141 +189,319 @@ func (s *authSuite) TestUserHasPublicKeyChecker(c *gc.C) {
 	c.Assert(err, gc.ErrorMatches, `caveat.*not satisfied: invalid public key ".*": .*`)
 }
 
-//
-//func (s *authSuite) TestGroupsFromRequest(c *gc.C) {
-//	testChecker := checkers.OperationChecker("test")
-//	store := s.pool.GetNoLimit()
-//	defer s.pool.Put(store)
-//
-//	// Get the groups for the admin user
-//	req, err := http.NewRequest("GET", "", nil)
-//	c.Assert(err, gc.IsNil)
-//	req.SetBasicAuth("test-admin", "open sesame")
-//	groups, err := store.GroupsFromRequest(testChecker, req)
-//	c.Assert(err, gc.IsNil)
-//	c.Assert(len(groups), gc.Equals, 1)
-//	c.Assert(groups[0], gc.Equals, "admin@idm")
-//
-//	// Incorrect admin credentials
-//	req, err = http.NewRequest("GET", "", nil)
-//	c.Assert(err, gc.IsNil)
-//	req.SetBasicAuth("test-admin", "open simsim")
-//	groups, err = store.GroupsFromRequest(testChecker, req)
-//	c.Assert(len(groups), gc.Equals, 0)
-//	c.Assert(errgo.Cause(err), gc.Equals, params.ErrUnauthorized)
-//
-//	// Request with no credentials (discharge required)
-//	req, err = http.NewRequest("GET", "http://example.com/v1/test", nil)
-//	c.Assert(err, gc.IsNil)
-//	groups, err = store.GroupsFromRequest(testChecker, req)
-//	c.Assert(len(groups), gc.Equals, 0)
-//	herr, ok := err.(*httpbakery.Error)
-//	c.Assert(ok, gc.Equals, true, gc.Commentf("unexpected error %s", err))
-//	c.Assert(herr.Code, gc.Equals, httpbakery.ErrDischargeRequired)
-//	c.Assert(herr.Info.MacaroonPath, gc.Equals, "../")
-//	c.Assert(herr.Info.Macaroon, gc.Not(gc.IsNil))
-//	c.Assert(herr.Info.CookieNameSuffix, gc.Equals, "idm")
-//	var foundThirdParty bool
-//	for _, cav := range herr.Info.Macaroon.Caveats() {
-//		if cav.Location == "" {
-//			continue
-//		}
-//		c.Assert(cav.Location, gc.Equals, identityLocation)
-//		foundThirdParty = true
-//	}
-//	c.Assert(foundThirdParty, gc.Equals, true)
-//
-//	// Non-existent identity
-//	m, err := store.Service.NewMacaroon(bakery.LatestVersion, []checkers.Caveat{
-//		checkers.DeclaredCaveat("username", "test2"),
-//	})
-//	c.Assert(err, gc.IsNil)
-//	req, err = http.NewRequest("GET", "", nil)
-//	c.Assert(err, gc.IsNil)
-//	cookie, err := httpbakery.NewCookie(macaroon.Slice{m})
-//	c.Assert(err, gc.IsNil)
-//	req.AddCookie(cookie)
-//	groups, err = store.GroupsFromRequest(testChecker, req)
-//	c.Assert(len(groups), gc.Equals, 0)
-//	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
-//
-//	// good identity
-//	s.createIdentity(c, &mongodoc.Identity{
-//		Username:   "test",
-//		ExternalID: "https://example.com/test",
-//		Groups:     []string{"test-group1", "test-group2"},
-//	})
-//	m, err = store.Service.NewMacaroon(bakery.LatestVersion, []checkers.Caveat{
-//		checkers.DeclaredCaveat("username", "test"),
-//	})
-//	req, err = http.NewRequest("GET", "", nil)
-//	c.Assert(err, gc.IsNil)
-//	cookie, err = httpbakery.NewCookie(macaroon.Slice{m})
-//	c.Assert(err, gc.IsNil)
-//	req.AddCookie(cookie)
-//	groups, err = store.GroupsFromRequest(testChecker, req)
-//	c.Assert(err, gc.IsNil)
-//	sort.Strings(groups)
-//	c.Assert(groups, jc.DeepEquals, []string{"test", "test-group1", "test-group2"})
-//}
-//
-//func (s *authSuite) TestCheckACL(c *gc.C) {
-//	testChecker := checkers.OperationChecker("test")
-//	s.createIdentity(c, &mongodoc.Identity{
-//		Username:   "test",
-//		ExternalID: "https://example.com/test",
-//		Groups:     []string{"test-group1", "test-group2"},
-//	})
-//
-//	store := s.pool.GetNoLimit()
-//	defer s.pool.Put(store)
-//
-//	// Admin ACL
-//	req, err := http.NewRequest("GET", "", nil)
-//	c.Assert(err, gc.IsNil)
-//	req.SetBasicAuth("test-admin", "open sesame")
-//	err = store.CheckACL(testChecker, req, []string{"admin@idm"})
-//	c.Assert(err, gc.IsNil)
-//
-//	// Normal ACL
-//	req, err = http.NewRequest("GET", "", nil)
-//	c.Assert(err, gc.IsNil)
-//	m, err := store.Service.NewMacaroon(bakery.LatestVersion, []checkers.Caveat{
-//		checkers.DeclaredCaveat("username", "test"),
-//	})
-//	cookie, err := httpbakery.NewCookie(macaroon.Slice{m})
-//	c.Assert(err, gc.IsNil)
-//	req.AddCookie(cookie)
-//	err = store.CheckACL(testChecker, req, []string{"test-group3", "test-group1"})
-//	c.Assert(err, gc.IsNil)
-//
-//	// No match
-//	err = store.CheckACL(testChecker, req, []string{"test-group3", "test-group4"})
-//	c.Assert(errgo.Cause(err), gc.Equals, params.ErrForbidden)
-//
-//	// error getting groups
-//	req, err = http.NewRequest("GET", "", nil)
-//	c.Assert(err, gc.IsNil)
-//	m, err = store.Service.NewMacaroon(bakery.LatestVersion, []checkers.Caveat{
-//		checkers.DeclaredCaveat("username", "test2"),
-//	})
-//	cookie, err = httpbakery.NewCookie(macaroon.Slice{m})
-//	c.Assert(err, gc.IsNil)
-//	req.AddCookie(cookie)
-//	err = store.CheckACL(testChecker, req, []string{"test-group3", "test-group1"})
-//	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
-//}
-//
-//func (s *authSuite) TestMacaroonRequired(c *gc.C) {
-//	testChecker := checkers.OperationChecker("test")
-//	store := s.pool.GetNoLimit()
-//	defer s.pool.Put(store)
-//
-//	// Get the groups for the admin user
-//	req, err := http.NewRequest("GET", "http://example.com/v1/test", nil)
-//	c.Assert(err, gc.IsNil)
-//	_, err = store.GroupsFromRequest(testChecker, req)
-//	bakeryError, ok := err.(*httpbakery.Error)
-//	c.Assert(ok, gc.Equals, true)
-//	c.Assert(bakeryError.Code.Error(), gc.Equals, "macaroon discharge required")
-//}
+var aclForOpTests = []struct {
+	op     bakery.Op
+	expect []string
+}{{
+	op: op("other", "read"),
+}, {
+	op:     op("global", "read"),
+	expect: store.AdminACL,
+}, {
+	op:     op("global", "verify"),
+	expect: []string{bakery.Everyone},
+}, {
+	op:     op("global", "dischargeFor"),
+	expect: store.AdminACL,
+}, {
+	op:     op("global", "login"),
+	expect: []string{bakery.Everyone},
+}, {
+	op: op("global-foo", "login"),
+}, {
+	op: op("global", "unknown"),
+}, {
+	op: op("u", "read"),
+}, {
+	op: op("u-", "read"),
+}, {
+	op:     op("u-bob", "read"),
+	expect: append([]string{"bob"}, store.AdminACL...),
+}, {
+	op:     op("u-bob", "createAgent"),
+	expect: append([]string{"+create-agent@bob"}, store.AdminACL...),
+}, {
+	op:     op("u-bob", "readAdmin"),
+	expect: store.AdminACL,
+}, {
+	op:     op("u-bob", "writeAdmin"),
+	expect: store.AdminACL,
+}, {
+	op:     op("u-bob", "readGroups"),
+	expect: append([]string{"bob", store.GroupListGroup}, store.AdminACL...),
+}, {
+	op:     op("u-bob", "writeGroups"),
+	expect: store.AdminACL,
+}, {
+	op:     op("u-bob", "readSSHKeys"),
+	expect: append([]string{"bob", store.SSHKeyGetterGroup}, store.AdminACL...),
+}, {
+	op:     op("u-bob", "writeSSHKeys"),
+	expect: append([]string{"bob"}, store.AdminACL...),
+}}
+
+func (s *authSuite) TestACLForOp(c *gc.C) {
+	st := s.pool.GetNoLimit()
+	defer s.pool.Put(st)
+	for i, test := range aclForOpTests {
+		c.Logf("test %d: %v", i, test.op)
+		sort.Strings(test.expect)
+		acl, err := store.StoreACLForOp(st, test.op)
+		c.Assert(err, gc.IsNil)
+		sort.Strings(acl)
+		c.Assert(acl, gc.DeepEquals, test.expect)
+	}
+}
+
+func (s *authSuite) TestAdminUserGroups(c *gc.C) {
+	st := s.pool.GetNoLimit()
+	defer s.pool.Put(st)
+
+	req, _ := http.NewRequest("GET", "/", nil)
+	req.SetBasicAuth("test-admin", "open sesame")
+	authInfo, err := st.Authorize(context.Background(), req, bakery.LoginOp)
+	c.Assert(err, gc.IsNil)
+	assertAuthorizedGroups(c, st, authInfo, []string{})
+}
+
+func (s *authSuite) TestNonExistentUserGroups(c *gc.C) {
+	st := s.pool.GetNoLimit()
+	defer s.pool.Put(st)
+
+	req, _ := http.NewRequest("GET", "/", nil)
+	m, err := st.Bakery.Oven.NewMacaroon(
+		context.Background(),
+		bakery.LatestVersion,
+		time.Now().Add(time.Minute), []checkers.Caveat{
+			idmclient.UserDeclaration("noone"),
+		},
+		bakery.LoginOp,
+	)
+	c.Assert(err, gc.IsNil)
+	cookie, err := httpbakery.NewCookie(nil, macaroon.Slice{m.M()})
+	c.Assert(err, gc.IsNil)
+	req.AddCookie(cookie)
+	authInfo, err := st.Authorize(context.Background(), req, bakery.LoginOp)
+	c.Assert(err, gc.IsNil)
+	ident := authInfo.Identity.(store.Identity)
+	ctx := store.ContextWithStore(context.Background(), st)
+	groups, err := ident.Groups(ctx)
+	c.Assert(err, gc.ErrorMatches, `user "noone" not found: not found`)
+	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
+	c.Assert(groups, gc.IsNil)
+}
+
+func (s *authSuite) TestExistingUserGroups(c *gc.C) {
+	st := s.pool.GetNoLimit()
+	defer s.pool.Put(st)
+	// good identity
+	s.createIdentity(c, &mongodoc.Identity{
+		Username:   "test",
+		ExternalID: "https://example.com/test",
+		Groups:     []string{"test-group1", "test-group2"},
+	})
+	req, _ := http.NewRequest("GET", "/", nil)
+	m, err := st.Bakery.Oven.NewMacaroon(
+		context.Background(),
+		bakery.LatestVersion,
+		time.Now().Add(time.Minute), []checkers.Caveat{
+			idmclient.UserDeclaration("test"),
+		},
+		bakery.LoginOp,
+	)
+	c.Assert(err, gc.IsNil)
+	cookie, err := httpbakery.NewCookie(nil, macaroon.Slice{m.M()})
+	c.Assert(err, gc.IsNil)
+	req.AddCookie(cookie)
+	authInfo, err := st.Authorize(context.Background(), req, bakery.LoginOp)
+	c.Assert(err, gc.IsNil)
+	assertAuthorizedGroups(c, st, authInfo, []string{"test-group1", "test-group2"})
+}
+
+func assertAuthorizedGroups(c *gc.C, st *store.Store, authInfo *bakery.AuthInfo, expectGroups []string) {
+	c.Assert(authInfo.Identity, gc.NotNil)
+	ident := authInfo.Identity.(store.Identity)
+	ctx := store.ContextWithStore(context.Background(), st)
+	groups, err := ident.Groups(ctx)
+	c.Assert(err, gc.IsNil)
+	c.Assert(groups, gc.DeepEquals, expectGroups)
+}
+
+var identityAllowTests = []struct {
+	about string
+
+	// groups holds the groups the user is a member of.
+	groups []string
+
+	// externalGroups holds the groups that will
+	// be returned by the external group getter.
+	externalGroups []string
+
+	// externalGroupsError holds an error to be returned by externalGroups.
+	externalGroupsError error
+
+	// ACL holds the ACL that's being checked.
+	acl []string
+
+	// withStore holds whether a store instance should
+	// be attached to the context.
+	withStore bool
+
+	// expectAllowed holds whether the access to the ACL
+	// should be granted.
+	expectAllowed bool
+
+	// expectError holds the expected error from the Allow call.
+	expectError string
+}{{
+	about:         "everyone is allowed even with no store",
+	acl:           []string{"everyone"},
+	expectAllowed: true,
+}, {
+	about:         "user is allowed even with no store",
+	acl:           []string{"testuser"},
+	expectAllowed: true,
+}, {
+	about:       "error when there's no store and result is not trivial",
+	acl:         []string{"somegroup"},
+	expectError: "no store found in context",
+}, {
+	about:         "empty ACL doesn't require store",
+	expectAllowed: false,
+}, {
+	about:         "user is allowed if they're in the expected group internally",
+	acl:           []string{"somegroup"},
+	groups:        []string{"x", "somegroup"},
+	withStore:     true,
+	expectAllowed: true,
+}, {
+	about:          "user is allowed if they're in the expected group externally",
+	acl:            []string{"somegroup"},
+	externalGroups: []string{"x", "somegroup"},
+	withStore:      true,
+	expectAllowed:  true,
+}, {
+	about:         "user is not allowed if they're not in the expected group",
+	acl:           []string{"somegroup"},
+	groups:        []string{"x"},
+	withStore:     true,
+	expectAllowed: false,
+}, {
+	about:               "error from external groups is ignored",
+	acl:                 []string{"somegroup"},
+	groups:              []string{"somegroup"},
+	externalGroupsError: errgo.New("some error"),
+	withStore:           true,
+	expectAllowed:       true,
+}}
+
+func (s *authSuite) TestIdentityAllow(c *gc.C) {
+	var externalGroups []string
+	var externalGroupsError error
+
+	pool, err := store.NewPool(
+		s.Session.Copy().DB("store-launchpad-tests"),
+		store.StoreParams{
+			ExternalGroupGetter: externalGroupGetterFunc(func(id string) ([]string, error) {
+				c.Check(id, gc.Equals, "testuser-external-id")
+				return externalGroups, externalGroupsError
+			}),
+			PrivateAddr: "localhost",
+		},
+	)
+	c.Assert(err, gc.IsNil)
+	defer pool.Close()
+	st := pool.GetNoLimit()
+	defer pool.Put(st)
+	// Add an identity to the store.
+	err = st.UpsertUser(&mongodoc.Identity{
+		Username:   "testuser",
+		ExternalID: "testuser-external-id",
+		Email:      "testuser@example.com",
+		FullName:   "Test User",
+		Groups: []string{
+			"test",
+		},
+	})
+	c.Assert(err, gc.IsNil)
+
+	for i, test := range identityAllowTests {
+		c.Logf("test %d: %v", i, test.about)
+		err = st.UpdateIdentity("testuser", bson.D{{"$set", bson.D{{"groups", test.groups}}}})
+		c.Assert(err, gc.IsNil)
+		externalGroups, externalGroupsError = test.externalGroups, test.externalGroupsError
+		id := store.Identity("testuser")
+		ctx := context.Background()
+		if test.withStore {
+			ctx = store.ContextWithStore(ctx, st)
+		}
+		ok, err := id.Allow(ctx, test.acl)
+		if test.expectError != "" {
+			c.Assert(err, gc.ErrorMatches, test.expectError)
+			c.Assert(ok, gc.Equals, false)
+		} else {
+			c.Assert(err, gc.IsNil)
+			c.Assert(ok, gc.Equals, test.expectAllowed)
+		}
+	}
+}
+
+func (s *authSuite) TestIdentityGroups(c *gc.C) {
+	pool, err := store.NewPool(
+		s.Session.Copy().DB("store-launchpad-tests"),
+		store.StoreParams{
+			ExternalGroupGetter: externalGroupGetterFunc(func(id string) ([]string, error) {
+				return []string{"extgroup1", "extgroup2", "group1"}, nil
+			}),
+			PrivateAddr: "localhost",
+		},
+	)
+	c.Assert(err, gc.IsNil)
+	defer pool.Close()
+	st := pool.GetNoLimit()
+	defer pool.Put(st)
+	err = st.UpsertUser(&mongodoc.Identity{
+		Username:   "testuser",
+		ExternalID: "testuser-external-id",
+		Email:      "testuser@example.com",
+		FullName:   "Test User",
+		Groups: []string{
+			"group1",
+			"group2",
+		},
+	})
+	c.Assert(err, gc.IsNil)
+	id := store.Identity("testuser")
+	ctx := store.ContextWithStore(context.Background(), st)
+	groups, err := id.Groups(ctx)
+	c.Assert(err, gc.IsNil)
+	c.Assert(groups, gc.DeepEquals, []string{"extgroup1", "extgroup2", "group1", "group2"})
+}
+
+type externalGroupGetterFunc func(string) ([]string, error)
+
+func (f externalGroupGetterFunc) GetGroups(id string) ([]string, error) {
+	return f(id)
+}
+
+func (s *authSuite) TestAuthorizeMacaroonRequired(c *gc.C) {
+	store := s.pool.GetNoLimit()
+	defer s.pool.Put(store)
+	req, err := http.NewRequest("GET", "http://example.com/v1/test", nil)
+	c.Assert(err, gc.IsNil)
+	authInfo, err := store.Authorize(context.Background(), req, bakery.LoginOp)
+	c.Assert(err, gc.ErrorMatches, `macaroon discharge required: authentication required`)
+	c.Assert(authInfo, gc.IsNil)
+	c.Assert(errgo.Cause(err), gc.FitsTypeOf, (*httpbakery.Error)(nil))
+	derr := errgo.Cause(err).(*httpbakery.Error)
+	c.Assert(derr.Info.CookieNameSuffix, gc.Equals, "idm")
+	c.Assert(derr.Info.MacaroonPath, gc.Equals, "../")
+	c.Assert(derr.Info.Macaroon, gc.NotNil)
+}
+
+func op(entity, action string) bakery.Op {
+	return bakery.Op{
+		Entity: entity,
+		Action: action,
+	}
+}
