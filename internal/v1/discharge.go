@@ -113,7 +113,9 @@ func (h *handler) updateDischargeTime(username params.Username) {
 			"lastdischarge", time.Now(),
 		}},
 	}})
-	logger.Infof("unexpected error updating last discharge time: %s", err)
+	if err != nil {
+		logger.Infof("unexpected error updating last discharge time: %s", err)
+	}
 }
 
 // checkAuthenticatedUser checks a third-party caveat for "is-authenticated-user". Currently the discharge
