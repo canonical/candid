@@ -890,7 +890,7 @@ func (s *usersSuite) TestQueryUsers(c *gc.C) {
 		expectBody:   []string{},
 	}, {
 		about:        "last login in range",
-		url:          apiURL("u?last-login-since=" + time.Now().AddDate(0, 0, -30).Format(time.RFC3339)),
+		url:          apiURL("u?last-login-since=" + url.QueryEscape(time.Now().AddDate(0, 0, -30).Format(time.RFC3339))),
 		method:       "GET",
 		body:         nil,
 		username:     adminUsername,
@@ -899,7 +899,7 @@ func (s *usersSuite) TestQueryUsers(c *gc.C) {
 		expectBody:   []string{"jbloggs2"},
 	}, {
 		about:        "last login too soon",
-		url:          apiURL("u?last-login-since=" + time.Now().AddDate(0, 0, -28).Format(time.RFC3339)),
+		url:          apiURL("u?last-login-since=" + url.QueryEscape(time.Now().AddDate(0, 0, -28).Format(time.RFC3339))),
 		method:       "GET",
 		body:         nil,
 		username:     adminUsername,
@@ -908,7 +908,7 @@ func (s *usersSuite) TestQueryUsers(c *gc.C) {
 		expectBody:   []string{},
 	}, {
 		about:        "last discharge in range",
-		url:          apiURL("u?last-discharge-since=" + time.Now().AddDate(0, 0, -15).Format(time.RFC3339)),
+		url:          apiURL("u?last-discharge-since=" + url.QueryEscape(time.Now().AddDate(0, 0, -15).Format(time.RFC3339))),
 		method:       "GET",
 		body:         nil,
 		username:     adminUsername,
@@ -917,7 +917,7 @@ func (s *usersSuite) TestQueryUsers(c *gc.C) {
 		expectBody:   []string{"jbloggs2"},
 	}, {
 		about:        "last discharge too soon",
-		url:          apiURL("u?last-discharge-since=" + time.Now().AddDate(0, 0, -13).Format(time.RFC3339)),
+		url:          apiURL("u?last-discharge-since=" + url.QueryEscape(time.Now().AddDate(0, 0, -13).Format(time.RFC3339))),
 		method:       "GET",
 		body:         nil,
 		username:     adminUsername,
@@ -926,7 +926,7 @@ func (s *usersSuite) TestQueryUsers(c *gc.C) {
 		expectBody:   []string{},
 	}, {
 		about:        "combined login and discharge (found)",
-		url:          apiURL("u?last-discharge-since=" + time.Now().AddDate(0, 0, -15).Format(time.RFC3339) + "&last-login-since=" + time.Now().AddDate(0, 0, -30).Format(time.RFC3339)),
+		url:          apiURL("u?last-discharge-since=" + url.QueryEscape(time.Now().AddDate(0, 0, -15).Format(time.RFC3339)) + "&last-login-since=" + url.QueryEscape(time.Now().AddDate(0, 0, -30).Format(time.RFC3339))),
 		method:       "GET",
 		body:         nil,
 		username:     adminUsername,
@@ -935,7 +935,7 @@ func (s *usersSuite) TestQueryUsers(c *gc.C) {
 		expectBody:   []string{"jbloggs2"},
 	}, {
 		about:        "combined login and discharge (not found)",
-		url:          apiURL("u?last-discharge-since=" + time.Now().AddDate(0, 0, -13).Format(time.RFC3339) + "&last-login-since=" + time.Now().AddDate(0, 0, -30).Format(time.RFC3339)),
+		url:          apiURL("u?last-discharge-since=" + url.QueryEscape(time.Now().AddDate(0, 0, -13).Format(time.RFC3339)) + "&last-login-since=" + url.QueryEscape(time.Now().AddDate(0, 0, -30).Format(time.RFC3339))),
 		method:       "GET",
 		body:         nil,
 		username:     adminUsername,

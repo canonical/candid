@@ -6,11 +6,10 @@ import (
 	"net/http"
 	"time"
 
-	"golang.org/x/net/trace"
-
 	"github.com/juju/httprequest"
 	"github.com/juju/idmclient/params"
 	"github.com/julienschmidt/httprouter"
+	"golang.org/x/net/trace"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
