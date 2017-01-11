@@ -6,18 +6,17 @@ import (
 	"crypto/md5"
 	"encoding/json"
 	"fmt"
-	"net/http"
-	"sort"
 	"strings"
 	"time"
 
 	"github.com/juju/httprequest"
+	"github.com/juju/idmclient"
 	"github.com/juju/idmclient/params"
+	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
 	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
-	"gopkg.in/macaroon.v2-unstable"
 	"gopkg.in/mgo.v2/bson"
 
 	"github.com/CanonicalLtd/blues-identity/internal/mongodoc"
@@ -30,14 +29,9 @@ var blacklistUsernames = map[params.Username]bool{
 	store.AdminUsername: true,
 }
 
-var storeGetLaunchpadGroups = (*store.Store).GetLaunchpadGroups
-
 // QueryUsers serves the /u endpoint. See http://tinyurl.com/lu3mmr9 for
 // details.
 func (h *apiHandler) QueryUsers(p httprequest.Params, r *params.QueryUsersRequest) ([]string, error) {
-	if err := h.checkAdmin(); err != nil {
-		return nil, errgo.Mask(err, errgo.Any)
-	}
 	query := make(bson.D, 0, 4)
 	if r.ExternalID != "" {
 		query = append(query, bson.DocElem{"external_id", r.ExternalID})
@@ -77,15 +71,11 @@ func (h *apiHandler) QueryUsers(p httprequest.Params, r *params.QueryUsersReques
 // User serves the /u/$username endpoint. See http://tinyurl.com/lrdjwmw
 // for details.
 func (h *apiHandler) User(p httprequest.Params, r *params.UserRequest) (*params.User, error) {
-	acl := append(adminACL, string(r.Username))
-	if err := h.store.CheckACL(opGetUser, p.Request, acl); err != nil {
-		return nil, errgo.Mask(err, errgo.Any)
-	}
 	id, err := h.store.GetIdentity(r.Username)
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
-	return userFromIdentity(h.store, id)
+	return userFromIdentity(p.Context, id)
 }
 
 // SetUser creates or updates the user with the given username. If the
@@ -96,9 +86,6 @@ func (h *apiHandler) User(p httprequest.Params, r *params.UserRequest) (*params.
 func (h *apiHandler) SetUser(p httprequest.Params, u *params.SetUserRequest) error {
 	if u.Owner != "" {
 		return h.setAgent(p, u)
-	}
-	if err := h.store.CheckACL(opCreateUser, p.Request, adminACL); err != nil {
-		return errgo.Mask(err, errgo.Any)
 	}
 	if blacklistUsernames[u.Username] {
 		return errgo.WithCausef(nil, params.ErrForbidden, "username %q is reserved", u.Username)
@@ -118,25 +105,47 @@ func (h *apiHandler) SetUser(p httprequest.Params, u *params.SetUserRequest) err
 // of the groups to which the owner has access. Note: Currently only
 // admin users can create agents.
 func (h *apiHandler) setAgent(p httprequest.Params, u *params.SetUserRequest) error {
-	err := h.store.CheckACL(opCreateAgent, p.Request, append(
-		adminACL,
-		"+create-agent@"+string(u.User.Owner),
-	))
-	if err != nil {
-		return errgo.Mask(err, errgo.Any)
-	}
 	if !strings.HasSuffix(string(u.Username), "@"+string(u.User.Owner)) {
 		return errgo.WithCausef(nil, params.ErrForbidden, `%s cannot create user %q (suffix must be "@%s")`, u.User.Owner, u.Username, u.User.Owner)
 	}
 	// TODO we will need a mechanism to revoke groups from all agents
 	// belonging to an owner if the owner loses the group.
-	if err := h.checkRequestHasAllGroups(p.Request, u.User.IDPGroups); err != nil {
+	if err := checkMemberOfAllGroups(p.Context, u.User.IDPGroups); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrForbidden))
 	}
-
 	doc := identityFromSetUserParams(u)
 	if err := h.store.UpsertAgent(doc); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrAlreadyExists))
+	}
+	return nil
+}
+
+func checkMemberOfAllGroups(ctx context.Context, groups []string) error {
+	id := identityFromContext(ctx)
+	if id == "" {
+		return errgo.Newf("no authenticated identity found")
+	}
+	// TODO If Identity.Allow was more efficient, we could just call
+	// id.Allow for each member of u.User.IDPGroups.
+	idGroups, err := id.Groups(ctx)
+	if err != nil {
+		return errgo.Notef(err, "cannot get groups")
+	}
+	// Admins are considered to be a member of all groups.
+	for _, g := range store.AdminACL {
+		if string(id) == g {
+			return nil
+		}
+	}
+
+Outer:
+	for _, g := range groups {
+		for _, idg := range idGroups {
+			if idg == g {
+				continue Outer
+			}
+		}
+		return errgo.WithCausef(err, params.ErrForbidden, "not a member of %q", g)
 	}
 	return nil
 }
@@ -145,23 +154,6 @@ func identityFromSetUserParams(u *params.SetUserRequest) *mongodoc.Identity {
 	id := identityFromUser(&u.User)
 	id.Username = string(u.Username)
 	return id
-}
-
-func (h *handler) checkRequestHasAllGroups(r *http.Request, groups []string) error {
-	requestGroups, err := h.store.GroupsFromRequest(opCreateAgent, r)
-	if err != nil {
-		return errgo.Notef(err, "cannot check groups")
-	}
-Outer:
-	for _, group := range groups {
-		for _, g := range requestGroups {
-			if g == group || g == store.AdminUsername {
-				continue Outer
-			}
-		}
-		return errgo.WithCausef(err, params.ErrForbidden, "not a member of %q", group)
-	}
-	return nil
 }
 
 // Calculate the gravatar hash based on the following specification :
@@ -178,41 +170,28 @@ func gravatarHash(s string) string {
 // UserGroups serves the GET /u/$username/groups endpoint, and returns
 // the list of groups associated with the user.
 func (h *apiHandler) UserGroups(p httprequest.Params, r *params.UserGroupsRequest) ([]string, error) {
-	// Administrators, users with GroupList permissions and the user
-	// themselves can list their groups.
-	if err := h.store.CheckACL(
-		opGetUserGroups,
-		p.Request,
-		append(adminACL, store.GroupListGroup, string(r.Username)),
-	); err != nil {
-		return nil, errgo.Mask(err, errgo.Any)
-	}
-	id, err := h.store.GetIdentity(r.Username)
+	groups, err := store.Identity(r.Username).Groups(p.Context)
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
-	return userGroups(h.store, id), nil
+	if groups == nil {
+		groups = []string{}
+	}
+	return groups, nil
 }
 
-func userGroups(store *store.Store, id *mongodoc.Identity) []string {
-	lpGroups, err := storeGetLaunchpadGroups(store, id.ExternalID)
-	if err != nil {
-		logger.Errorf("Failed to get launchpad groups for user: %s", err)
-	}
-	return uniqueStrings(append(id.Groups, lpGroups...))
+// UserIDPGroups serves the /u/$username/idpgroups endpoint, and returns
+// the list of groups associated with the user. This endpoint should no longer be used
+// and is maintained for backwards compatibility purposes only.
+func (h *apiHandler) UserIDPGroups(p httprequest.Params, r *params.UserIDPGroupsRequest) ([]string, error) {
+	return h.UserGroups(p, &params.UserGroupsRequest{
+		Username: r.Username,
+	})
 }
 
 // SetUserGroups serves the PUT /u/$username/groups endpoint, and sets the
 // list of groups associated with the user.
 func (h *apiHandler) SetUserGroups(p httprequest.Params, r *params.SetUserGroupsRequest) error {
-	// Only administrators can set a user's groups.
-	if err := h.store.CheckACL(
-		opSetUserGroups,
-		p.Request,
-		adminACL,
-	); err != nil {
-		return errgo.Mask(err, errgo.Any)
-	}
 	if err := h.store.SetGroups(r.Username, r.Groups.Groups); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
@@ -227,14 +206,6 @@ func (h *apiHandler) ModifyUserGroups(p httprequest.Params, r *params.ModifyUser
 	if len(r.Groups.Add) > 0 && len(r.Groups.Remove) > 0 {
 		return errgo.WithCausef(nil, params.ErrBadRequest, "cannot add and remove groups in the same operation")
 	}
-	// Only administrators can update a user's groups.
-	if err := h.store.CheckACL(
-		opSetUserGroups,
-		p.Request,
-		adminACL,
-	); err != nil {
-		return errgo.Mask(err, errgo.Any)
-	}
 	if len(r.Groups.Add) > 0 {
 		return errgo.Mask(h.store.AddGroups(r.Username, r.Groups.Add), errgo.Is(params.ErrNotFound))
 	} else {
@@ -242,50 +213,9 @@ func (h *apiHandler) ModifyUserGroups(p httprequest.Params, r *params.ModifyUser
 	}
 }
 
-// uniqueStrings removes all duplicates from the supplied
-// string slice, updating the slice in place.
-// The values will be in lexicographic order.
-func uniqueStrings(ss []string) []string {
-	if ss == nil {
-		return []string{}
-	}
-	if len(ss) < 2 {
-		return ss
-	}
-	sort.Strings(ss)
-	prev := ss[0]
-	out := ss[:1]
-	for _, s := range ss[1:] {
-		if s == prev {
-			continue
-		}
-		out = append(out, s)
-		prev = s
-	}
-	return out
-}
-
-// UserIDPGroups serves the /u/$username/idpgroups endpoint, and returns
-// the list of groups associated with the user. This endpoint should no longer be used
-// and is maintained for backwards compatibility purposes only.
-func (h *apiHandler) UserIDPGroups(p httprequest.Params, r *params.UserIDPGroupsRequest) ([]string, error) {
-	if err := h.checkAdmin(); err != nil {
-		return nil, errgo.Mask(err, errgo.Any)
-	}
-	id, err := h.store.GetIdentity(r.Username)
-	if err != nil {
-		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
-	}
-	return userGroups(h.store, id), nil
-}
-
 // GetSSHKeys serves the /u/$username/sshkeys endpoint, and returns
 // the list of ssh keys associated with the user.
 func (h *apiHandler) GetSSHKeys(p httprequest.Params, r *params.SSHKeysRequest) (params.SSHKeysResponse, error) {
-	acl := append(adminACL, store.SSHKeyGetterGroup, string(r.Username))
-	if err := h.store.CheckACL(opGetUserSSHKey, p.Request, acl); err != nil {
-		return params.SSHKeysResponse{}, errgo.Mask(err, errgo.Any)
-	}
 	id, err := h.store.GetIdentity(r.Username)
 	if err != nil {
 		return params.SSHKeysResponse{}, errgo.Mask(err, errgo.Is(params.ErrNotFound))
@@ -299,10 +229,6 @@ func (h *apiHandler) GetSSHKeys(p httprequest.Params, r *params.SSHKeysRequest) 
 // the list of ssh keys associated with the user. If the add parameter is set to
 // true then it will only add to the current list of ssh keys
 func (h *apiHandler) PutSSHKeys(p httprequest.Params, r *params.PutSSHKeysRequest) error {
-	acl := append(adminACL, string(r.Username))
-	if err := h.store.CheckACL(opSetUserSSHKey, p.Request, acl); err != nil {
-		return errgo.Mask(err, errgo.Any)
-	}
 	if r.Body.Add {
 		err := h.store.UpdateIdentity(r.Username, bson.D{{"$addToSet", bson.D{{"ssh_keys", bson.D{{"$each", r.Body.SSHKeys}}}}}})
 		if err != nil {
@@ -320,10 +246,6 @@ func (h *apiHandler) PutSSHKeys(p httprequest.Params, r *params.PutSSHKeysReques
 // DeleteSSHKeys serves the /u/$username/sshkeys delete endpoint, and remove
 // ssh keys from the list of ssh keys associated with the user.
 func (h *apiHandler) DeleteSSHKeys(p httprequest.Params, r *params.DeleteSSHKeysRequest) error {
-	acl := append(adminACL, string(r.Username))
-	if err := h.store.CheckACL(opSetUserSSHKey, p.Request, acl); err != nil {
-		return errgo.Mask(err, errgo.Any)
-	}
 	err := h.store.UpdateIdentity(r.Username, bson.D{{"$pull", bson.D{{"ssh_keys", bson.D{{"$in", r.Body.SSHKeys}}}}}})
 	if err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrNotFound))
@@ -333,44 +255,41 @@ func (h *apiHandler) DeleteSSHKeys(p httprequest.Params, r *params.DeleteSSHKeys
 
 // UserToken serves a token, in the form of a macaroon, identifying
 // the user. This token can only be generated by an administrator.
-func (h *apiHandler) UserToken(p httprequest.Params, r *params.UserTokenRequest) (*macaroon.Macaroon, error) {
-	if err := h.checkAdmin(); err != nil {
-		return nil, errgo.Mask(err, errgo.Any)
-	}
+func (h *apiHandler) UserToken(p httprequest.Params, r *params.UserTokenRequest) (*bakery.Macaroon, error) {
 	id, err := h.store.GetIdentity(r.Username)
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
-	m, err := h.store.Service.NewMacaroon(httpbakery.RequestVersion(p.Request),
+	m, err := h.store.Bakery.Oven.NewMacaroon(
+		p.Context,
+		httpbakery.RequestVersion(p.Request),
+		time.Now().Add(24*time.Hour),
 		[]checkers.Caveat{
-			checkers.DeclaredCaveat("uuid", id.UUID),
-			checkers.DeclaredCaveat("username", id.Username),
-			checkers.TimeBeforeCaveat(time.Now().Add(24 * time.Hour)),
-		})
+			idmclient.UserDeclaration(id.Username),
+		},
+		bakery.LoginOp,
+	)
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot mint macaroon")
 	}
 	return m, nil
 }
 
-func (h *apiHandler) VerifyToken(r *params.VerifyTokenRequest) (map[string]string, error) {
-	d := checkers.InferDeclared(r.Macaroons)
-	err := h.store.Service.Check(r.Macaroons, checkers.New(
-		checkers.TimeBefore,
-		d,
-	))
+func (h *apiHandler) VerifyToken(p httprequest.Params, r *params.VerifyTokenRequest) (map[string]string, error) {
+	ctx := httpbakery.ContextWithRequest(p.Context, p.Request)
+	authInfo, err := h.store.Bakery.Checker.Auth(r.Macaroons).Allow(ctx, bakery.LoginOp)
 	if err != nil {
+		// TODO only return ErrForbidden when the error is because of bad macaroons.
 		return nil, errgo.WithCausef(err, params.ErrForbidden, `verification failure`)
 	}
-	return d, nil
+	return map[string]string{
+		"username": authInfo.Identity.Id(),
+	}, nil
 }
 
 // UserExtraInfo serves the /v1/u/:username/extra-info endpoint, see
 // http://tinyurl.com/mxo24yy for details.
 func (h *apiHandler) UserExtraInfo(p httprequest.Params, r *params.UserExtraInfoRequest) (map[string]interface{}, error) {
-	if err := h.checkAdmin(); err != nil {
-		return nil, errgo.Mask(err, errgo.Any)
-	}
 	id, err := h.store.GetIdentity(r.Username)
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
@@ -386,9 +305,6 @@ func (h *apiHandler) UserExtraInfo(p httprequest.Params, r *params.UserExtraInfo
 // SetUserExtraInfo serves the /v1/u/:username/extra-info endpoint, see
 // http://tinyurl.com/mqpynlw for details.
 func (h *apiHandler) SetUserExtraInfo(p httprequest.Params, r *params.SetUserExtraInfoRequest) error {
-	if err := h.checkAdmin(); err != nil {
-		return errgo.Mask(err, errgo.Any)
-	}
 	ei := make(bson.D, 0, len(r.ExtraInfo))
 	for k, v := range r.ExtraInfo {
 		if err := checkExtraInfoKey(k); err != nil {
@@ -411,9 +327,6 @@ func (h *apiHandler) SetUserExtraInfo(p httprequest.Params, r *params.SetUserExt
 // UserExtraInfoItem serves the /u/:username/extra-info/:item
 // endpoint, see http://tinyurl.com/mjuu7dt for details.
 func (h *apiHandler) UserExtraInfoItem(p httprequest.Params, r *params.UserExtraInfoItemRequest) (interface{}, error) {
-	if err := h.checkAdmin(); err != nil {
-		return nil, errgo.Mask(err, errgo.Any)
-	}
 	id, err := h.store.GetIdentity(r.Username)
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
@@ -425,9 +338,6 @@ func (h *apiHandler) UserExtraInfoItem(p httprequest.Params, r *params.UserExtra
 // ServeUserPutExtraInfoItem serves the /u/:username/extra-info/:item
 // endpoint, see http://tinyurl.com/l5dc4r4 for details.
 func (h *apiHandler) SetUserExtraInfoItem(p httprequest.Params, r *params.SetUserExtraInfoItemRequest) error {
-	if err := h.checkAdmin(); err != nil {
-		return errgo.Mask(err, errgo.Any)
-	}
 	if err := checkExtraInfoKey(r.Item); err != nil {
 		return errgo.Mask(err, errgo.Is(params.ErrBadRequest))
 	}
@@ -452,7 +362,7 @@ func checkExtraInfoKey(key string) error {
 	return nil
 }
 
-func userFromIdentity(store *store.Store, id *mongodoc.Identity) (*params.User, error) {
+func userFromIdentity(ctx context.Context, id *mongodoc.Identity) (*params.User, error) {
 	var publicKeys []*bakery.PublicKey
 	if len(id.PublicKeys) > 0 {
 		publicKeys = make([]*bakery.PublicKey, len(id.PublicKeys))
@@ -464,13 +374,17 @@ func userFromIdentity(store *store.Store, id *mongodoc.Identity) (*params.User, 
 			publicKeys[i] = &pk
 		}
 	}
+	groups, err := store.Identity(id.Username).Groups(ctx)
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
 	return &params.User{
 		Username:      params.Username(id.Username),
 		ExternalID:    id.ExternalID,
 		FullName:      id.FullName,
 		Email:         id.Email,
 		GravatarID:    id.GravatarID,
-		IDPGroups:     userGroups(store, id),
+		IDPGroups:     groups,
 		Owner:         params.Username(id.Owner),
 		PublicKeys:    publicKeys,
 		SSHKeys:       id.SSHKeys,

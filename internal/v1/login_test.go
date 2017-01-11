@@ -3,17 +3,13 @@
 package v1_test
 
 import (
-	"encoding/base64"
-	"encoding/json"
 	"net/http/httptest"
 	"net/url"
-	"strings"
 	"time"
 
 	"github.com/juju/idmclient/params"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
-	"gopkg.in/macaroon.v2-unstable"
 
 	"github.com/CanonicalLtd/blues-identity/idp"
 	"github.com/CanonicalLtd/blues-identity/idp/test"
@@ -61,7 +57,7 @@ func (s *loginSuite) TestInteractiveLogin(c *gc.C) {
 	}
 	u, err := url.Parse(location + "/v1/idp/test/login")
 	c.Assert(err, gc.IsNil)
-	err = visitor.VisitWebPage(client, map[string]*url.URL{httpbakery.UserInteractionMethod: u})
+	err = visitor.VisitWebPage(testContext, client, map[string]*url.URL{httpbakery.UserInteractionMethod: u})
 	c.Assert(err, gc.IsNil)
 	c.Assert(jar.cookies, gc.HasLen, 0)
 	st := s.pool.GetNoLimit()
@@ -85,7 +81,7 @@ func (s *loginSuite) TestNonInteractiveLogin(c *gc.C) {
 	}
 	u, err := url.Parse(location + "/v1/idp/test/login")
 	c.Assert(err, gc.IsNil)
-	err = visitor.VisitWebPage(client, map[string]*url.URL{"test": u})
+	err = visitor.VisitWebPage(testContext, client, map[string]*url.URL{"test": u})
 	c.Assert(err, gc.IsNil)
 	c.Assert(jar.cookies, gc.HasLen, 0)
 	st := s.pool.GetNoLimit()
@@ -103,31 +99,7 @@ func (s *loginSuite) TestLoginFailure(c *gc.C) {
 	}
 	u, err := url.Parse(location + "/v1/idp/test/login")
 	c.Assert(err, gc.IsNil)
-	err = visitor.VisitWebPage(client, map[string]*url.URL{httpbakery.UserInteractionMethod: u})
-	c.Assert(err, gc.ErrorMatches, `user "" not found: not found`)
+	err = visitor.VisitWebPage(testContext, client, map[string]*url.URL{httpbakery.UserInteractionMethod: u})
+	c.Assert(err, gc.ErrorMatches, `Post https:.*: user "" not found: not found`)
 	c.Assert(jar.cookies, gc.HasLen, 0)
-}
-
-func (s *loginSuite) assertMacaroon(c *gc.C, jar *testCookieJar, userId string) {
-	var ms macaroon.Slice
-	for _, cookie := range jar.cookies {
-		if strings.HasPrefix(cookie.Name, "macaroon-") {
-			data, err := base64.StdEncoding.DecodeString(cookie.Value)
-			c.Assert(err, gc.IsNil)
-			err = json.Unmarshal(data, &ms)
-			c.Assert(err, gc.IsNil)
-			break
-		}
-	}
-	c.Assert(ms, gc.Not(gc.HasLen), 0)
-	cavs := ms[0].Caveats()
-	var found bool
-	for _, cav := range cavs {
-		if strings.HasPrefix(string(cav.Id), "declared username") {
-			found = true
-			un := strings.TrimPrefix(string(cav.Id), "declared username ")
-			c.Assert(un, gc.Equals, userId)
-		}
-	}
-	c.Assert(found, gc.Equals, true, gc.Commentf("no username  caveat"))
 }

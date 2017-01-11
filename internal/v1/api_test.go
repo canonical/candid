@@ -11,13 +11,13 @@ import (
 	"github.com/juju/idmclient/params"
 	"github.com/juju/testing"
 	"github.com/juju/testing/httptesting"
+	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
 	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
 	"gopkg.in/macaroon.v2-unstable"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
-	"launchpad.net/lpad"
 
 	"github.com/CanonicalLtd/blues-identity/idp"
 	"github.com/CanonicalLtd/blues-identity/internal/identity"
@@ -85,7 +85,6 @@ func newServer(c *gc.C, session *mgo.Session, key *bakery.KeyPair, idps []idp.Id
 		Key:               key,
 		Location:          location,
 		MaxMgoSessions:    50,
-		Launchpad:         lpad.Production,
 		IdentityProviders: idps,
 		PrivateAddr:       "localhost",
 	}
@@ -95,7 +94,6 @@ func newServer(c *gc.C, session *mgo.Session, key *bakery.KeyPair, idps []idp.Id
 		Key:            sp.Key,
 		Location:       sp.Location,
 		MaxMgoSessions: sp.MaxMgoSessions,
-		Launchpad:      sp.Launchpad,
 		PrivateAddr:    sp.PrivateAddr,
 	})
 	c.Assert(err, gc.IsNil)
@@ -110,11 +108,13 @@ func newServer(c *gc.C, session *mgo.Session, key *bakery.KeyPair, idps []idp.Id
 	return srv, pool
 }
 
-func (s *apiSuite) assertMacaroon(c *gc.C, ms macaroon.Slice, check bakery.FirstPartyChecker) {
+func (s *apiSuite) assertMacaroon(c *gc.C, ms macaroon.Slice, expectUser string) {
 	store := s.pool.GetNoLimit()
 	defer s.pool.Put(store)
-	err := store.Service.Check(ms, check)
+	authInfo, err := store.Bakery.Checker.Auth(ms).Allow(context.TODO(), bakery.LoginOp)
 	c.Assert(err, gc.IsNil)
+	c.Assert(authInfo.Identity, gc.NotNil)
+	c.Assert(authInfo.Identity.Id(), gc.Equals, expectUser)
 }
 
 func (s *apiSuite) createUser(c *gc.C, user *params.User) string {

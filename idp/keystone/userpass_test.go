@@ -12,7 +12,6 @@ import (
 	"github.com/juju/testing/httptesting"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
-	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
 	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery/form"
 	"gopkg.in/yaml.v2"
 
@@ -78,23 +77,18 @@ func (s *userpassSuite) TestKeystoneUserpassIdentityProviderHandleResponse(c *gc
 	req, err := http.NewRequest("POST", "https://idp.test/login?waitid=1", bytes.NewReader(body))
 	c.Assert(err, gc.IsNil)
 	req.Header.Set("Content-Type", "application/json")
-	b, err := bakery.NewService(bakery.NewServiceParams{})
 	tc := &idptest.TestContext{
 		URLPrefix: "https://idp.test",
-		Bakery_:   b,
+		Bakery_:   bakery.New(bakery.BakeryParams{}),
 		Request:   req,
 	}
 	s.idp.Handle(tc)
-	idptest.AssertLoginSuccess(c, tc,
-		checkers.New(
-			checkers.TimeBefore,
-		),
-		&params.User{
-			Username:   params.Username("testuser@openstack"),
-			ExternalID: "abc@openstack",
-			IDPGroups:  []string{"abc_project@openstack"},
-		},
-	)
+	idptest.AssertLoginSuccess(c, tc, "testuser@openstack")
+	idptest.AssertUser(c, tc, &params.User{
+		Username:   params.Username("testuser@openstack"),
+		ExternalID: "abc@openstack",
+		IDPGroups:  []string{"abc_project@openstack"},
+	})
 	c.Assert(tc.Response().Body.String(), gc.Equals, "login successful as user testuser@openstack\n")
 }
 
@@ -102,10 +96,9 @@ func (s *userpassSuite) TestKeystoneUserpassIdentityProviderHandleBadRequest(c *
 	req, err := http.NewRequest("POST", "https://idp.test/login?waitid=1", strings.NewReader("{"))
 	c.Assert(err, gc.IsNil)
 	req.Header.Set("Content-Type", "application/json")
-	b, err := bakery.NewService(bakery.NewServiceParams{})
 	tc := &idptest.TestContext{
 		URLPrefix: "https://idp.test",
-		Bakery_:   b,
+		Bakery_:   bakery.New(bakery.BakeryParams{}),
 		Request:   req,
 	}
 	s.idp.Handle(tc)
@@ -123,10 +116,9 @@ func (s *userpassSuite) TestKeystoneUserpassIdentityProviderHandleNoUsername(c *
 	req, err := http.NewRequest("POST", "https://idp.test/login?waitid=1", bytes.NewReader(body))
 	c.Assert(err, gc.IsNil)
 	req.Header.Set("Content-Type", "application/json")
-	b, err := bakery.NewService(bakery.NewServiceParams{})
 	tc := &idptest.TestContext{
 		URLPrefix: "https://idp.test",
-		Bakery_:   b,
+		Bakery_:   bakery.New(bakery.BakeryParams{}),
 		Request:   req,
 	}
 	s.idp.Handle(tc)

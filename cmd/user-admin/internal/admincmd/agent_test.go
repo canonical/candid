@@ -24,17 +24,9 @@ const testAgent = `{"username":"admin@idm","public_key":"5Htoc1jTiIlSDxUW+9ZIrSX
 const testInvalidAgent = `{"username":"admin@idm","public_key":"\xff5Htoc1jTiIlSDxUW+9ZIrSXEarH1XU/SRJNNLRvgN1k=","private_key":"YwBfLQvzPwuFEeqGUprc8zYk3iMi1VqdRmklZdF++w8="}`
 const testAgentCookie = `{"username":"admin@idm","public_key":"5Htoc1jTiIlSDxUW+9ZIrSXEarH1XU/SRJNNLRvgN1k="}`
 
-type agentSuite struct {
-	key *bakery.KeyPair
-}
+type agentSuite struct{}
 
 var _ = gc.Suite(&agentSuite{})
-
-func (s *agentSuite) SetUpSuite(c *gc.C) {
-	var err error
-	s.key, err = bakery.GenerateKey()
-	c.Assert(err, gc.Equals, nil)
-}
 
 var readTests = []struct {
 	about            string
@@ -120,10 +112,11 @@ func (s *agentSuite) TestLoadBadFile(c *gc.C) {
 }
 
 func (s *agentSuite) TestWrite(c *gc.C) {
+	key := bakery.MustGenerateKey()
 	a := admincmd.Agent{
 		Username:   "agent@bob",
-		PublicKey:  &s.key.Public,
-		PrivateKey: &s.key.Private,
+		PublicKey:  &key.Public,
+		PrivateKey: &key.Private,
 	}
 	buf := new(bytes.Buffer)
 	err := admincmd.Write(buf, a)
@@ -135,9 +128,10 @@ func (s *agentSuite) TestWrite(c *gc.C) {
 }
 
 func (s *agentSuite) TestWriteNoPrivateKey(c *gc.C) {
+	key := bakery.MustGenerateKey()
 	a := admincmd.Agent{
 		Username:  "agent@bob",
-		PublicKey: &s.key.Public,
+		PublicKey: &key.Public,
 	}
 	buf := new(bytes.Buffer)
 	err := admincmd.Write(buf, a)
@@ -146,18 +140,19 @@ func (s *agentSuite) TestWriteNoPrivateKey(c *gc.C) {
 	err = json.Unmarshal(buf.Bytes(), &m)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(m["username"], gc.Equals, "agent@bob")
-	c.Assert(m["public_key"], gc.Equals, s.key.Public.String())
+	c.Assert(m["public_key"], gc.Equals, key.Public.String())
 	_, ok := m["private_key"]
 	c.Assert(ok, gc.Equals, false)
 }
 
 func (s *agentSuite) TestWriteError(c *gc.C) {
+	key := bakery.MustGenerateKey()
 	stub := new(testing.Stub)
 	w, _ := filetesting.NewStubWriter(stub)
 	stub.SetErrors(errgo.New("test error"))
 	a := admincmd.Agent{
 		Username:  "agent@bob",
-		PublicKey: &s.key.Public,
+		PublicKey: &key.Public,
 	}
 	err := admincmd.Write(w, a)
 	c.Assert(err, gc.ErrorMatches, `test error`)

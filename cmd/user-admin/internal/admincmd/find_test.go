@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/juju/httprequest"
 	"github.com/juju/idmclient/params"
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
@@ -19,39 +18,37 @@ type findSuite struct {
 var _ = gc.Suite(&findSuite{})
 
 func (s *findSuite) TestFindEmail(c *gc.C) {
-	bakeryService := newBakery()
-	runf := s.RunServer(c, []httprequest.Handler{
-		queryUsersHandler(bakeryService, func(req *params.QueryUsersRequest) ([]string, error) {
+	runf := s.RunServer(c, &handler{
+		queryUsers: func(req *params.QueryUsersRequest) ([]string, error) {
 			if req.Email == "bob@example.com" {
 				return []string{"bob"}, nil
 			}
 			return []string{}, nil
-		}),
+		},
 	})
 	stdout := CheckSuccess(c, runf, "find", "-a", "admin.agent", "-e", "bob@example.com")
 	c.Assert(stdout, gc.Equals, "bob\n")
 }
 
 func (s *findSuite) TestFindEmailNotFound(c *gc.C) {
-	bakeryService := newBakery()
-	runf := s.RunServer(c, []httprequest.Handler{
-		queryUsersHandler(bakeryService, func(req *params.QueryUsersRequest) ([]string, error) {
+	runf := s.RunServer(c, &handler{
+		queryUsers: func(req *params.QueryUsersRequest) ([]string, error) {
 			if req.Email == "alice@example.com" {
 				return []string{"alice"}, nil
 			}
 			return []string{}, nil
-		}),
+		},
 	})
 	stdout := CheckSuccess(c, runf, "find", "-a", "admin.agent", "-e", "bob@example.com")
 	c.Assert(stdout, gc.Equals, "")
 }
 
 func (s *findSuite) TestFindNoParameters(c *gc.C) {
-	bakeryService := newBakery()
-	runf := s.RunServer(c, []httprequest.Handler{
-		queryUsersHandler(bakeryService, func(req *params.QueryUsersRequest) ([]string, error) {
+
+	runf := s.RunServer(c, &handler{
+		queryUsers: func(req *params.QueryUsersRequest) ([]string, error) {
 			return []string{"alice", "bob", "charlie"}, nil
-		}),
+		},
 	})
 	stdout := CheckSuccess(c, runf, "find", "-a", "admin.agent", "--format", "json")
 	var usernames []string
@@ -62,14 +59,13 @@ func (s *findSuite) TestFindNoParameters(c *gc.C) {
 
 func (s *findSuite) TestFindLastLoginTime(c *gc.C) {
 	var gotTime time.Time
-	bakeryService := newBakery()
-	runf := s.RunServer(c, []httprequest.Handler{
-		queryUsersHandler(bakeryService, func(req *params.QueryUsersRequest) ([]string, error) {
+	runf := s.RunServer(c, &handler{
+		queryUsers: func(req *params.QueryUsersRequest) ([]string, error) {
 			if err := gotTime.UnmarshalText([]byte(req.LastLoginSince)); err != nil {
 				return nil, err
 			}
 			return []string{"alice", "bob", "charlie"}, nil
-		}),
+		},
 	})
 	stdout := CheckSuccess(c, runf, "find", "-a", "admin.agent", "--format", "json", "--last-login", "30")
 	var usernames []string
@@ -82,14 +78,13 @@ func (s *findSuite) TestFindLastLoginTime(c *gc.C) {
 
 func (s *findSuite) TestFindLastDischargeTime(c *gc.C) {
 	var gotTime time.Time
-	bakeryService := newBakery()
-	runf := s.RunServer(c, []httprequest.Handler{
-		queryUsersHandler(bakeryService, func(req *params.QueryUsersRequest) ([]string, error) {
+	runf := s.RunServer(c, &handler{
+		queryUsers: func(req *params.QueryUsersRequest) ([]string, error) {
 			if err := gotTime.UnmarshalText([]byte(req.LastDischargeSince)); err != nil {
 				return nil, err
 			}
 			return []string{"alice", "bob", "charlie"}, nil
-		}),
+		},
 	})
 	stdout := CheckSuccess(c, runf, "find", "-a", "admin.agent", "--format", "json", "--last-discharge", "20")
 	var usernames []string

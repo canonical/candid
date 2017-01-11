@@ -9,7 +9,7 @@ import (
 	"golang.org/x/net/context"
 	"golang.org/x/net/trace"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
+	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
 	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
 
 	"github.com/CanonicalLtd/blues-identity/idp"
@@ -21,29 +21,15 @@ import (
 
 var logger = loggo.GetLogger("identity.internal.v1")
 
-const (
-	opAdmin         checkers.OperationChecker = "admin"
-	opCreateAgent   checkers.OperationChecker = "create-agent"
-	opCreateUser    checkers.OperationChecker = "create-user"
-	opGetUser       checkers.OperationChecker = "get-user"
-	opGetUserSSHKey checkers.OperationChecker = "get-user-ssh-key"
-	opSetUserSSHKey checkers.OperationChecker = "set-user-ssh-key"
-	opGetUserGroups checkers.OperationChecker = "get-user-groups"
-	opSetUserGroups checkers.OperationChecker = "set-user-groups"
-)
-
-// TODO(mhilton) make the admin ACL configurable
-var adminACL = []string{store.AdminUsername}
-
 // NewAPIHandler is an identity.NewAPIHandlerFunc.
 func NewAPIHandler(p *store.Pool, params identity.ServerParams) ([]httprequest.Handler, error) {
 	h := New(p, params)
-	handlers := identity.ErrorMapper.Handlers(h.apiHandler)
-	handlers = append(handlers, identity.ErrorMapper.Handlers(h.dischargeHandler)...)
+	handlers := identity.ReqServer.Handlers(h.apiHandler)
+	handlers = append(handlers, identity.ReqServer.Handlers(h.dischargeHandler)...)
 	d := httpbakery.NewDischarger(httpbakery.DischargerParams{
 		Checker:         thirdPartyCaveatChecker{h},
 		Key:             params.Key,
-		ErrorToResponse: identity.ErrorMapper,
+		ErrorToResponse: identity.ReqServer.ErrorMapper,
 	})
 	for _, h := range d.Handlers() {
 		handlers = append(handlers, h)
@@ -84,9 +70,37 @@ func (h *Handler) newHandler() interface{} {
 	}
 }
 
-func (h *Handler) getHandler(p httprequest.Params, traceFamily string) (*handler, error) {
+func (h *Handler) getAuthorizedHandler(p httprequest.Params, traceFamily string, req interface{}) (*handler, context.Context, error) {
+	hnd, ctx, err := h.getHandler(p, traceFamily)
+	if err != nil {
+		return nil, nil, errgo.Mask(err)
+	}
+	op := opForRequest(req)
+	logger.Infof("opForRequest %#v -> %#v", req, op)
+	if op.Entity == "" {
+		hnd.Close()
+		return nil, nil, params.ErrUnauthorized
+	}
+	authInfo, err := hnd.store.Authorize(p.Context, p.Request, op)
+	if err != nil {
+		hnd.Close()
+		return nil, nil, errgo.Mask(err, errgo.Any)
+	}
+	if authInfo.Identity != nil {
+		id, ok := authInfo.Identity.(store.Identity)
+		if !ok {
+			hnd.Close()
+			return nil, nil, errgo.Newf("unexpected identity type %T", authInfo.Identity)
+		}
+		ctx = contextWithIdentity(ctx, id)
+	}
+	return hnd, ctx, nil
+}
+
+func (h *Handler) getHandler(p httprequest.Params, traceFamily string) (*handler, context.Context, error) {
+	ctx := p.Context
 	t := trace.New(traceFamily, p.PathPattern)
-	store, err := h.storePool.Get()
+	st, err := h.storePool.Get()
 	if err != nil {
 		// TODO(mhilton) consider logging inside the pool.
 		t.LazyPrintf("cannot get store: %s", err)
@@ -94,33 +108,23 @@ func (h *Handler) getHandler(p httprequest.Params, traceFamily string) (*handler
 			t.SetError()
 		}
 		t.Finish()
-		return nil, errgo.NoteMask(err, "cannot get store", errgo.Any)
+		return nil, nil, errgo.NoteMask(err, "cannot get store", errgo.Any)
 	}
 	t.LazyPrintf("store acquired")
 	handler := h.handlerPool.Get().(*handler)
-	handler.store = store
-	handler.place = &place{store.Place}
-	handler.context = trace.NewContext(context.Background(), t)
-	handler.params = p
-	return handler, nil
+	handler.store = st
+	handler.place = &place{st.Place}
+	handler.trace = t
+	ctx = trace.NewContext(p.Context, t)
+	ctx = store.ContextWithStore(ctx, st)
+	return handler, ctx, nil
 }
 
 type handler struct {
-	h       *Handler
-	params  httprequest.Params
-	store   *store.Store
-	place   *place
-	context context.Context
-}
-
-func (h *handler) checkAdmin() error {
-	return h.store.CheckACL(opAdmin, h.params.Request, adminACL)
-}
-
-// requestURL calculates the originally requested URL for the
-// provided http.Request.
-func (h *handler) requestURL() string {
-	return h.h.location + h.params.Request.RequestURI
+	h     *Handler
+	store *store.Store
+	place *place
+	trace trace.Trace
 }
 
 // serviceURL creates an external URL addressed to the specified path
@@ -133,14 +137,11 @@ func (h *handler) serviceURL(path string) string {
 // once a request is complete.
 func (h *handler) Close() error {
 	h.h.storePool.Put(h.store)
-	if t, ok := trace.FromContext(h.context); ok {
-		t.LazyPrintf("store released")
-		t.Finish()
-	}
+	h.trace.LazyPrintf("store released")
+	h.trace.Finish()
 	h.store = nil
 	h.place = nil
-	h.context = nil
-	h.params = httprequest.Params{}
+	h.trace = nil
 	h.h.handlerPool.Put(h)
 	return nil
 }
@@ -150,15 +151,15 @@ func (h *handler) Close() error {
 // https://godoc.org/github.com/juju/httprequest#ErrorMapper.Handlers and
 // so can be used to automatically derive the list of endpoints to add to
 // the router.
-func (h *Handler) apiHandler(p httprequest.Params) (*apiHandler, error) {
-	hnd, err := h.getHandler(p, "identity.internal.v1")
+func (h *Handler) apiHandler(p httprequest.Params, arg interface{}) (*apiHandler, context.Context, error) {
+	hnd, ctx, err := h.getAuthorizedHandler(p, "identity.internal.v1", arg)
 	if err != nil {
-		return nil, errgo.NoteMask(err, "cannot create handler", errgo.Any)
+		return nil, nil, errgo.Mask(err, errgo.Any)
 	}
 	return &apiHandler{
 		handler: hnd,
 		monReq:  monitoring.NewRequest(&p),
-	}, nil
+	}, ctx, nil
 }
 
 type apiHandler struct {
@@ -178,15 +179,17 @@ func (h *apiHandler) Close() error {
 // https://godoc.org/github.com/juju/httprequest#ErrorMapper.Handlers and
 // so can be used to automatically derive the list of endpoints to add to
 // the router.
-func (h *Handler) dischargeHandler(p httprequest.Params) (*dischargeHandler, error) {
-	hnd, err := h.getHandler(p, p.Request.URL.Path)
+func (h *Handler) dischargeHandler(p httprequest.Params, arg interface{}) (*dischargeHandler, context.Context, error) {
+	hnd, ctx, err := h.getAuthorizedHandler(p, p.Request.URL.Path, arg)
 	if err != nil {
-		return nil, errgo.NoteMask(err, "cannot create handler", errgo.Any)
+		logger.Infof("cannot get authorized handler for discharge handler (pathpat %q; arg %#v): %v", p.PathPattern, arg, err)
+		return nil, nil, errgo.Mask(err, errgo.Any)
 	}
+	logger.Infof("got authorized handler ok")
 	return &dischargeHandler{
 		handler: hnd,
 		monReq:  monitoring.NewRequest(&p),
-	}, nil
+	}, ctx, nil
 }
 
 type dischargeHandler struct {
@@ -199,8 +202,6 @@ func (h *dischargeHandler) Close() error {
 	h.monReq.ObserveMetric()
 	return err
 }
-
-var errNotImplemented = errgo.Newf("method not implemented")
 
 func (h *Handler) idpHandlers() []httprequest.Handler {
 	var handlers []httprequest.Handler
@@ -227,4 +228,66 @@ func (h *Handler) idpHandlers() []httprequest.Handler {
 		)
 	}
 	return handlers
+}
+
+// opForRequest returns the operation that will be performed
+// by the API handler method which takes the given argument r.
+func opForRequest(r interface{}) bakery.Op {
+	switch r := r.(type) {
+	case *params.QueryUsersRequest:
+		return store.GlobalOp(store.ActionRead)
+	case *params.UserRequest:
+		return store.UserOp(r.Username, store.ActionRead)
+	case *params.SetUserRequest:
+		if r.Owner != "" {
+			return store.UserOp(r.Owner, store.ActionCreateAgent)
+		}
+		return store.UserOp(r.Username, store.ActionWriteAdmin)
+	case *params.UserGroupsRequest:
+		return store.UserOp(r.Username, store.ActionReadGroups)
+	case *params.SetUserGroupsRequest:
+		return store.UserOp(r.Username, store.ActionWriteGroups)
+	case *params.ModifyUserGroupsRequest:
+		return store.UserOp(r.Username, store.ActionWriteGroups)
+	case *params.UserIDPGroupsRequest:
+		return store.UserOp(r.Username, store.ActionReadGroups)
+	case *params.SSHKeysRequest:
+		return store.UserOp(r.Username, store.ActionReadSSHKeys)
+	case *params.PutSSHKeysRequest:
+		return store.UserOp(r.Username, store.ActionWriteSSHKeys)
+	case *params.DeleteSSHKeysRequest:
+		return store.UserOp(r.Username, store.ActionWriteSSHKeys)
+	case *params.UserTokenRequest:
+		return store.UserOp(r.Username, store.ActionReadAdmin)
+	case *params.VerifyTokenRequest:
+		return store.GlobalOp(store.ActionVerify)
+	case *params.UserExtraInfoRequest:
+		return store.UserOp(r.Username, store.ActionReadAdmin)
+	case *params.SetUserExtraInfoRequest:
+		return store.UserOp(r.Username, store.ActionWriteAdmin)
+	case *params.UserExtraInfoItemRequest:
+		return store.UserOp(r.Username, store.ActionReadAdmin)
+	case *params.SetUserExtraInfoItemRequest:
+		return store.UserOp(r.Username, store.ActionWriteAdmin)
+	case *loginRequest:
+		return store.GlobalOp(store.ActionLogin)
+	case *dischargeTokenForUserRequest:
+		return store.GlobalOp(store.ActionDischargeFor)
+	case *waitRequest:
+		return store.GlobalOp(store.ActionLogin)
+	default:
+		logger.Infof("unknown API argument type %#v", r)
+	}
+	return bakery.Op{}
+}
+
+type identityKey struct{}
+
+func contextWithIdentity(ctx context.Context, identity store.Identity) context.Context {
+	return context.WithValue(ctx, identityKey{}, identity)
+}
+
+func identityFromContext(ctx context.Context) store.Identity {
+	id, _ := ctx.Value(identityKey{}).(store.Identity)
+	return id
 }

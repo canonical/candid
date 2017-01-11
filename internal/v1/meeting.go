@@ -13,9 +13,10 @@ import (
 )
 
 type dischargeRequestInfo struct {
-	CaveatId []byte
-	Caveat   string
-	Origin   string
+	CaveatId  []byte
+	Caveat    []byte
+	Condition string
+	Origin    string
 }
 
 type loginInfo struct {

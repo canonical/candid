@@ -9,10 +9,10 @@ import (
 	"regexp"
 
 	"github.com/juju/httprequest"
+	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
 	envschemaform "gopkg.in/juju/environschema.v1/form"
-	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
 	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
 	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery/form"
 
@@ -73,9 +73,7 @@ func (s *dischargeSuite) SetUpTest(c *gc.C) {
 }
 
 func (s *dischargeSuite) TestInteractiveDischarge(c *gc.C) {
-	s.AssertDischarge(c, idptest.VisitorFunc(s.visitInteractive), checkers.New(
-		checkers.TimeBefore,
-	))
+	s.AssertDischarge(c, idptest.VisitorFunc(s.visitInteractive))
 }
 
 var urlRegexp = regexp.MustCompile(`[Aa][Cc][Tt][Ii][Oo][Nn]="(.*)"`)
@@ -120,9 +118,7 @@ func (s *dischargeSuite) TestFormDischarge(c *gc.C) {
 			},
 		},
 	)
-	s.AssertDischarge(c, nil, checkers.New(
-		checkers.TimeBefore,
-	))
+	s.AssertDischarge(c, nil)
 }
 
 type keystoneFormFiller struct {
@@ -143,9 +139,7 @@ func (h keystoneFormFiller) Fill(f envschemaform.Form) (map[string]interface{}, 
 }
 
 func (s *dischargeSuite) TestTokenDischarge(c *gc.C) {
-	s.AssertDischarge(c, idptest.VisitorFunc(s.visitToken), checkers.New(
-		checkers.TimeBefore,
-	))
+	s.AssertDischarge(c, idptest.VisitorFunc(s.visitToken))
 }
 
 type tokenLoginRequest struct {
@@ -155,7 +149,7 @@ type tokenLoginRequest struct {
 
 func (s *dischargeSuite) visitToken(u *url.URL) error {
 	var lm map[string]string
-	if err := idputil.GetLoginMethods(s.HTTPRequestClient, u, &lm); err != nil {
+	if err := idputil.GetLoginMethods(context.TODO(), s.HTTPRequestClient, u, &lm); err != nil {
 		return errgo.Mask(err)
 	}
 	if lm["token"] == "" {
@@ -163,7 +157,7 @@ func (s *dischargeSuite) visitToken(u *url.URL) error {
 	}
 	var req tokenLoginRequest
 	req.Token.Login.ID = "789"
-	if err := s.HTTPRequestClient.CallURL(lm["token"], &req, nil); err != nil {
+	if err := s.HTTPRequestClient.CallURL(context.TODO(), lm["token"], &req, nil); err != nil {
 		return errgo.Mask(err)
 	}
 	return nil

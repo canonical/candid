@@ -5,6 +5,7 @@ package admincmd
 import (
 	"github.com/juju/cmd"
 	"github.com/juju/idmclient/params"
+	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
 )
 
@@ -49,6 +50,7 @@ func (c *addGroupCommand) args() string {
 }
 
 func (c *addGroupCommand) Run(ctxt *cmd.Context) error {
+	ctx := context.Background()
 	username, err := c.lookupUser(ctxt)
 	if err != nil {
 		return errgo.Mask(err)
@@ -57,7 +59,7 @@ func (c *addGroupCommand) Run(ctxt *cmd.Context) error {
 	if err != nil {
 		return errgo.Mask(err)
 	}
-	err = client.ModifyUserGroups(&params.ModifyUserGroupsRequest{
+	err = client.ModifyUserGroups(ctx, &params.ModifyUserGroupsRequest{
 		Username: username,
 		Groups: params.ModifyGroups{
 			Add: c.groups,

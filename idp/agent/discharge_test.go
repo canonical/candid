@@ -7,10 +7,10 @@ import (
 
 	"github.com/juju/httprequest"
 	"github.com/juju/idmclient/params"
+	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
-	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
 	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
 	httpbakeryagent "gopkg.in/macaroon-bakery.v2-unstable/httpbakery/agent"
 
@@ -37,7 +37,7 @@ func (s *dischargeSuite) SetUpTest(c *gc.C) {
 }
 
 func (s *dischargeSuite) TestHTTPBakeryAgentDischarge(c *gc.C) {
-	err := s.IDMClient.SetUser(&params.SetUserRequest{
+	err := s.IDMClient.SetUser(context.TODO(), &params.SetUserRequest{
 		Username: params.Username("test@admin@idm"),
 		User: params.User{
 			Username: params.Username("test@admin@idm"),
@@ -48,18 +48,14 @@ func (s *dischargeSuite) TestHTTPBakeryAgentDischarge(c *gc.C) {
 		},
 	})
 	c.Assert(err, gc.IsNil)
-	u, err := url.Parse(idptest.DischargeLocation)
-	c.Assert(err, gc.IsNil)
 	s.BakeryClient.Key = s.agentKey
-	httpbakeryagent.SetUpAuth(s.BakeryClient, u, "test@admin@idm")
-	s.AssertDischarge(c, nil, checkers.New(
-		checkers.TimeBefore,
-	))
+	httpbakeryagent.SetUpAuth(s.BakeryClient, idptest.DischargeLocation, "test@admin@idm")
+	s.AssertDischarge(c, nil)
 	c.Assert(err, gc.IsNil)
 }
 
 func (s *dischargeSuite) TestLegacyAgentDischarge(c *gc.C) {
-	err := s.IDMClient.SetUser(&params.SetUserRequest{
+	err := s.IDMClient.SetUser(context.TODO(), &params.SetUserRequest{
 		Username: params.Username("test@admin@idm"),
 		User: params.User{
 			Username: params.Username("test@admin@idm"),
@@ -76,9 +72,6 @@ func (s *dischargeSuite) TestLegacyAgentDischarge(c *gc.C) {
 			"test@admin@idm",
 			&s.agentKey.Public,
 		}),
-		checkers.New(
-			checkers.TimeBefore,
-		),
 	)
 	c.Assert(err, gc.IsNil)
 }
@@ -93,7 +86,7 @@ type agentVisitor struct {
 	pk       *bakery.PublicKey
 }
 
-func (v *agentVisitor) VisitWebPage(client *httpbakery.Client, m map[string]*url.URL) error {
+func (v *agentVisitor) VisitWebPage(ctx context.Context, client *httpbakery.Client, m map[string]*url.URL) error {
 	agentURL, ok := m["agent"]
 	if !ok {
 		return httpbakery.ErrMethodNotSupported
@@ -107,7 +100,7 @@ func (v *agentVisitor) VisitWebPage(client *httpbakery.Client, m map[string]*url
 			PublicKey: v.pk,
 		},
 	}
-	if err := cl.CallURL(agentURL.String(), req, nil); err != nil {
+	if err := cl.CallURL(ctx, agentURL.String(), req, nil); err != nil {
 		return errgo.Mask(err)
 	}
 	return nil

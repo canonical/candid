@@ -13,7 +13,6 @@ import (
 	"github.com/juju/testing/httptesting"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
-	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
 	"gopkg.in/yaml.v2"
 
 	"github.com/CanonicalLtd/blues-identity/config"
@@ -170,12 +169,10 @@ var handleTests = []struct {
 }}
 
 func (s *testSuite) TestHandle(c *gc.C) {
-	b, err := bakery.NewService(bakery.NewServiceParams{})
-	c.Assert(err, gc.IsNil)
 	for i, test := range handleTests {
 		c.Logf("%d. %s", i, test.about)
 		tc := &idptest.TestContext{
-			Bakery_:   b,
+			Bakery_:   bakery.New(bakery.BakeryParams{}),
 			URLPrefix: "https://idp.test",
 			Request:   test.req,
 		}
@@ -188,7 +185,8 @@ func (s *testSuite) TestHandle(c *gc.C) {
 			idptest.AssertLoginFailure(c, tc, test.expectError)
 			continue
 		}
-		idptest.AssertLoginSuccess(c, tc, checkers.TimeBefore, test.expectUser)
+		idptest.AssertLoginSuccess(c, tc, test.expectUser.Username)
+		idptest.AssertUser(c, tc, test.expectUser)
 	}
 }
 

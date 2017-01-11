@@ -8,6 +8,7 @@ import (
 	"html/template"
 
 	"github.com/juju/idmclient/params"
+	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
 
 	"github.com/CanonicalLtd/blues-identity/config"
@@ -153,7 +154,8 @@ const loginPage = `<!doctype html>
 
 // doLogin performs the login with the keystone server.
 func (idp *identityProvider) doLogin(c idp.Context, a keystone.Auth) {
-	resp, err := idp.client.Tokens(&keystone.TokensRequest{
+	ctx := c.Params().Context
+	resp, err := idp.client.Tokens(ctx, &keystone.TokensRequest{
 		Body: keystone.TokensBody{
 			Auth: a,
 		},
@@ -162,7 +164,7 @@ func (idp *identityProvider) doLogin(c idp.Context, a keystone.Auth) {
 		c.LoginFailure(errgo.WithCausef(err, params.ErrUnauthorized, "cannot log in"))
 		return
 	}
-	groups, err := idp.getGroups(resp.Access.Token.ID)
+	groups, err := idp.getGroups(ctx, resp.Access.Token.ID)
 	if err != nil {
 		c.LoginFailure(errgo.Mask(err))
 		return
@@ -183,8 +185,8 @@ func (idp *identityProvider) doLogin(c idp.Context, a keystone.Auth) {
 // getGroups connects to keystone using token and lists tenants
 // associated with the token. The tenants are then converted to groups
 // names by suffixing with the domain, if configured.
-func (idp *identityProvider) getGroups(token string) ([]string, error) {
-	resp, err := idp.client.Tenants(&keystone.TenantsRequest{
+func (idp *identityProvider) getGroups(ctx context.Context, token string) ([]string, error) {
+	resp, err := idp.client.Tenants(ctx, &keystone.TenantsRequest{
 		AuthToken: token,
 	})
 	if err != nil {
@@ -199,7 +201,8 @@ func (idp *identityProvider) getGroups(token string) ([]string, error) {
 
 // doLoginV3 performs the login with the keystone (version 3) server.
 func (idp *identityProvider) doLoginV3(c idp.Context, a keystone.AuthV3) {
-	resp, err := idp.client.AuthTokens(&keystone.AuthTokensRequest{
+	ctx := c.Params().Context
+	resp, err := idp.client.AuthTokens(ctx, &keystone.AuthTokensRequest{
 		Body: keystone.AuthTokensBody{
 			Auth: a,
 		},
@@ -208,7 +211,7 @@ func (idp *identityProvider) doLoginV3(c idp.Context, a keystone.AuthV3) {
 		c.LoginFailure(errgo.WithCausef(err, params.ErrUnauthorized, "cannot log in"))
 		return
 	}
-	groups, err := idp.getGroupsV3(resp.SubjectToken, resp.Token.User.ID)
+	groups, err := idp.getGroupsV3(ctx, resp.SubjectToken, resp.Token.User.ID)
 	if err != nil {
 		c.LoginFailure(errgo.Mask(err))
 		return
@@ -229,8 +232,8 @@ func (idp *identityProvider) doLoginV3(c idp.Context, a keystone.AuthV3) {
 // getGroupsV3 connects to keystone using token and lists groups
 // associated with the user. The group names are suffixing with the
 // domain, if configured.
-func (idp *identityProvider) getGroupsV3(token, user string) ([]string, error) {
-	resp, err := idp.client.UserGroups(&keystone.UserGroupsRequest{
+func (idp *identityProvider) getGroupsV3(ctx context.Context, token, user string) ([]string, error) {
+	resp, err := idp.client.UserGroups(ctx, &keystone.UserGroupsRequest{
 		AuthToken: token,
 		UserID:    user,
 	})

@@ -3,8 +3,7 @@
 package v1
 
 var (
-	GravatarHash            = gravatarHash
-	StoreGetLaunchpadGroups = &storeGetLaunchpadGroups
+	GravatarHash = gravatarHash
 )
 
 type WaitResponse waitResponse

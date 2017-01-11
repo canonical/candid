@@ -10,7 +10,6 @@ import (
 	"github.com/juju/idmclient/params"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
-	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
 	"gopkg.in/yaml.v2"
 
 	"github.com/CanonicalLtd/blues-identity/config"
@@ -114,24 +113,17 @@ func (s *keystoneSuite) TestKeystoneIdentityProviderHandlePost(c *gc.C) {
 	)
 	c.Assert(err, gc.IsNil)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	b, err := bakery.NewService(bakery.NewServiceParams{})
-	c.Assert(err, gc.IsNil)
 	tc := &idptest.TestContext{
-
 		Request: req,
-		Bakery_: b,
+		Bakery_: bakery.New(bakery.BakeryParams{}),
 	}
 	s.idp.Handle(tc)
-	idptest.AssertLoginSuccess(c, tc,
-		checkers.New(
-			checkers.TimeBefore,
-		),
-		&params.User{
-			Username:   params.Username("testuser@openstack"),
-			ExternalID: "abc@openstack",
-			IDPGroups:  []string{"abc_project@openstack"},
-		},
-	)
+	idptest.AssertLoginSuccess(c, tc, "testuser@openstack")
+	idptest.AssertUser(c, tc, &params.User{
+		Username:   params.Username("testuser@openstack"),
+		ExternalID: "abc@openstack",
+		IDPGroups:  []string{"abc_project@openstack"},
+	})
 	c.Assert(tc.Response().Body.String(), gc.Equals, "login successful as user testuser@openstack\n")
 }
 
@@ -146,15 +138,13 @@ func (s *keystoneSuite) TestKeystoneIdentityProviderHandlePostBadPassword(c *gc.
 	)
 	c.Assert(err, gc.IsNil)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	b, err := bakery.NewService(bakery.NewServiceParams{})
-	c.Assert(err, gc.IsNil)
 	tc := &idptest.TestContext{
 		URLPrefix: "https://idp.test",
 		Request:   req,
-		Bakery_:   b,
+		Bakery_:   bakery.New(bakery.BakeryParams{}),
 	}
 	s.idp.Handle(tc)
-	idptest.AssertLoginFailure(c, tc, `cannot log in: invalid credentials`)
+	idptest.AssertLoginFailure(c, tc, `cannot log in: Post http.*: invalid credentials`)
 }
 
 func (s *keystoneSuite) TestKeystoneIdentityProviderHandlePostNoTenants(c *gc.C) {
@@ -168,15 +158,13 @@ func (s *keystoneSuite) TestKeystoneIdentityProviderHandlePostNoTenants(c *gc.C)
 	)
 	c.Assert(err, gc.IsNil)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	b, err := bakery.NewService(bakery.NewServiceParams{})
-	c.Assert(err, gc.IsNil)
 	tc := &idptest.TestContext{
 		URLPrefix: "https://idp.test",
 		Request:   req,
-		Bakery_:   b,
+		Bakery_:   bakery.New(bakery.BakeryParams{}),
 	}
 	s.idp.Handle(tc)
-	idptest.AssertLoginFailure(c, tc, `cannot get tenants: bad token`)
+	idptest.AssertLoginFailure(c, tc, `cannot get tenants: Get .*: bad token`)
 }
 
 func (s *keystoneSuite) TestKeystoneIdentityProviderHandleExistingUser(c *gc.C) {
@@ -190,12 +178,10 @@ func (s *keystoneSuite) TestKeystoneIdentityProviderHandleExistingUser(c *gc.C) 
 	)
 	c.Assert(err, gc.IsNil)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	b, err := bakery.NewService(bakery.NewServiceParams{})
-	c.Assert(err, gc.IsNil)
 	tc := &idptest.TestContext{
 		URLPrefix: "https://idp.test",
 		Request:   req,
-		Bakery_:   b,
+		Bakery_:   bakery.New(bakery.BakeryParams{}),
 	}
 	err = tc.UpdateUser(&params.User{
 		Username:   params.Username("testuser@openstack"),

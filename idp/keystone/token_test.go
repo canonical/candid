@@ -11,7 +11,6 @@ import (
 	"github.com/juju/idmclient/params"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
-	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
 	"gopkg.in/yaml.v2"
 
 	"github.com/CanonicalLtd/blues-identity/config"
@@ -61,23 +60,18 @@ func (s *tokenSuite) TestKeystoneTokenIdentityProviderHandle(c *gc.C) {
 	req, err := http.NewRequest("POST", "https://idp.test/login?waitid=1", bytes.NewReader(body))
 	c.Assert(err, gc.IsNil)
 	req.Header.Set("Content-Type", "application/json")
-	b, err := bakery.NewService(bakery.NewServiceParams{})
 	tc := &idptest.TestContext{
 		URLPrefix: "https://idp.test",
-		Bakery_:   b,
+		Bakery_:   bakery.New(bakery.BakeryParams{}),
 		Request:   req,
 	}
 	s.idp.Handle(tc)
-	idptest.AssertLoginSuccess(c, tc,
-		checkers.New(
-			checkers.TimeBefore,
-		),
-		&params.User{
-			Username:   params.Username("testuser@openstack"),
-			ExternalID: "abc@openstack",
-			IDPGroups:  []string{"abc_project@openstack"},
-		},
-	)
+	idptest.AssertLoginSuccess(c, tc, "testuser@openstack")
+	idptest.AssertUser(c, tc, &params.User{
+		Username:   params.Username("testuser@openstack"),
+		ExternalID: "abc@openstack",
+		IDPGroups:  []string{"abc_project@openstack"},
+	})
 	c.Assert(tc.Response().Body.String(), gc.Equals, "login successful as user testuser@openstack\n")
 }
 
@@ -89,24 +83,22 @@ func (s *tokenSuite) TestKeystoneTokenIdentityProviderHandleBadToken(c *gc.C) {
 	req, err := http.NewRequest("POST", "https://idp.test/login?waitid=1", bytes.NewReader(body))
 	c.Assert(err, gc.IsNil)
 	req.Header.Set("Content-Type", "application/json")
-	b, err := bakery.NewService(bakery.NewServiceParams{})
 	tc := &idptest.TestContext{
 		URLPrefix: "https://idp.test",
-		Bakery_:   b,
+		Bakery_:   bakery.New(bakery.BakeryParams{}),
 		Request:   req,
 	}
 	s.idp.Handle(tc)
-	idptest.AssertLoginFailure(c, tc, `cannot log in: invalid credentials`)
+	idptest.AssertLoginFailure(c, tc, `cannot log in: Post http.*: invalid credentials`)
 }
 
 func (s *tokenSuite) TestKeystoneTokenIdentityProviderHandleBadRequest(c *gc.C) {
 	req, err := http.NewRequest("POST", "https://idp.test/login?waitid=1", strings.NewReader("{"))
 	c.Assert(err, gc.IsNil)
 	req.Header.Set("Content-Type", "application/json")
-	b, err := bakery.NewService(bakery.NewServiceParams{})
 	tc := &idptest.TestContext{
 		URLPrefix: "https://idp.test",
-		Bakery_:   b,
+		Bakery_:   bakery.New(bakery.BakeryParams{}),
 		Request:   req,
 	}
 	s.idp.Handle(tc)

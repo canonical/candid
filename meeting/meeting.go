@@ -16,6 +16,7 @@ import (
 	"github.com/juju/loggo"
 	"github.com/juju/utils/clock"
 	"github.com/julienschmidt/httprouter"
+	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/tomb.v2"
 )
@@ -134,7 +135,7 @@ func newServer(getStore func() Store, m Metrics, listenAddr string, runGC bool) 
 		srv: srv,
 	}
 	router := httprouter.New()
-	for _, h := range errMapper.Handlers(srv.newHandler) {
+	for _, h := range reqServer.Handlers(srv.newHandler) {
 		router.Handle(h.Method, h.Path, h.Handle)
 	}
 	if runGC {
@@ -285,14 +286,16 @@ func (srv *Server) isLocal(id string) bool {
 	return srv.items[id] != nil
 }
 
-func (srv *Server) newHandler(httprequest.Params) (*handler, error) {
-	return srv.handler, nil
+func (srv *Server) newHandler(p httprequest.Params) (*handler, context.Context, error) {
+	return srv.handler, p.Context, nil
 }
 
-var errMapper httprequest.ErrorMapper = func(err error) (httpStatus int, errorBody interface{}) {
-	return http.StatusInternalServerError, &httprequest.RemoteError{
-		Message: err.Error(),
-	}
+var reqServer = httprequest.Server{
+	ErrorMapper: func(ctx context.Context, err error) (httpStatus int, errorBody interface{}) {
+		return http.StatusInternalServerError, &httprequest.RemoteError{
+			Message: err.Error(),
+		}
+	},
 }
 
 func newId() (string, error) {
@@ -341,7 +344,7 @@ func (p *Place) Wait(id string) (data0, data1 []byte, err error) {
 	if err != nil {
 		return nil, nil, errgo.Mask(err)
 	}
-	resp, err := client.Wait(&waitRequest{
+	resp, err := client.Wait(context.TODO(), &waitRequest{
 		Id: id,
 	})
 	if err != nil {
@@ -361,7 +364,7 @@ func (p *Place) Done(id string, data []byte) error {
 	if err != nil {
 		return errgo.Mask(err)
 	}
-	if err := client.Done(&doneRequest{
+	if err := client.Done(context.TODO(), &doneRequest{
 		Id: id,
 		Body: doneData{
 			Data1: data,

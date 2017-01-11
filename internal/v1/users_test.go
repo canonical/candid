@@ -16,6 +16,7 @@ import (
 	"github.com/juju/idmclient/params"
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/testing/httptesting"
+	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
@@ -25,7 +26,6 @@ import (
 
 	"github.com/CanonicalLtd/blues-identity/internal/mongodoc"
 	"github.com/CanonicalLtd/blues-identity/internal/store"
-	"github.com/CanonicalLtd/blues-identity/internal/v1"
 )
 
 type usersSuite struct {
@@ -247,7 +247,7 @@ func (s *usersSuite) TestUser(c *gc.C) {
 		expectStatus: http.StatusUnauthorized,
 		expectBody: params.Error{
 			Code:    "unauthorized",
-			Message: "invalid credentials",
+			Message: "could not determine identity: invalid credentials",
 		},
 	}, {
 		about:    "incorrect password",
@@ -267,7 +267,7 @@ func (s *usersSuite) TestUser(c *gc.C) {
 		expectStatus: http.StatusUnauthorized,
 		expectBody: params.Error{
 			Code:    "unauthorized",
-			Message: "invalid credentials",
+			Message: "could not determine identity: invalid credentials",
 		},
 	}, {
 		about:  "no credentials",
@@ -597,58 +597,6 @@ func (s *usersSuite) TestSetAgentOverwritesGroups(c *gc.C) {
 	})
 }
 
-func (s *usersSuite) TestGetUserGetsGroupsFromLaunchpad(c *gc.C) {
-
-	s.PatchValue(v1.StoreGetLaunchpadGroups, func(s *store.Store, externalId string) ([]string, error) {
-		return []string{"test3"}, nil
-	})
-
-	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
-		Handler: s.srv,
-		URL:     apiURL("u/jbloggs2"),
-		Method:  "PUT",
-		Header: http.Header{
-			"Content-Type": []string{"application/json"},
-		},
-		Body: marshal(c, params.User{
-			Username:   "jbloggs2",
-			ExternalID: "https://login.ubuntu.com/+id/test",
-			Email:      "jbloggs2@example.com",
-			FullName:   "Joe Bloggs II",
-			IDPGroups: []string{
-				"test",
-				"test2",
-			},
-		}),
-		Username:     adminUsername,
-		Password:     adminPassword,
-		ExpectStatus: http.StatusOK,
-	})
-	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
-		Handler: s.srv,
-		URL:     apiURL("u/jbloggs2"),
-		Method:  "GET",
-		Header: http.Header{
-			"Content-Type": []string{"application/json"},
-		},
-		Username:     adminUsername,
-		Password:     adminPassword,
-		ExpectStatus: http.StatusOK,
-		ExpectBody: params.User{
-			Username:   "jbloggs2",
-			ExternalID: "https://login.ubuntu.com/+id/test",
-			Email:      "jbloggs2@example.com",
-			FullName:   "Joe Bloggs II",
-			GravatarID: "b1337cf8d58e2e2be9b6a5356cfc268b",
-			IDPGroups: []string{
-				"test",
-				"test2",
-				"test3",
-			},
-		},
-	})
-}
-
 func (s *usersSuite) TestUpdateAgentSetPublicKeys(c *gc.C) {
 	key, err := bakery.GenerateKey()
 	c.Assert(err, gc.IsNil)
@@ -833,7 +781,7 @@ func (s *usersSuite) TestQueryUsers(c *gc.C) {
 		expectStatus: http.StatusUnauthorized,
 		expectBody: params.Error{
 			Code:    "unauthorized",
-			Message: "invalid credentials",
+			Message: "could not determine identity: invalid credentials",
 		},
 	}, {
 		about:    "incorrect password",
@@ -853,7 +801,7 @@ func (s *usersSuite) TestQueryUsers(c *gc.C) {
 		expectStatus: http.StatusUnauthorized,
 		expectBody: params.Error{
 			Code:    "unauthorized",
-			Message: "invalid credentials",
+			Message: "could not determine identity: invalid credentials",
 		},
 	}, {
 		about:  "no credentials",
@@ -987,15 +935,7 @@ func (s *usersSuite) TestUserToken(c *gc.C) {
 			var m macaroon.Macaroon
 			err := json.Unmarshal(resp.Body.Bytes(), &m)
 			c.Assert(err, gc.IsNil)
-			s.assertMacaroon(c, macaroon.Slice{&m}, checkers.New(
-				checkers.Declared(
-					map[string]string{
-						"username": "jbloggs",
-						"uuid":     "34737258-2146-5fb3-8e59-aba081f88346",
-					},
-				),
-				checkers.TimeBefore,
-			))
+			s.assertMacaroon(c, macaroon.Slice{&m}, "jbloggs")
 		},
 	}, {
 		about:    "no user",
@@ -1205,7 +1145,6 @@ func (s *usersSuite) TestVerifyUserToken(c *gc.C) {
 		expectStatus: http.StatusOK,
 		expectBody: map[string]string{
 			"username": "jbloggs",
-			"uuid":     "34737258-2146-5fb3-8e59-aba081f88346",
 		},
 	}, {
 		about:        "bad token",
@@ -1213,7 +1152,7 @@ func (s *usersSuite) TestVerifyUserToken(c *gc.C) {
 		expectStatus: http.StatusForbidden,
 		expectBody: params.Error{
 			Code:    "forbidden",
-			Message: "verification failure: verification failed: macaroon not found in storage",
+			Message: "verification failure: macaroon discharge required: authentication required",
 		},
 	}}
 	for i, test := range tests {
@@ -1438,13 +1377,7 @@ func (s *usersSuite) TestUserGroups(c *gc.C) {
 		if test.password != "" {
 			un = test.username
 		} else if test.username != "" {
-			m, err := st.Service.NewMacaroon(bakery.LatestVersion, []checkers.Caveat{
-				checkers.DeclaredCaveat("username", test.username),
-			})
-			c.Assert(err, gc.IsNil)
-			cookie, err := httpbakery.NewCookie(macaroon.Slice{m})
-			c.Assert(err, gc.IsNil)
-			cookies = append(cookies, cookie)
+			cookies = cookiesForUser(st, test.username)
 		}
 		httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 			Handler:      s.srv,
@@ -1493,10 +1426,10 @@ var setUserGroupsTests = []struct {
 	about:        "no permission",
 	startGroups:  []string{"test1", "test2"},
 	groups:       []string{"test3", "test4"},
-	expectStatus: http.StatusForbidden,
+	expectStatus: http.StatusUnauthorized,
 	expectError: params.Error{
-		Code:    params.ErrForbidden,
-		Message: "user does not have correct permissions",
+		Code:    params.ErrUnauthorized,
+		Message: "permission denied",
 	},
 	expectGroups: []string{"test1", "test2"},
 }, {
@@ -1527,13 +1460,7 @@ func (s *usersSuite) TestSetUserGroups(c *gc.C) {
 		}
 		var cookies []*http.Cookie
 		if test.username == "" {
-			m, err := store.Service.NewMacaroon(bakery.LatestVersion, []checkers.Caveat{
-				checkers.DeclaredCaveat("username", string(username)),
-			})
-			c.Assert(err, gc.IsNil)
-			cookie, err := httpbakery.NewCookie(macaroon.Slice{m})
-			c.Assert(err, gc.IsNil)
-			cookies = append(cookies, cookie)
+			cookies = cookiesForUser(store, string(username))
 		}
 		httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 			Handler:      s.srv,
@@ -1610,10 +1537,10 @@ var modifyUserGroupsTests = []struct {
 	about:        "no permission",
 	startGroups:  []string{"test1", "test2"},
 	addGroups:    []string{"test3", "test4"},
-	expectStatus: http.StatusForbidden,
+	expectStatus: http.StatusUnauthorized,
 	expectError: params.Error{
-		Code:    params.ErrForbidden,
-		Message: "user does not have correct permissions",
+		Code:    params.ErrUnauthorized,
+		Message: "permission denied",
 	},
 	expectGroups: []string{"test1", "test2"},
 }, {
@@ -1654,13 +1581,7 @@ func (s *usersSuite) TestModifyUserGroups(c *gc.C) {
 		}
 		var cookies []*http.Cookie
 		if test.username == "" {
-			m, err := store.Service.NewMacaroon(bakery.LatestVersion, []checkers.Caveat{
-				checkers.DeclaredCaveat("username", string(username)),
-			})
-			c.Assert(err, gc.IsNil)
-			cookie, err := httpbakery.NewCookie(macaroon.Slice{m})
-			c.Assert(err, gc.IsNil)
-			cookies = append(cookies, cookie)
+			cookies = cookiesForUser(store, string(username))
 		}
 		httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 			Handler:  s.srv,
@@ -1915,15 +1836,10 @@ func (s *usersSuite) TestMultipleEndpointAccess(c *gc.C) {
 		Groups:   []string{"g3", "g4"},
 	})
 	client := httpbakery.NewClient()
-	m, err := store.Service.NewMacaroon(bakery.LatestVersion, []checkers.Caveat{
-		checkers.DeclaredCaveat("username", "jbloggs1"),
-	})
-	c.Assert(err, gc.IsNil)
-	cookie, err := httpbakery.NewCookie(macaroon.Slice{m})
-	c.Assert(err, gc.IsNil)
+
 	u, err := url.Parse(location)
 	c.Assert(err, gc.IsNil)
-	client.Client.Jar.SetCookies(u, []*http.Cookie{cookie})
+	client.Client.Jar.SetCookies(u, cookiesForUser(store, "jbloggs1"))
 	req, err := http.NewRequest("GET", location+"/v1/u/jbloggs1/groups", nil)
 	c.Assert(err, gc.IsNil)
 	resp, err := client.Do(req)
@@ -1939,11 +1855,30 @@ func (s *usersSuite) TestMultipleEndpointAccess(c *gc.C) {
 	resp, err = client.Do(req)
 	c.Assert(err, gc.IsNil)
 	defer resp.Body.Close()
-	c.Assert(resp.StatusCode, gc.Equals, http.StatusForbidden)
+	c.Assert(resp.StatusCode, gc.Equals, http.StatusUnauthorized)
 	body, err = ioutil.ReadAll(resp.Body)
 	c.Assert(err, gc.IsNil)
 	c.Assert(string(body), jc.JSONEquals, params.Error{
-		Code:    params.ErrForbidden,
-		Message: "user does not have correct permissions",
+		Code:    params.ErrUnauthorized,
+		Message: "permission denied",
 	})
+}
+
+func cookiesForUser(st *store.Store, username string) []*http.Cookie {
+	m := macaroonForUser(st, username)
+	cookie, err := httpbakery.NewCookie(st.Bakery.Checker.Namespace(), macaroon.Slice{m.M()})
+	if err != nil {
+		panic(err)
+	}
+	return []*http.Cookie{cookie}
+}
+
+func macaroonForUser(st *store.Store, username string) *bakery.Macaroon {
+	m, err := st.Bakery.Oven.NewMacaroon(context.TODO(), bakery.LatestVersion, time.Now().Add(time.Minute), []checkers.Caveat{
+		checkers.DeclaredCaveat("username", username),
+	}, bakery.LoginOp)
+	if err != nil {
+		panic(err)
+	}
+	return m
 }

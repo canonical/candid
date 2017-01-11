@@ -9,8 +9,8 @@ import (
 	"github.com/garyburd/go-oauth/oauth"
 	"github.com/juju/httprequest"
 	"github.com/juju/idmclient/params"
+	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
-	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
 	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
 
 	"github.com/CanonicalLtd/blues-identity/idp"
@@ -54,7 +54,7 @@ func (s *dischargeSuite) TearDownTest(c *gc.C) {
 }
 
 func (s *dischargeSuite) TestDischarge(c *gc.C) {
-	err := s.IDMClient.SetUser(&params.SetUserRequest{
+	err := s.IDMClient.SetUser(context.TODO(), &params.SetUserRequest{
 		Username: "test",
 		User: params.User{
 			Username:   "test",
@@ -96,9 +96,7 @@ func (s *dischargeSuite) TestDischarge(c *gc.C) {
 		s.client,
 		s.token,
 	})
-	s.AssertDischarge(c, visitor, checkers.New(
-		checkers.TimeBefore,
-	))
+	s.AssertDischarge(c, visitor)
 }
 
 type oauthVisitor struct {
@@ -109,7 +107,7 @@ type oauthVisitor struct {
 
 // oauthVisit returns a visit function that will sign a response to the return_to url
 // with the oauth credentials provided.
-func (v *oauthVisitor) VisitWebPage(c *httpbakery.Client, m map[string]*url.URL) error {
+func (v *oauthVisitor) VisitWebPage(ctx context.Context, c *httpbakery.Client, m map[string]*url.URL) error {
 	uOAuth, ok := m["usso_oauth"]
 	if !ok {
 		return httpbakery.ErrMethodNotSupported

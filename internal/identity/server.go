@@ -13,6 +13,7 @@ import (
 	"github.com/juju/loggo"
 	"github.com/julienschmidt/httprouter"
 	"github.com/prometheus/client_golang/prometheus"
+	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
 	"gopkg.in/mgo.v2"
@@ -34,14 +35,17 @@ func New(db *mgo.Database, sp ServerParams, versions map[string]NewAPIHandlerFun
 	if len(versions) == 0 {
 		return nil, errgo.Newf("identity server must serve at least one version of the API")
 	}
-
+	var groupGetter store.ExternalGroupGetter
+	if sp.Launchpad != "" {
+		groupGetter = store.NewLaunchpadGroups(sp.Launchpad, 10*time.Minute)
+	}
 	// Create the identities store.
 	pool, err := store.NewPool(db, store.StoreParams{
 		AuthUsername:        sp.AuthUsername,
 		AuthPassword:        sp.AuthPassword,
 		Key:                 sp.Key,
 		Location:            sp.Location,
-		Launchpad:           sp.Launchpad,
+		ExternalGroupGetter: groupGetter,
 		MaxMgoSessions:      sp.MaxMgoSessions,
 		RequestTimeout:      sp.RequestTimeout,
 		PrivateAddr:         sp.PrivateAddr,
@@ -154,7 +158,7 @@ type ServerParams struct {
 //notFound is the handler that is called when a handler cannot be found
 //for the requested endpoint.
 func notFound(w http.ResponseWriter, req *http.Request) {
-	ErrorMapper.WriteError(w, errgo.WithCausef(nil, params.ErrNotFound, "not found: %s", req.URL.Path))
+	WriteError(context.TODO(), w, errgo.WithCausef(nil, params.ErrNotFound, "not found: %s", req.URL.Path))
 }
 
 //methodNotAllowed is the handler that is called when a handler cannot
@@ -167,7 +171,7 @@ func (s *Server) methodNotAllowed(w http.ResponseWriter, req *http.Request) {
 			continue
 		}
 		if h, _, _ := s.router.Lookup(method, req.URL.Path); h != nil {
-			ErrorMapper.WriteError(w, errgo.WithCausef(nil, params.ErrMethodNotAllowed, "%s not allowed for %s", req.Method, req.URL.Path))
+			WriteError(context.TODO(), w, errgo.WithCausef(nil, params.ErrMethodNotAllowed, "%s not allowed for %s", req.Method, req.URL.Path))
 			return
 		}
 	}
