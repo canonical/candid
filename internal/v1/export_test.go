@@ -3,7 +3,8 @@
 package v1
 
 var (
-	GravatarHash = gravatarHash
+	GravatarHash  = gravatarHash
+	NewIDPHandler = (*Handler).newIDPHandler
 )
 
 type WaitResponse waitResponse

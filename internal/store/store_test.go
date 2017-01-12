@@ -125,15 +125,44 @@ var upsertUserTests = []struct {
 }, {
 	about: "not fully specified",
 	identity: &mongodoc.Identity{
-		Username:   "existing-agent",
+		Username:   "test",
 		ExternalID: "",
-		Email:      "existing@example.com",
-		FullName:   "Existing User",
+		Email:      "test@example.com",
+		FullName:   "Test User",
 		Groups: []string{
 			"test",
 		},
 	},
 	expectErr: "no external_id specified",
+}, {
+	about: "invalid username",
+	identity: &mongodoc.Identity{
+		Username:   "test-",
+		ExternalID: "http://example.com/test-",
+		Email:      "test@example.com",
+		FullName:   "Test User",
+		Groups: []string{
+			"test",
+		},
+	},
+	expectErr: `invalid username "test-"`,
+}, {
+	about: "user with domain",
+	identity: &mongodoc.Identity{
+		Username:   "test2@example",
+		ExternalID: "http://example.com/test2",
+		Email:      "test2@example.com",
+		FullName:   "Test User II",
+		Groups: []string{
+			"test",
+		},
+		SSHKeys: []string{
+			"ssh-key-1",
+		},
+		ExtraInfo: map[string][]byte{
+			"extra-info-1": []byte("null"),
+		},
+	},
 }}
 
 func (s *storeSuite) TestUpsertUser(c *gc.C) {
@@ -174,7 +203,7 @@ var upsertAgentTests = []struct {
 }{{
 	about: "insert agent",
 	identity: &mongodoc.Identity{
-		Username: "agent",
+		Username: "agent@owner",
 		Groups: []string{
 			"test",
 		},
@@ -184,11 +213,11 @@ var upsertAgentTests = []struct {
 }, {
 	about: "duplicate agent",
 	identity: &mongodoc.Identity{
-		Username: "existing-agent",
+		Username: "existing-agent@owner",
 		Groups: []string{
 			"test",
 		},
-		Owner: "another owner",
+		Owner: "another-owner",
 		PublicKeys: []mongodoc.PublicKey{
 			{Key: []byte("0000000000000000000000000000000")},
 			{Key: []byte("1111111111111111111111111111111")},
@@ -198,7 +227,7 @@ var upsertAgentTests = []struct {
 }, {
 	about: "owner not  specified",
 	identity: &mongodoc.Identity{
-		Username: "existing-agent",
+		Username: "agent@admin@idm",
 		Groups: []string{
 			"test",
 		},
@@ -208,7 +237,49 @@ var upsertAgentTests = []struct {
 			{Key: []byte("1111111111111111111111111111111")},
 		},
 	},
-	expectErr: "no owner specified",
+	expectErr: `invalid owner ""`,
+}, {
+	about: "invalid agent name - no owner part",
+	identity: &mongodoc.Identity{
+		Username: "agent",
+		Groups: []string{
+			"test",
+		},
+		Owner: "owner",
+		PublicKeys: []mongodoc.PublicKey{
+			{Key: []byte("0000000000000000000000000000000")},
+			{Key: []byte("1111111111111111111111111111111")},
+		},
+	},
+	expectErr: `invalid username "agent"`,
+}, {
+	about: "invalid agent name - invalid name part",
+	identity: &mongodoc.Identity{
+		Username: "agent-@owner",
+		Groups: []string{
+			"test",
+		},
+		Owner: "owner",
+		PublicKeys: []mongodoc.PublicKey{
+			{Key: []byte("0000000000000000000000000000000")},
+			{Key: []byte("1111111111111111111111111111111")},
+		},
+	},
+	expectErr: `invalid username "agent-@owner"`,
+}, {
+	about: "invalid agent name - invalid owner part",
+	identity: &mongodoc.Identity{
+		Username: "agent@owner@owner@owner",
+		Groups: []string{
+			"test",
+		},
+		Owner: "owner@owner@owner",
+		PublicKeys: []mongodoc.PublicKey{
+			{Key: []byte("0000000000000000000000000000000")},
+			{Key: []byte("1111111111111111111111111111111")},
+		},
+	},
+	expectErr: `invalid username "agent@owner@owner@owner"`,
 }}
 
 func (s *storeSuite) TestUpsertAgent(c *gc.C) {
@@ -217,7 +288,7 @@ func (s *storeSuite) TestUpsertAgent(c *gc.C) {
 
 	// Add existing agent user
 	err := store.UpsertAgent(&mongodoc.Identity{
-		Username: "existing-agent",
+		Username: "existing-agent@owner",
 		Groups: []string{
 			"test",
 		},
@@ -319,7 +390,7 @@ var setGroupsTests = []struct {
 }, {
 	about: "update existing agent",
 	identity: &mongodoc.Identity{
-		Username: "existing-agent",
+		Username: "existing-agent@owner",
 		Groups: []string{
 			"test",
 			"test2",
@@ -330,9 +401,9 @@ var setGroupsTests = []struct {
 		},
 	},
 }, {
-	about: "update a non existing user",
+	about: "update a non existing agent",
 	identity: &mongodoc.Identity{
-		Username:   "non-existing-agent",
+		Username:   "non-existing-agent@owner",
 		ExternalID: "",
 		Email:      "existing@example.com",
 		FullName:   "Existing User",
@@ -345,7 +416,7 @@ var setGroupsTests = []struct {
 			{Key: []byte("0000000000000000000000000000000")},
 		},
 	},
-	expectErr: "user \"non-existing-agent\" not found: not found",
+	expectErr: "user \"non-existing-agent@owner\" not found: not found",
 }}
 
 func (s *storeSuite) TestSetGroups(c *gc.C) {
@@ -366,7 +437,7 @@ func (s *storeSuite) TestSetGroups(c *gc.C) {
 
 	// Add existing agent user
 	err = store.UpsertAgent(&mongodoc.Identity{
-		Username: "existing-agent",
+		Username: "existing-agent@owner",
 		Groups: []string{
 			"test",
 		},
@@ -544,7 +615,7 @@ var updatePublicKeysIdentityTests = []struct {
 }{{
 	about: "update existing agent",
 	identity: &mongodoc.Identity{
-		Username: "existing-agent",
+		Username: "existing-agent@owner",
 		Groups: []string{
 			"test",
 			"test2",
@@ -558,7 +629,7 @@ var updatePublicKeysIdentityTests = []struct {
 }, {
 	about: "update a non existing agent",
 	identity: &mongodoc.Identity{
-		Username:   "non-existing-agent",
+		Username:   "non-existing-agent@owner",
 		ExternalID: "",
 		Email:      "existing@example.com",
 		FullName:   "Existing User",
@@ -571,7 +642,7 @@ var updatePublicKeysIdentityTests = []struct {
 			{Key: []byte("0000000000000000000000000000000")},
 		},
 	},
-	expectErr: "user \"non-existing-agent\" not found: not found",
+	expectErr: "user \"non-existing-agent@owner\" not found: not found",
 }}
 
 func (s *storeSuite) TestUpdatePublicKeys(c *gc.C) {
@@ -580,7 +651,7 @@ func (s *storeSuite) TestUpdatePublicKeys(c *gc.C) {
 
 	// Add existing agent user
 	err := store.UpsertAgent(&mongodoc.Identity{
-		Username: "existing-agent",
+		Username: "existing-agent@owner",
 		Groups: []string{
 			"test",
 			"test2",

@@ -145,7 +145,7 @@ func (s *authSuite) TestUserHasPublicKeyChecker(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 
 	s.createIdentity(c, &mongodoc.Identity{
-		Username: "test",
+		Username: "test@admin",
 		Owner:    "admin",
 		PublicKeys: []mongodoc.PublicKey{
 			{Key: key.Public.Key[:]},
@@ -162,7 +162,7 @@ func (s *authSuite) TestUserHasPublicKeyChecker(c *gc.C) {
 		return checker.CheckFirstPartyCaveat(ctx, cav.Condition)
 	}
 
-	err = checkCaveat(store.UserHasPublicKeyCaveat(params.Username("test"), &key.Public))
+	err = checkCaveat(store.UserHasPublicKeyCaveat(params.Username("test@admin"), &key.Public))
 	c.Assert(err, gc.IsNil)
 	// Unknown username
 	err = checkCaveat(store.UserHasPublicKeyCaveat("test2", &key.Public))

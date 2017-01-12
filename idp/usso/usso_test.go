@@ -260,3 +260,33 @@ func (s *ussoSuite) TestInteractiveLoginFromDifferentProvider(c *gc.C) {
 	s.idp.Handle(tc)
 	idptest.AssertLoginFailure(c, tc, `.*rejecting login from https://login\.badplace\.com/\+openid`)
 }
+
+func (s *ussoSuite) TestHandleUpdateUserError(c *gc.C) {
+	tc := &idptest.TestContext{
+		URLPrefix: "https://idp.test",
+		Bakery_:   bakery.New(bakery.BakeryParams{}),
+		Database_: s.Session.DB("test"),
+	}
+	s.MockUSSO.AddUser(&mockusso.User{
+		ID:       "test",
+		NickName: "test-",
+		FullName: "Test User",
+		Email:    "test@example.com",
+	})
+	s.MockUSSO.SetLoginUser("test")
+	cl := http.Client{
+		CheckRedirect: func(*http.Request, []*http.Request) error {
+			return errors.New("no redirect")
+		},
+	}
+	u, err := s.idp.URL(tc, "5")
+	c.Assert(err, gc.IsNil)
+	resp, err := cl.Get(u)
+	defer resp.Body.Close()
+	tc.Request, err = http.NewRequest("GET", resp.Header.Get("Location"), nil)
+	c.Assert(err, gc.IsNil)
+	tc.Request.ParseForm()
+	tc.UpdateUserError = errgo.New(`invalid username "test-"`)
+	s.idp.Handle(tc)
+	idptest.AssertLoginFailure(c, tc, `invalid username "test-"`)
+}
