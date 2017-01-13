@@ -2,20 +2,13 @@
 
 package mongodoc
 
-import "time"
+import (
+	"time"
+)
 
 // Identity holds the in-database representation of a user in the identities
 // Mongo collection.
 type Identity struct {
-	// UUID holds the unique identifier for the identity. The key can be used
-	// as a foreign key in other parts that are linked to the identity
-	// (for example groups, environments, etc.).
-	//
-	// If updating an existing entry the UUID should not be changed. omitempty
-	// is used to ensure that an attempt to update the UUID cannot be made
-	// inadvertently when updating other fields in an Identity document.
-	UUID string `bson:"_id,omitempty"`
-
 	// Username holds the unique name for the user of the system, which is
 	// associated to the URL accessed through jaas.io/u/username.
 	Username string
