@@ -131,7 +131,7 @@ func (idp *identityProvider) Handle(c idp.Context) {
 		return
 	}
 	user, err := userFromCallback(&r)
-	// If identityFromCallback returns an error it is because the
+	// If userFromCallback returns an error it is because the
 	// OpenID simple registration fields (see
 	// http://openid.net/specs/openid-simple-registration-extension-1_1-01.html)
 	// were not filled out in the callback. This means that a new
@@ -159,7 +159,7 @@ func (idp *identityProvider) Handle(c idp.Context) {
 	idputil.LoginUser(c, user)
 }
 
-// identityFromCallback creates a new identity document from the callback
+// userFromCallback creates a new user document from the callback
 // parameters.
 func userFromCallback(r *callbackRequest) (*params.User, error) {
 	signed := make(map[string]bool)

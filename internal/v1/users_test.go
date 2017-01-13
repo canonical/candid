@@ -474,6 +474,61 @@ func (s *usersSuite) TestUser(c *gc.C) {
 				"test2",
 			},
 		},
+	}, {
+		about:  "illegal username",
+		url:    apiURL("u/jbloggs9-"),
+		method: "PUT",
+		body: marshal(c, params.User{
+			ExternalID: "http://example.com/jbloggs9",
+			Email:      "jbloggs9@example.com",
+			FullName:   "Joe Bloggs IX",
+			IDPGroups: []string{
+				"test",
+			},
+		}),
+		username:     adminUsername,
+		password:     adminPassword,
+		expectStatus: http.StatusBadRequest,
+		expectBody: params.Error{
+			Code:    params.ErrBadRequest,
+			Message: `cannot unmarshal parameters: cannot unmarshal into field: illegal username "jbloggs9-"`,
+		},
+	}, {
+		about:  "invalid username for user",
+		url:    apiURL("u/jbloggs10@domain@domain2"),
+		method: "PUT",
+		body: marshal(c, params.User{
+			ExternalID: "http://example.com/jbloggs10",
+			Email:      "jbloggs10@example.com",
+			FullName:   "Joe Bloggs X",
+			IDPGroups: []string{
+				"test",
+			},
+		}),
+		username:     adminUsername,
+		password:     adminPassword,
+		expectStatus: http.StatusBadRequest,
+		expectBody: params.Error{
+			Code:    params.ErrBadRequest,
+			Message: `invalid username "jbloggs10@domain@domain2"`,
+		},
+	}, {
+		about:  "invalid username for agent",
+		url:    apiURL("u/agent@owner@domain@domain2"),
+		method: "PUT",
+		body: marshal(c, params.User{
+			Owner: "owner@domain@domain2",
+			IDPGroups: []string{
+				"test",
+			},
+		}),
+		username:     adminUsername,
+		password:     adminPassword,
+		expectStatus: http.StatusBadRequest,
+		expectBody: params.Error{
+			Code:    params.ErrBadRequest,
+			Message: `invalid username "agent@owner@domain@domain2"`,
+		},
 	}}
 	for i, test := range tests {
 		c.Logf("%d. %s", i, test.about)
@@ -1826,12 +1881,12 @@ func (s *usersSuite) TestMultipleEndpointAccess(c *gc.C) {
 	store := s.pool.GetNoLimit()
 	defer s.pool.Put(store)
 	s.createIdentity(c, &mongodoc.Identity{
-		Username: "jbloggs1",
+		Username: "jbloggs1@test",
 		Owner:    "test",
 		Groups:   []string{"g1", "g2"},
 	})
 	s.createIdentity(c, &mongodoc.Identity{
-		Username: "jbloggs2",
+		Username: "jbloggs2@test",
 		Owner:    "test",
 		Groups:   []string{"g3", "g4"},
 	})
@@ -1839,8 +1894,8 @@ func (s *usersSuite) TestMultipleEndpointAccess(c *gc.C) {
 
 	u, err := url.Parse(location)
 	c.Assert(err, gc.IsNil)
-	client.Client.Jar.SetCookies(u, cookiesForUser(store, "jbloggs1"))
-	req, err := http.NewRequest("GET", location+"/v1/u/jbloggs1/groups", nil)
+	client.Client.Jar.SetCookies(u, cookiesForUser(store, "jbloggs1@test"))
+	req, err := http.NewRequest("GET", location+"/v1/u/jbloggs1@test/groups", nil)
 	c.Assert(err, gc.IsNil)
 	resp, err := client.Do(req)
 	c.Assert(err, gc.IsNil)
@@ -1850,7 +1905,7 @@ func (s *usersSuite) TestMultipleEndpointAccess(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 	c.Assert(string(body), jc.JSONEquals, []string{"g1", "g2"})
 
-	req, err = http.NewRequest("GET", location+"/v1/u/jbloggs2/groups", nil)
+	req, err = http.NewRequest("GET", location+"/v1/u/jbloggs2@test/groups", nil)
 	c.Assert(err, gc.IsNil)
 	resp, err = client.Do(req)
 	c.Assert(err, gc.IsNil)

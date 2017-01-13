@@ -95,6 +95,9 @@ func (h *apiHandler) SetUser(p httprequest.Params, u *params.SetUserRequest) err
 	}
 	doc := identityFromSetUserParams(u)
 	if err := h.store.UpsertUser(doc); err != nil {
+		if errgo.Cause(err) == store.ErrInvalidData {
+			return errgo.WithCausef(err, params.ErrBadRequest, "")
+		}
 		return errgo.Mask(err, errgo.Is(params.ErrAlreadyExists))
 	}
 	return nil
@@ -115,6 +118,9 @@ func (h *apiHandler) setAgent(p httprequest.Params, u *params.SetUserRequest) er
 	}
 	doc := identityFromSetUserParams(u)
 	if err := h.store.UpsertAgent(doc); err != nil {
+		if errgo.Cause(err) == store.ErrInvalidData {
+			return errgo.WithCausef(err, params.ErrBadRequest, "")
+		}
 		return errgo.Mask(err, errgo.Is(params.ErrAlreadyExists))
 	}
 	return nil

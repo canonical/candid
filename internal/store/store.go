@@ -5,6 +5,7 @@ package store
 import (
 	"math"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/juju/idmclient/params"
@@ -13,6 +14,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
+	"gopkg.in/juju/names.v2"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery/mgorootkeystore"
 	"gopkg.in/mgo.v2"
@@ -27,6 +29,8 @@ import (
 
 var logger = loggo.GetLogger("identity.internal.store")
 var IdentityNamespace = uuid.Parse("685c2eaa-9721-11e4-b717-a7bf1a250a86")
+
+var ErrInvalidData = errgo.New("invalid data")
 
 // StoreParams contains configuration parameters for a store.
 type StoreParams struct {
@@ -428,7 +432,13 @@ func (s *Store) ensureAdminUser(sp StoreParams) error {
 // fields will be added to those present, overwriting any with identical
 // keys. If the given doc has a non-zero last login time the the last
 // login time will be set to the new time.
+//
+// If the username given in doc is not valid then an error with a cause
+// of ErrInvalidData will be returned.
 func (s *Store) UpsertUser(doc *mongodoc.Identity) error {
+	if !names.IsValidUser(doc.Username) {
+		return errgo.WithCausef(nil, ErrInvalidData, "invalid username %q", doc.Username)
+	}
 	doc.UUID = uuid.NewSHA1(IdentityNamespace, []byte(doc.Username)).String()
 	if doc.ExternalID == "" {
 		return errgo.New("no external_id specified")
@@ -475,11 +485,24 @@ func (s *Store) UpsertUser(doc *mongodoc.Identity) error {
 // UpsertAgent creates or updates an agent identity in the store. The
 // agent will have the username, owner, groups and public keys from the
 // given document, all other fields will be ignored.
+//
+// If the username or owner given in doc is not valid then an error with
+// a cause of ErrInvalidData will be returned.
 func (s *Store) UpsertAgent(doc *mongodoc.Identity) error {
-	doc.UUID = uuid.NewSHA1(IdentityNamespace, []byte(doc.Username)).String()
-	if doc.Owner == "" {
-		return errgo.New("no owner specified")
+	nameParts := strings.SplitN(string(doc.Username), "@", 2)
+	if len(nameParts) < 2 {
+		return errgo.WithCausef(nil, ErrInvalidData, "invalid username %q", doc.Username)
 	}
+	if !names.IsValidUserName(nameParts[0]) {
+		return errgo.WithCausef(nil, ErrInvalidData, "invalid username %q", doc.Username)
+	}
+	if !names.IsValidUser(nameParts[1]) {
+		return errgo.WithCausef(nil, ErrInvalidData, "invalid username %q", doc.Username)
+	}
+	if !names.IsValidUser(doc.Owner) {
+		return errgo.WithCausef(nil, ErrInvalidData, "invalid owner %q", doc.Owner)
+	}
+	doc.UUID = uuid.NewSHA1(IdentityNamespace, []byte(doc.Username)).String()
 	query := bson.D{{
 		"_id", doc.UUID,
 	}, {
