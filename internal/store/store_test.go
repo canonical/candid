@@ -324,8 +324,10 @@ func (s *storeSuite) TestUpsertUserEmptyUserInformation(c *gc.C) {
 	var doc map[string]interface{}
 	err = store.DB.Identities().Find(bson.D{{"username", "test"}}).One(&doc)
 	c.Assert(err, gc.IsNil)
+	_, ok := doc["_id"]
+	c.Assert(ok, gc.Equals, true)
+	delete(doc, "_id")
 	c.Assert(doc, jc.DeepEquals, map[string]interface{}{
-		"_id":         id.UUID,
 		"username":    "test",
 		"external_id": "http://example.com/test",
 		"email":       "",
@@ -355,7 +357,6 @@ func (s *storeSuite) TestUpsertUserDedupeGroups(c *gc.C) {
 
 	expect := &mongodoc.Identity{
 		Username:   "test",
-		UUID:       id.UUID,
 		ExternalID: "http://example.com/test",
 		Email:      "test@example.com",
 		FullName:   "Test User",
@@ -456,7 +457,6 @@ func (s *storeSuite) TestSetGroups(c *gc.C) {
 		c.Assert(err, gc.IsNil)
 		doc, err := store.GetIdentity(params.Username(test.identity.Username))
 		c.Assert(err, gc.IsNil)
-		doc.UUID = ""
 		c.Assert(doc, jc.DeepEquals, test.identity)
 	}
 }
@@ -673,7 +673,6 @@ func (s *storeSuite) TestUpdatePublicKeys(c *gc.C) {
 		c.Assert(err, gc.IsNil)
 		doc, err := store.GetIdentity(params.Username(test.identity.Username))
 		c.Assert(err, gc.IsNil)
-		doc.UUID = ""
 		c.Assert(doc, jc.DeepEquals, test.identity)
 	}
 }
@@ -699,7 +698,6 @@ func (s *storeSuite) TestSetGroupsDedupeGroups(c *gc.C) {
 
 	expect := &mongodoc.Identity{
 		Username:   "test",
-		UUID:       id.UUID,
 		ExternalID: "http://example.com/test",
 		Email:      "test@example.com",
 		FullName:   "Test User",

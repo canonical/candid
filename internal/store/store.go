@@ -10,7 +10,6 @@ import (
 
 	"github.com/juju/idmclient/params"
 	"github.com/juju/loggo"
-	"github.com/pborman/uuid"
 	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
@@ -28,7 +27,6 @@ import (
 )
 
 var logger = loggo.GetLogger("identity.internal.store")
-var IdentityNamespace = uuid.Parse("685c2eaa-9721-11e4-b717-a7bf1a250a86")
 
 var ErrInvalidData = errgo.New("invalid data")
 
@@ -439,13 +437,10 @@ func (s *Store) UpsertUser(doc *mongodoc.Identity) error {
 	if !names.IsValidUser(doc.Username) {
 		return errgo.WithCausef(nil, ErrInvalidData, "invalid username %q", doc.Username)
 	}
-	doc.UUID = uuid.NewSHA1(IdentityNamespace, []byte(doc.Username)).String()
 	if doc.ExternalID == "" {
 		return errgo.New("no external_id specified")
 	}
 	query := bson.D{{
-		"_id", doc.UUID,
-	}, {
 		"username", doc.Username,
 	}, {
 		"external_id", doc.ExternalID,
@@ -502,10 +497,7 @@ func (s *Store) UpsertAgent(doc *mongodoc.Identity) error {
 	if !names.IsValidUser(doc.Owner) {
 		return errgo.WithCausef(nil, ErrInvalidData, "invalid owner %q", doc.Owner)
 	}
-	doc.UUID = uuid.NewSHA1(IdentityNamespace, []byte(doc.Username)).String()
 	query := bson.D{{
-		"_id", doc.UUID,
-	}, {
 		"username", doc.Username,
 	}, {
 		"owner", doc.Owner,

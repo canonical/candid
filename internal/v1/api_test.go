@@ -117,7 +117,7 @@ func (s *apiSuite) assertMacaroon(c *gc.C, ms macaroon.Slice, expectUser string)
 	c.Assert(authInfo.Identity.Id(), gc.Equals, expectUser)
 }
 
-func (s *apiSuite) createUser(c *gc.C, user *params.User) string {
+func (s *apiSuite) createUser(c *gc.C, user *params.User) {
 	store := s.pool.GetNoLimit()
 	defer s.pool.Put(store)
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
@@ -139,10 +139,9 @@ func (s *apiSuite) createUser(c *gc.C, user *params.User) string {
 		bson.D{{"username", user.Username}},
 	).Select(bson.D{{"baseurl", 1}}).One(&id)
 	c.Assert(err, gc.IsNil)
-	return id.UUID
 }
 
-func (s *apiSuite) createIdentity(c *gc.C, doc *mongodoc.Identity) (uuid string) {
+func (s *apiSuite) createIdentity(c *gc.C, doc *mongodoc.Identity) {
 	store := s.pool.GetNoLimit()
 	defer s.pool.Put(store)
 	if doc.Owner != "" {
@@ -152,7 +151,6 @@ func (s *apiSuite) createIdentity(c *gc.C, doc *mongodoc.Identity) (uuid string)
 		err := store.UpsertUser(doc)
 		c.Assert(err, gc.IsNil)
 	}
-	return doc.UUID
 }
 
 func apiURL(path string) string {
