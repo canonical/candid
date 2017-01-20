@@ -138,44 +138,44 @@ func (identityProvider) Interactive() bool {
 }
 
 // URL gets the login URL to use this identity provider.
-func (identityProvider) URL(c idp.URLContext, waitID string) (string, error) {
-	url := c.URL("/login")
-	if waitID != "" {
-		url += "?waitid=" + waitID
-	}
-	return url, nil
+func (identityProvider) URL(ctx idp.Context, waitID string) string {
+	return idputil.URL(ctx, "/login", waitID)
+}
+
+// Init initialises the identity provider.
+func (identityProvider) Init(c idp.Context) error {
+	return nil
 }
 
 // Handle handles the Ubuntu SSO Macaroon login process.
-func (idp identityProvider) Handle(c idp.Context) {
-	if err := idp.handle(c); err != nil {
-		c.LoginFailure(err)
+func (idp identityProvider) Handle(ctx idp.RequestContext, w http.ResponseWriter, req *http.Request) {
+	if err := idp.handle(ctx, w, req); err != nil {
+		ctx.LoginFailure(idputil.WaitID(req), err)
 	}
 }
 
-func (idp identityProvider) handle(c idp.Context) error {
-	p := c.Params()
-	switch p.Request.Method {
+func (idp identityProvider) handle(ctx idp.RequestContext, w http.ResponseWriter, req *http.Request) error {
+	switch req.Method {
 	case "GET":
-		m, err := idp.ussoMacaroon(p.Context, c.Bakery().Oven)
+		m, err := idp.ussoMacaroon(ctx, ctx.Bakery().Oven)
 		if err != nil {
 			return err
 		}
-		httprequest.WriteJSON(p.Response, http.StatusOK, ussodischarge.MacaroonResponse{
+		httprequest.WriteJSON(w, http.StatusOK, ussodischarge.MacaroonResponse{
 			Macaroon: m,
 		})
 	case "POST":
-		user, err := idp.verifyUSSOMacaroon(p.Context, c.Bakery().Checker, p)
+		user, err := idp.verifyUSSOMacaroon(ctx, ctx.Bakery().Checker, req)
 		if err != nil {
 			return err
 		}
-		err = c.UpdateUser(user)
+		err = ctx.UpdateUser(user)
 		if err != nil {
 			return err
 		}
-		idputil.LoginUser(c, user)
+		idputil.LoginUser(ctx, idputil.WaitID(req), w, user)
 	default:
-		return errgo.WithCausef(nil, params.ErrBadRequest, "unexpected method %q", p.Request.Method)
+		return errgo.WithCausef(nil, params.ErrBadRequest, "unexpected method %q", req.Method)
 	}
 	return nil
 }
@@ -232,9 +232,9 @@ type ussoCaveatID struct {
 	Version int    `json:"version"`
 }
 
-func (idp identityProvider) verifyUSSOMacaroon(ctx context.Context, c0 *bakery.Checker, p httprequest.Params) (*params.User, error) {
-	var req ussodischarge.LoginRequest
-	if err := httprequest.Unmarshal(p, &req); err != nil {
+func (idp identityProvider) verifyUSSOMacaroon(ctx context.Context, c0 *bakery.Checker, req *http.Request) (*params.User, error) {
+	var lr ussodischarge.LoginRequest
+	if err := httprequest.Unmarshal(idputil.RequestParams(ctx, nil, req), &lr); err != nil {
 		return nil, errgo.Mask(err)
 	}
 	// Make a copy of the checker so that we can use our USSO-specific first
@@ -246,7 +246,7 @@ func (idp identityProvider) verifyUSSOMacaroon(ctx context.Context, c0 *bakery.C
 	}
 	c.FirstPartyCaveatChecker = checker
 
-	_, err := c.Auth(req.Login.Macaroons).Allow(ctx, ussoLoginOp)
+	_, err := c.Auth(lr.Login.Macaroons).Allow(ctx, ussoLoginOp)
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrBadRequest))
 	}

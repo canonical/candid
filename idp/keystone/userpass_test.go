@@ -6,10 +6,12 @@ import (
 	"bytes"
 	"encoding/json"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 
 	"github.com/juju/idmclient/params"
 	"github.com/juju/testing/httptesting"
+	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
 	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery/form"
@@ -58,11 +60,13 @@ func (s *userpassSuite) TestKeystoneUserpassIdentityProviderHandle(c *gc.C) {
 	req, err := http.NewRequest("GET", "https://idp.test/login?waitid=1", nil)
 	c.Assert(err, gc.IsNil)
 	tc := &idptest.TestContext{
+		Context: context.Background(),
 		Request: req,
 	}
-	s.idp.Handle(tc)
+	rr := httptest.NewRecorder()
+	s.idp.Handle(tc, rr, tc.Request)
 	idptest.AssertLoginInProgress(c, tc)
-	httptesting.AssertJSONResponse(c, tc.Response(), http.StatusOK, keystoneidp.KeystoneSchemaResponse)
+	httptesting.AssertJSONResponse(c, rr, http.StatusOK, keystoneidp.KeystoneSchemaResponse)
 }
 
 func (s *userpassSuite) TestKeystoneUserpassIdentityProviderHandleResponse(c *gc.C) {
@@ -78,18 +82,20 @@ func (s *userpassSuite) TestKeystoneUserpassIdentityProviderHandleResponse(c *gc
 	c.Assert(err, gc.IsNil)
 	req.Header.Set("Content-Type", "application/json")
 	tc := &idptest.TestContext{
+		Context:   context.Background(),
 		URLPrefix: "https://idp.test",
 		Bakery_:   bakery.New(bakery.BakeryParams{}),
 		Request:   req,
 	}
-	s.idp.Handle(tc)
+	rr := httptest.NewRecorder()
+	s.idp.Handle(tc, rr, tc.Request)
 	idptest.AssertLoginSuccess(c, tc, "testuser@openstack")
 	idptest.AssertUser(c, tc, &params.User{
 		Username:   params.Username("testuser@openstack"),
 		ExternalID: "abc@openstack",
 		IDPGroups:  []string{"abc_project@openstack"},
 	})
-	c.Assert(tc.Response().Body.String(), gc.Equals, "login successful as user testuser@openstack\n")
+	c.Assert(rr.Body.String(), gc.Equals, "login successful as user testuser@openstack\n")
 }
 
 func (s *userpassSuite) TestKeystoneUserpassIdentityProviderHandleBadRequest(c *gc.C) {
@@ -97,11 +103,13 @@ func (s *userpassSuite) TestKeystoneUserpassIdentityProviderHandleBadRequest(c *
 	c.Assert(err, gc.IsNil)
 	req.Header.Set("Content-Type", "application/json")
 	tc := &idptest.TestContext{
+		Context:   context.Background(),
 		URLPrefix: "https://idp.test",
 		Bakery_:   bakery.New(bakery.BakeryParams{}),
 		Request:   req,
 	}
-	s.idp.Handle(tc)
+	rr := httptest.NewRecorder()
+	s.idp.Handle(tc, rr, tc.Request)
 	idptest.AssertLoginFailure(c, tc, `cannot unmarshal login request: cannot unmarshal into field: cannot unmarshal request body: unexpected end of JSON input`)
 }
 
@@ -117,11 +125,13 @@ func (s *userpassSuite) TestKeystoneUserpassIdentityProviderHandleNoUsername(c *
 	c.Assert(err, gc.IsNil)
 	req.Header.Set("Content-Type", "application/json")
 	tc := &idptest.TestContext{
+		Context:   context.Background(),
 		URLPrefix: "https://idp.test",
 		Bakery_:   bakery.New(bakery.BakeryParams{}),
 		Request:   req,
 	}
-	s.idp.Handle(tc)
+	rr := httptest.NewRecorder()
+	s.idp.Handle(tc, rr, tc.Request)
 	idptest.AssertLoginFailure(c, tc, `cannot validate form: username: expected string, got nothing`)
 }
 

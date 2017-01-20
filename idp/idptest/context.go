@@ -5,11 +5,10 @@ package idptest
 
 import (
 	"net/http"
-	"net/http/httptest"
+	"strings"
 	"sync"
 	"time"
 
-	"github.com/juju/httprequest"
 	"github.com/juju/idmclient/params"
 	jc "github.com/juju/testing/checkers"
 	"golang.org/x/net/context"
@@ -21,11 +20,13 @@ import (
 
 // TestContext is an idp.Context that can be used to test identity providers.
 type TestContext struct {
+	context.Context
+
 	// URLPrefix contains the prefix to add to the front of generated
 	// URLs.
 	URLPrefix string
 
-	// Request contains the request to return to Handle in Params().
+	// Request contains the request for this context.
 	Request *http.Request
 
 	// TestBakery contains the bakery.Service to return to Handle in Bakery().
@@ -54,13 +55,6 @@ type TestContext struct {
 	// mu protects the remaining variables.
 	mu sync.Mutex
 
-	// params contains the parameters for the request. It will be
-	// genreated the first time it is used. params.Request will be
-	// Request, params.Response will be a new
-	// httptest.ResponseRecorder that can be retrieved later using
-	// Response.
-	params httprequest.Params
-
 	// users contains the list of users known to this context.
 	// UpdateUser adds or updates the array. FindUserByName and
 	// FindUserByExternalID examine the list to find appropriate
@@ -79,45 +73,32 @@ type TestContext struct {
 	errSet bool
 }
 
-// URL implements URLContext.URL.
+// URL implements idp.Context.URL.
 func (c *TestContext) URL(path string) string {
 	return c.URLPrefix + path
 }
 
-// RequestURL implements Context.RequestURL.
+// RequestURL implements idp.RequestContext.RequestURL.
 func (c *TestContext) RequestURL() string {
-	return c.Params().Request.URL.String()
+	return c.Request.URL.String()
 }
 
-// Params implements Context.Params.
-func (c *TestContext) Params() httprequest.Params {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if c.params.Request == nil {
-		var r http.Request
-		if c.Request != nil {
-			r = *c.Request
-		}
-		c.params = httprequest.Params{
-			Request:  &r,
-			Response: httptest.NewRecorder(),
-			Context:  context.Background(),
-		}
-	}
-	return c.params
+// Path implements idp.RequestContext.Path.
+func (c *TestContext) Path() string {
+	return strings.TrimPrefix(c.Request.URL.Path, c.URLPrefix)
 }
 
-// Bakery implements Context.Bakery.
+// Bakery implements idp.Context.Bakery.
 func (c *TestContext) Bakery() *bakery.Bakery {
 	return c.Bakery_
 }
 
-// Database implements Context.Database.
+// Database implements idp.Context.Database.
 func (c *TestContext) Database() *mgo.Database {
 	return c.Database_
 }
 
-// UpdateUser implements Context.UpdateUser.
+// UpdateUser implements idp.RequestContext.UpdateUser.
 func (c *TestContext) UpdateUser(user *params.User) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -139,7 +120,7 @@ func (c *TestContext) UpdateUser(user *params.User) error {
 	return nil
 }
 
-// FindUserByName implements Context.FindUserByName.
+// FindUserByName implements idp.RequestContext.FindUserByName.
 func (c *TestContext) FindUserByName(name params.Username) (*params.User, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -154,7 +135,7 @@ func (c *TestContext) FindUserByName(name params.Username) (*params.User, error)
 	return nil, errgo.WithCausef(nil, params.ErrNotFound, "cannot find user %q", name)
 }
 
-// FindUserByExternalId implements Context.FindUserByExternalId.
+// FindUserByExternalId implements idp.RequestContext.FindUserByExternalId.
 func (c *TestContext) FindUserByExternalId(id string) (*params.User, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -169,24 +150,19 @@ func (c *TestContext) FindUserByExternalId(id string) (*params.User, error) {
 	return nil, errgo.WithCausef(nil, params.ErrNotFound, "cannot find external id %q", id)
 }
 
-// LoginSuccess implements Context.LoginSuccess.
-func (c *TestContext) LoginSuccess(username params.Username, expiry time.Time) bool {
+// LoginSuccess implements idp.RequestContext.LoginSuccess.
+func (c *TestContext) LoginSuccess(waitid string, username params.Username, expiry time.Time) bool {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.username, c.expiry, c.usernameSet = username, expiry, true
 	return !c.FailOnLoginSuccess
 }
 
-// LoginFailure implements Context.LoginFailure.
-func (c *TestContext) LoginFailure(err error) {
+// LoginFailure implements idp.RequestContext.LoginFailure.
+func (c *TestContext) LoginFailure(waitid string, err error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.err, c.errSet = err, true
-}
-
-// Response gets the HTTP response that was written.
-func (c *TestContext) Response() *httptest.ResponseRecorder {
-	return c.Params().Response.(*httptest.ResponseRecorder)
 }
 
 // LoginSuccessCall returns information about the call to LoginSuccess.

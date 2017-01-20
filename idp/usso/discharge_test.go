@@ -54,20 +54,25 @@ func (s *dischargeSuite) TestInteractiveDischarge(c *gc.C) {
 		Groups:   []string{"test1", "test2"},
 	})
 	s.MockUSSO.SetLoginUser("test")
-	s.AssertDischarge(c, idptest.VisitorFunc(s.visitWebPage))
+	s.AssertDischarge(c, idptest.VisitorFunc(s.visitWebPage(c)))
 }
 
-func (s *dischargeSuite) visitWebPage(u *url.URL) error {
-	client := http.Client{
-		Transport: s.RoundTripper,
+func (s *dischargeSuite) visitWebPage(c *gc.C) func(u *url.URL) error {
+	return func(u *url.URL) error {
+		c.Logf("visiting %s", u)
+		client := http.Client{
+			Transport: s.RoundTripper,
+		}
+		resp, err := client.Get(u.String())
+		if err != nil {
+			c.Logf("error: %s", err)
+			return err
+		}
+		defer resp.Body.Close()
+		c.Logf("status %s", resp.Status)
+		if resp.StatusCode != http.StatusOK {
+			return errgo.Newf("bad status %q", resp.Status)
+		}
+		return nil
 	}
-	resp, err := client.Get(u.String())
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return errgo.Newf("bad status %q", resp.Status)
-	}
-	return nil
 }

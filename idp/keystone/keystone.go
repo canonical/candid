@@ -6,6 +6,7 @@ package keystone
 
 import (
 	"html/template"
+	"net/http"
 
 	"github.com/juju/idmclient/params"
 	"golang.org/x/net/context"
@@ -102,38 +103,37 @@ func (*identityProvider) Interactive() bool {
 }
 
 // URL implements idp.IdentityProvider.URL.
-func (*identityProvider) URL(c idp.URLContext, waitID string) (string, error) {
-	url := c.URL("/login")
-	if waitID != "" {
-		url += "?waitid=" + waitID
-	}
-	return url, nil
+func (*identityProvider) URL(ctx idp.Context, waitID string) string {
+	return idputil.URL(ctx, "/login", waitID)
+}
+
+// Init implements idp.IdentityProvider.Init.
+func (idp *identityProvider) Init(c idp.Context) error {
+	return nil
 }
 
 // Handle implements idp.IdentityProvider.Handle.
-func (idp *identityProvider) Handle(c idp.Context) {
-	p := c.Params()
-	p.Request.ParseForm()
-	if p.Request.Form.Get("username") != "" {
-		idp.doLogin(c, keystone.Auth{
+func (idp *identityProvider) Handle(ctx idp.RequestContext, w http.ResponseWriter, req *http.Request) {
+	if req.Form.Get("username") != "" {
+		idp.doLogin(ctx, w, req, keystone.Auth{
 			PasswordCredentials: &keystone.PasswordCredentials{
-				Username: p.Request.Form.Get("username"),
-				Password: p.Request.Form.Get("password"),
+				Username: req.Form.Get("username"),
+				Password: req.Form.Get("password"),
 			},
 		})
 		return
 	}
-	url := c.URL("/login")
-	if p.Request.Form.Get("waitid") != "" {
-		url += "?waitid=" + p.Request.Form.Get("waitid")
+	url := ctx.URL("/login")
+	if waitid := idputil.WaitID(req); waitid != "" {
+		url += "?waitid=" + waitid
 	}
-	p.Response.Header().Set("Content-Type", "text/html;charset=UTF-8")
-	err := loginTemplate.Execute(p.Response, map[string]string{
+	w.Header().Set("Content-Type", "text/html;charset=UTF-8")
+	err := loginTemplate.Execute(w, map[string]string{
 		"Description": idp.params.Description,
 		"Callback":    url,
 	})
 	if err != nil {
-		c.LoginFailure(err)
+		ctx.LoginFailure(idputil.WaitID(req), err)
 	}
 }
 
@@ -153,20 +153,19 @@ const loginPage = `<!doctype html>
 `
 
 // doLogin performs the login with the keystone server.
-func (idp *identityProvider) doLogin(c idp.Context, a keystone.Auth) {
-	ctx := c.Params().Context
+func (idp *identityProvider) doLogin(ctx idp.RequestContext, w http.ResponseWriter, req *http.Request, a keystone.Auth) {
 	resp, err := idp.client.Tokens(ctx, &keystone.TokensRequest{
 		Body: keystone.TokensBody{
 			Auth: a,
 		},
 	})
 	if err != nil {
-		c.LoginFailure(errgo.WithCausef(err, params.ErrUnauthorized, "cannot log in"))
+		ctx.LoginFailure(idputil.WaitID(req), errgo.WithCausef(err, params.ErrUnauthorized, "cannot log in"))
 		return
 	}
 	groups, err := idp.getGroups(ctx, resp.Access.Token.ID)
 	if err != nil {
-		c.LoginFailure(errgo.Mask(err))
+		ctx.LoginFailure(idputil.WaitID(req), errgo.Mask(err))
 		return
 	}
 	user := &params.User{
@@ -175,11 +174,11 @@ func (idp *identityProvider) doLogin(c idp.Context, a keystone.Auth) {
 		IDPGroups:  groups,
 	}
 
-	if err := c.UpdateUser(user); err != nil {
-		c.LoginFailure(errgo.Notef(err, "cannot update identity"))
+	if err := ctx.UpdateUser(user); err != nil {
+		ctx.LoginFailure(idputil.WaitID(req), errgo.Notef(err, "cannot update identity"))
 		return
 	}
-	idputil.LoginUser(c, user)
+	idputil.LoginUser(ctx, idputil.WaitID(req), w, user)
 }
 
 // getGroups connects to keystone using token and lists tenants
@@ -200,20 +199,19 @@ func (idp *identityProvider) getGroups(ctx context.Context, token string) ([]str
 }
 
 // doLoginV3 performs the login with the keystone (version 3) server.
-func (idp *identityProvider) doLoginV3(c idp.Context, a keystone.AuthV3) {
-	ctx := c.Params().Context
+func (idp *identityProvider) doLoginV3(ctx idp.RequestContext, w http.ResponseWriter, req *http.Request, a keystone.AuthV3) {
 	resp, err := idp.client.AuthTokens(ctx, &keystone.AuthTokensRequest{
 		Body: keystone.AuthTokensBody{
 			Auth: a,
 		},
 	})
 	if err != nil {
-		c.LoginFailure(errgo.WithCausef(err, params.ErrUnauthorized, "cannot log in"))
+		ctx.LoginFailure(idputil.WaitID(req), errgo.WithCausef(err, params.ErrUnauthorized, "cannot log in"))
 		return
 	}
 	groups, err := idp.getGroupsV3(ctx, resp.SubjectToken, resp.Token.User.ID)
 	if err != nil {
-		c.LoginFailure(errgo.Mask(err))
+		ctx.LoginFailure(idputil.WaitID(req), errgo.Mask(err))
 		return
 	}
 	user := &params.User{
@@ -222,11 +220,11 @@ func (idp *identityProvider) doLoginV3(c idp.Context, a keystone.AuthV3) {
 		IDPGroups:  groups,
 	}
 
-	if err := c.UpdateUser(user); err != nil {
-		c.LoginFailure(errgo.Notef(err, "cannot update identity"))
+	if err := ctx.UpdateUser(user); err != nil {
+		ctx.LoginFailure(idputil.WaitID(req), errgo.Notef(err, "cannot update identity"))
 		return
 	}
-	idputil.LoginUser(c, user)
+	idputil.LoginUser(ctx, idputil.WaitID(req), w, user)
 }
 
 // getGroupsV3 connects to keystone using token and lists groups

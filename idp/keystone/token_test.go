@@ -6,9 +6,11 @@ import (
 	"bytes"
 	"encoding/json"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 
 	"github.com/juju/idmclient/params"
+	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
 	"gopkg.in/yaml.v2"
@@ -61,18 +63,20 @@ func (s *tokenSuite) TestKeystoneTokenIdentityProviderHandle(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 	req.Header.Set("Content-Type", "application/json")
 	tc := &idptest.TestContext{
+		Context:   context.Background(),
 		URLPrefix: "https://idp.test",
 		Bakery_:   bakery.New(bakery.BakeryParams{}),
 		Request:   req,
 	}
-	s.idp.Handle(tc)
+	rr := httptest.NewRecorder()
+	s.idp.Handle(tc, rr, tc.Request)
 	idptest.AssertLoginSuccess(c, tc, "testuser@openstack")
 	idptest.AssertUser(c, tc, &params.User{
 		Username:   params.Username("testuser@openstack"),
 		ExternalID: "abc@openstack",
 		IDPGroups:  []string{"abc_project@openstack"},
 	})
-	c.Assert(tc.Response().Body.String(), gc.Equals, "login successful as user testuser@openstack\n")
+	c.Assert(rr.Body.String(), gc.Equals, "login successful as user testuser@openstack\n")
 }
 
 func (s *tokenSuite) TestKeystoneTokenIdentityProviderHandleBadToken(c *gc.C) {
@@ -84,11 +88,13 @@ func (s *tokenSuite) TestKeystoneTokenIdentityProviderHandleBadToken(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 	req.Header.Set("Content-Type", "application/json")
 	tc := &idptest.TestContext{
+		Context:   context.Background(),
 		URLPrefix: "https://idp.test",
 		Bakery_:   bakery.New(bakery.BakeryParams{}),
 		Request:   req,
 	}
-	s.idp.Handle(tc)
+	rr := httptest.NewRecorder()
+	s.idp.Handle(tc, rr, tc.Request)
 	idptest.AssertLoginFailure(c, tc, `cannot log in: Post http.*: invalid credentials`)
 }
 
@@ -97,11 +103,13 @@ func (s *tokenSuite) TestKeystoneTokenIdentityProviderHandleBadRequest(c *gc.C) 
 	c.Assert(err, gc.IsNil)
 	req.Header.Set("Content-Type", "application/json")
 	tc := &idptest.TestContext{
+		Context:   context.Background(),
 		URLPrefix: "https://idp.test",
 		Bakery_:   bakery.New(bakery.BakeryParams{}),
 		Request:   req,
 	}
-	s.idp.Handle(tc)
+	rr := httptest.NewRecorder()
+	s.idp.Handle(tc, rr, tc.Request)
 	idptest.AssertLoginFailure(c, tc, `cannot unmarshal login request: cannot unmarshal into field: cannot unmarshal request body: unexpected end of JSON input`)
 }
 

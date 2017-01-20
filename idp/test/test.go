@@ -47,12 +47,13 @@ func (*identityProvider) Interactive() bool {
 }
 
 // URL gets the login URL to use this identity provider.
-func (*identityProvider) URL(c idp.URLContext, waitID string) (string, error) {
-	url := c.URL("/test-login")
-	if waitID != "" {
-		url += "?waitid=" + waitID
-	}
-	return url, nil
+func (*identityProvider) URL(c idp.Context, waitID string) string {
+	return idputil.URL(c, "/test-login", waitID)
+}
+
+// Init implements idp.IdentityProvider.Init.
+func (*identityProvider) Init(c idp.Context) error {
+	return nil
 }
 
 type testInteractiveLoginResponse struct {
@@ -65,47 +66,40 @@ type testLoginRequest struct {
 }
 
 // Handle handles the login process.
-func (idp *identityProvider) Handle(c idp.Context) {
-	p := c.Params()
-	switch p.Request.Method {
+func (idp *identityProvider) Handle(ctx idp.RequestContext, w http.ResponseWriter, req *http.Request) {
+	switch req.Method {
 	case "GET":
-		var resp testInteractiveLoginResponse
-		var err error
-		p.Request.ParseForm()
-		resp.URL, err = idp.URL(c, p.Request.Form.Get("waitid"))
-		if err != nil {
-			c.LoginFailure(err)
-			return
-		}
-		httprequest.WriteJSON(p.Response, http.StatusOK, resp)
+		httprequest.WriteJSON(w, http.StatusOK, testInteractiveLoginResponse{
+			URL: idp.URL(ctx, idputil.WaitID(req)),
+		})
 	case "POST":
-		var req testLoginRequest
-		if err := httprequest.Unmarshal(p, &req); err != nil {
-			c.LoginFailure(err)
+		var lr testLoginRequest
+		if err := httprequest.Unmarshal(idputil.RequestParams(ctx, w, req), &lr); err != nil {
+			ctx.LoginFailure(idputil.WaitID(req), err)
 			return
 		}
-		u := req.User
+		u := lr.User
 		if u.ExternalID == "" {
 			var err error
-			u, err = c.FindUserByName(u.Username)
+			u, err = ctx.FindUserByName(u.Username)
 			if err != nil {
-				c.LoginFailure(err)
+				ctx.LoginFailure(idputil.WaitID(req), err)
 				return
 			}
 		} else if u.Username == "" {
 			var err error
-			u, err = c.FindUserByExternalId(u.ExternalID)
+			u, err = ctx.FindUserByExternalId(u.ExternalID)
 			if err != nil {
-				c.LoginFailure(err)
+				ctx.LoginFailure(idputil.WaitID(req), err)
 				return
 			}
-		} else if err := c.UpdateUser(u); err != nil {
-			c.LoginFailure(err)
+		} else if err := ctx.UpdateUser(u); err != nil {
+			ctx.LoginFailure(idputil.WaitID(req), err)
 			return
 		}
-		idputil.LoginUser(c, u)
+		idputil.LoginUser(ctx, idputil.WaitID(req), w, u)
 	default:
-		c.LoginFailure(errgo.WithCausef(nil, params.ErrMethodNotAllowed, "%s not allowed", p.Request.Method))
+		ctx.LoginFailure(idputil.WaitID(req), errgo.WithCausef(nil, params.ErrMethodNotAllowed, "%s not allowed", req.Method))
 	}
 }
 

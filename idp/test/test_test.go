@@ -7,10 +7,12 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 
 	"github.com/juju/idmclient/params"
 	"github.com/juju/testing/httptesting"
+	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
 	"gopkg.in/yaml.v2"
@@ -59,21 +61,22 @@ func (s *testSuite) TestURL(c *gc.C) {
 	tc := &idptest.TestContext{
 		URLPrefix: "https://idp.test",
 	}
-	u, err := s.idp.URL(tc, "1")
-	c.Assert(err, gc.IsNil)
+	u := s.idp.URL(tc, "1")
 	c.Assert(u, gc.Equals, "https://idp.test/test-login?waitid=1")
 }
 
 func (s *testSuite) TestHandleGet(c *gc.C) {
 	tc := &idptest.TestContext{
+		Context:   context.Background(),
 		URLPrefix: "https://idp.test",
 		Request: &http.Request{
 			Method: "GET",
 		},
 	}
-	s.idp.Handle(tc)
+	rr := httptest.NewRecorder()
+	s.idp.Handle(tc, rr, tc.Request)
 	idptest.AssertLoginInProgress(c, tc)
-	httptesting.AssertJSONResponse(c, tc.Response(), http.StatusOK,
+	httptesting.AssertJSONResponse(c, rr, http.StatusOK,
 		test.TestInteractiveLoginResponse{
 			URL: "https://idp.test/test-login",
 		},
@@ -172,6 +175,7 @@ func (s *testSuite) TestHandle(c *gc.C) {
 	for i, test := range handleTests {
 		c.Logf("%d. %s", i, test.about)
 		tc := &idptest.TestContext{
+			Context:   context.Background(),
 			Bakery_:   bakery.New(bakery.BakeryParams{}),
 			URLPrefix: "https://idp.test",
 			Request:   test.req,
@@ -180,7 +184,8 @@ func (s *testSuite) TestHandle(c *gc.C) {
 			err := tc.UpdateUser(test.createUser)
 			c.Assert(err, gc.IsNil)
 		}
-		s.idp.Handle(tc)
+		rr := httptest.NewRecorder()
+		s.idp.Handle(tc, rr, tc.Request)
 		if test.expectError != "" {
 			idptest.AssertLoginFailure(c, tc, test.expectError)
 			continue
