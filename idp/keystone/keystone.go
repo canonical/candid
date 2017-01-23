@@ -92,6 +92,11 @@ func (idp *identityProvider) Name() string {
 	return idp.params.Name
 }
 
+// Domain implements idp.IdentityProvider.Domain.
+func (idp *identityProvider) Domain() string {
+	return idp.params.Domain
+}
+
 // Description implements idp.IdentityProvider.Description.
 func (idp *identityProvider) Description() string {
 	return idp.params.Description

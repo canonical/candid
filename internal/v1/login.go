@@ -5,6 +5,7 @@ package v1
 import (
 	"net/http"
 
+	"github.com/CanonicalLtd/blues-identity/idp"
 	"github.com/juju/httprequest"
 	"github.com/juju/idmclient/params"
 	"gopkg.in/errgo.v1"
@@ -15,6 +16,7 @@ import (
 // loginRequest is a request to start a login to the identity manager.
 type loginRequest struct {
 	httprequest.Route `httprequest:"GET /v1/login"`
+	Domain            string `httprequest:"domain,form"`
 	WaitID            string `httprequest:"waitid,form"`
 }
 
@@ -48,20 +50,38 @@ func (h *dischargeHandler) Login(p httprequest.Params, lr *loginRequest) error {
 		return nil
 	}
 	// Use the normal interactive login method.
+	var selected idp.IdentityProvider
 	for _, idp := range h.h.idps {
-		if idp.Interactive() {
-			ctxt := &idpHandler{
-				Context: p.Context,
-				h:       h.h,
-				store:   h.store,
-				idp:     idp,
-			}
-			url := idp.URL(ctxt, lr.WaitID)
-			http.Redirect(p.Response, p.Request, url, http.StatusFound)
-			return nil
+		if !idp.Interactive() {
+			continue
+		}
+		// Select the first interactive identity provider even if
+		// it does not match the domain.If no subsequent match is
+		// found for the domain then this identity provider will
+		// be used.
+		if selected == nil {
+			selected = idp
+		}
+		if lr.Domain == "" {
+			break
+		}
+		if idp.Domain() == lr.Domain {
+			selected = idp
+			break
 		}
 	}
-	return errgo.Newf("no interactive login methods found")
+	if selected == nil {
+		return errgo.Newf("no interactive login methods found")
+	}
+	ctxt := &idpHandler{
+		Context: p.Context,
+		h:       h.h,
+		store:   h.store,
+		idp:     selected,
+	}
+	url := selected.URL(ctxt, lr.WaitID)
+	http.Redirect(p.Response, p.Request, url, http.StatusFound)
+	return nil
 }
 
 // agentLogin provides a shortcut to log in to the agent identity

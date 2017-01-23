@@ -4,6 +4,7 @@ package v1
 
 import (
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -12,6 +13,7 @@ import (
 	"github.com/juju/idmclient/params"
 	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
+	"gopkg.in/juju/names.v2"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
 	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
@@ -130,6 +132,9 @@ func needLoginError(h *handler, req *http.Request, info *dischargeRequestInfo, w
 		return errgo.Notef(err, "cannot make rendezvous")
 	}
 	visitURL := h.serviceURL("/v1/login?waitid=" + waitId)
+	if c, err := req.Cookie("domain"); err == nil && names.IsValidUserDomain(c.Value) {
+		visitURL += "&domain=" + url.QueryEscape(c.Value)
+	}
 	waitURL := h.serviceURL("/v1/wait?waitid=" + waitId)
 	return httpbakery.NewInteractionRequiredError(visitURL, waitURL, why, req)
 }

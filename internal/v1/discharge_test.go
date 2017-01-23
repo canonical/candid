@@ -50,7 +50,7 @@ var _ = gc.Suite(&dischargeSuite{})
 
 func (s *dischargeSuite) SetUpTest(c *gc.C) {
 	s.IDPs = []idp.IdentityProvider{
-		test.IdentityProvider,
+		test.NewIdentityProvider(test.Params{Name: "test"}),
 		agentidp.IdentityProvider,
 	}
 	s.DischargeSuite.SetUpTest(c)
@@ -156,6 +156,64 @@ func (s *dischargeSuite) TestWaitReturnsDischargeToken(c *gc.C) {
 		c.Assert(wresp.DischargeToken[0].Signature(), gc.DeepEquals, mss[0][0].Signature())
 	}
 	c.Assert(dischargeCount, gc.Not(gc.Equals), 0)
+}
+
+func (s *dischargeSuite) TestVisitURLWithDomainCookie(c *gc.C) {
+	u, err := url.Parse("https://idp.test/discharge")
+	c.Assert(err, gc.Equals, nil)
+	s.BakeryClient.Client.Jar.SetCookies(u, []*http.Cookie{{
+		Name:  "domain",
+		Value: "test2",
+	}})
+	visitor := &valueSavingVisitor{
+		visitor: &test.Visitor{
+			User: s.user,
+		},
+	}
+	s.AssertDischarge(c, visitor)
+	c.Assert(visitor.url.Query().Get("domain"), gc.Equals, "test2")
+}
+
+func (s *dischargeSuite) TestVisitURLWithInvalidDomainCookie(c *gc.C) {
+	u, err := url.Parse("https://idp.test/discharge")
+	c.Assert(err, gc.Equals, nil)
+	s.BakeryClient.Client.Jar.SetCookies(u, []*http.Cookie{{
+		Name:  "domain",
+		Value: "test2-",
+	}})
+	visitor := &valueSavingVisitor{
+		visitor: &test.Visitor{
+			User: s.user,
+		},
+	}
+	s.AssertDischarge(c, visitor)
+	c.Assert(visitor.url.Query().Get("domain"), gc.Equals, "")
+}
+
+func (s *dischargeSuite) TestVisitURLWithEscapedDomainCookie(c *gc.C) {
+	u, err := url.Parse("https://idp.test/discharge")
+	c.Assert(err, gc.Equals, nil)
+	s.BakeryClient.Client.Jar.SetCookies(u, []*http.Cookie{{
+		Name:  "domain",
+		Value: "test+2",
+	}})
+	visitor := &valueSavingVisitor{
+		visitor: &test.Visitor{
+			User: s.user,
+		},
+	}
+	s.AssertDischarge(c, visitor)
+	c.Assert(visitor.url.Query().Get("domain"), gc.Equals, "test+2")
+}
+
+type valueSavingVisitor struct {
+	url     *url.URL
+	visitor httpbakery.Visitor
+}
+
+func (v *valueSavingVisitor) VisitWebPage(ctx context.Context, client *httpbakery.Client, methodURLs map[string]*url.URL) error {
+	v.url = methodURLs[httpbakery.UserInteractionMethod]
+	return v.visitor.VisitWebPage(ctx, client, methodURLs)
 }
 
 // cookiesToMacaroons returns a slice of any macaroons found

@@ -49,6 +49,12 @@ func (*identityProvider) Name() string {
 	return "agent"
 }
 
+// Domain returns "" as the agent identity provider will not create
+// users.
+func (*identityProvider) Domain() string {
+	return ""
+}
+
 // Description gives a description of the identity provider.
 func (*identityProvider) Description() string {
 	return "Agent"

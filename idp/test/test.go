@@ -21,19 +21,47 @@ import (
 )
 
 func init() {
-	config.RegisterIDP("test", func(func(interface{}) error) (idp.IdentityProvider, error) {
-		return IdentityProvider, nil
+	config.RegisterIDP("test", func(unmarshal func(interface{}) error) (idp.IdentityProvider, error) {
+		var p Params
+		if err := unmarshal(&p); err != nil {
+			return nil, errgo.Mask(err)
+		}
+		if p.Name == "" {
+			p.Name = "test"
+		}
+		return NewIdentityProvider(p), nil
 	})
 }
 
-// IdentityProvider is an idp.IdentityProvider that can be used for tests.
-var IdentityProvider idp.IdentityProvider = (*identityProvider)(nil)
+type Params struct {
+	// Name is the name that will be used with the identity provider.
+	Name string
 
-type identityProvider struct{}
+	// Domain contains the domain that will be used with the identity
+	// provider.
+	Domain string
+}
 
-// Name gives the name of the identity provider (test).
-func (*identityProvider) Name() string {
-	return "test"
+// NewIdentityProvider creates an idp.IdentityProvider that can be used
+// for tests.
+func NewIdentityProvider(p Params) idp.IdentityProvider {
+	return &identityProvider{
+		params: p,
+	}
+}
+
+type identityProvider struct {
+	params Params
+}
+
+// Name implements idp.IdentityProvider.Name.
+func (idp *identityProvider) Name() string {
+	return idp.params.Name
+}
+
+// Domain implements idp.IdentityProvider.Domain.
+func (idp *identityProvider) Domain() string {
+	return idp.params.Domain
 }
 
 // Description gives a description of the identity provider.

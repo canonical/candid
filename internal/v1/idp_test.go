@@ -333,6 +333,7 @@ func (s *idpSuite) TestInitError(c *gc.C) {
 type testIDP struct {
 	c           *gc.C
 	name        string
+	domain      string
 	description string
 	interactive bool
 	url         func(idp.Context, string) string
@@ -342,6 +343,10 @@ type testIDP struct {
 
 func (idp *testIDP) Name() string {
 	return idp.name
+}
+
+func (idp *testIDP) Domain() string {
+	return idp.domain
 }
 
 func (idp *testIDP) Description() string {
