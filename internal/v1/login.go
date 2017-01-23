@@ -3,7 +3,6 @@
 package v1
 
 import (
-	"fmt"
 	"net/http"
 
 	"github.com/juju/httprequest"
@@ -35,15 +34,12 @@ func (h *dischargeHandler) Login(p httprequest.Params, lr *loginRequest) error {
 		methods := make(map[string]string)
 		for _, idp := range h.h.idps {
 			ctxt := &idpHandler{
-				h:     h.h,
-				store: h.store,
-				idp:   idp,
+				Context: p.Context,
+				h:       h.h,
+				store:   h.store,
+				idp:     idp,
 			}
-			var err error
-			methods[idp.Name()], err = idp.URL(ctxt, lr.WaitID)
-			if err != nil {
-				return errgo.NoteMask(err, fmt.Sprintf("cannot get URL for %q", idp.Name()), errgo.Any)
-			}
+			methods[idp.Name()] = idp.URL(ctxt, lr.WaitID)
 		}
 		err := httprequest.WriteJSON(p.Response, http.StatusOK, methods)
 		if err != nil {
@@ -55,14 +51,12 @@ func (h *dischargeHandler) Login(p httprequest.Params, lr *loginRequest) error {
 	for _, idp := range h.h.idps {
 		if idp.Interactive() {
 			ctxt := &idpHandler{
-				h:     h.h,
-				store: h.store,
-				idp:   idp,
+				Context: p.Context,
+				h:       h.h,
+				store:   h.store,
+				idp:     idp,
 			}
-			url, err := idp.URL(ctxt, lr.WaitID)
-			if err != nil {
-				return errgo.NoteMask(err, fmt.Sprintf("cannot get URL for %q", idp.Name()), errgo.Any)
-			}
+			url := idp.URL(ctxt, lr.WaitID)
 			http.Redirect(p.Response, p.Request, url, http.StatusFound)
 			return nil
 		}
@@ -80,17 +74,19 @@ func (h *dischargeHandler) agentLogin(p httprequest.Params, user string, key *ba
 			continue
 		}
 		ctxt := &idpHandler{
-			h:      h.h,
-			store:  h.store,
-			idp:    idp,
-			place:  h.place,
-			params: p,
+			Context:        p.Context,
+			h:              h.h,
+			store:          h.store,
+			idp:            idp,
+			place:          h.place,
+			responseWriter: p.Response,
+			request:        p.Request,
 			agentLogin: params.AgentLogin{
 				Username:  params.Username(user),
 				PublicKey: key,
 			},
 		}
-		idp.Handle(ctxt)
+		idp.Handle(ctxt, p.Response, p.Request)
 		return true
 	}
 	logger.Warningf("agent cookie found, but agent identity provider not configured")

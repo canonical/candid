@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"net/http"
+	"net/http/httptest"
 	"time"
 
 	"github.com/juju/idmclient/params"
@@ -96,8 +97,7 @@ func (s *ussoMacaroonSuite) TestURL(c *gc.C) {
 		URLPrefix: "https://idp.test",
 		Database_: s.Session.DB("test"),
 	}
-	t, err := s.idp.URL(tc, "1")
-	c.Assert(err, gc.Equals, nil)
+	t := s.idp.URL(tc, "1")
 	c.Assert(t, gc.Equals, "https://idp.test/login?waitid=1")
 }
 
@@ -110,11 +110,11 @@ func (s *ussoMacaroonSuite) TestHandleGetSuccess(c *gc.C) {
 		Database_: s.Session.DB("test"),
 		Request:   req,
 	}
-	s.idp.Handle(tc)
-	resp := tc.Response()
-	c.Assert(resp.Code, gc.Equals, http.StatusOK, gc.Commentf("%s", resp.Body))
+	rr := httptest.NewRecorder()
+	s.idp.Handle(tc, rr, tc.Request)
+	c.Assert(rr.Code, gc.Equals, http.StatusOK, gc.Commentf("%s", rr.Body))
 	var mresp udclient.MacaroonResponse
-	err = json.Unmarshal(resp.Body.Bytes(), &mresp)
+	err = json.Unmarshal(rr.Body.Bytes(), &mresp)
 	c.Assert(err, gc.Equals, nil)
 	m := mresp.Macaroon.M()
 	cavs := m.Caveats()
@@ -290,12 +290,15 @@ func (s *ussoMacaroonSuite) TestHandlePost(c *gc.C) {
 		c.Assert(err, gc.Equals, nil)
 		req.Header.Set("Content-Type", "application/json")
 		tc := &idptest.TestContext{
+			Context:   context.Background(),
 			URLPrefix: "https://idp.test",
 			Bakery_:   s.bakery,
 			Database_: s.Session.DB("test"),
 			Request:   req,
 		}
-		s.idp.Handle(tc)
+		tc.Request.ParseForm()
+		rr := httptest.NewRecorder()
+		s.idp.Handle(tc, rr, tc.Request)
 		if test.expectError != "" {
 			idptest.AssertLoginFailure(c, tc, test.expectError)
 			continue

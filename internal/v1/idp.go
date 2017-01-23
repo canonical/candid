@@ -4,9 +4,9 @@ package v1
 
 import (
 	"net/http"
+	"strings"
 	"time"
 
-	"github.com/juju/httprequest"
 	"github.com/juju/idmclient"
 	"github.com/juju/idmclient/params"
 	"github.com/julienschmidt/httprouter"
@@ -26,11 +26,31 @@ import (
 	"github.com/CanonicalLtd/blues-identity/internal/store"
 )
 
+func (h *Handler) initIDPs() error {
+	st, err := h.storePool.Get()
+	if err != nil {
+		return errgo.Mask(err)
+	}
+	defer h.storePool.Put(st)
+	for _, idp := range h.idps {
+		ctx := &idpHandler{
+			Context: context.Background(),
+			h:       h,
+			idp:     idp,
+			store:   st,
+		}
+		if err := idp.Init(ctx); err != nil {
+			return errgo.Mask(err)
+		}
+	}
+	return nil
+}
+
 func (h *Handler) newIDPHandler(idp idp.IdentityProvider) httprouter.Handle {
-	return func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
+	return func(w http.ResponseWriter, req *http.Request, p httprouter.Params) {
 		ctx := context.TODO()
 		t := trace.New("identity.internal.v1.idp", idp.Name())
-		r.ParseForm()
+		req.ParseForm()
 		st, err := h.storePool.Get()
 		if err != nil {
 			// TODO(mhilton) consider logging inside the pool.
@@ -51,55 +71,52 @@ func (h *Handler) newIDPHandler(idp idp.IdentityProvider) httprouter.Handle {
 		t.LazyPrintf("store acquired")
 		// TODO have a pool of these?
 		c := &idpHandler{
-			h:     h,
-			idp:   idp,
-			store: st,
-			params: httprequest.Params{
-				Context:  ctx,
-				Response: w,
-				Request:  r,
-				PathVar:  p,
-			},
-			place: &place{st.Place},
+			Context:        ctx,
+			h:              h,
+			idp:            idp,
+			store:          st,
+			responseWriter: w,
+			request:        req,
+			place:          &place{st.Place},
 		}
-		idp.Handle(c)
+		idp.Handle(c, w, req)
 	}
 }
 
 // idpHandler provides and idp.Context that is used by identity providers
 // to access the identity store.
 type idpHandler struct {
-	h          *Handler
-	store      *store.Store
-	idp        idp.IdentityProvider
-	params     httprequest.Params
-	place      *place
-	agentLogin params.AgentLogin
+	context.Context
+	h              *Handler
+	store          *store.Store
+	idp            idp.IdentityProvider
+	responseWriter http.ResponseWriter
+	request        *http.Request
+	place          *place
+	agentLogin     params.AgentLogin
 }
 
-// URL implements idp.URLContext.URL.
+// URL implements idp.Context.URL.
 func (c *idpHandler) URL(path string) string {
 	return c.h.location + "/v1/idp/" + c.idp.Name() + path
 }
 
-// Params implements idp.Context.Params.
-func (c *idpHandler) Params() httprequest.Params {
-	return c.params
-}
-
-// RequestURL implements idp.Context.RequestURL.
+// RequestURL implements idp.RequestContext.RequestURL.
 func (c *idpHandler) RequestURL() string {
-	return c.h.location + c.params.Request.RequestURI
+	return c.h.location + c.request.RequestURI
 }
 
-// LoginSuccess implements idp.Context.LoginSuccess.
-func (c *idpHandler) LoginSuccess(username params.Username, expiry time.Time) bool {
+// Path implements idp.RequestContext.Path.
+func (c *idpHandler) Path() string {
+	return strings.TrimPrefix(c.request.URL.Path, "/v1/idp/"+c.idp.Name())
+}
+
+// LoginSuccess implements idp.RequestContext.LoginSuccess.
+func (c *idpHandler) LoginSuccess(waitid string, username params.Username, expiry time.Time) bool {
 	logger.Infof("login success, username %q", username)
-	c.params.Request.ParseForm()
-	waitId := c.params.Request.Form.Get("waitid")
 	m, err := c.store.Bakery.Oven.NewMacaroon(
-		c.params.Context,
-		httpbakery.RequestVersion(c.params.Request),
+		c,
+		httpbakery.RequestVersion(c.request),
 		expiry,
 		[]checkers.Caveat{
 			idmclient.UserDeclaration(string(username)),
@@ -107,14 +124,14 @@ func (c *idpHandler) LoginSuccess(username params.Username, expiry time.Time) bo
 		bakery.LoginOp,
 	)
 	if err != nil {
-		c.LoginFailure(errgo.Notef(err, "cannot mint identity macaroon"))
+		c.LoginFailure(waitid, errgo.Notef(err, "cannot mint identity macaroon"))
 		return false
 	}
-	if waitId != "" {
-		if err := c.place.Done(waitId, &loginInfo{
+	if waitid != "" {
+		if err := c.place.Done(waitid, &loginInfo{
 			IdentityMacaroon: macaroon.Slice{m.M()},
 		}); err != nil {
-			c.LoginFailure(errgo.Notef(err, "cannot complete rendezvous"))
+			c.LoginFailure(waitid, errgo.Notef(err, "cannot complete rendezvous"))
 			return false
 		}
 	}
@@ -122,17 +139,15 @@ func (c *idpHandler) LoginSuccess(username params.Username, expiry time.Time) bo
 	return true
 }
 
-// LoginFailure implements idp.Context.LoginFailure.
-func (c *idpHandler) LoginFailure(err error) {
-	c.params.Request.ParseForm()
-	waitId := c.params.Request.Form.Get("waitid")
-	_, bakeryErr := httpbakery.ErrorToResponse(c.params.Context, err)
-	if waitId != "" {
-		c.place.Done(waitId, &loginInfo{
+// LoginFailure implements idp.RequestContext.LoginFailure.
+func (c *idpHandler) LoginFailure(waitid string, err error) {
+	_, bakeryErr := httpbakery.ErrorToResponse(c, err)
+	if waitid != "" {
+		c.place.Done(waitid, &loginInfo{
 			Error: bakeryErr.(*httpbakery.Error),
 		})
 	}
-	identity.WriteError(c.params.Context, c.params.Response, err)
+	identity.WriteError(c, c.responseWriter, err)
 }
 
 // Bakery implements idp.Context.Bakery.
@@ -145,7 +160,7 @@ func (c *idpHandler) Database() *mgo.Database {
 	return c.store.DB.Session.DB("idp" + c.idp.Name())
 }
 
-// FindUserByExternalId implements idp.Context.FindUserByExternalId.
+// FindUserByExternalId implements idp.RequestContext.FindUserByExternalId.
 func (c *idpHandler) FindUserByExternalId(id string) (*params.User, error) {
 	var identity mongodoc.Identity
 	if err := c.store.DB.Identities().Find(bson.D{{"external_id", id}}).One(&identity); err != nil {
@@ -154,19 +169,19 @@ func (c *idpHandler) FindUserByExternalId(id string) (*params.User, error) {
 		}
 		return nil, errgo.Mask(err)
 	}
-	return userFromIdentity(c.params.Context, &identity)
+	return userFromIdentity(c, &identity)
 }
 
-// FindUserByName implements idp.Context.FindUserByName.
+// FindUserByName implements idp.RequestContext.FindUserByName.
 func (c *idpHandler) FindUserByName(name params.Username) (*params.User, error) {
 	id, err := c.store.GetIdentity(name)
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
-	return userFromIdentity(c.params.Context, id)
+	return userFromIdentity(c, id)
 }
 
-// UpdateUser implements idp.Context.UpdateUser.
+// UpdateUser implements idp.RequestContext.UpdateUser.
 func (c *idpHandler) UpdateUser(u *params.User) error {
 	id := identityFromUser(u)
 	if id.Owner != "" {

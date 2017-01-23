@@ -4,6 +4,7 @@ package ussooauth_test
 
 import (
 	"net/http"
+	"net/http/httptest"
 
 	"github.com/garyburd/go-oauth/oauth"
 	"github.com/juju/idmclient/params"
@@ -58,8 +59,7 @@ func (s *ussooauthSuite) TestURL(c *gc.C) {
 	tc := &idptest.TestContext{
 		URLPrefix: "https://idp.test",
 	}
-	t, err := s.idp.URL(tc, "1")
-	c.Assert(err, gc.IsNil)
+	t := s.idp.URL(tc, "1")
 	c.Assert(t, gc.Equals, "https://idp.test/oauth?waitid=1")
 }
 
@@ -104,7 +104,8 @@ func (s *ussooauthSuite) TestHandleSuccess(c *gc.C) {
 		nil,
 	)
 	c.Assert(err, gc.IsNil)
-	s.idp.Handle(tc)
+	rr := httptest.NewRecorder()
+	s.idp.Handle(tc, rr, tc.Request)
 	idptest.AssertLoginSuccess(c, tc, "test")
 	idptest.AssertUser(c, tc, &params.User{
 		ExternalID: "https://login.ubuntu.com/+id/test",
@@ -112,7 +113,7 @@ func (s *ussooauthSuite) TestHandleSuccess(c *gc.C) {
 		FullName:   "Test User",
 		Email:      "test@example.com",
 	})
-	c.Assert(tc.Response().Body.String(), gc.Equals, "login successful as user test\n")
+	c.Assert(rr.Body.String(), gc.Equals, "login successful as user test\n")
 }
 
 func (s *ussooauthSuite) TestHandleVerifyFail(c *gc.C) {
@@ -155,6 +156,7 @@ func (s *ussooauthSuite) TestHandleVerifyFail(c *gc.C) {
 		nil,
 	)
 	c.Assert(err, gc.IsNil)
-	s.idp.Handle(tc)
+	rr := httptest.NewRecorder()
+	s.idp.Handle(tc, rr, tc.Request)
 	idptest.AssertLoginFailure(c, tc, `invalid OAuth credentials`)
 }

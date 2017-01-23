@@ -4,7 +4,6 @@ package v1_test
 
 import (
 	"net/http"
-	"net/http/httptest"
 
 	"github.com/juju/idmclient/params"
 	"github.com/juju/testing"
@@ -81,7 +80,7 @@ func (s *idpSuite) TestURL(c *gc.C) {
 		name: "url-test",
 	}
 	var hasRun bool
-	tidp.handle = func(ctx idp.Context) {
+	tidp.handle = func(ctx idp.RequestContext, _ http.ResponseWriter, _ *http.Request) {
 		hasRun = true
 		c.Check(ctx.URL("/path"), gc.Equals, location+"/v1/idp/url-test/path")
 	}
@@ -92,33 +91,13 @@ func (s *idpSuite) TestURL(c *gc.C) {
 	c.Assert(hasRun, gc.Equals, true)
 }
 
-func (s *idpSuite) TestParams(c *gc.C) {
-	tidp := &testIDP{
-		c:    c,
-		name: "url-test",
-	}
-	req, err := http.NewRequest("", "", nil)
-	c.Assert(err, gc.Equals, nil)
-	rr := httptest.NewRecorder()
-	var hasRun bool
-	tidp.handle = func(ctx idp.Context) {
-		hasRun = true
-		params := ctx.Params()
-		c.Check(params.Request, gc.Equals, req)
-		c.Check(params.Response, gc.Equals, rr)
-	}
-	hnd := s.idpHandler(tidp)
-	hnd(rr, req, nil)
-	c.Assert(hasRun, gc.Equals, true)
-}
-
 func (s *idpSuite) TestRequestURL(c *gc.C) {
 	tidp := &testIDP{
 		c:    c,
 		name: "url-test",
 	}
 	var hasRun bool
-	tidp.handle = func(ctx idp.Context) {
+	tidp.handle = func(ctx idp.RequestContext, _ http.ResponseWriter, _ *http.Request) {
 		hasRun = true
 		c.Check(ctx.RequestURL(), gc.Equals, location)
 	}
@@ -135,7 +114,7 @@ func (s *idpSuite) TestBakery(c *gc.C) {
 		name: "url-test",
 	}
 	var hasRun bool
-	tidp.handle = func(ctx idp.Context) {
+	tidp.handle = func(ctx idp.RequestContext, _ http.ResponseWriter, _ *http.Request) {
 		hasRun = true
 		c.Check(ctx.Bakery(), gc.Not(gc.Equals), nil)
 	}
@@ -152,7 +131,7 @@ func (s *idpSuite) TestDatabase(c *gc.C) {
 		name: "url-test",
 	}
 	var hasRun bool
-	tidp.handle = func(ctx idp.Context) {
+	tidp.handle = func(ctx idp.RequestContext, _ http.ResponseWriter, _ *http.Request) {
 		hasRun = true
 		c.Check(ctx.Database(), gc.Not(gc.Equals), nil)
 	}
@@ -169,7 +148,7 @@ func (s *idpSuite) TestUpdateUser(c *gc.C) {
 		name: "url-test",
 	}
 	var hasRun bool
-	tidp.handle = func(ctx idp.Context) {
+	tidp.handle = func(ctx idp.RequestContext, _ http.ResponseWriter, _ *http.Request) {
 		hasRun = true
 		err := ctx.UpdateUser(&params.User{
 			Username:   "test",
@@ -194,7 +173,7 @@ func (s *idpSuite) TestUpdateUserBadUsername(c *gc.C) {
 		name: "url-test",
 	}
 	var hasRun bool
-	tidp.handle = func(ctx idp.Context) {
+	tidp.handle = func(ctx idp.RequestContext, _ http.ResponseWriter, _ *http.Request) {
 		hasRun = true
 		err := ctx.UpdateUser(&params.User{
 			Username:   "test-",
@@ -215,7 +194,7 @@ func (s *idpSuite) TestFindUserByName(c *gc.C) {
 		name: "url-test",
 	}
 	var hasRun bool
-	tidp.handle = func(ctx idp.Context) {
+	tidp.handle = func(ctx idp.RequestContext, _ http.ResponseWriter, _ *http.Request) {
 		hasRun = true
 		err := ctx.UpdateUser(&params.User{
 			Username:   "test",
@@ -240,7 +219,7 @@ func (s *idpSuite) TestFindUserByNameNoUser(c *gc.C) {
 		name: "url-test",
 	}
 	var hasRun bool
-	tidp.handle = func(ctx idp.Context) {
+	tidp.handle = func(ctx idp.RequestContext, _ http.ResponseWriter, _ *http.Request) {
 		hasRun = true
 		_, err := ctx.FindUserByName("test")
 		c.Check(err, gc.ErrorMatches, `user "test" not found: not found`)
@@ -259,7 +238,7 @@ func (s *idpSuite) TestFindUserByExternalID(c *gc.C) {
 		name: "url-test",
 	}
 	var hasRun bool
-	tidp.handle = func(ctx idp.Context) {
+	tidp.handle = func(ctx idp.RequestContext, _ http.ResponseWriter, _ *http.Request) {
 		hasRun = true
 		err := ctx.UpdateUser(&params.User{
 			Username:   "test",
@@ -284,7 +263,7 @@ func (s *idpSuite) TestFindUserByExternalIDNoUser(c *gc.C) {
 		name: "url-test",
 	}
 	var hasRun bool
-	tidp.handle = func(ctx idp.Context) {
+	tidp.handle = func(ctx idp.RequestContext, _ http.ResponseWriter, _ *http.Request) {
 		hasRun = true
 		_, err := ctx.FindUserByExternalId("https://example.com/test")
 		c.Check(err, gc.ErrorMatches, `not found`)
@@ -297,13 +276,68 @@ func (s *idpSuite) TestFindUserByExternalIDNoUser(c *gc.C) {
 	c.Assert(hasRun, gc.Equals, true)
 }
 
+func (s *idpSuite) TestInit(c *gc.C) {
+	var hasRun bool
+	tidp := &testIDP{
+		c:    c,
+		name: "test",
+		init: func(ctx idp.Context) error {
+			hasRun = true
+			return nil
+		},
+	}
+	key, err := bakery.GenerateKey()
+	c.Assert(err, gc.IsNil)
+	_, err = v1.NewAPIHandler(s.pool, identity.ServerParams{
+		AuthUsername:   adminUsername,
+		AuthPassword:   adminPassword,
+		Key:            key,
+		Location:       location,
+		MaxMgoSessions: 50,
+		PrivateAddr:    "localhost",
+		IdentityProviders: []idp.IdentityProvider{
+			tidp,
+		},
+	})
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(hasRun, gc.Equals, true)
+}
+
+func (s *idpSuite) TestInitError(c *gc.C) {
+	var hasRun bool
+	tidp := &testIDP{
+		c:    c,
+		name: "test",
+		init: func(ctx idp.Context) error {
+			hasRun = true
+			return errgo.New("test error")
+		},
+	}
+	key, err := bakery.GenerateKey()
+	c.Assert(err, gc.IsNil)
+	_, err = v1.NewAPIHandler(s.pool, identity.ServerParams{
+		AuthUsername:   adminUsername,
+		AuthPassword:   adminPassword,
+		Key:            key,
+		Location:       location,
+		MaxMgoSessions: 50,
+		PrivateAddr:    "localhost",
+		IdentityProviders: []idp.IdentityProvider{
+			tidp,
+		},
+	})
+	c.Assert(err, gc.ErrorMatches, "test error")
+	c.Assert(hasRun, gc.Equals, true)
+}
+
 type testIDP struct {
 	c           *gc.C
 	name        string
 	description string
 	interactive bool
-	url         func(idp.URLContext, string) (string, error)
-	handle      func(idp.Context)
+	url         func(idp.Context, string) string
+	init        func(idp.Context) error
+	handle      func(idp.RequestContext, http.ResponseWriter, *http.Request)
 }
 
 func (idp *testIDP) Name() string {
@@ -318,17 +352,25 @@ func (idp *testIDP) Interactive() bool {
 	return idp.interactive
 }
 
-func (idp *testIDP) URL(c idp.URLContext, waitid string) (string, error) {
+func (idp *testIDP) URL(ctx idp.Context, waitid string) string {
 	if idp.url != nil {
-		return idp.url(c, waitid)
+		return idp.url(ctx, waitid)
 	}
 	idp.c.Error("URL called unexpectedly")
-	return "", nil
+	return ""
 }
 
-func (idp *testIDP) Handle(c idp.Context) {
+func (idp *testIDP) Init(ctx idp.Context) error {
+	if idp.init != nil {
+		return idp.init(ctx)
+	}
+	idp.c.Error("Init called unexpectedly")
+	return nil
+}
+
+func (idp *testIDP) Handle(c idp.RequestContext, w http.ResponseWriter, req *http.Request) {
 	if idp.handle != nil {
-		idp.handle(c)
+		idp.handle(c, w, req)
 		return
 	}
 	idp.c.Error("Handle called unexpectedly")

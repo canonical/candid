@@ -15,6 +15,7 @@ import (
 
 	"github.com/CanonicalLtd/blues-identity/config"
 	"github.com/CanonicalLtd/blues-identity/idp"
+	"github.com/CanonicalLtd/blues-identity/idp/idputil"
 	"github.com/CanonicalLtd/blues-identity/idp/keystone/internal/keystone"
 )
 
@@ -44,24 +45,23 @@ func (*userpassIdentityProvider) Interactive() bool {
 }
 
 // Handle implements idp.IdentityProvider.Handle.
-func (idp *userpassIdentityProvider) Handle(c idp.Context) {
-	p := c.Params()
-	if p.Request.Method != "POST" {
-		httprequest.WriteJSON(p.Response, http.StatusOK, keystoneSchemaResponse)
+func (idp *userpassIdentityProvider) Handle(ctx idp.RequestContext, w http.ResponseWriter, req *http.Request) {
+	if req.Method != "POST" {
+		httprequest.WriteJSON(w, http.StatusOK, keystoneSchemaResponse)
 		return
 	}
 	var lr form.LoginRequest
-	if err := httprequest.Unmarshal(p, &lr); err != nil {
-		c.LoginFailure(errgo.WithCausef(err, params.ErrBadRequest, "cannot unmarshal login request"))
+	if err := httprequest.Unmarshal(idputil.RequestParams(ctx, w, req), &lr); err != nil {
+		ctx.LoginFailure(idputil.WaitID(req), errgo.WithCausef(err, params.ErrBadRequest, "cannot unmarshal login request"))
 		return
 	}
 	form, err := keystoneFieldsChecker.Coerce(lr.Body.Form, nil)
 	if err != nil {
-		c.LoginFailure(errgo.Notef(err, "cannot validate form"))
+		ctx.LoginFailure(idputil.WaitID(req), errgo.Notef(err, "cannot validate form"))
 		return
 	}
 	m := form.(map[string]interface{})
-	idp.doLogin(c, keystone.Auth{
+	idp.doLogin(ctx, w, req, keystone.Auth{
 		PasswordCredentials: &keystone.PasswordCredentials{
 			Username: m["username"].(string),
 			Password: m["password"].(string),

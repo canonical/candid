@@ -18,6 +18,7 @@ import (
 
 	"github.com/CanonicalLtd/blues-identity/config"
 	"github.com/CanonicalLtd/blues-identity/idp"
+	"github.com/CanonicalLtd/blues-identity/idp/idputil"
 	"github.com/CanonicalLtd/blues-identity/internal/identity"
 	"github.com/CanonicalLtd/blues-identity/internal/store"
 )
@@ -59,12 +60,13 @@ func (*identityProvider) Interactive() bool {
 }
 
 // URL gets the login URL to use this identity provider.
-func (*identityProvider) URL(c idp.URLContext, waitID string) (string, error) {
-	callback := c.URL("/agent")
-	if waitID != "" {
-		callback += "?waitid=" + waitID
-	}
-	return callback, nil
+func (*identityProvider) URL(ctx idp.Context, waitID string) string {
+	return idputil.URL(ctx, "/agent", waitID)
+}
+
+// Init implements idp.IdentityProvider.Init by doing nothing.
+func (*identityProvider) Init(idp.Context) error {
+	return nil
 }
 
 // agentLoginRequest is the expected request to the login endpoint.
@@ -77,7 +79,7 @@ type agentLoginRequest struct {
 //
 // TODO (mhilton) remove the need for special access.
 type agentContext interface {
-	idp.Context
+	idp.RequestContext
 	AgentLogin() params.AgentLogin
 	Store() *store.Store
 }
@@ -85,13 +87,11 @@ type agentContext interface {
 const agentLoginMacaroonDuration = 10 * time.Second
 
 // Handle handles the agent login process.
-func (a *identityProvider) Handle(c idp.Context) {
-	p := c.Params()
-	logger.Infof("agent handle %v", p.Request.URL)
-	ctx := p.Context
-	ac, ok := c.(agentContext)
+func (a *identityProvider) Handle(rctx idp.RequestContext, w http.ResponseWriter, req *http.Request) {
+	logger.Infof("agent handle %v", req.URL)
+	ac, ok := rctx.(agentContext)
 	if !ok {
-		c.LoginFailure(errgo.Newf("unsupported context"))
+		rctx.LoginFailure(idputil.WaitID(req), errgo.Newf("unsupported context"))
 	}
 	var login params.AgentLogin
 	if al := ac.AgentLogin(); al.Username != "" {
@@ -100,23 +100,23 @@ func (a *identityProvider) Handle(c idp.Context) {
 		// so we can't expect to find the curret login parameters there.
 		login = al
 	} else {
-		var req agentLoginRequest
-		if err := httprequest.Unmarshal(p, &req); err != nil {
-			ac.LoginFailure(errgo.NoteMask(err, "cannot unmarshal request", errgo.Any))
+		var alr agentLoginRequest
+		if err := httprequest.Unmarshal(idputil.RequestParams(rctx, w, req), &alr); err != nil {
+			ac.LoginFailure(idputil.WaitID(req), errgo.NoteMask(err, "cannot unmarshal request", errgo.Any))
 			return
 		}
-		login = req.AgentLogin
+		login = alr.AgentLogin
 	}
 	loginOp := bakery.Op{
 		Entity: "agent-" + string(login.Username),
 		Action: "login",
 	}
-	ctx = httpbakery.ContextWithRequest(ctx, p.Request)
+	ctx := httpbakery.ContextWithRequest(rctx, req)
 	ctx = store.ContextWithStore(ctx, ac.Store())
-	_, err := c.Bakery().Checker.Auth(httpbakery.RequestMacaroons(p.Request)...).Allow(ctx, loginOp)
+	_, err := ac.Bakery().Checker.Auth(httpbakery.RequestMacaroons(req)...).Allow(ctx, loginOp)
 	if err == nil {
-		if ac.LoginSuccess(login.Username, time.Now().Add(agentMacaroonDuration)) {
-			httprequest.WriteJSON(p.Response, http.StatusOK,
+		if ac.LoginSuccess(idputil.WaitID(req), login.Username, time.Now().Add(agentMacaroonDuration)) {
+			httprequest.WriteJSON(w, http.StatusOK,
 				params.AgentLoginResponse{
 					AgentLogin: true,
 				},
@@ -132,7 +132,7 @@ func (a *identityProvider) Handle(c idp.Context) {
 	// Instead, mint a very short term macaroon containing
 	// the local third party caveat that will allow access if discharged.
 
-	vers := httpbakery.RequestVersion(c.Params().Request)
+	vers := httpbakery.RequestVersion(req)
 	m, err := ac.Bakery().Oven.NewMacaroon(
 		ctx,
 		vers,
@@ -144,16 +144,16 @@ func (a *identityProvider) Handle(c idp.Context) {
 		loginOp,
 	)
 	if err != nil {
-		c.LoginFailure(errgo.Notef(err, "cannot create macaroon"))
+		ac.LoginFailure(idputil.WaitID(req), errgo.Notef(err, "cannot create macaroon"))
 		return
 	}
-	path, err := utils.RelativeURLPath(p.Request.URL.Path, "/")
+	path, err := utils.RelativeURLPath(req.URL.Path, "/")
 	if err != nil {
-		c.LoginFailure(errgo.Mask(err))
+		ac.LoginFailure(idputil.WaitID(req), errgo.Mask(err))
 		return
 	}
 
-	err = httpbakery.NewDischargeRequiredErrorForRequest(m, path, nil, p.Request)
+	err = httpbakery.NewDischargeRequiredErrorForRequest(m, path, nil, req)
 	err.(*httpbakery.Error).Info.CookieNameSuffix = "agent-login"
-	identity.WriteError(ctx, p.Response, err)
+	identity.WriteError(ctx, w, err)
 }

@@ -3,12 +3,15 @@
 package keystone
 
 import (
+	"net/http"
+
 	"github.com/juju/httprequest"
 	"github.com/juju/idmclient/params"
 	"gopkg.in/errgo.v1"
 
 	"github.com/CanonicalLtd/blues-identity/config"
 	"github.com/CanonicalLtd/blues-identity/idp"
+	"github.com/CanonicalLtd/blues-identity/idp/idputil"
 	"github.com/CanonicalLtd/blues-identity/idp/keystone/internal/keystone"
 )
 
@@ -37,13 +40,13 @@ func (*tokenIdentityProvider) Interactive() bool {
 }
 
 // Handle implements idp.IdentityProvider.Handle.
-func (idp *tokenIdentityProvider) Handle(c idp.Context) {
+func (idp *tokenIdentityProvider) Handle(ctx idp.RequestContext, w http.ResponseWriter, req *http.Request) {
 	var lr tokenLoginRequest
-	if err := httprequest.Unmarshal(c.Params(), &lr); err != nil {
-		c.LoginFailure(errgo.WithCausef(err, params.ErrBadRequest, "cannot unmarshal login request"))
+	if err := httprequest.Unmarshal(idputil.RequestParams(ctx, w, req), &lr); err != nil {
+		ctx.LoginFailure(idputil.WaitID(req), errgo.WithCausef(err, params.ErrBadRequest, "cannot unmarshal login request"))
 		return
 	}
-	idp.doLogin(c, keystone.Auth{
+	idp.doLogin(ctx, w, req, keystone.Auth{
 		Token: &keystone.Token{
 			ID: lr.Token.Login.ID,
 		},

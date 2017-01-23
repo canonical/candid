@@ -24,6 +24,9 @@ var logger = loggo.GetLogger("identity.internal.v1")
 // NewAPIHandler is an identity.NewAPIHandlerFunc.
 func NewAPIHandler(p *store.Pool, params identity.ServerParams) ([]httprequest.Handler, error) {
 	h := New(p, params)
+	if err := h.initIDPs(); err != nil {
+		return nil, errgo.Mask(err)
+	}
 	handlers := identity.ReqServer.Handlers(h.apiHandler)
 	handlers = append(handlers, identity.ReqServer.Handlers(h.dischargeHandler)...)
 	d := httpbakery.NewDischarger(httpbakery.DischargerParams{

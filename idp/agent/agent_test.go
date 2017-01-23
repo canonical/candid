@@ -83,17 +83,18 @@ func (s *agentSuite) TestInteractive(c *gc.C) {
 func (s *agentSuite) TestURL(c *gc.C) {
 	tc := &agentContext{
 		TestContext: idptest.TestContext{
+			Context:   context.Background(),
 			URLPrefix: "https://idp.test/agent",
 		},
 	}
-	u, err := s.idp.URL(tc, "1")
-	c.Assert(err, gc.IsNil)
+	u := s.idp.URL(tc, "1")
 	c.Assert(u, gc.Equals, "https://idp.test/agent/agent?waitid=1")
 }
 
 func (s *agentSuite) TestHandleBadRequest(c *gc.C) {
 	tc := &agentContext{
 		TestContext: idptest.TestContext{
+			Context:   context.Background(),
 			URLPrefix: "https://idp.test/agent",
 		},
 	}
@@ -106,9 +107,10 @@ func (s *agentSuite) TestHandleBadRequest(c *gc.C) {
 		},
 		Body: ioutil.NopCloser(bytes.NewReader(nil)),
 	}
-	s.idp.Handle(tc)
+	rr := httptest.NewRecorder()
+	s.idp.Handle(tc, rr, tc.Request)
 	idptest.AssertLoginFailure(c, &tc.TestContext, "cannot unmarshal request: cannot unmarshal into field: unexpected content type text/plain; want application/json; content: ")
-	c.Assert(tc.Response().Body.Len(), gc.Equals, 0)
+	c.Assert(rr.Body.Len(), gc.Equals, 0)
 }
 
 func (s *agentSuite) TestHandleNoMacaroon(c *gc.C) {
@@ -116,6 +118,7 @@ func (s *agentSuite) TestHandleNoMacaroon(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 	tc := &agentContext{
 		TestContext: idptest.TestContext{
+			Context:   context.Background(),
 			URLPrefix: "https://idp.test/agent",
 			Bakery_:   s.store.Bakery,
 		},
@@ -132,8 +135,9 @@ func (s *agentSuite) TestHandleNoMacaroon(c *gc.C) {
 			PublicKey: &key.Public,
 		}),
 	}
-	s.idp.Handle(tc)
-	s.assertDischargeRequired(c, tc.Response())
+	rr := httptest.NewRecorder()
+	s.idp.Handle(tc, rr, tc.Request)
+	s.assertDischargeRequired(c, rr)
 }
 
 func (s *agentSuite) TestHandleWithUsableMacaroon(c *gc.C) {
@@ -141,6 +145,7 @@ func (s *agentSuite) TestHandleWithUsableMacaroon(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 	tc := &agentContext{
 		TestContext: idptest.TestContext{
+			Context:   context.Background(),
 			URLPrefix: "https://idp.test/agent",
 			Bakery_:   s.store.Bakery,
 		},
@@ -164,7 +169,7 @@ func (s *agentSuite) TestHandleWithUsableMacaroon(c *gc.C) {
 	})
 	c.Assert(err, gc.IsNil)
 	m, err := s.store.Bakery.Oven.NewMacaroon(
-		context.TODO(),
+		tc,
 		bakery.LatestVersion,
 		time.Now().Add(time.Minute),
 		nil,
@@ -177,9 +182,10 @@ func (s *agentSuite) TestHandleWithUsableMacaroon(c *gc.C) {
 	cookie, err := httpbakery.NewCookie(s.store.Bakery.Checker.Namespace(), macaroon.Slice{m.M()})
 	c.Assert(err, gc.IsNil)
 	tc.Request.AddCookie(cookie)
-	s.idp.Handle(tc)
+	rr := httptest.NewRecorder()
+	s.idp.Handle(tc, rr, tc.Request)
 	idptest.AssertLoginSuccess(c, &tc.TestContext, "test")
-	httptesting.AssertJSONResponse(c, tc.Response(), http.StatusOK, params.AgentLoginResponse{
+	httptesting.AssertJSONResponse(c, rr, http.StatusOK, params.AgentLoginResponse{
 		AgentLogin: true,
 	})
 }
@@ -189,6 +195,7 @@ func (s *agentSuite) TestHandleWithUnsableMacaroon(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 	tc := &agentContext{
 		TestContext: idptest.TestContext{
+			Context:   context.Background(),
 			URLPrefix: "https://idp.test/agent",
 			Bakery_:   s.store.Bakery,
 		},
@@ -207,7 +214,7 @@ func (s *agentSuite) TestHandleWithUnsableMacaroon(c *gc.C) {
 		}),
 	}
 	m, err := s.store.Bakery.Oven.NewMacaroon(
-		context.TODO(),
+		tc,
 		bakery.LatestVersion,
 		time.Now().Add(time.Minute),
 		[]checkers.Caveat{checkers.AllowCaveat("nothing")},
@@ -220,9 +227,10 @@ func (s *agentSuite) TestHandleWithUnsableMacaroon(c *gc.C) {
 	cookie, err := httpbakery.NewCookie(s.store.Bakery.Checker.Namespace(), macaroon.Slice{m.M()})
 	c.Assert(err, gc.IsNil)
 	tc.Request.AddCookie(cookie)
-	s.idp.Handle(tc)
+	rr := httptest.NewRecorder()
+	s.idp.Handle(tc, rr, tc.Request)
 	idptest.AssertLoginInProgress(c, &tc.TestContext)
-	s.assertDischargeRequired(c, tc.Response())
+	s.assertDischargeRequired(c, rr)
 }
 
 func (s *agentSuite) TestHandleShortcutNoMacaroon(c *gc.C) {
@@ -230,6 +238,7 @@ func (s *agentSuite) TestHandleShortcutNoMacaroon(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 	tc := &agentContext{
 		TestContext: idptest.TestContext{
+			Context:   context.Background(),
 			URLPrefix: "https://idp.test/agent",
 			Bakery_:   s.store.Bakery,
 		},
@@ -244,9 +253,10 @@ func (s *agentSuite) TestHandleShortcutNoMacaroon(c *gc.C) {
 		},
 		Header: http.Header{},
 	}
-	s.idp.Handle(tc)
+	rr := httptest.NewRecorder()
+	s.idp.Handle(tc, rr, tc.Request)
 	idptest.AssertLoginInProgress(c, &tc.TestContext)
-	s.assertDischargeRequired(c, tc.Response())
+	s.assertDischargeRequired(c, rr)
 }
 
 func (s *agentSuite) TestHandleWithShortcutUsableMacaroon(c *gc.C) {
@@ -254,6 +264,7 @@ func (s *agentSuite) TestHandleWithShortcutUsableMacaroon(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 	tc := &agentContext{
 		TestContext: idptest.TestContext{
+			Context:   context.Background(),
 			URLPrefix: "https://idp.test/agent",
 			Bakery_:   s.store.Bakery,
 		},
@@ -270,7 +281,7 @@ func (s *agentSuite) TestHandleWithShortcutUsableMacaroon(c *gc.C) {
 	tc.Request, err = http.NewRequest("", "/", nil)
 	c.Assert(err, gc.IsNil)
 	m, err := s.store.Bakery.Oven.NewMacaroon(
-		context.TODO(),
+		tc,
 		bakery.LatestVersion,
 		time.Now().Add(time.Minute),
 		[]checkers.Caveat{checkers.DeclaredCaveat("username", "test")},
@@ -282,9 +293,10 @@ func (s *agentSuite) TestHandleWithShortcutUsableMacaroon(c *gc.C) {
 	cookie, err := httpbakery.NewCookie(s.store.Bakery.Checker.Namespace(), macaroon.Slice{m.M()})
 	c.Assert(err, gc.IsNil)
 	tc.Request.AddCookie(cookie)
-	s.idp.Handle(tc)
+	rr := httptest.NewRecorder()
+	s.idp.Handle(tc, rr, tc.Request)
 	idptest.AssertLoginSuccess(c, &tc.TestContext, "test")
-	httptesting.AssertJSONResponse(c, tc.Response(), http.StatusOK, params.AgentLoginResponse{
+	httptesting.AssertJSONResponse(c, rr, http.StatusOK, params.AgentLoginResponse{
 		AgentLogin: true,
 	})
 }
@@ -294,6 +306,7 @@ func (s *agentSuite) TestHandleShortcutWithUnsableMacaroon(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 	tc := &agentContext{
 		TestContext: idptest.TestContext{
+			Context:   context.Background(),
 			URLPrefix: "https://idp.test/agent",
 			Bakery_:   s.store.Bakery,
 		},
@@ -305,7 +318,7 @@ func (s *agentSuite) TestHandleShortcutWithUnsableMacaroon(c *gc.C) {
 	tc.Request, err = http.NewRequest("", "/login", nil)
 	c.Assert(err, gc.IsNil)
 	m, err := s.store.Bakery.Oven.NewMacaroon(
-		context.TODO(),
+		tc,
 		bakery.LatestVersion,
 		time.Now().Add(time.Minute),
 		[]checkers.Caveat{checkers.AllowCaveat("nothing")},
@@ -318,9 +331,10 @@ func (s *agentSuite) TestHandleShortcutWithUnsableMacaroon(c *gc.C) {
 	cookie, err := httpbakery.NewCookie(s.store.Bakery.Checker.Namespace(), macaroon.Slice{m.M()})
 	c.Assert(err, gc.IsNil)
 	tc.Request.AddCookie(cookie)
-	s.idp.Handle(tc)
+	rr := httptest.NewRecorder()
+	s.idp.Handle(tc, rr, tc.Request)
 	idptest.AssertLoginInProgress(c, &tc.TestContext)
-	s.assertDischargeRequired(c, tc.Response())
+	s.assertDischargeRequired(c, rr)
 }
 
 func (s *agentSuite) assertDischargeRequired(c *gc.C, rr *httptest.ResponseRecorder) {

@@ -12,9 +12,11 @@ import (
 	"github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/testing/httptesting"
+	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
+	mgo "gopkg.in/mgo.v2"
 	"gopkg.in/yaml.v2"
 
 	"github.com/CanonicalLtd/blues-identity/config"
@@ -79,12 +81,26 @@ func (s *ussoSuite) TestInteractive(c *gc.C) {
 
 func (s *ussoSuite) TestURL(c *gc.C) {
 	tc := &idptest.TestContext{
+		Context:   context.Background(),
+		URLPrefix: "https://idp.test",
+	}
+	c.Assert(s.idp.URL(tc, "1"), gc.Equals, "https://idp.test/login?waitid=1")
+}
+
+func (s *ussoSuite) TestRedirect(c *gc.C) {
+	req, err := http.NewRequest("", "https://idp.test?waitid=1", nil)
+	c.Assert(err, gc.Equals, nil)
+	tc := &idptest.TestContext{
+		Context:   context.Background(),
 		URLPrefix: "https://idp.test",
 		Database_: s.Session.DB("test"),
+		Request:   req,
 	}
-	t, err := s.idp.URL(tc, "1")
-	c.Assert(err, gc.IsNil)
-	u, err := url.Parse(t)
+	tc.Request.ParseForm()
+	rr := httptest.NewRecorder()
+	s.idp.Handle(tc, rr, tc.Request)
+	c.Assert(rr.Code, gc.Equals, http.StatusFound)
+	u, err := url.Parse(rr.Header().Get("Location"))
 	c.Assert(err, gc.IsNil)
 	c.Assert(u.Host, gc.Equals, "login.ubuntu.com")
 	c.Assert(u.Path, gc.Equals, "/+openid")
@@ -104,10 +120,12 @@ func (s *ussoSuite) TestURL(c *gc.C) {
 }
 
 func (s *ussoSuite) TestHandleSuccess(c *gc.C) {
+	db := s.Session.DB("test")
 	tc := &idptest.TestContext{
+		Context:   context.Background(),
 		URLPrefix: "https://idp.test",
 		Bakery_:   bakery.New(bakery.BakeryParams{}),
-		Database_: s.Session.DB("test"),
+		Database_: db,
 	}
 	s.MockUSSO.AddUser(&mockusso.User{
 		ID:       "test",
@@ -121,28 +139,29 @@ func (s *ussoSuite) TestHandleSuccess(c *gc.C) {
 			return errors.New("no redirect")
 		},
 	}
-	u, err := s.idp.URL(tc, "2")
-	c.Assert(err, gc.IsNil)
-	resp, err := cl.Get(u)
+	resp, err := cl.Get(s.ussoURL(c, "https://idp.test", db, "2"))
 	defer resp.Body.Close()
 	tc.Request, err = http.NewRequest("GET", resp.Header.Get("Location"), nil)
 	c.Assert(err, gc.IsNil)
 	tc.Request.ParseForm()
-	s.idp.Handle(tc)
+	rr := httptest.NewRecorder()
+	s.idp.Handle(tc, rr, tc.Request)
 	idptest.AssertLoginSuccess(c, tc, "test")
 	idptest.AssertUser(c, tc, &params.User{
 		Username:   params.Username("test"),
 		ExternalID: "https://login.ubuntu.com/+id/test",
 		FullName:   "Test User", Email: "test@example.com",
 	})
-	c.Assert(tc.Response().Body.String(), gc.Equals, "login successful as user test\n")
+	c.Assert(rr.Body.String(), gc.Equals, "login successful as user test\n")
 }
 
 func (s *ussoSuite) TestHandleSuccessNoExtensions(c *gc.C) {
+	db := s.Session.DB("test")
 	tc := &idptest.TestContext{
+		Context:   context.Background(),
 		URLPrefix: "https://idp.test",
 		Bakery_:   bakery.New(bakery.BakeryParams{}),
-		Database_: s.Session.DB("test"),
+		Database_: db,
 	}
 	err := tc.UpdateUser(&params.User{
 		ExternalID: "https://login.ubuntu.com/+id/test",
@@ -164,14 +183,13 @@ func (s *ussoSuite) TestHandleSuccessNoExtensions(c *gc.C) {
 			return errors.New("no redirect")
 		},
 	}
-	u, err := s.idp.URL(tc, "3")
-	c.Assert(err, gc.IsNil)
-	resp, err := cl.Get(u)
+	resp, err := cl.Get(s.ussoURL(c, "https://idp.test", db, "3"))
 	defer resp.Body.Close()
 	tc.Request, err = http.NewRequest("GET", resp.Header.Get("Location"), nil)
 	c.Assert(err, gc.IsNil)
 	tc.Request.ParseForm()
-	s.idp.Handle(tc)
+	rr := httptest.NewRecorder()
+	s.idp.Handle(tc, rr, tc.Request)
 	idptest.AssertLoginSuccess(c, tc, "test")
 	idptest.AssertUser(c, tc, &params.User{
 		ExternalID: "https://login.ubuntu.com/+id/test",
@@ -179,13 +197,15 @@ func (s *ussoSuite) TestHandleSuccessNoExtensions(c *gc.C) {
 		FullName:   "Test User",
 		Email:      "test@example.com",
 	})
-	c.Assert(tc.Response().Body.String(), gc.Equals, "login successful as user test\n")
+	c.Assert(rr.Body.String(), gc.Equals, "login successful as user test\n")
 }
 
 func (s *ussoSuite) TestHandleNoExtensionsNotFound(c *gc.C) {
+	db := s.Session.DB("test")
 	tc := &idptest.TestContext{
+		Context:   context.Background(),
 		URLPrefix: "https://idp.test",
-		Database_: s.Session.DB("test"),
+		Database_: db,
 	}
 	s.MockUSSO.AddUser(&mockusso.User{
 		ID:       "test",
@@ -200,23 +220,24 @@ func (s *ussoSuite) TestHandleNoExtensionsNotFound(c *gc.C) {
 			return errors.New("no redirect")
 		},
 	}
-	u, err := s.idp.URL(tc, "4")
-	c.Assert(err, gc.IsNil)
-	resp, err := cl.Get(u)
+	resp, err := cl.Get(s.ussoURL(c, "https://idp.test", db, "4"))
 	defer resp.Body.Close()
 	tc.Request, err = http.NewRequest("GET", resp.Header.Get("Location"), nil)
 	c.Assert(err, gc.IsNil)
 	tc.Request.ParseForm()
-	s.idp.Handle(tc)
+	rr := httptest.NewRecorder()
+	s.idp.Handle(tc, rr, tc.Request)
 	idptest.AssertLoginFailure(c, tc, `cannot get user details for "https://login.ubuntu.com/\+id/test": cannot find external id "https://login.ubuntu.com/\+id/test"`)
 	err, _ = tc.LoginFailureCall()
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrForbidden)
 }
 
 func (s *ussoSuite) TestInteractiveLoginFromDifferentProvider(c *gc.C) {
+	db := s.Session.DB("test")
 	tc := &idptest.TestContext{
+		Context:   context.Background(),
 		URLPrefix: "https://idp.test",
-		Database_: s.Session.DB("test"),
+		Database_: db,
 	}
 	mockUSSO := mockusso.New("https://login.badplace.com")
 	server := httptest.NewServer(mockUSSO)
@@ -239,8 +260,8 @@ func (s *ussoSuite) TestInteractiveLoginFromDifferentProvider(c *gc.C) {
 	v.Set("openid.mode", "checkid_setup")
 	v.Set("openid.claimed_id", "https://login.badplace.com")
 	v.Set("openid.identity", "http://specs.openid.net/auth/2.0/identifier_select")
-	v.Set("openid.return_to", "https://idp.test/v1/idp/usso/callback")
-	v.Set("openid.realm", "https://idp.test/v1/idp/usso/callback")
+	v.Set("openid.return_to", "https://idp.test/callback")
+	v.Set("openid.realm", "https://idp.test/callback")
 	u := &url.URL{
 		Scheme:   "https",
 		Host:     "login.badplace.com",
@@ -257,15 +278,18 @@ func (s *ussoSuite) TestInteractiveLoginFromDifferentProvider(c *gc.C) {
 	tc.Request, err = http.NewRequest("GET", resp.Header.Get("Location"), nil)
 	c.Assert(err, gc.IsNil)
 	tc.Request.ParseForm()
-	s.idp.Handle(tc)
+	rr := httptest.NewRecorder()
+	s.idp.Handle(tc, rr, tc.Request)
 	idptest.AssertLoginFailure(c, tc, `.*rejecting login from https://login\.badplace\.com/\+openid`)
 }
 
 func (s *ussoSuite) TestHandleUpdateUserError(c *gc.C) {
+	db := s.Session.DB("test")
 	tc := &idptest.TestContext{
+		Context:   context.Background(),
 		URLPrefix: "https://idp.test",
 		Bakery_:   bakery.New(bakery.BakeryParams{}),
-		Database_: s.Session.DB("test"),
+		Database_: db,
 	}
 	s.MockUSSO.AddUser(&mockusso.User{
 		ID:       "test",
@@ -279,14 +303,29 @@ func (s *ussoSuite) TestHandleUpdateUserError(c *gc.C) {
 			return errors.New("no redirect")
 		},
 	}
-	u, err := s.idp.URL(tc, "5")
-	c.Assert(err, gc.IsNil)
-	resp, err := cl.Get(u)
+	resp, err := cl.Get(s.ussoURL(c, "https://idp.test", db, "5"))
 	defer resp.Body.Close()
 	tc.Request, err = http.NewRequest("GET", resp.Header.Get("Location"), nil)
 	c.Assert(err, gc.IsNil)
 	tc.Request.ParseForm()
 	tc.UpdateUserError = errgo.New(`invalid username "test-"`)
-	s.idp.Handle(tc)
+	rr := httptest.NewRecorder()
+	s.idp.Handle(tc, rr, tc.Request)
 	idptest.AssertLoginFailure(c, tc, `invalid username "test-"`)
+}
+
+func (s *ussoSuite) ussoURL(c *gc.C, prefix string, db *mgo.Database, waitid string) string {
+	tc := &idptest.TestContext{
+		Context:   context.Background(),
+		URLPrefix: prefix,
+		Database_: db,
+	}
+	var err error
+	tc.Request, err = http.NewRequest("", s.idp.URL(tc, waitid), nil)
+	c.Assert(err, gc.Equals, nil)
+	tc.Request.ParseForm()
+	rr := httptest.NewRecorder()
+	s.idp.Handle(tc, rr, tc.Request)
+	c.Assert(rr.Code, gc.Equals, http.StatusFound)
+	return rr.Header().Get("Location")
 }

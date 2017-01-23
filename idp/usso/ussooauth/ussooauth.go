@@ -54,27 +54,28 @@ func (*identityProvider) Interactive() bool {
 }
 
 // URL gets the login URL to use this identity provider.
-func (*identityProvider) URL(c idp.URLContext, waitID string) (string, error) {
-	callback := c.URL("/oauth")
-	if waitID != "" {
-		callback += "?waitid=" + waitID
-	}
-	return callback, nil
+func (*identityProvider) URL(ctx idp.Context, waitID string) string {
+	return idputil.URL(ctx, "/oauth", waitID)
+}
+
+// Init initialises the identity provider.
+func (*identityProvider) Init(c idp.Context) error {
+	return nil
 }
 
 // Handle handles the Ubuntu SSO OAuth login process.
-func (*identityProvider) Handle(c idp.Context) {
-	id, err := verifyOAuthSignature(c.RequestURL(), c.Params().Request)
+func (*identityProvider) Handle(ctx idp.RequestContext, w http.ResponseWriter, req *http.Request) {
+	id, err := verifyOAuthSignature(ctx.RequestURL(), req)
 	if err != nil {
-		c.LoginFailure(err)
+		ctx.LoginFailure(idputil.WaitID(req), err)
 		return
 	}
-	u, err := c.FindUserByExternalId(id)
+	u, err := ctx.FindUserByExternalId(id)
 	if err != nil {
-		c.LoginFailure(errgo.Notef(err, "cannot get user details for %q", id))
+		ctx.LoginFailure(idputil.WaitID(req), errgo.Notef(err, "cannot get user details for %q", id))
 		return
 	}
-	idputil.LoginUser(c, u)
+	idputil.LoginUser(ctx, idputil.WaitID(req), w, u)
 }
 
 var consumerKeyRegexp = regexp.MustCompile(`oauth_consumer_key="([^"]*)"`)

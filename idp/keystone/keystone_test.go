@@ -4,10 +4,12 @@ package keystone_test
 
 import (
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"strings"
 
 	"github.com/juju/idmclient/params"
+	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
 	"gopkg.in/yaml.v2"
@@ -69,23 +71,25 @@ func (s *keystoneSuite) TestKeystoneIdentityProviderUseNameForDescription(c *gc.
 
 func (s *keystoneSuite) TestKeystoneIdentityProviderURL(c *gc.C) {
 	tc := &idptest.TestContext{
+		Context:   context.Background(),
 		URLPrefix: "https://idp.test",
 	}
-	u, err := s.idp.URL(tc, "1")
-	c.Assert(err, gc.IsNil)
+	u := s.idp.URL(tc, "1")
 	c.Assert(u, gc.Equals, "https://idp.test/login?waitid=1")
 }
 
 func (s *keystoneSuite) TestKeystoneIdentityProviderHandleGet(c *gc.C) {
 	req, err := http.NewRequest("GET", "https://idp.test/login?waitid=1", nil)
 	c.Assert(err, gc.IsNil)
+	req.ParseForm()
 	tc := &idptest.TestContext{
+		Context:   context.Background(),
 		URLPrefix: "https://idp.test",
 		Request:   req,
 	}
-	s.idp.Handle(tc)
+	rr := httptest.NewRecorder()
+	s.idp.Handle(tc, rr, tc.Request)
 	idptest.AssertLoginInProgress(c, tc)
-	rr := tc.Response()
 	c.Assert(rr.Code, gc.Equals, http.StatusOK)
 	c.Assert(rr.HeaderMap.Get("Content-Type"), gc.Equals, "text/html;charset=UTF-8")
 	c.Assert(rr.Body.String(), gc.Equals, `<!doctype html>
@@ -113,18 +117,21 @@ func (s *keystoneSuite) TestKeystoneIdentityProviderHandlePost(c *gc.C) {
 	)
 	c.Assert(err, gc.IsNil)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.ParseForm()
 	tc := &idptest.TestContext{
+		Context: context.Background(),
 		Request: req,
 		Bakery_: bakery.New(bakery.BakeryParams{}),
 	}
-	s.idp.Handle(tc)
+	rr := httptest.NewRecorder()
+	s.idp.Handle(tc, rr, tc.Request)
 	idptest.AssertLoginSuccess(c, tc, "testuser@openstack")
 	idptest.AssertUser(c, tc, &params.User{
 		Username:   params.Username("testuser@openstack"),
 		ExternalID: "abc@openstack",
 		IDPGroups:  []string{"abc_project@openstack"},
 	})
-	c.Assert(tc.Response().Body.String(), gc.Equals, "login successful as user testuser@openstack\n")
+	c.Assert(rr.Body.String(), gc.Equals, "login successful as user testuser@openstack\n")
 }
 
 func (s *keystoneSuite) TestKeystoneIdentityProviderHandlePostBadPassword(c *gc.C) {
@@ -138,12 +145,15 @@ func (s *keystoneSuite) TestKeystoneIdentityProviderHandlePostBadPassword(c *gc.
 	)
 	c.Assert(err, gc.IsNil)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.ParseForm()
 	tc := &idptest.TestContext{
+		Context:   context.Background(),
 		URLPrefix: "https://idp.test",
 		Request:   req,
 		Bakery_:   bakery.New(bakery.BakeryParams{}),
 	}
-	s.idp.Handle(tc)
+	rr := httptest.NewRecorder()
+	s.idp.Handle(tc, rr, tc.Request)
 	idptest.AssertLoginFailure(c, tc, `cannot log in: Post http.*: invalid credentials`)
 }
 
@@ -158,12 +168,15 @@ func (s *keystoneSuite) TestKeystoneIdentityProviderHandlePostNoTenants(c *gc.C)
 	)
 	c.Assert(err, gc.IsNil)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.ParseForm()
 	tc := &idptest.TestContext{
+		Context:   context.Background(),
 		URLPrefix: "https://idp.test",
 		Request:   req,
 		Bakery_:   bakery.New(bakery.BakeryParams{}),
 	}
-	s.idp.Handle(tc)
+	rr := httptest.NewRecorder()
+	s.idp.Handle(tc, rr, tc.Request)
 	idptest.AssertLoginFailure(c, tc, `cannot get tenants: Get .*: bad token`)
 }
 
@@ -178,7 +191,9 @@ func (s *keystoneSuite) TestKeystoneIdentityProviderHandleExistingUser(c *gc.C) 
 	)
 	c.Assert(err, gc.IsNil)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.ParseForm()
 	tc := &idptest.TestContext{
+		Context:   context.Background(),
 		URLPrefix: "https://idp.test",
 		Request:   req,
 		Bakery_:   bakery.New(bakery.BakeryParams{}),
@@ -187,7 +202,9 @@ func (s *keystoneSuite) TestKeystoneIdentityProviderHandleExistingUser(c *gc.C) 
 		Username:   params.Username("testuser@openstack"),
 		ExternalID: "some other thing",
 	})
-	s.idp.Handle(tc)
+	c.Assert(err, gc.IsNil)
+	rr := httptest.NewRecorder()
+	s.idp.Handle(tc, rr, tc.Request)
 	idptest.AssertLoginFailure(c, tc, `cannot update identity: username "testuser@openstack" already used`)
 }
 

@@ -27,9 +27,9 @@ const (
 // LoginUser completes a successful login for the specified user. A new
 // identity macaroon is generated for the user and an appropriate message
 // will be returned for the login request.
-func LoginUser(c idp.Context, u *params.User) {
-	if c.LoginSuccess(params.Username(u.Username), time.Now().Add(identityMacaroonDuration)) {
-		fmt.Fprintf(c.Params().Response, "login successful as user %s\n", u.Username)
+func LoginUser(c idp.RequestContext, waitid string, w http.ResponseWriter, u *params.User) {
+	if c.LoginSuccess(waitid, params.Username(u.Username), time.Now().Add(identityMacaroonDuration)) {
+		fmt.Fprintf(w, "login successful as user %s\n", u.Username)
 	}
 }
 
@@ -45,4 +45,28 @@ func GetLoginMethods(ctx context.Context, c *httprequest.Client, u *url.URL, v i
 		return errgo.Mask(err)
 	}
 	return nil
+}
+
+// RequestParams creates an httprequest.Params object from the given fields.
+func RequestParams(ctx context.Context, w http.ResponseWriter, req *http.Request) httprequest.Params {
+	return httprequest.Params{
+		Response: w,
+		Request:  req,
+		Context:  ctx,
+	}
+}
+
+// WaitID gets the wait ID from the given request using the standard form value.
+func WaitID(req *http.Request) string {
+	return req.Form.Get("waitid")
+}
+
+// URL creates a URL addressed to the fgiven path within the IDP handler
+// and adds the given waitid (when specified).
+func URL(ctx idp.Context, path, waitid string) string {
+	callback := ctx.URL(path)
+	if waitid != "" {
+		callback += "?waitid=" + waitid
+	}
+	return callback
 }
