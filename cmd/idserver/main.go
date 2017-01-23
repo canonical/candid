@@ -21,6 +21,7 @@ import (
 	"github.com/CanonicalLtd/blues-identity/config"
 	"github.com/CanonicalLtd/blues-identity/idp"
 	"github.com/CanonicalLtd/blues-identity/idp/agent"
+	_ "github.com/CanonicalLtd/blues-identity/idp/azure"
 	_ "github.com/CanonicalLtd/blues-identity/idp/keystone"
 	"github.com/CanonicalLtd/blues-identity/idp/usso"
 	_ "github.com/CanonicalLtd/blues-identity/idp/usso/ussodischarge"
