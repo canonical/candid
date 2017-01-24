@@ -3,6 +3,7 @@
 package v1_test
 
 import (
+	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"time"
@@ -24,7 +25,13 @@ var _ = gc.Suite(&loginSuite{})
 
 func (s *loginSuite) SetUpSuite(c *gc.C) {
 	s.apiSuite.idps = []idp.IdentityProvider{
-		test.IdentityProvider,
+		test.NewIdentityProvider(test.Params{
+			Name: "test",
+		}),
+		test.NewIdentityProvider(test.Params{
+			Name:   "test2",
+			Domain: "test2",
+		}),
 	}
 	s.apiSuite.SetUpSuite(c)
 }
@@ -102,4 +109,22 @@ func (s *loginSuite) TestLoginFailure(c *gc.C) {
 	err = visitor.VisitWebPage(testContext, client, map[string]*url.URL{httpbakery.UserInteractionMethod: u})
 	c.Assert(err, gc.ErrorMatches, `Post https:.*: user "" not found: not found`)
 	c.Assert(jar.cookies, gc.HasLen, 0)
+}
+
+func (s *loginSuite) TestInteractiveIdentityProviderSelection(c *gc.C) {
+	rr := httptest.NewRecorder()
+	req, err := http.NewRequest("GET", "/v1/login", nil)
+	c.Assert(err, gc.Equals, nil)
+	s.srv.ServeHTTP(rr, req)
+	c.Assert(rr.Code, gc.Equals, http.StatusFound)
+	c.Assert(rr.HeaderMap.Get("Location"), gc.Equals, location+"/v1/idp/test/test-login")
+}
+
+func (s *loginSuite) TestInteractiveIdentityProviderSelectionWithDomain(c *gc.C) {
+	rr := httptest.NewRecorder()
+	req, err := http.NewRequest("GET", "/v1/login?domain=test2", nil)
+	c.Assert(err, gc.Equals, nil)
+	s.srv.ServeHTTP(rr, req)
+	c.Assert(rr.Code, gc.Equals, http.StatusFound)
+	c.Assert(rr.HeaderMap.Get("Location"), gc.Equals, location+"/v1/idp/test2/test-login")
 }

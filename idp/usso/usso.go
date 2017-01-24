@@ -58,6 +58,11 @@ func (*identityProvider) Name() string {
 	return "usso"
 }
 
+// Domain implements idp.IdentityProvider.Domain.
+func (*identityProvider) Domain() string {
+	return ""
+}
+
 // Description gives a description of the identity provider.
 func (*identityProvider) Description() string {
 	return "Ubuntu SSO"

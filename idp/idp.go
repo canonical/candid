@@ -74,6 +74,10 @@ type IdentityProvider interface {
 	// appear in urls.
 	Name() string
 
+	// Domain is the domain in which this identity provider will
+	// create users.
+	Domain() string
+
 	// Description is a name for the identity provider used to show
 	// end users.
 	Description() string

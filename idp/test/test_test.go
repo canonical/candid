@@ -42,7 +42,9 @@ identity-providers:
 }
 
 func (s *testSuite) SetUpTest(c *gc.C) {
-	s.idp = test.IdentityProvider
+	s.idp = test.NewIdentityProvider(test.Params{
+		Name: "test",
+	})
 }
 
 func (s *testSuite) TestName(c *gc.C) {

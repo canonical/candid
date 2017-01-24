@@ -127,6 +127,11 @@ func (idp identityProvider) Name() string {
 	return "usso_macaroon"
 }
 
+// Domain implements idp.IdentityProvider.Domain
+func (idp identityProvider) Domain() string {
+	return idp.params.Domain
+}
+
 // Description gives a description of the identity provider.
 func (identityProvider) Description() string {
 	return "Ubuntu SSO macaroon discharge authentication"

@@ -21,7 +21,9 @@ var _ = gc.Suite(&dischargeSuite{})
 
 func (s *dischargeSuite) SetUpTest(c *gc.C) {
 	s.IDPs = []idp.IdentityProvider{
-		test.IdentityProvider,
+		test.NewIdentityProvider(test.Params{
+			Name: "test",
+		}),
 	}
 	s.DischargeSuite.SetUpTest(c)
 	s.visitor = test.Visitor{
