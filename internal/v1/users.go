@@ -173,6 +173,19 @@ func gravatarHash(s string) string {
 	return fmt.Sprintf("%x", hasher.Sum(nil))
 }
 
+// WhoAmI returns authentication information on the client that is
+// making the call.
+func (h *apiHandler) WhoAmI(p httprequest.Params, arg *params.WhoAmIRequest) (params.WhoAmIResponse, error) {
+	id := identityFromContext(p.Context)
+	if id == "" {
+		// Should never happen, as the endpoint should require authentication.
+		return params.WhoAmIResponse{}, errgo.Newf("no identity")
+	}
+	return params.WhoAmIResponse{
+		User: string(id),
+	}, nil
+}
+
 // UserGroups serves the GET /u/$username/groups endpoint, and returns
 // the list of groups associated with the user.
 func (h *apiHandler) UserGroups(p httprequest.Params, r *params.UserGroupsRequest) ([]string, error) {

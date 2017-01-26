@@ -11,7 +11,7 @@ github.com/juju/gnuflag	git	4e76c56581859c14d9d87e1ddbe29e1c0f10195f	2016-08-09T
 github.com/juju/go4	git	40d72ab9641a2a8c36a9c46a51e28367115c8e59	2016-02-22T16:32:58Z
 github.com/juju/httpprof	git	14bf14c307672fd2456bdbf35d19cf0ccd3cf565	2014-12-17T16:00:36Z
 github.com/juju/httprequest	git	6c8f962a4a2b9fbf5141d8191974c2ab3a4c9373	2016-12-15T09:34:54Z
-github.com/juju/idmclient	git	c342e365f26c1dbe11b88c99de142d22458f095f	2016-12-22T17:47:08Z
+github.com/juju/idmclient	git	1b14f6560d9748a0a686472d46ea27544db70fc4	2017-01-27T12:07:20Z
 github.com/juju/loggo	git	3b7ece48644d35850f4ced4c2cbc2cf8413f58e0	2016-08-18T02:57:24Z
 github.com/juju/persistent-cookiejar	git	b48f5b9290d63455d10de0c0e4c26e06e6e74842	2016-10-07T16:41:21Z
 github.com/juju/retry	git	62c62032529169c7ec02fa48f93349604c345e1f	2015-10-29T02:48:21Z
