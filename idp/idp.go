@@ -4,6 +4,7 @@
 package idp
 
 import (
+	"html/template"
 	"net/http"
 	"time"
 
@@ -41,6 +42,11 @@ type RequestContext interface {
 	// Bakery returns a *bakery.Bakery that the identity provider
 	// can use to mint new macaroons.
 	Bakery() *bakery.Bakery
+
+	// Template returns the template with the given name from the set
+	// of templates configured in the server, or nil if there is no
+	// such template.
+	Template(name string) *template.Template
 
 	// LoginSuccess completes a login request successfully. The user
 	// with the given username will have their last login time

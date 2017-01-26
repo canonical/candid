@@ -3,6 +3,8 @@
 package v1
 
 import (
+	"html/template"
+
 	"github.com/juju/httprequest"
 	"github.com/juju/idmclient/params"
 	"github.com/juju/loggo"
@@ -54,6 +56,7 @@ type Handler struct {
 	handlerPool mempool.Pool
 	location    string
 	idps        []idp.IdentityProvider
+	template    *template.Template
 }
 
 // New returns a new instance of the v1 API handler.
@@ -62,6 +65,7 @@ func New(p *store.Pool, params identity.ServerParams) *Handler {
 		storePool: p,
 		location:  params.Location,
 		idps:      params.IdentityProviders,
+		template:  params.Template,
 	}
 	h.handlerPool.New = h.newHandler
 	return h

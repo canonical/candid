@@ -4,6 +4,7 @@ package identity
 
 import (
 	"fmt"
+	"html/template"
 	"net/http"
 	"runtime/debug"
 	"time"
@@ -70,6 +71,7 @@ func New(db *mgo.Database, sp ServerParams, versions map[string]NewAPIHandlerFun
 
 	srv.router.Handle("OPTIONS", "/*path", srv.options)
 	srv.router.Handler("GET", "/metrics", prometheus.Handler())
+	srv.router.Handler("GET", "/static/*path", http.StripPrefix("/static", http.FileServer(sp.StaticFileSystem)))
 	for name, newAPI := range versions {
 		handlers, err := newAPI(pool, sp)
 		if err != nil {
@@ -153,6 +155,14 @@ type ServerParams struct {
 
 	// AdminAgentPublicKey contains the public key of the admin agent.
 	AdminAgentPublicKey *bakery.PublicKey
+
+	// StaticFileSystem contains an http.FileSystem that can be used
+	// to serve static files.
+	StaticFileSystem http.FileSystem
+
+	// Template contains a set of templates that are used to generate
+	// html output.
+	Template *template.Template
 }
 
 //notFound is the handler that is called when a handler cannot be found

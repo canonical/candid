@@ -4,7 +4,11 @@ package identity_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
 
 	"github.com/juju/httprequest"
 	"github.com/juju/idmclient/params"
@@ -165,6 +169,48 @@ func (s *serverSuite) TestServerPanicRecovery(c *gc.C) {
 		},
 	})
 	c.Assert(w.Log(), jc.LogMatches, []jc.SimpleMessage{{loggo.ERROR, `PANIC!: test panic\n.*`}})
+}
+
+func (s *serverSuite) TestServerStaticFiles(c *gc.C) {
+	db := s.Session.DB("foo")
+	serveVersion := func(vers string) identity.NewAPIHandlerFunc {
+		return func(*store.Pool, identity.ServerParams) ([]httprequest.Handler, error) {
+			return []httprequest.Handler{{
+				Method: "GET",
+				Path:   "/" + vers + "/*path",
+				Handle: func(w http.ResponseWriter, req *http.Request, p httprouter.Params) {
+					w.Header().Set("Content-Type", "application/json")
+					response := versionResponse{
+						Version: vers,
+						Path:    req.URL.Path,
+					}
+					enc := json.NewEncoder(w)
+					err := enc.Encode(response)
+					c.Assert(err, gc.IsNil)
+				},
+			}}, nil
+		}
+	}
+	path := c.MkDir()
+	h, err := identity.New(db, identity.ServerParams{
+		PrivateAddr:      "localhost",
+		StaticFileSystem: http.Dir(path),
+	}, map[string]identity.NewAPIHandlerFunc{
+		"version1": serveVersion("version1"),
+	})
+	c.Assert(err, gc.IsNil)
+
+	f, err := os.Create(filepath.Join(path, "file"))
+	c.Assert(err, gc.IsNil)
+	fmt.Fprintf(f, "test file")
+	f.Close()
+
+	rr := httptest.NewRecorder()
+	req, err := http.NewRequest("GET", "/static/file", nil)
+	c.Assert(err, gc.IsNil)
+	h.ServeHTTP(rr, req)
+	c.Assert(rr.Code, gc.Equals, http.StatusOK, gc.Commentf("%d: %s", rr.Code, rr.Body.String()))
+	c.Assert(rr.Body.String(), gc.Equals, "test file")
 }
 
 func assertServesVersion(c *gc.C, h http.Handler, vers string) {

@@ -5,18 +5,20 @@
 package idputil
 
 import (
-	"fmt"
 	"net/http"
 	"net/url"
 	"time"
 
 	"github.com/juju/httprequest"
 	"github.com/juju/idmclient/params"
+	"github.com/juju/loggo"
 	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
 
 	"github.com/CanonicalLtd/blues-identity/idp"
 )
+
+var logger = loggo.GetLogger("identity.idp.idputil")
 
 const (
 	// identityMacaroonDuration is the length of time for which an
@@ -27,9 +29,16 @@ const (
 // LoginUser completes a successful login for the specified user. A new
 // identity macaroon is generated for the user and an appropriate message
 // will be returned for the login request.
-func LoginUser(c idp.RequestContext, waitid string, w http.ResponseWriter, u *params.User) {
-	if c.LoginSuccess(waitid, params.Username(u.Username), time.Now().Add(identityMacaroonDuration)) {
-		fmt.Fprintf(w, "login successful as user %s\n", u.Username)
+func LoginUser(ctx idp.RequestContext, waitid string, w http.ResponseWriter, u *params.User) {
+	if !ctx.LoginSuccess(waitid, params.Username(u.Username), time.Now().Add(identityMacaroonDuration)) {
+		return
+	}
+	t := ctx.Template("login")
+	if t == nil {
+		return
+	}
+	if err := t.Execute(w, u); err != nil {
+		logger.Errorf("error processing login template: %s", err)
 	}
 }
 

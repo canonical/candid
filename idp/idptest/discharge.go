@@ -99,6 +99,7 @@ func (s *DischargeSuite) SetUpTest(c *gc.C) {
 		PrivateAddr:         "localhost",
 		IdentityProviders:   s.IDPs,
 		AdminAgentPublicKey: &s.adminAgentKey.Public,
+		Template:            DefaultTemplate,
 	}, identity.V1)
 	c.Assert(err, gc.IsNil)
 	s.Server = httptest.NewServer(s.srv)
