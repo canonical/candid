@@ -34,7 +34,7 @@ email removeress bob@example.com:
 func (c *removeGroupCommand) Info() *cmd.Info {
 	return &cmd.Info{
 		Name:    "remove-group",
-		Args:    c.args(),
+		Args:    "[group...]",
 		Purpose: "remove a user from groups",
 		Doc:     removeGroupDoc,
 	}
@@ -43,10 +43,6 @@ func (c *removeGroupCommand) Info() *cmd.Info {
 func (c *removeGroupCommand) Init(args []string) error {
 	c.groups = args
 	return errgo.Mask(c.userCommand.Init(nil))
-}
-
-func (c *removeGroupCommand) args() string {
-	return c.userCommand.args() + " [group...]"
 }
 
 func (c *removeGroupCommand) Run(ctxt *cmd.Context) error {

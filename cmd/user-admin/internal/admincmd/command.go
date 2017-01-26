@@ -3,6 +3,8 @@
 package admincmd
 
 import (
+	"encoding/json"
+	"io/ioutil"
 	"os"
 	"strings"
 	"sync"
@@ -44,7 +46,7 @@ func New() cmd.Command {
 		Version: version.VersionInfo.Version,
 	})
 	supercmd.Register(newAddGroupCommand())
-	supercmd.Register(newCreateAdminAgentCommand())
+	supercmd.Register(newPutAgentCommand())
 	supercmd.Register(newFindCommand())
 	supercmd.Register(newRemoveGroupCommand())
 	return supercmd
@@ -89,17 +91,11 @@ func (c *idmCommand) Client(ctxt *cmd.Context) (*idmclient.Client, error) {
 	}
 	idmURL := idmURL(c.url)
 	if c.agentFile != "" {
-		a, err := Load(ctxt.AbsPath(c.agentFile))
+		v, err := readAgentFile(ctxt.AbsPath(c.agentFile))
 		if err != nil {
 			return nil, errgo.Notef(err, "cannot load agent information")
 		}
-		bClient.Key = &bakery.KeyPair{
-			Public:  *a.PublicKey,
-			Private: *a.PrivateKey,
-		}
-		if err := agent.SetUpAuth(bClient, idmURL, a.Username); err != nil {
-			return nil, errgo.Notef(err, "cannot set up agent authentication")
-		}
+		bClient.WebPageVisitor = httpbakery.NewMultiVisitor(v, httpbakery.WebBrowserVisitor)
 	} else {
 		bClient.WebPageVisitor = httpbakery.WebBrowserVisitor
 	}
@@ -161,10 +157,7 @@ func (c *userCommand) AllowInterspersedFlags() bool {
 	return false
 }
 
-func (c *userCommand) args() string {
-	return "(-u username|-e email)"
-}
-
+// lookupUser returns the username specified by the command line flags.
 func (c *userCommand) lookupUser(ctxt *cmd.Context) (params.Username, error) {
 	if c.username != "" {
 		return params.Username(c.username), nil
@@ -195,4 +188,62 @@ func (c *userCommand) lookupUser(ctxt *cmd.Context) (params.Username, error) {
 	// separate for implementation reasons, but could represent the
 	// same Ubuntu SSO user.
 	return "", errgo.Newf("more than one user found with email %q (%s)", c.email, strings.Join(users, ", "))
+}
+
+func publicKeyVar(f *gnuflag.FlagSet, key **bakery.PublicKey, name string, usage string) {
+	f.Var(publicKeyValue{key}, name, usage)
+}
+
+type publicKeyValue struct {
+	key **bakery.PublicKey
+}
+
+// Set implements gnuflag.Getter.Set.
+func (v publicKeyValue) Set(s string) error {
+	var k bakery.PublicKey
+	if err := k.UnmarshalText([]byte(s)); err != nil {
+		return errgo.Mask(err)
+	}
+	*v.key = &k
+	return nil
+}
+
+// String implements gnuflag.Getter.String.
+func (v publicKeyValue) String() string {
+	if *v.key == nil {
+		return `""`
+	}
+	// Marshaling a key can never fail (and even
+	// if it could, there's no way of returning an error here)
+	data, _ := (*v.key).MarshalText()
+	return fmt.Sprintf("%q", data)
+}
+
+// Get implements gnuflag.Getter.Get.
+func (v publicKeyValue) Get() interface{} {
+	return *v.key
+}
+
+func readAgentFile(f string) (*agent.Visitor, error) {
+	data, err := ioutil.ReadFile(f)
+	if err != nil {
+		return nil, errgo.Mask(err, os.IsNotExist)
+	}
+	var v agent.Visitor
+	if err := json.Unmarshal(data, &v); err != nil {
+		return nil, errgo.Notef(err, "cannot parse agent data from %q", f)
+	}
+	return &v, nil
+}
+
+func writeAgentFile(f string, v *agent.Visitor) error {
+	data, err := json.MarshalIndent(v, "", "\t")
+	if err != nil {
+		return errgo.Mask(err)
+	}
+	// TODO should we write this atomically?
+	if err := ioutil.WriteFile(f, data, 0600); err != nil {
+		return errgo.Mask(err)
+	}
+	return nil
 }
