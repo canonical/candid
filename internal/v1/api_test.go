@@ -5,6 +5,7 @@ package v1_test
 import (
 	"bytes"
 	"encoding/json"
+	"html/template"
 	"net/http"
 	"net/http/httptest"
 
@@ -35,11 +36,12 @@ const (
 
 type apiSuite struct {
 	testing.IsolatedMgoSuite
-	srv     *identity.Server
-	pool    *store.Pool
-	keyPair *bakery.KeyPair
-	idps    []idp.IdentityProvider
-	server  *httptest.Server
+	srv      *identity.Server
+	pool     *store.Pool
+	keyPair  *bakery.KeyPair
+	idps     []idp.IdentityProvider
+	server   *httptest.Server
+	template *template.Template
 }
 
 var _ = gc.Suite(&apiSuite{})
@@ -57,7 +59,8 @@ func (s *apiSuite) SetUpTest(c *gc.C) {
 
 	key, err := bakery.GenerateKey()
 	c.Assert(err, gc.IsNil)
-	s.srv, s.pool = newServer(c, s.Session.Copy(), key, s.idps)
+	s.template = template.New("")
+	s.srv, s.pool = newServer(c, s.Session.Copy(), key, s.template, s.idps)
 	s.keyPair = key
 	s.server = httptest.NewServer(s.srv)
 	s.PatchValue(&http.DefaultTransport, httptesting.URLRewritingTransport{
@@ -77,7 +80,7 @@ func fakeRedirectURL(_, _, _ string) (string, error) {
 	return "http://0.1.2.3/nowhere", nil
 }
 
-func newServer(c *gc.C, session *mgo.Session, key *bakery.KeyPair, idps []idp.IdentityProvider) (*identity.Server, *store.Pool) {
+func newServer(c *gc.C, session *mgo.Session, key *bakery.KeyPair, t *template.Template, idps []idp.IdentityProvider) (*identity.Server, *store.Pool) {
 	db := session.DB("testing")
 	sp := identity.ServerParams{
 		AuthUsername:      adminUsername,
@@ -87,6 +90,7 @@ func newServer(c *gc.C, session *mgo.Session, key *bakery.KeyPair, idps []idp.Id
 		MaxMgoSessions:    50,
 		IdentityProviders: idps,
 		PrivateAddr:       "localhost",
+		Template:          t,
 	}
 	pool, err := store.NewPool(db, store.StoreParams{
 		AuthUsername:   sp.AuthUsername,

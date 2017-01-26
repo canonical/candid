@@ -3,6 +3,7 @@
 package identity
 
 import (
+	"html/template"
 	"net/http"
 	"sort"
 	"time"
@@ -81,6 +82,14 @@ type ServerParams struct {
 
 	// AdminAgentPublicKey contains the public key of the admin agent.
 	AdminAgentPublicKey *bakery.PublicKey
+
+	// StaticFileSystem contains an http.FileSystem that can be used
+	// to serve static files.
+	StaticFileSystem http.FileSystem
+
+	// Template contains a set of templates that are used to generate
+	// html output.
+	Template *template.Template
 }
 
 // NewServer returns a new handler that handles identity service requests and

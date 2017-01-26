@@ -3,6 +3,7 @@
 package v1
 
 import (
+	"html/template"
 	"net/http"
 	"strings"
 	"time"
@@ -150,9 +151,14 @@ func (c *idpHandler) LoginFailure(waitid string, err error) {
 	identity.WriteError(c, c.responseWriter, err)
 }
 
-// Bakery implements idp.Context.Bakery.
+// Bakery implements idp.RequestContext.Bakery.
 func (c *idpHandler) Bakery() *bakery.Bakery {
 	return c.store.Bakery
+}
+
+// Template implements idp.RequestContext.Template.
+func (c *idpHandler) Template(name string) *template.Template {
+	return c.h.template.Lookup(name)
 }
 
 // Database implements idp.Context.Database.

@@ -4,6 +4,7 @@
 package idptest
 
 import (
+	"html/template"
 	"net/http"
 	"strings"
 	"sync"
@@ -29,11 +30,17 @@ type TestContext struct {
 	// Request contains the request for this context.
 	Request *http.Request
 
-	// TestBakery contains the bakery.Service to return to Handle in Bakery().
+	// Bakery contains the bakery.Service to return to Handle in
+	// Bakery().
 	Bakery_ *bakery.Bakery
 
-	// TestDatabase contains the mgo.Database to return to Handle in Database().
+	// Database contains the mgo.Database to return to Handle in
+	// Database().
 	Database_ *mgo.Database
+
+	// Template contains the template.Template that will be used in
+	// Template().
+	Template_ *template.Template
 
 	// FailOnLoginSuccess can be used to simulate a login failure
 	// after the identity provider has indicated it is a successful
@@ -96,6 +103,14 @@ func (c *TestContext) Bakery() *bakery.Bakery {
 // Database implements idp.Context.Database.
 func (c *TestContext) Database() *mgo.Database {
 	return c.Database_
+}
+
+// Template implements idp.Context.Template.
+func (c *TestContext) Template(name string) *template.Template {
+	if c.Template_ == nil {
+		return DefaultTemplate.Lookup(name)
+	}
+	return c.Template_.Lookup(name)
 }
 
 // UpdateUser implements idp.RequestContext.UpdateUser.
@@ -228,3 +243,11 @@ func AssertLoginInProgress(c *gc.C, tc *TestContext) {
 	_, _, called = tc.LoginSuccessCall()
 	c.Assert(called, gc.Equals, false)
 }
+
+var DefaultTemplate = template.New("")
+
+func init() {
+	template.Must(DefaultTemplate.New("login").Parse(loginTemplate))
+}
+
+const loginTemplate = "login successful as user {{.Username}}\n"

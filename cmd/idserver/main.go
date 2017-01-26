@@ -5,6 +5,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"html/template"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -81,6 +82,14 @@ func serve(confPath string) error {
 			idps[i] = idp
 		}
 	}
+	resourcePath := "."
+	if conf.ResourcePath != "" {
+		resourcePath = conf.ResourcePath
+	}
+	t, err := template.New("").ParseGlob(filepath.Join(resourcePath, "templates", "*"))
+	if err != nil {
+		return errgo.Notef(err, "cannot parse templates")
+	}
 	srv, err := identity.NewServer(
 		db,
 		identity.ServerParams{
@@ -98,6 +107,8 @@ func serve(confPath string) error {
 			PrivateAddr:         conf.PrivateAddr,
 			DebugTeams:          conf.DebugTeams,
 			AdminAgentPublicKey: conf.AdminAgentPublicKey,
+			StaticFileSystem:    http.Dir(filepath.Join(resourcePath, "static")),
+			Template:            t,
 		},
 		identity.V1,
 		identity.Debug,
