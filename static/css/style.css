@@ -421,6 +421,7 @@ html {
 
 body {
     overflow: hidden;
+    overflow-y: scroll;
     height: 1vh;
     background: #f7f7f7;
     -webkit-font-smoothing: antialiased;
@@ -445,7 +446,7 @@ body {
 
 .login {
     margin: 80px auto 0;
-    width: 350px;
+    width: 420px;
 }
 
 .login__logo {
@@ -509,6 +510,7 @@ body {
 }
 button, input, select, textarea {
     font-family: Ubuntu,Arial,'libra sans',sans-serif;
+    width: 240px;
 }
 
 .button-row {
