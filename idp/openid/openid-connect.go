@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"time"
 
-	oidc "github.com/coreos/go-oidc"
+	"github.com/coreos/go-oidc"
 	"github.com/juju/idmclient/params"
 	"golang.org/x/oauth2"
 	"gopkg.in/errgo.v1"
@@ -112,6 +112,10 @@ func (idp *openidConnectIdentityProvider) Handle(ctx idp.RequestContext, w http.
 		if waitid, err := idp.callback(ctx, w, req); err != nil {
 			ctx.LoginFailure(waitid, err)
 		}
+	case "/register":
+		if waitid, err := idp.register(ctx, w, req); err != nil {
+			ctx.LoginFailure(waitid, err)
+		}
 	default:
 		if err := idp.login(ctx, w, req); err != nil {
 			ctx.LoginFailure(idputil.WaitID(req), err)
@@ -132,7 +136,6 @@ func (idp *openidConnectIdentityProvider) login(ctx idp.RequestContext, w http.R
 
 func (idp *openidConnectIdentityProvider) callback(ctx idp.RequestContext, w http.ResponseWriter, req *http.Request) (string, error) {
 	waitid, err := idp.getSession(ctx, req)
-	idp.deleteSession(ctx, w)
 	if err != nil {
 		return waitid, errgo.WithCausef(err, params.ErrBadRequest, "")
 	}
@@ -158,6 +161,7 @@ func (idp *openidConnectIdentityProvider) callback(ctx idp.RequestContext, w htt
 	externalID := fmt.Sprintf("openid-connect:%s:%s", id.Issuer, id.Subject)
 	u, err := ctx.FindUserByExternalId(externalID)
 	if err == nil {
+		idp.deleteSession(ctx, w)
 		idputil.LoginUser(ctx, waitid, w, u)
 		return "", nil
 	}
@@ -168,17 +172,85 @@ func (idp *openidConnectIdentityProvider) callback(ctx idp.RequestContext, w htt
 	if err := id.Claims(&claims); err != nil {
 		return waitid, errgo.Mask(err)
 	}
-	u = &params.User{
+	state, err := idp.codec.Encode(registrationState{
+		WaitID:     waitid,
 		ExternalID: externalID,
-		Username:   joinDomain(sanitizeUsername(claims.PreferredUsername), idp.params.Domain),
-		FullName:   claims.FullName,
-		Email:      claims.Email,
+	})
+	preferredUsername := ""
+	if names.IsValidUserName(claims.PreferredUsername) {
+		preferredUsername = claims.PreferredUsername
 	}
-	if err := ctx.UpdateUser(u); err != nil {
+	return waitid, errgo.Mask(idputil.RegistrationForm(ctx, w, idputil.RegistrationParams{
+		State:    state,
+		Username: preferredUsername,
+		Domain:   idp.params.Domain,
+		FullName: claims.FullName,
+		Email:    claims.Email,
+	}))
+}
+
+func (idp *openidConnectIdentityProvider) register(ctx idp.RequestContext, w http.ResponseWriter, req *http.Request) (string, error) {
+	waitid, err := idp.getSession(ctx, req)
+	if err != nil {
+		return waitid, errgo.WithCausef(err, params.ErrBadRequest, "")
+	}
+	var state registrationState
+	if err := idp.codec.Decode(req.Form.Get("state"), &state); err != nil {
+		return waitid, errgo.WithCausef(err, params.ErrBadRequest, "invalid registration state")
+	}
+	if state.WaitID != waitid {
+		return waitid, errgo.WithCausef(err, params.ErrBadRequest, "invalid registration state")
+	}
+	u := &params.User{
+		ExternalID: state.ExternalID,
+		Username:   joinDomain(req.Form.Get("username"), idp.params.Domain),
+		FullName:   req.Form.Get("fullname"),
+		Email:      req.Form.Get("email"),
+	}
+	u, err = idp.registerUser(ctx, u)
+	if err == nil {
+		idp.deleteSession(ctx, w)
+		idputil.LoginUser(ctx, waitid, w, u)
+		return waitid, nil
+	}
+	if errgo.Cause(err) != errInvalidUser {
 		return waitid, errgo.Mask(err)
 	}
-	idputil.LoginUser(ctx, waitid, w, u)
-	return "", nil
+	return waitid, errgo.Mask(idputil.RegistrationForm(ctx, w, idputil.RegistrationParams{
+		State:    req.Form.Get("state"),
+		Error:    err.Error(),
+		Username: req.Form.Get("username"),
+		Domain:   idp.params.Domain,
+		FullName: req.Form.Get("fullname"),
+		Email:    req.Form.Get("email"),
+	}))
+}
+
+var errInvalidUser = errgo.New("invalid user")
+
+func (idp *openidConnectIdentityProvider) registerUser(ctx idp.RequestContext, u *params.User) (*params.User, error) {
+	if !names.IsValidUser(string(u.Username)) {
+		return nil, errgo.WithCausef(nil, errInvalidUser, "invalid user name. The username must contain only A-Z, a-z, 0-9, '.', '-', & '+', and must start and end with a letter or number.")
+	}
+	err := ctx.UpdateUser(u)
+	if err == nil {
+		return u, nil
+	}
+	if errgo.Cause(err) != params.ErrAlreadyExists {
+		return nil, errgo.Mask(err)
+	}
+	// If the record already exists, either we have registered as
+	// part of another login, or the username is already taken. If
+	// it's the former complete the login using the previously chosen
+	// username. If the latter then ask the user again.
+	u, err = ctx.FindUserByExternalId(u.ExternalID)
+	if err == nil {
+		return u, nil
+	}
+	if errgo.Cause(err) != params.ErrNotFound {
+		return nil, errgo.Mask(err)
+	}
+	return nil, errgo.WithCausef(nil, errInvalidUser, "Username already taken, please pick a different one.")
 }
 
 // newSession stores the state data for this login session in an
@@ -245,32 +317,6 @@ type claims struct {
 	PreferredUsername string `json:"preferred_username"`
 }
 
-// sanitizeUsername parses the given name and replaces any unsupported
-// characters with a '+'.
-//
-// Note: it is quite possible that two users could generate the same
-// username by this method.
-//
-// TODO(mhilton): allow users to choose their username.
-func sanitizeUsername(name string) string {
-	if names.IsValidUserName(name) {
-		return name
-	}
-	buf := make([]byte, 0, len(name))
-	for _, r := range name {
-		switch {
-		case 'A' <= r && r <= 'Z':
-		case 'a' <= r && r <= 'z':
-		case '0' <= r && r <= '9':
-		case r == '.' || r == '-' || r == '+':
-		default:
-			r = '+'
-		}
-		buf = append(buf, byte(r))
-	}
-	return string(buf)
-}
-
 // joinDomain creates a new params.Username with the given name and
 // (optional) domain.
 func joinDomain(name, domain string) params.Username {
@@ -278,4 +324,11 @@ func joinDomain(name, domain string) params.Username {
 		return params.Username(name)
 	}
 	return params.Username(fmt.Sprintf("%s@%s", name, domain))
+}
+
+// registrationState holds state information about a registration that is
+// in progress.
+type registrationState struct {
+	WaitID     string `json:"wid"`
+	ExternalID string `json:"eid"`
 }
