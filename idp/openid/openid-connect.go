@@ -203,11 +203,10 @@ func (idp *openidConnectIdentityProvider) register(ctx idp.RequestContext, w htt
 	}
 	u := &params.User{
 		ExternalID: state.ExternalID,
-		Username:   joinDomain(req.Form.Get("username"), idp.params.Domain),
 		FullName:   req.Form.Get("fullname"),
 		Email:      req.Form.Get("email"),
 	}
-	u, err = idp.registerUser(ctx, u)
+	u, err = idp.registerUser(ctx, req.Form.Get("username"), u)
 	if err == nil {
 		idp.deleteSession(ctx, w)
 		idputil.LoginUser(ctx, waitid, w, u)
@@ -228,10 +227,14 @@ func (idp *openidConnectIdentityProvider) register(ctx idp.RequestContext, w htt
 
 var errInvalidUser = errgo.New("invalid user")
 
-func (idp *openidConnectIdentityProvider) registerUser(ctx idp.RequestContext, u *params.User) (*params.User, error) {
-	if !names.IsValidUser(string(u.Username)) {
+func (idp *openidConnectIdentityProvider) registerUser(ctx idp.RequestContext, username string, u *params.User) (*params.User, error) {
+	if !names.IsValidUserName(username) {
 		return nil, errgo.WithCausef(nil, errInvalidUser, "invalid user name. The username must contain only A-Z, a-z, 0-9, '.', '-', & '+', and must start and end with a letter or number.")
 	}
+	if idputil.ReservedUsernames[username] {
+		return nil, errgo.WithCausef(nil, errInvalidUser, "username %s is not allowed, please choose another.", username)
+	}
+	u.Username = joinDomain(username, idp.params.Domain)
 	err := ctx.UpdateUser(u)
 	if err == nil {
 		return u, nil

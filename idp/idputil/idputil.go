@@ -26,6 +26,11 @@ const (
 	identityMacaroonDuration = 28 * 24 * time.Hour
 )
 
+var ReservedUsernames = map[string]bool{
+	"admin":    true,
+	"everyone": true,
+}
+
 // LoginUser completes a successful login for the specified user. A new
 // identity macaroon is generated for the user and an appropriate message
 // will be returned for the login request.
