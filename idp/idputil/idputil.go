@@ -37,6 +37,7 @@ func LoginUser(ctx idp.RequestContext, waitid string, w http.ResponseWriter, u *
 	if t == nil {
 		return
 	}
+	w.Header().Set("Content-Type", "text/html;charset=utf-8")
 	if err := t.Execute(w, u); err != nil {
 		logger.Errorf("error processing login template: %s", err)
 	}
@@ -78,4 +79,44 @@ func URL(ctx idp.Context, path, waitid string) string {
 		callback += "?waitid=" + waitid
 	}
 	return callback
+}
+
+type RegistrationParams struct {
+	// State contains some opaque state for the registration. It can
+	// be used to pass arbitrary data back to the idp once the
+	// registration is processed.
+	State string
+
+	// Username contains the preferred username for the user. This
+	// will be used to populate the username input.
+	Username string
+
+	// Error contains an error message if the registration failed.
+	Error string
+
+	// Domain contains the domain in which the user is being created.
+	// This cannot be modified by the user.
+	Domain string
+
+	// FullName contains the full name of the user. This is used to
+	// populate the fullname input.
+	FullName string
+
+	// Email contains the email address of the user. This is used to
+	// populate the email input.
+	Email string
+}
+
+// RegistrationForm writes a registration form to the given writer using
+// the given parameters.
+func RegistrationForm(ctx idp.RequestContext, w http.ResponseWriter, params RegistrationParams) error {
+	t := ctx.Template("register")
+	if t == nil {
+		errgo.New("registration template not found")
+	}
+	w.Header().Set("Content-Type", "text/html;charset=utf-8")
+	if err := t.Execute(w, params); err != nil {
+		return errgo.Notef(err, "cannot process registration template")
+	}
+	return nil
 }
