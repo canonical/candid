@@ -1446,6 +1446,35 @@ func (s *usersSuite) TestUserGroups(c *gc.C) {
 	}
 }
 
+func (s *usersSuite) TestWhoAmIWithAuthenticatedUser(c *gc.C) {
+	st := s.pool.GetNoLimit()
+	defer s.pool.Put(st)
+	s.createUser(c, &params.User{
+		Username:   "bob",
+		ExternalID: "http://example.com/bob",
+		Email:      "bob@example.com",
+		FullName:   "Bob",
+	})
+	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+		Handler: s.srv,
+		URL:     apiURL("whoami"),
+		Cookies: cookiesForUser(st, "bob"),
+		ExpectBody: params.WhoAmIResponse{
+			User: "bob",
+		},
+	})
+}
+
+func (s *usersSuite) TestWhoAmIWithNoUser(c *gc.C) {
+	st := s.pool.GetNoLimit()
+	defer s.pool.Put(st)
+	rec := httptesting.DoRequest(c, httptesting.DoRequestParams{
+		Handler: s.srv,
+		URL:     apiURL("whoami"),
+	})
+	c.Assert(rec.Code, gc.Equals, 407)
+}
+
 func (s *usersSuite) getToken(c *gc.C, un string) *macaroon.Macaroon {
 	resp := httptesting.DoRequest(c, httptesting.DoRequestParams{
 		Handler:  s.srv,
