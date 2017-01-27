@@ -22,6 +22,9 @@ type Context interface {
 	// URL returns a URL addressed to path within the identity provider.
 	URL(path string) string
 
+	// Key returns the identity server's public/private key pair.
+	Key() *bakery.KeyPair
+
 	// Database returns a mgo.Database that the identity provider may use to
 	// store any necessary state data.
 	Database() *mgo.Database

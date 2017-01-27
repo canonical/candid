@@ -30,15 +30,18 @@ type TestContext struct {
 	// Request contains the request for this context.
 	Request *http.Request
 
-	// Bakery contains the bakery.Service to return to Handle in
+	// Key_ contains the bakery.KeyPair to return in Key().
+	Key_ *bakery.KeyPair
+
+	// Bakery_ contains the bakery.Service to return to Handle in
 	// Bakery().
 	Bakery_ *bakery.Bakery
 
-	// Database contains the mgo.Database to return to Handle in
+	// Database_ contains the mgo.Database to return to Handle in
 	// Database().
 	Database_ *mgo.Database
 
-	// Template contains the template.Template that will be used in
+	// Template_ contains the template.Template that will be used in
 	// Template().
 	Template_ *template.Template
 
@@ -95,7 +98,12 @@ func (c *TestContext) Path() string {
 	return strings.TrimPrefix(c.Request.URL.Path, c.URLPrefix)
 }
 
-// Bakery implements idp.Context.Bakery.
+// Bakery implements idp.Context.Key.
+func (c *TestContext) Key() *bakery.KeyPair {
+	return c.Key_
+}
+
+// Bakery implements idp.RequestContext.Bakery.
 func (c *TestContext) Bakery() *bakery.Bakery {
 	return c.Bakery_
 }
@@ -212,7 +220,7 @@ func AssertLoginSuccess(c *gc.C, tc *TestContext, username params.Username) {
 	c.Assert(called, gc.Equals, true)
 
 	if now := time.Now(); calledExpiry.Before(now) {
-		c.Error("expiry time %v is before now %v", calledExpiry, now)
+		c.Errorf("expiry time %v is before now %v", calledExpiry, now)
 	}
 	c.Assert(calledUsername, gc.Equals, username)
 }

@@ -57,6 +57,7 @@ type Handler struct {
 	location    string
 	idps        []idp.IdentityProvider
 	template    *template.Template
+	key         *bakery.KeyPair
 }
 
 // New returns a new instance of the v1 API handler.
@@ -66,6 +67,7 @@ func New(p *store.Pool, params identity.ServerParams) *Handler {
 		location:  params.Location,
 		idps:      params.IdentityProviders,
 		template:  params.Template,
+		key:       params.Key,
 	}
 	h.handlerPool.New = h.newHandler
 	return h

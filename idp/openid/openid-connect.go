@@ -14,11 +14,10 @@ import (
 	"golang.org/x/oauth2"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/names.v2"
-	"gopkg.in/mgo.v2"
-	"gopkg.in/mgo.v2/bson"
 
 	"github.com/CanonicalLtd/blues-identity/idp"
 	"github.com/CanonicalLtd/blues-identity/idp/idputil"
+	"github.com/CanonicalLtd/blues-identity/idp/idputil/secret"
 )
 
 type OpenIDConnectParams struct {
@@ -59,6 +58,7 @@ type openidConnectIdentityProvider struct {
 	params   OpenIDConnectParams
 	provider *oidc.Provider
 	config   *oauth2.Config
+	codec    *secret.Codec
 }
 
 // Name implements idp.IdentityProvider.Name.
@@ -101,9 +101,7 @@ func (idp *openidConnectIdentityProvider) Init(ctx idp.Context) error {
 		RedirectURL:  ctx.URL("/callback"),
 		Scopes:       []string{oidc.ScopeOpenID, "profile"},
 	}
-	if err := ctx.Database().C("states").EnsureIndex(mgo.Index{Key: []string{"created"}, ExpireAfter: time.Hour}); err != nil {
-		return errgo.Mask(err)
-	}
+	idp.codec = secret.NewCodec(ctx.Key())
 	return nil
 }
 
@@ -122,56 +120,53 @@ func (idp *openidConnectIdentityProvider) Handle(ctx idp.RequestContext, w http.
 }
 
 func (idp *openidConnectIdentityProvider) login(ctx idp.RequestContext, w http.ResponseWriter, req *http.Request) error {
-	state := state{
-		ID:      bson.NewObjectId(),
-		WaitID:  idputil.WaitID(req),
-		Created: time.Now(),
-	}
-	if err := ctx.Database().C("states").Insert(state); err != nil {
+	waitid := idputil.WaitID(req)
+	err := idp.newSession(ctx, w, waitid)
+	if err != nil {
 		return errgo.Mask(err)
 	}
-	url := idp.config.AuthCodeURL(state.ID.Hex())
+	url := idp.config.AuthCodeURL(waitid)
 	http.Redirect(w, req, url, http.StatusFound)
 	return nil
 }
 
 func (idp *openidConnectIdentityProvider) callback(ctx idp.RequestContext, w http.ResponseWriter, req *http.Request) (string, error) {
-	var state state
-	if hex := req.Form.Get("state"); bson.IsObjectIdHex(hex) {
-		if err := ctx.Database().C("states").FindId(bson.ObjectIdHex(hex)).One(&state); err != nil {
-			return "", errgo.Notef(err, "cannot retrieve state %q", hex)
-		}
-	} else {
-		return "", errgo.WithCausef(nil, params.ErrBadRequest, "invalid state %q", hex)
+	waitid, err := idp.getSession(ctx, req)
+	idp.deleteSession(ctx, w)
+	if err != nil {
+		return waitid, errgo.WithCausef(err, params.ErrBadRequest, "")
+	}
+	if waitid != req.Form.Get("state") {
+		return waitid, errgo.WithCausef(nil, params.ErrBadRequest, "invalid session")
 	}
 	tok, err := idp.config.Exchange(ctx, req.Form.Get("code"))
 	if err != nil {
-		return state.WaitID, errgo.Mask(err)
+		return waitid, errgo.Mask(err)
 	}
 	idtok := tok.Extra("id_token")
 	if idtok == nil {
-		return state.WaitID, errgo.Newf("no id_token in OpenID response")
+		return waitid, errgo.Newf("no id_token in OpenID response")
 	}
 	idtoks, ok := idtok.(string)
 	if !ok {
-		return state.WaitID, errgo.Newf("invalid id_token in OpenID response")
+		return waitid, errgo.Newf("invalid id_token in OpenID response")
 	}
 	id, err := idp.provider.Verifier(&oidc.Config{ClientID: idp.config.ClientID}).Verify(ctx, idtoks)
 	if err != nil {
-		return state.WaitID, errgo.Mask(err)
+		return waitid, errgo.Mask(err)
 	}
 	externalID := fmt.Sprintf("openid-connect:%s:%s", id.Issuer, id.Subject)
 	u, err := ctx.FindUserByExternalId(externalID)
 	if err == nil {
-		idputil.LoginUser(ctx, state.WaitID, w, u)
+		idputil.LoginUser(ctx, waitid, w, u)
 		return "", nil
 	}
 	if errgo.Cause(err) != params.ErrNotFound {
-		return state.WaitID, errgo.Mask(err)
+		return waitid, errgo.Mask(err)
 	}
 	var claims claims
 	if err := id.Claims(&claims); err != nil {
-		return state.WaitID, errgo.Mask(err)
+		return waitid, errgo.Mask(err)
 	}
 	u = &params.User{
 		ExternalID: externalID,
@@ -180,18 +175,66 @@ func (idp *openidConnectIdentityProvider) callback(ctx idp.RequestContext, w htt
 		Email:      claims.Email,
 	}
 	if err := ctx.UpdateUser(u); err != nil {
-		return state.WaitID, errgo.Mask(err)
+		return waitid, errgo.Mask(err)
 	}
-	idputil.LoginUser(ctx, state.WaitID, w, u)
+	idputil.LoginUser(ctx, waitid, w, u)
 	return "", nil
 }
 
-// state contains the stored state for the OAuth2 authoriaztion query
-// used in the the OpenID login.
-type state struct {
-	ID      bson.ObjectId `bson:"_id"`
-	WaitID  string
-	Created time.Time
+// newSession stores the state data for this login session in an
+// encrypted session cookie.
+func (idp *openidConnectIdentityProvider) newSession(ctx idp.RequestContext, w http.ResponseWriter, waitid string) error {
+	sessionCookie := sessionCookie{
+		WaitID:  waitid,
+		Expires: time.Now().Add(15 * time.Minute),
+	}
+	value, err := idp.codec.Encode(sessionCookie)
+	if err != nil {
+		return errgo.Mask(err)
+	}
+	http.SetCookie(w, &http.Cookie{
+		Name:  idp.sessionCookieName(),
+		Value: value,
+	})
+	return nil
+}
+
+// getSession retrieves and validats the current session cookie for the
+// login session and returns the associated waitid.
+func (idp *openidConnectIdentityProvider) getSession(ctx idp.RequestContext, req *http.Request) (string, error) {
+	c, err := req.Cookie(idp.sessionCookieName())
+	if err == http.ErrNoCookie {
+		return "", errgo.Notef(err, "no login session")
+	}
+	if err != nil {
+		return "", err
+	}
+	var sessionCookie sessionCookie
+	if err = idp.codec.Decode(c.Value, &sessionCookie); err != nil {
+		return "", errgo.Notef(err, "invalid session")
+	}
+	if sessionCookie.Expires.Before(time.Now()) {
+		return "", errgo.New("expired session")
+	}
+	return sessionCookie.WaitID, nil
+}
+
+// deleteSession removes the session cookie for the current login
+// session.
+func (idp *openidConnectIdentityProvider) deleteSession(ctx idp.RequestContext, w http.ResponseWriter) {
+	http.SetCookie(w, &http.Cookie{
+		Name: idp.sessionCookieName(),
+	})
+}
+
+func (idp *openidConnectIdentityProvider) sessionCookieName() string {
+	return "idp-login-" + idp.params.Name
+}
+
+// sessionCookie contains the stored state for the OpenID login process.
+type sessionCookie struct {
+	WaitID  string    `json:"wid"`
+	Expires time.Time `json:"exp"`
 }
 
 // claims contains the set of claims possibly returned in the OpenID

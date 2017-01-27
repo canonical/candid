@@ -151,6 +151,11 @@ func (c *idpHandler) LoginFailure(waitid string, err error) {
 	identity.WriteError(c, c.responseWriter, err)
 }
 
+// Bakery implements idp.Context.Key.
+func (c *idpHandler) Key() *bakery.KeyPair {
+	return c.h.key
+}
+
 // Bakery implements idp.RequestContext.Bakery.
 func (c *idpHandler) Bakery() *bakery.Bakery {
 	return c.store.Bakery
