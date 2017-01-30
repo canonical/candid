@@ -57,7 +57,7 @@ with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="login__full-form">
             <div class="login__env-name">You're logged in as {{.Username}}</div>
             <div class="button-row">
-              <a class="button--positive" href="#" onclick="javascript:window.close();">Close</a>
+              You can now close this window.
             </div>
           </div>
           <div class="login__message">
