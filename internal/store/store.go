@@ -70,53 +70,52 @@ type ExternalGroupGetter interface {
 	GetGroups(externalId string) ([]string, error)
 }
 
-type LimitPool interface {
-	Close()
-	Get(time.Duration) (limitpool.Item, error)
-	GetNoLimit() limitpool.Item
-	Stats() limitpool.Stats
-	Put(limitpool.Item)
-}
-
-func NewMonitoredPool(gauge prometheus.Gauge, limit int, new func() limitpool.Item) *monitoredPool {
+// newMonitoredSessionPool returns a wrapper around a limitpool.Pool that
+// records how many unused items are currently in the pool in the
+// given gauge.
+func newMonitoredSessionPool(count prometheus.Gauge, limit int, new func() limitpool.Item) *monitoredSessionPool {
 	monitoredNew := func() limitpool.Item {
-		gauge.Inc()
+		count.Inc()
 		return new()
 	}
-	pool := limitpool.NewPool(limit, monitoredNew)
-	return &monitoredPool{
-		Pool:    pool,
-		m_items: gauge,
+	return &monitoredSessionPool{
+		pool:  limitpool.NewPool(limit, monitoredNew),
+		count: count,
 	}
 }
 
-type monitoredPool struct {
-	*limitpool.Pool
-	m_items prometheus.Gauge
+type monitoredSessionPool struct {
+	pool  *limitpool.Pool
+	count prometheus.Gauge
 }
 
-func (p *monitoredPool) Get(t time.Duration) (limitpool.Item, error) {
-	i, err := p.Pool.Get(t)
+func (p *monitoredSessionPool) Get(t time.Duration) (limitpool.Item, error) {
+	i, err := p.pool.Get(t)
 	if err == nil {
-		p.m_items.Dec()
+		p.count.Dec()
 	}
 	return i, err
 }
 
-func (p *monitoredPool) GetNoLimit() limitpool.Item {
-	i := p.Pool.GetNoLimit()
-	p.m_items.Dec()
+func (p *monitoredSessionPool) GetNoLimit() limitpool.Item {
+	i := p.pool.GetNoLimit()
+	p.count.Dec()
 	return i
 }
 
-func (p *monitoredPool) Put(i limitpool.Item) {
-	p.Pool.Put(i)
-	p.m_items.Inc()
+func (p *monitoredSessionPool) Put(i limitpool.Item) {
+	p.pool.Put(i)
+	p.count.Inc()
+}
+
+func (p *monitoredSessionPool) Close() {
+	p.count.Set(0)
+	p.pool.Close()
 }
 
 // Pool provides a pool of *Store objects.
 type Pool struct {
-	sessionPool LimitPool
+	sessionPool *monitoredSessionPool
 	storePool   mempool.Pool
 
 	// meetingServer holds the server used to create
@@ -127,6 +126,8 @@ type Pool struct {
 	db           *mgo.Database
 	rootKeys     *mgorootkeystore.RootKeys
 	bakeryParams bakery.BakeryParams
+
+	monitor *collectionMonitor
 }
 
 // NewPool creates a new Pool. The pool will be sized at sp.MaxMgoSessions.
@@ -139,16 +140,17 @@ func NewPool(db *mgo.Database, sp StoreParams) (*Pool, error) {
 		return nil, errgo.New("no private address configured")
 	}
 
-	m_items := prometheus.NewGauge(prometheus.GaugeOpts{
+	sessionGauge := prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: "blues_identity",
 		Subsystem: "store",
 		Name:      "mgo_session_pool_size",
 		Help:      "Size of the mongo session pool.",
 	})
-	prometheus.MustRegisterOrGet(m_items)
+	prometheus.MustRegisterOrGet(sessionGauge)
 
-	p.sessionPool = NewMonitoredPool(m_items, sp.MaxMgoSessions, p.newSession)
+	p.sessionPool = newMonitoredSessionPool(sessionGauge, sp.MaxMgoSessions, p.newSession)
 	p.storePool.New = func() interface{} {
+		logger.Infof("in storePool.New")
 		return p.newStore()
 	}
 	var err error
@@ -201,13 +203,10 @@ func NewPool(db *mgo.Database, sp StoreParams) (*Pool, error) {
 		return nil, errgo.Notef(err, "cannot ensure indexes")
 	}
 
-	cm := NewCollectionMonitor(map[string]Counter{
-		"identities": db.C("identities"),
-		"macaroons":  db.C("macaroons"),
-		"meeting":    db.C("meeting")})
-	_, err = prometheus.RegisterOrGet(cm)
-	if err != nil {
-		return nil, errgo.Notef(err, "could not register collection monitor")
+	p.monitor = newCollectionMonitor(p, "identities", "macaroons", "meeting")
+	if err := prometheus.Register(p.monitor); err != nil {
+		logger.Warningf("could not register collection monitor: %v", err)
+		p.monitor = nil
 	}
 
 	return p, nil
@@ -290,7 +289,7 @@ func (p *Pool) Put(s *Store) {
 
 // Stats returns information about the current pool statistics.
 func (p *Pool) Stats() limitpool.Stats {
-	return p.sessionPool.Stats()
+	return p.sessionPool.pool.Stats()
 }
 
 // Close clears out the pool closing the contained stores and prevents
@@ -302,6 +301,9 @@ func (p *Pool) Close() {
 	p.meetingServer.Close()
 	p.sessionPool.Close()
 	p.db.Session.Close()
+	if p.monitor != nil {
+		prometheus.Unregister(p.monitor)
+	}
 }
 
 // Store represents the underlying identity data store.
@@ -687,48 +689,50 @@ func uniqueStrings(ss []string) []string {
 	return out
 }
 
+type collectionMonitor struct {
+	pool    *Pool
+	entries []*collectionMonitorEntry
+}
+
 type collectionMonitorEntry struct {
-	collection Counter
+	collection string
 	m          prometheus.Gauge
 }
 
-type Counter interface {
-	Count() (int, error)
-}
-
-type collectionMonitor []*collectionMonitorEntry
-
-func NewCollectionMonitor(collections map[string]Counter) collectionMonitor {
-	c := collectionMonitor(make([]*collectionMonitorEntry, len(collections)))
-	var i int
-	for collName, collCounter := range collections {
-		c[i] = &collectionMonitorEntry{
-			collection: collCounter,
+func newCollectionMonitor(p *Pool, collectionNames ...string) *collectionMonitor {
+	c := &collectionMonitor{
+		pool:    p,
+		entries: make([]*collectionMonitorEntry, len(collectionNames)),
+	}
+	for i, collName := range collectionNames {
+		c.entries[i] = &collectionMonitorEntry{
+			collection: collName,
 			m: prometheus.NewGauge(prometheus.GaugeOpts{
 				Namespace: "blues_identity_collection",
 				Subsystem: collName,
 				Name:      "count",
 				Help:      "collection size"}),
 		}
-		i++
 	}
 	return c
 }
 
 // Describe implements the prometheus.Collector interface.
-func (cm collectionMonitor) Describe(c chan<- *prometheus.Desc) {
-	for _, entry := range cm {
+func (cm *collectionMonitor) Describe(c chan<- *prometheus.Desc) {
+	for _, entry := range cm.entries {
 		c <- entry.m.Desc()
 	}
 }
 
 // Collect implements the prometheus.Collector interface.
-func (cm collectionMonitor) Collect(c chan<- prometheus.Metric) {
-	for _, entry := range cm {
-		cnt, err := entry.collection.Count()
+func (cm *collectionMonitor) Collect(c chan<- prometheus.Metric) {
+	store := cm.pool.GetNoLimit()
+	defer cm.pool.Put(store)
+	for _, entry := range cm.entries {
+		cnt, err := store.DB.C(entry.collection).Count()
 		if err != nil {
 			entry.m.Set(math.NaN())
-			logger.Debugf("collectionMonitor Collect could not get collection count for %s: %s", entry.m.Desc(), err)
+			logger.Errorf("collectionMonitor Collect could not get collection count for %s: %s", entry.m.Desc(), err)
 		} else {
 			entry.m.Set(float64(cnt))
 		}

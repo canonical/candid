@@ -67,7 +67,7 @@ func checkThirdPartyCaveat(ctx context.Context, h *handler, req *http.Request, c
 		return nil, needLoginError(h, req, &dischargeRequestInfo{
 			Caveat:    ci.Caveat,
 			CaveatId:  ci.Id,
-			Condition: ci.Condition,
+			Condition: string(ci.Condition),
 			Origin:    req.Header.Get("Origin"),
 		}, err)
 	}
@@ -79,7 +79,7 @@ func checkThirdPartyCaveat(ctx context.Context, h *handler, req *http.Request, c
 		}
 		authInfo.Identity = store.Identity(dischargeForUser)
 	}
-	cond, args, err := checkers.ParseCaveat(ci.Condition)
+	cond, args, err := checkers.ParseCaveat(string(ci.Condition))
 	if err != nil {
 		return nil, errgo.WithCausef(err, params.ErrBadRequest, "cannot parse caveat %q", ci.Condition)
 	}
