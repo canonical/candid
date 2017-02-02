@@ -3,24 +3,25 @@
 package store_test
 
 import (
+	"bufio"
 	"fmt"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"sort"
-	"sync"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/juju/idmclient/params"
 	"github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"
 	"github.com/prometheus/client_golang/prometheus"
-	prom "github.com/prometheus/client_model/go"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/mgo.v2/bson"
 	"launchpad.net/lpad"
 
-	"github.com/CanonicalLtd/blues-identity/internal/limitpool"
 	"github.com/CanonicalLtd/blues-identity/internal/mongodoc"
 	"github.com/CanonicalLtd/blues-identity/internal/store"
 )
@@ -933,90 +934,65 @@ func (s *storeSuite) TestGetStoreFromPoolPutBeforeTimeout(c *gc.C) {
 	c.Assert(s2.DB.Session, gc.Equals, s1Session)
 }
 
-type gauge struct {
-	sync.Mutex
-	prometheus.Gauge
+func (s *storeSuite) TestCollectionCountsMonitor(c *gc.C) {
+	store := s.pool.GetNoLimit()
+	defer s.pool.Put(store)
+	// Add existing interactive user.
+	err := store.UpsertUser(&mongodoc.Identity{
+		Username:   "existing",
+		ExternalID: "http://example.com/existing",
+		Email:      "existing@example.com",
+	})
+	c.Assert(err, gc.IsNil)
 
-	value int
-}
+	identitiesCount, err := store.DB.Identities().Count()
+	c.Assert(err, gc.IsNil)
+	// We've just inserted an identity and the admin user always has an entry.
+	c.Assert(identitiesCount, gc.Equals, 2)
 
-func (g *gauge) Inc() {
-	g.Lock()
-	g.value++
-	g.Unlock()
-}
+	srv := httptest.NewServer(prometheus.Handler())
+	defer srv.Close()
+	resp, err := http.Get(srv.URL)
+	c.Assert(err, gc.IsNil)
+	c.Assert(resp.StatusCode, gc.Equals, http.StatusOK)
+	defer resp.Body.Close()
+	counts := make(map[string]float64)
+	for scan := bufio.NewScanner(resp.Body); scan.Scan(); {
+		t := scan.Text()
+		c.Logf("line %s", t)
+		if t == "" || strings.HasPrefix(t, "#") {
+			continue
+		}
+		if i := strings.Index(t, "{"); i >= 0 {
+			j := strings.LastIndex(t, "}")
+			t = t[0:i] + t[j+1:]
+		}
+		fields := strings.Fields(t)
+		if len(fields) != 2 {
+			c.Logf("unexpected prometheus line %q", scan.Text())
+			continue
+		}
+		f, err := strconv.ParseFloat(fields[1], 64)
+		if err != nil {
+			c.Logf("bad value in prometheus line %q", scan.Text())
+			continue
+		}
+		counts[fields[0]] += f
+	}
 
-func (g *gauge) Dec() {
-	g.Lock()
-	g.value--
-	g.Unlock()
-}
-
-func (g *gauge) GetValue() int {
-	g.Lock()
-	defer g.Unlock()
-	return g.value
-}
-
-type monitoredPoolSuite struct {
-	gauge *gauge
-	pool  store.LimitPool
+	expectCounts := map[string]int{
+		"identities": 2,
+		"meeting":    0,
+		"macaroons":  0,
+	}
+	for name, count := range expectCounts {
+		name = "blues_identity_collection_" + name + "_count"
+		got, ok := counts[name]
+		c.Assert(ok, gc.Equals, true, gc.Commentf("%s", name))
+		c.Check(math.Trunc(got), gc.Equals, float64(count), gc.Commentf("%s", name))
+	}
 }
 
 type nopCloser struct{}
 
-func (*nopCloser) Close() {}
-
-var _ = gc.Suite(&monitoredPoolSuite{})
-
-func (s *monitoredPoolSuite) SetUpTest(c *gc.C) {
-	s.gauge = &gauge{}
-	s.pool = store.NewMonitoredPool(s.gauge, 3, func() limitpool.Item { return &nopCloser{} })
-}
-
-func (s *monitoredPoolSuite) TestGetIncrements(c *gc.C) {
-	c.Assert(s.gauge.GetValue(), gc.Equals, 0)
-	i, err := s.pool.Get(time.Second)
-	c.Assert(err, gc.IsNil)
-	c.Assert(s.gauge.GetValue(), gc.Equals, 0)
-	s.pool.Put(i)
-	c.Assert(s.gauge.GetValue(), gc.Equals, 1)
-}
-
-func (s *monitoredPoolSuite) TestGetNoLimitIncrements(c *gc.C) {
-	c.Assert(s.gauge.GetValue(), gc.Equals, 0)
-	i := s.pool.GetNoLimit()
-	c.Assert(s.gauge.GetValue(), gc.Equals, 0)
-	s.pool.Put(i)
-	c.Assert(s.gauge.GetValue(), gc.Equals, 1)
-}
-
-type collectionMonitorSuite struct{}
-
-var _ = gc.Suite(&collectionMonitorSuite{})
-
-type mockCounter struct {
-	value int
-}
-
-func (c *mockCounter) Count() (int, error) {
-	return c.value, nil
-}
-
-func (s *collectionMonitorSuite) TestMonitorCollect(c *gc.C) {
-	cnt := &mockCounter{value: 5}
-	coll := store.NewCollectionMonitor(map[string]store.Counter{
-		"sample": cnt,
-	})
-	ch := make(chan prometheus.Metric, 1)
-	coll.Collect(ch)
-	var m prometheus.Metric
-	select {
-	case m = <-ch:
-	default:
-		c.Error("no metric received from collector")
-	}
-	var value prom.Metric
-	m.Write(&value)
-	c.Assert(value.GetGauge().GetValue(), gc.Equals, 5.0)
-}
+func (nopCloser) Close() {}
