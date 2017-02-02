@@ -5,7 +5,6 @@ package admincmd_test
 import (
 	"bytes"
 	"net/http"
-	"os"
 	"path/filepath"
 	"time"
 
@@ -19,6 +18,7 @@ import (
 	errgo "gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
 	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
+	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery/agent"
 
 	"github.com/CanonicalLtd/blues-identity/cmd/user-admin/internal/admincmd"
 	"github.com/CanonicalLtd/blues-identity/internal/identity"
@@ -83,11 +83,8 @@ func (s *commandSuite) RunServer(c *gc.C, handler *handler) func(args ...string)
 	return func(args ...string) (code int, stdout, stderr string) {
 		server := newServer(handler)
 		defer server.Close()
-		f, err := os.Create(filepath.Join(s.Dir, "admin.agent"))
-		c.Assert(err, gc.Equals, nil)
-		defer f.Close()
 		ag := server.adminAgent()
-		err = admincmd.Write(f, ag)
+		err := admincmd.WriteAgentFile(filepath.Join(s.Dir, "admin.agent"), ag)
 		c.Assert(err, gc.Equals, nil)
 		s.PatchEnvironment("IDM_URL", server.idmServer.URL.String())
 		return s.Run(args...)
@@ -115,14 +112,20 @@ func (srv *server) Close() {
 	srv.idmServer.Close()
 }
 
-func (srv *server) adminAgent() admincmd.Agent {
+// adminAgent returns an agent Visitor holding
+// details of the admin agent.
+func (srv *server) adminAgent() *agent.Visitor {
+	var v agent.Visitor
 	key := srv.idmServer.UserPublicKey("admin@idm")
-	return admincmd.Agent{
-		URL:        srv.idmServer.URL.String(),
-		Username:   "admin@idm",
-		PublicKey:  &key.Public,
-		PrivateKey: &key.Private,
+	err := v.AddAgent(agent.Agent{
+		URL:      srv.idmServer.URL.String(),
+		Username: "admin@idm",
+		Key:      key,
+	})
+	if err != nil {
+		panic(err)
 	}
+	return &v
 }
 
 func (srv *server) ThirdPartyInfo(context.Context, string) (bakery.ThirdPartyInfo, error) {
@@ -142,6 +145,8 @@ func (srv *server) newHandler(p httprequest.Params) (*handler, context.Context, 
 type handler struct {
 	modifyGroups func(*params.ModifyUserGroupsRequest) error
 	queryUsers   func(*params.QueryUsersRequest) ([]string, error)
+	setUser      func(*params.SetUserRequest) error
+	whoAmI       func(*params.WhoAmIRequest) (*params.WhoAmIResponse, error)
 }
 
 func (h *handler) ModifyGroups(req *params.ModifyUserGroupsRequest) error {
@@ -150,6 +155,14 @@ func (h *handler) ModifyGroups(req *params.ModifyUserGroupsRequest) error {
 
 func (h *handler) QueryUsers(req *params.QueryUsersRequest) ([]string, error) {
 	return h.queryUsers(req)
+}
+
+func (h *handler) SetUser(req *params.SetUserRequest) error {
+	return h.setUser(req)
+}
+
+func (h *handler) WhoAmI(p *params.WhoAmIRequest) (*params.WhoAmIResponse, error) {
+	return h.whoAmI(p)
 }
 
 var ages = time.Now().Add(time.Hour)

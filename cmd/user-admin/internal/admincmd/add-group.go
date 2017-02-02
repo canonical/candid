@@ -34,7 +34,7 @@ address bob@example.com:
 func (c *addGroupCommand) Info() *cmd.Info {
 	return &cmd.Info{
 		Name:    "add-group",
-		Args:    c.args(),
+		Args:    "[group...]",
 		Purpose: "add a user to groups",
 		Doc:     addGroupDoc,
 	}
@@ -43,10 +43,6 @@ func (c *addGroupCommand) Info() *cmd.Info {
 func (c *addGroupCommand) Init(args []string) error {
 	c.groups = args
 	return errgo.Mask(c.userCommand.Init(nil))
-}
-
-func (c *addGroupCommand) args() string {
-	return c.userCommand.args() + " [group...]"
 }
 
 func (c *addGroupCommand) Run(ctxt *cmd.Context) error {
