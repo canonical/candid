@@ -66,6 +66,13 @@ func serve(confPath string) error {
 		return errgo.Notef(err, "cannot read config file %q", confPath)
 	}
 
+	if conf.HTTPProxy != "" {
+		os.Setenv("HTTP_PROXY", conf.HTTPProxy)
+	}
+	if conf.NoProxy != "" {
+		os.Setenv("NO_PROXY", conf.NoProxy)
+	}
+
 	logger.Infof("connecting to mongo")
 	session, err := mgo.Dial(conf.MongoAddr)
 	if err != nil {

@@ -98,6 +98,8 @@ tls-key: |
   FWQQKAkL5KolhJye0Kz/X8CT3UMmhOK73UkUaOvMvdSjxLFgIruxWQ==
   -----END RSA PRIVATE KEY-----
 resource-path: /resources
+http-proxy: http://proxy.example.com:3128
+no-proxy: localhost,.example.com
 `
 
 func (s *configSuite) readConfig(c *gc.C, content string) (*config.Config, error) {
@@ -160,6 +162,8 @@ func (s *configSuite) TestRead(c *gc.C) {
 		PrivateAddr:  "localhost",
 		DebugTeams:   []string{"yellow", "cloud-green"},
 		ResourcePath: "/resources",
+		HTTPProxy:    "http://proxy.example.com:3128",
+		NoProxy:      "localhost,.example.com",
 	})
 }
 

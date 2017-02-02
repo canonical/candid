@@ -40,6 +40,8 @@ type Config struct {
 	PrivateKey          *bakery.PrivateKey `yaml:"private-key"`
 	AdminAgentPublicKey *bakery.PublicKey  `yaml:"admin-agent-public-key"`
 	ResourcePath        string             `yaml:"resource-path"`
+	HTTPProxy           string             `yaml:"http-proxy"`
+	NoProxy             string             `yaml:"no-proxy"`
 }
 
 func (c *Config) TLSConfig() *tls.Config {
