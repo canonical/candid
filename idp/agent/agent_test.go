@@ -109,7 +109,7 @@ func (s *agentSuite) TestHandleBadRequest(c *gc.C) {
 	}
 	rr := httptest.NewRecorder()
 	s.idp.Handle(tc, rr, tc.Request)
-	idptest.AssertLoginFailure(c, &tc.TestContext, "cannot unmarshal request: cannot unmarshal into field: unexpected content type text/plain; want application/json; content: ")
+	idptest.AssertLoginFailure(c, &tc.TestContext, "cannot unmarshal request: cannot unmarshal into field AgentLogin: unexpected content type text/plain; want application/json; content: ")
 	c.Assert(rr.Body.Len(), gc.Equals, 0)
 }
 

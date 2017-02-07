@@ -145,7 +145,7 @@ var handleTests = []struct {
 		Method: "POST",
 		Body:   ioutil.NopCloser(strings.NewReader("")),
 	},
-	expectError: `cannot unmarshal into field: unexpected content type ""; want application/json; content: ""`,
+	expectError: `cannot unmarshal into field User: unexpected content type ""; want application/json; content: ""`,
 }, {
 	about: "login username not found",
 	req: testLogin(&params.User{
