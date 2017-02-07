@@ -77,7 +77,8 @@ func (g *LaunchpadGroups) getLaunchpadGroupsNoCache(externalId string) ([]string
 }
 
 func (g *LaunchpadGroups) getLaunchpadPersonByOpenID(root *lpad.Root, externalId string) (*lpad.Person, error) {
-	v, err := root.Location("/people").Get(lpad.Params{"ws.op": "getByOpenIDIdentifier", "identifier": externalId})
+	launchpadId := "https://login.launchpad.net/+id/" + strings.TrimPrefix(externalId, "https://login.ubuntu.com/+id/")
+	v, err := root.Location("/people").Get(lpad.Params{"ws.op": "getByOpenIDIdentifier", "identifier": launchpadId})
 	// TODO if err == lpad.ErrNotFound, return a not found error
 	// so that we won't round-trip to launchpad for users that don't exist there.
 	if err != nil {
