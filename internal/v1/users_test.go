@@ -227,7 +227,7 @@ func (s *usersSuite) TestUser(c *gc.C) {
 		expectStatus: http.StatusBadRequest,
 		expectBody: params.Error{
 			Code:    "bad request",
-			Message: "cannot unmarshal parameters: cannot unmarshal into field: cannot unmarshal request body: invalid character 'i' looking for beginning of value",
+			Message: "cannot unmarshal parameters: cannot unmarshal into field User: cannot unmarshal request body: invalid character 'i' looking for beginning of value",
 		},
 	}, {
 		about:    "incorrect username",
@@ -317,7 +317,7 @@ func (s *usersSuite) TestUser(c *gc.C) {
 		expectStatus: http.StatusBadRequest,
 		expectBody: params.Error{
 			Code:    "bad request",
-			Message: `cannot unmarshal parameters: cannot unmarshal into field: illegal username "jbloggs{}"`,
+			Message: `cannot unmarshal parameters: cannot unmarshal into field Username: illegal username "jbloggs{}"`,
 		},
 	}, {
 		about:  "long username",
@@ -336,7 +336,7 @@ func (s *usersSuite) TestUser(c *gc.C) {
 		expectStatus: http.StatusBadRequest,
 		expectBody: params.Error{
 			Code:    "bad request",
-			Message: `cannot unmarshal parameters: cannot unmarshal into field: username longer than 256 characters`,
+			Message: `cannot unmarshal parameters: cannot unmarshal into field Username: username longer than 256 characters`,
 		},
 	}, {
 		about:  "invalid subpath",
@@ -491,7 +491,7 @@ func (s *usersSuite) TestUser(c *gc.C) {
 		expectStatus: http.StatusBadRequest,
 		expectBody: params.Error{
 			Code:    params.ErrBadRequest,
-			Message: `cannot unmarshal parameters: cannot unmarshal into field: illegal username "jbloggs9-"`,
+			Message: `cannot unmarshal parameters: cannot unmarshal into field Username: illegal username "jbloggs9-"`,
 		},
 	}, {
 		about:  "invalid username for user",

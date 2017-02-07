@@ -110,7 +110,7 @@ func (s *userpassSuite) TestKeystoneUserpassIdentityProviderHandleBadRequest(c *
 	}
 	rr := httptest.NewRecorder()
 	s.idp.Handle(tc, rr, tc.Request)
-	idptest.AssertLoginFailure(c, tc, `cannot unmarshal login request: cannot unmarshal into field: cannot unmarshal request body: unexpected end of JSON input`)
+	idptest.AssertLoginFailure(c, tc, `cannot unmarshal login request: cannot unmarshal into field Body: cannot unmarshal request body: unexpected end of JSON input`)
 }
 
 func (s *userpassSuite) TestKeystoneUserpassIdentityProviderHandleNoUsername(c *gc.C) {
