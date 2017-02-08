@@ -11,9 +11,11 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"path"
 	"strings"
 	"time"
 
+	"github.com/juju/httprequest"
 	"github.com/juju/idmclient/params"
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/testing/httptesting"
@@ -426,7 +428,6 @@ func (s *dischargeSuite) TestDischargeForUser(c *gc.C) {
 		&params.SetUserRequest{
 			Username: "jbloggs",
 			User: params.User{
-				Username:   "jbloggs",
 				ExternalID: "http://example.com/jbloggs",
 				Email:      "jbloggs@example.com",
 				FullName:   "Joe Bloggs",
@@ -437,31 +438,42 @@ func (s *dischargeSuite) TestDischargeForUser(c *gc.C) {
 		},
 	)
 	c.Assert(err, gc.IsNil)
-	tests := []struct {
-		about      string
-		condition  string
-		m          *bakery.Macaroon
-		modifier   *requestModifier
-		expectUser string
-		expectErr  string
-	}{{
-		about:     "discharge macaroon",
-		condition: "is-authenticated-user",
-		modifier: &requestModifier{
-			f: func(r *http.Request) {
-				r.SetBasicAuth(adminUsername, adminPassword)
-				r.URL.RawQuery += "&discharge-for-user=jbloggs"
+	err = s.IDMClient.SetUser(
+		testContext,
+		&params.SetUserRequest{
+			Username: "jbloggs@test",
+			User: params.User{
+				ExternalID: "http://test.example.com/jbloggs",
+				Email:      "jbloggs@test.example.com",
+				FullName:   "Joe Bloggs",
+				IDPGroups: []string{
+					"test",
+				},
 			},
 		},
-		expectUser: "jbloggs",
+	)
+	c.Assert(err, gc.IsNil)
+	tests := []struct {
+		about            string
+		condition        string
+		username         string
+		password         string
+		dischargeForUser string
+		m                *bakery.Macaroon
+		expectUser       string
+		expectErr        string
+	}{{
+		about:            "discharge macaroon",
+		condition:        "is-authenticated-user",
+		username:         adminUsername,
+		password:         adminPassword,
+		dischargeForUser: "jbloggs",
+		expectUser:       "jbloggs",
 	}, {
 		about:     "no discharge user",
 		condition: "is-authenticated-user",
-		modifier: &requestModifier{
-			f: func(r *http.Request) {
-				r.SetBasicAuth(adminUsername, adminPassword)
-			},
-		},
+		username:  adminUsername,
+		password:  adminPassword,
 		// Without the discharge-for-user query parameter, the administrator
 		// is just discharging for themselves.
 		// Note that even though we've used "admin" as the basic-auth
@@ -469,55 +481,75 @@ func (s *dischargeSuite) TestDischargeForUser(c *gc.C) {
 		// as if it had agent authenticated as the admin agent.
 		expectUser: store.AdminUsername,
 	}, {
-		about:     "no authentication",
-		condition: "is-authenticated-user",
-		modifier: &requestModifier{
-			f: func(r *http.Request) {
-				r.URL.RawQuery += "&discharge-for-user=jbloggs"
-			},
-		},
-		expectErr: `cannot get discharge from "[^"]*": cannot start interactive session: interaction required but not possible`,
+		about:            "no authentication",
+		condition:        "is-authenticated-user",
+		dischargeForUser: "jbloggs",
+		expectErr:        `cannot get discharge from "https://idp.test": Post https://idp.test/discharge: cannot get discharge from "https://idp.test": cannot start interactive session: interaction required but not possible`,
 	}, {
-		about:     "unsupported user",
-		condition: "is-authenticated-user",
-		modifier: &requestModifier{
-			f: func(r *http.Request) {
-				r.SetBasicAuth(adminUsername, adminPassword)
-				r.URL.RawQuery += "&discharge-for-user=jbloggs2"
-			},
-		},
-		expectErr: `.*cannot discharge: user \"jbloggs2\" not found: not found`,
+		about:            "unsupported user",
+		condition:        "is-authenticated-user",
+		username:         adminUsername,
+		password:         adminPassword,
+		dischargeForUser: "jbloggs2",
+		expectErr:        `cannot get discharge from "https://idp.test": Post https://idp.test/discharge: cannot discharge: invalid username "jbloggs2": user "jbloggs2" not found: not found`,
 	}, {
-		about:     "unsupported condition",
-		condition: "is-authenticated-group",
-		modifier: &requestModifier{
-			f: func(r *http.Request) {
-				r.SetBasicAuth(adminUsername, adminPassword)
-				r.URL.RawQuery += "&discharge-for-user=jbloggs"
-			},
-		},
-		expectErr: `.*caveat not recognized`,
+		about:            "unsupported condition",
+		condition:        "is-authenticated-group",
+		username:         adminUsername,
+		password:         adminPassword,
+		dischargeForUser: "jbloggs",
+		expectErr:        `.*caveat not recognized`,
 	}, {
-		about:     "bad credentials",
-		condition: "is-authenticated-user",
-		modifier: &requestModifier{
-			f: func(r *http.Request) {
-				r.SetBasicAuth("not-admin-username", adminPassword)
-				r.URL.RawQuery += "&discharge-for-user=jbloggs2"
-			},
-		},
-		// The invalid basic-auth credentials are ignored and
-		// the usual interaction-required error is returned.
-		expectErr: `cannot get discharge from "https://idp.test": cannot start interactive session: interaction required but not possible`,
+		about:            "bad credentials",
+		condition:        "is-authenticated-user",
+		username:         "not-admin-username",
+		password:         adminPassword,
+		dischargeForUser: "jbloggs",
+		expectErr:        `cannot get discharge from "https://idp.test": Post https://idp.test/discharge: cannot discharge: could not determine identity: invalid credentials`,
+	}, {
+		about:            "is-authenticated-user with domain",
+		condition:        "is-authenticated-user @test",
+		username:         adminUsername,
+		password:         adminPassword,
+		dischargeForUser: "jbloggs@test",
+		expectUser:       "jbloggs@test",
+	}, {
+		about:            "is-authenticated-user with wrong domain",
+		condition:        "is-authenticated-user @test2",
+		username:         adminUsername,
+		password:         adminPassword,
+		dischargeForUser: "jbloggs@test",
+		expectErr:        `cannot get discharge from "https://idp.test": Post https://idp.test/discharge: cannot discharge: invalid username "jbloggs@test": "jbloggs@test" not in domain "test2"`,
+	}, {
+		about:            "is-authenticated-user with invalid domain",
+		condition:        "is-authenticated-user @test-",
+		username:         adminUsername,
+		password:         adminPassword,
+		dischargeForUser: "jbloggs@test",
+		expectErr:        `cannot get discharge from "https://idp.test": Post https://idp.test/discharge: cannot discharge: invalid domain "test-"`,
+	}, {
+		about:            "invalid caveat",
+		condition:        " invalid caveat",
+		username:         adminUsername,
+		password:         adminPassword,
+		dischargeForUser: "jbloggs@test",
+		expectErr:        `cannot get discharge from "https://idp.test": Post https://idp.test/discharge: cannot discharge: cannot parse caveat " invalid caveat": caveat starts with space character`,
 	}}
 	for i, test := range tests {
 		c.Logf("test %d. %s", i, test.about)
+		cl0 := httpbakery.NewClient()
+		cl0.Transport = s.RoundTripper
+		da := &testDischargeAcquirer{
+			client:           &httprequest.Client{Doer: cl0},
+			username:         test.username,
+			password:         test.password,
+			dischargeForUser: test.dischargeForUser,
+		}
+
 		client := httpbakery.NewClient()
 		client.Transport = s.RoundTripper
-		if test.modifier != nil {
-			test.modifier.transport = client.Client.Transport
-			client.Client.Transport = test.modifier
-		}
+		client.DischargeAcquirer = da
+
 		m := s.newMacaroon(test.condition, bakery.LoginOp)
 		ms, err := client.DischargeAll(testContext, m)
 
@@ -528,6 +560,50 @@ func (s *dischargeSuite) TestDischargeForUser(c *gc.C) {
 		c.Assert(err, gc.IsNil)
 		s.assertDischarged(c, ms, bakery.LoginOp, test.expectUser)
 	}
+}
+
+// testDischargeAcquirer acquires a discharge by using the provided basic
+// authentication credentials to perform an discharge as the specified
+// user.
+type testDischargeAcquirer struct {
+	client             *httprequest.Client
+	username, password string
+	dischargeForUser   string
+}
+
+func (da *testDischargeAcquirer) AcquireDischarge(ctx context.Context, cav macaroon.Caveat, payload []byte) (*bakery.Macaroon, error) {
+	u, err := url.Parse(cav.Location)
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
+	u.Path = path.Join(u.Path, "discharge")
+	params := make(url.Values)
+	if len(payload) > 0 {
+		params.Set("id64", base64.RawURLEncoding.EncodeToString(cav.Id))
+		params.Set("caveat64", base64.RawURLEncoding.EncodeToString(payload))
+	} else {
+		params.Set("id64", base64.RawURLEncoding.EncodeToString(cav.Id))
+	}
+	if da.dischargeForUser != "" {
+		params.Set("discharge-for-user", da.dischargeForUser)
+	}
+	req, err := http.NewRequest("POST", u.String(), strings.NewReader(params.Encode()))
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
+	if da.username != "" {
+		req.SetBasicAuth(da.username, da.password)
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	var dr dischargeResponse
+	if err := da.client.Do(ctx, req, &dr); err != nil {
+		return nil, errgo.Mask(err, errgo.Any)
+	}
+	return dr.Macaroon, nil
+}
+
+type dischargeResponse struct {
+	Macaroon *bakery.Macaroon `json:",omitempty"`
 }
 
 // newMacaroon uses s.bakery to mint a new macaroon for the third party caveat condition
@@ -616,14 +692,14 @@ func (s *dischargeSuite) TestDischargeMemberOf(c *gc.C) {
 	}, {
 		about:       "test membership in single group - no match",
 		condition:   "is-member-of test1",
-		expectError: "third party refused discharge: cannot discharge: user is not a member of required groups",
+		expectError: "third party refused discharge: user is not a member of required groups",
 	}, {
 		about:     "test membership in a set of groups - one group matches",
 		condition: "is-member-of test2 test4",
 	}, {
 		about:       "test membership in a set of groups fail - no match",
 		condition:   "is-member-of test1 test3",
-		expectError: "third party refused discharge: cannot discharge: user is not a member of required groups",
+		expectError: "third party refused discharge: user is not a member of required groups",
 	},
 	}
 
@@ -851,4 +927,63 @@ func (s *dischargeSuite) TestLastDischargeTimeUpdates(c *gc.C) {
 	})
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(u2.LastDischarge.After(*u1.LastDischarge), gc.Equals, true)
+}
+
+func (s *dischargeSuite) TestDomainInInteractionURLs(c *gc.C) {
+	tests := []struct {
+		about        string
+		condition    string
+		cookies      map[string]string
+		expectDomain string
+	}{{
+		about:        "domain login",
+		condition:    "is-authenticated-user @test-domain",
+		expectDomain: "test-domain",
+	}, {
+		about:     "no domain",
+		condition: "is-authenticated-user",
+	}, {
+		about:     "domain from cookies",
+		condition: "is-authenticated-user",
+		cookies: map[string]string{
+			"domain": "cookie-domain",
+		},
+		expectDomain: "cookie-domain",
+	}, {
+		about:     "condition trumps cookies",
+		condition: "is-authenticated-user @test-domain",
+		cookies: map[string]string{
+			"domain": "cookie-domain",
+		},
+		expectDomain: "test-domain",
+	}}
+	for i, tst := range tests {
+		c.Logf("test %d. %s", i, tst.about)
+		client := httpbakery.NewClient()
+		client.Transport = s.RoundTripper
+		username := "user"
+		if tst.expectDomain != "" {
+			username = "user@" + tst.expectDomain
+		}
+		client.WebPageVisitor = &valueSavingVisitor{
+			visitor: &test.Visitor{
+				User: &params.User{
+					Username:   params.Username(username),
+					ExternalID: tst.expectDomain + ":user",
+				},
+			},
+		}
+		for k, v := range tst.cookies {
+			u, err := url.Parse(idptest.DischargeLocation)
+			c.Assert(err, gc.IsNil)
+			client.Jar.SetCookies(u, []*http.Cookie{{
+				Name:  k,
+				Value: v,
+			}})
+		}
+		m := s.newMacaroon(tst.condition, bakery.LoginOp)
+		ms, err := client.DischargeAll(testContext, m)
+		c.Assert(err, gc.IsNil)
+		s.assertDischarged(c, ms, bakery.LoginOp, username)
+	}
 }

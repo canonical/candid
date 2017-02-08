@@ -57,56 +57,86 @@ func (c thirdPartyCaveatChecker) CheckThirdPartyCaveat(ctx context.Context, req 
 // by the httpbakery discharge logic. See httpbakery.DischargeHandler
 // for futher details.
 func checkThirdPartyCaveat(ctx context.Context, h *handler, req *http.Request, ci *bakery.ThirdPartyCaveatInfo) ([]checkers.Caveat, error) {
-	dischargeForUser := req.Form.Get("discharge-for-user")
-	op := bakery.LoginOp
-	if dischargeForUser != "" {
-		op = store.GlobalOp(store.ActionDischargeFor)
-	}
-	authInfo, err := h.store.Authorize(context.TODO(), req, op)
-	if err != nil {
-		return nil, needLoginError(h, req, &dischargeRequestInfo{
-			Caveat:    ci.Caveat,
-			CaveatId:  ci.Id,
-			Condition: string(ci.Condition),
-			Origin:    req.Header.Get("Origin"),
-		}, err)
-	}
-	logger.Infof("authorization for %#v succeeded, identity %#v", op, authInfo.Identity)
-	if dischargeForUser != "" {
-		// We've bypassed the usual authorization logic, so make sure that the identity actually exists.
-		if _, err := h.store.GetIdentity(params.Username(dischargeForUser)); err != nil {
-			return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
-		}
-		authInfo.Identity = store.Identity(dischargeForUser)
-	}
 	cond, args, err := checkers.ParseCaveat(string(ci.Condition))
 	if err != nil {
 		return nil, errgo.WithCausef(err, params.ErrBadRequest, "cannot parse caveat %q", ci.Condition)
 	}
+	checkDomain := false
+	domain := ""
+	if c, err := req.Cookie("domain"); err == nil && names.IsValidUserDomain(c.Value) {
+		domain = c.Value
+	}
+	switch cond {
+	case "is-authenticated-user":
+		if len(args) > 0 {
+			if args[0] != '@' {
+				return nil, checkers.ErrCaveatNotRecognized
+			}
+			if !names.IsValidUserDomain(args[1:]) {
+				return nil, errgo.WithCausef(err, params.ErrBadRequest, "invalid domain %q", args[1:])
+			}
+			domain = args[1:]
+			checkDomain = true
+		}
+	case "is-member-of":
+	default:
+		return nil, checkers.ErrCaveatNotRecognized
+	}
+
+	var identity store.Identity
+	var invalidUserf func(err error) error
+	if user := req.Form.Get("discharge-for-user"); user != "" {
+		_, err := h.store.Authorize(ctx, req, store.GlobalOp(store.ActionDischargeFor))
+		if err != nil {
+			return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized), isDischargeRequiredError)
+		}
+		invalidUserf = func(err error) error {
+			return errgo.WithCausef(err, params.ErrBadRequest, "invalid username %q", user)
+		}
+		// We've bypassed the usual authorization logic, so make sure that the identity actually exists.
+		if _, err := h.store.GetIdentity(params.Username(user)); err != nil {
+			return nil, invalidUserf(err)
+		}
+		identity = store.Identity(user)
+
+	} else {
+		invalidUserf = func(err error) error {
+			return needLoginError(h, req, domain, &dischargeRequestInfo{
+				Caveat:    ci.Caveat,
+				CaveatId:  ci.Id,
+				Condition: string(ci.Condition),
+				Origin:    req.Header.Get("Origin"),
+			}, err)
+		}
+		userInfo, err := h.store.Authorize(ctx, req, bakery.LoginOp)
+		if err != nil {
+			return nil, invalidUserf(err)
+		}
+		identity = userInfo.Identity.(store.Identity)
+	}
+	logger.Infof("authorization for %#v succeeded", identity)
+
 	var cavs []checkers.Caveat
 	switch cond {
 	case "is-authenticated-user":
-		user := dischargeForUser
-		if user == "" {
-			user = authInfo.Identity.Id()
+		if checkDomain && !strings.HasSuffix(identity.Id(), "@"+domain) {
+			return nil, invalidUserf(errgo.Newf("%q not in domain %q", identity.Id(), domain))
 		}
 		cavs = []checkers.Caveat{
-			idmclient.UserDeclaration(user),
+			idmclient.UserDeclaration(identity.Id()),
 			checkers.TimeBeforeCaveat(time.Now().Add(24 * time.Hour)),
 		}
 	case "is-member-of":
-		ok, err := authInfo.Identity.(bakery.ACLIdentity).Allow(ctx, strings.Fields(args))
+		ok, err := identity.Allow(ctx, strings.Fields(args))
 		if err != nil {
 			return nil, errgo.Notef(err, "cannot check group membership")
 		}
 		if !ok {
-			return nil, errgo.Newf("user is not a member of required groups")
+			return nil, invalidUserf(errgo.Newf("user is not a member of required groups"))
 		}
 		// TODO should this be time-limited?
-	default:
-		return nil, checkers.ErrCaveatNotRecognized
 	}
-	h.updateDischargeTime(params.Username(authInfo.Identity.Id()))
+	h.updateDischargeTime(params.Username(identity.Id()))
 	return cavs, nil
 }
 
@@ -124,7 +154,7 @@ func (h *handler) updateDischargeTime(username params.Username) {
 // needLoginError returns an error suitable for returning
 // from a discharge request that can only be satisfied
 // if the user logs in.
-func needLoginError(h *handler, req *http.Request, info *dischargeRequestInfo, why error) error {
+func needLoginError(h *handler, req *http.Request, domain string, info *dischargeRequestInfo, why error) error {
 	// TODO(rog) If the user is already logged in (username != ""),
 	// we should perhaps just return an error here.
 	waitId, err := h.place.NewRendezvous(info)
@@ -132,8 +162,8 @@ func needLoginError(h *handler, req *http.Request, info *dischargeRequestInfo, w
 		return errgo.Notef(err, "cannot make rendezvous")
 	}
 	visitURL := h.serviceURL("/v1/login?waitid=" + waitId)
-	if c, err := req.Cookie("domain"); err == nil && names.IsValidUserDomain(c.Value) {
-		visitURL += "&domain=" + url.QueryEscape(c.Value)
+	if domain != "" {
+		visitURL += "&domain=" + url.QueryEscape(domain)
 	}
 	waitURL := h.serviceURL("/v1/wait?waitid=" + waitId)
 	return httpbakery.NewInteractionRequiredError(visitURL, waitURL, why, req)
@@ -262,4 +292,9 @@ func (h *dischargeHandler) DischargeTokenForUser(p httprequest.Params, r *discha
 	return dischargeTokenForUserResponse{
 		DischargeToken: m,
 	}, nil
+}
+
+func isDischargeRequiredError(err error) bool {
+	cause, ok := errgo.Cause(err).(*httpbakery.Error)
+	return ok && cause.Code == httpbakery.ErrDischargeRequired
 }
