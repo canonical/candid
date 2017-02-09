@@ -397,6 +397,10 @@ func userFromIdentity(ctx context.Context, id *mongodoc.Identity) (*params.User,
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}
+	if groups == nil {
+		// Ensure that a null list of groups is never sent.
+		groups = []string{}
+	}
 	return &params.User{
 		Username:      params.Username(id.Username),
 		ExternalID:    id.ExternalID,
