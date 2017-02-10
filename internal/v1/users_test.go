@@ -76,6 +76,12 @@ func (s *usersSuite) TestUser(c *gc.C) {
 			"test2",
 		},
 	})
+	s.createUser(c, &params.User{
+		Username:   "jbloggs11",
+		ExternalID: "http://example.com/jbloggs11",
+		Email:      "jbloggs11@example.com",
+		FullName:   "Joe Bloggs XI",
+	})
 	tests := []struct {
 		about        string
 		url          string
@@ -528,6 +534,20 @@ func (s *usersSuite) TestUser(c *gc.C) {
 		expectBody: params.Error{
 			Code:    params.ErrBadRequest,
 			Message: `invalid username "agent@owner@domain@domain2"`,
+		},
+	}, {
+		about:    "user without groups",
+		url:      apiURL("u/jbloggs11"),
+		method:   "GET",
+		username: adminUsername,
+		password: adminPassword,
+		expectBody: params.User{
+			Username:   "jbloggs11",
+			ExternalID: "http://example.com/jbloggs11",
+			Email:      "jbloggs11@example.com",
+			FullName:   "Joe Bloggs XI",
+			GravatarID: "24a6670b7814fcdd353c8caed1727f74",
+			IDPGroups:  []string{},
 		},
 	}}
 	for i, test := range tests {
