@@ -339,14 +339,43 @@ func (id Identity) Groups(ctx context.Context) ([]string, error) {
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
-	var lpGroups []string
-	if getter := store.pool.params.ExternalGroupGetter; getter != nil {
-		lpGroups, err = getter.GetGroups(idDoc.ExternalID)
-		if err != nil {
-			logger.Errorf("Failed to get launchpad groups for user: %s", err)
+	var groups []string
+	switch {
+	case idDoc.ExternalID != "":
+		var lpGroups []string
+		if getter := store.pool.params.ExternalGroupGetter; getter != nil {
+			lpGroups, err = getter.GetGroups(idDoc.ExternalID)
+			if err != nil {
+				logger.Errorf("Failed to get launchpad groups for user: %s", err)
+			}
+		}
+		groups = uniqueStrings(append(idDoc.Groups, lpGroups...))
+	case idDoc.Owner != "":
+		groups = filterGroups(ctx, idDoc.Groups, idDoc.Owner)
+	}
+	return groups, nil
+}
+
+// filterGroups removes any entry in groups that is not in the owner's groups set.
+func filterGroups(ctx context.Context, groups []string, owner string) []string {
+	if owner == AdminUsername {
+		// Admin is in every group by definition.
+		return groups
+	}
+	ownerGroups, err := Identity(owner).Groups(ctx)
+	if err != nil {
+		logger.Errorf("cannot get owner group information: %s", err)
+		return nil
+	}
+	filtered := make([]string, 0, len(groups))
+	for _, g := range groups {
+		for _, g1 := range ownerGroups {
+			if g == g1 {
+				filtered = append(filtered, g)
+			}
 		}
 	}
-	return uniqueStrings(append(idDoc.Groups, lpGroups...)), nil
+	return filtered
 }
 
 // trivialAllow reports whether the username should be allowed

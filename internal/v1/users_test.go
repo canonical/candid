@@ -1930,6 +1930,11 @@ func (s *usersSuite) TestMultipleEndpointAccess(c *gc.C) {
 	store := s.pool.GetNoLimit()
 	defer s.pool.Put(store)
 	s.createIdentity(c, &mongodoc.Identity{
+		Username:   "test",
+		ExternalID: "https://example.com/test",
+		Groups:     []string{"g1", "g2", "g3", "g4"},
+	})
+	s.createIdentity(c, &mongodoc.Identity{
 		Username: "jbloggs1@test",
 		Owner:    "test",
 		Groups:   []string{"g1", "g2"},
