@@ -477,6 +477,52 @@ func (s *authSuite) TestIdentityGroups(c *gc.C) {
 	c.Assert(groups, gc.DeepEquals, []string{"extgroup1", "extgroup2", "group1", "group2"})
 }
 
+func (s *authSuite) TestIdentityGroupsForAgent(c *gc.C) {
+	pool, err := store.NewPool(
+		s.Session.Copy().DB("store-launchpad-tests"),
+		store.StoreParams{
+			ExternalGroupGetter: externalGroupGetterFunc(func(id string) ([]string, error) {
+				if id != "testuser-external-id" {
+					return nil, params.ErrNotFound
+				}
+				return []string{"extgroup1", "extgroup2", "group1"}, nil
+			}),
+			PrivateAddr: "localhost",
+		},
+	)
+	c.Assert(err, gc.IsNil)
+	defer pool.Close()
+	st := pool.GetNoLimit()
+	defer pool.Put(st)
+	err = st.UpsertUser(&mongodoc.Identity{
+		Username:   "testuser",
+		ExternalID: "testuser-external-id",
+		Email:      "testuser@example.com",
+		FullName:   "Test User",
+		Groups: []string{
+			"group1",
+			"group2",
+		},
+	})
+	c.Assert(err, gc.IsNil)
+	err = st.UpsertAgent(&mongodoc.Identity{
+		Username: "agent@testuser",
+		Owner:    "testuser",
+		Groups: []string{
+			"extgroup2",
+			"group1",
+			"group2",
+			"group3",
+		},
+	})
+	c.Assert(err, gc.IsNil)
+	id := store.Identity("agent@testuser")
+	ctx := store.ContextWithStore(context.Background(), st)
+	groups, err := id.Groups(ctx)
+	c.Assert(err, gc.IsNil)
+	c.Assert(groups, gc.DeepEquals, []string{"extgroup2", "group1", "group2"})
+}
+
 type externalGroupGetterFunc func(string) ([]string, error)
 
 func (f externalGroupGetterFunc) GetGroups(id string) ([]string, error) {
