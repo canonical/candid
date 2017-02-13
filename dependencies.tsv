@@ -42,7 +42,7 @@ gopkg.in/errgo.v1	git	442357a80af5c6bf9b6d51ae791a39c3421004f3	2016-12-22T12:58:
 gopkg.in/goose.v1	git	8f055ce635d660f9b7827a1ff398c360715df261	2016-11-30T14:51:16Z
 gopkg.in/juju/environschema.v1	git	7359fc7857abe2b11b5b3e23811a9c64cb6b01e0	2015-11-04T11:58:10Z
 gopkg.in/juju/names.v2	git	0847c26d322a121e52614f969fb82eae2820c715	2016-11-02T13:43:03Z
-gopkg.in/macaroon-bakery.v2-unstable	git	ca59f6968e3afabc702e96b2b20fd06070e851a0	2017-01-31T12:42:21Z
+gopkg.in/macaroon-bakery.v2-unstable	git	a766ab64310c9b958e9e09422de8a34903204095	2017-02-13T17:54:28Z
 gopkg.in/macaroon.v2-unstable	git	e4c879958311648cb7f2c2b97290bee05c02718d	2016-11-18T07:12:15Z
 gopkg.in/mgo.v2	git	f2b6f6c918c452ad107eec89615f074e3bd80e33	2016-08-18T01:52:18Z
 gopkg.in/natefinch/lumberjack.v2	git	514cbda263a734ae8caac038dadf05f8f3f9f738	2016-01-25T11:17:49Z
