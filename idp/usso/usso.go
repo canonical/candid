@@ -167,17 +167,11 @@ func (idp *identityProvider) callback(ctx idp.RequestContext, w http.ResponseWri
 	// identity cannot be created. It is still possible to log the
 	// user in if the identity already exists.
 	if err != nil {
-		user, err = ctx.FindUserByExternalId(id)
-		if err != nil {
-			ctx.LoginFailure(idputil.WaitID(req), errgo.WithCausef(
-				err,
-				params.ErrForbidden,
-				"cannot get user details for %q",
-				id,
-			))
+		if user, err := ctx.FindUserByExternalId(id); err == nil {
+			idputil.LoginUser(ctx, idputil.WaitID(req), w, user)
 			return
 		}
-		idputil.LoginUser(ctx, idputil.WaitID(req), w, user)
+		ctx.LoginFailure(idputil.WaitID(req), errgo.WithCausef(err, params.ErrForbidden, "invalid user"))
 		return
 	}
 	err = ctx.UpdateUser(user)
@@ -195,15 +189,16 @@ func userFromCallback(r *callbackRequest) (*params.User, error) {
 	for _, f := range strings.Split(r.Signed, ",") {
 		signed[f] = true
 	}
+	if r.Nickname == "" || !signed["sreg.nickname"] {
+		return nil, errgo.New("username not specified")
+	}
 	if r.Email == "" || !signed["sreg.email"] {
-		return nil, errgo.New("sreg.email not specified")
+		return nil, errgo.New("email address not specified")
 	}
 	if r.Fullname == "" || !signed["sreg.fullname"] {
-		return nil, errgo.New("sreg.fullname not specified")
+		return nil, errgo.New("full name not specified")
 	}
-	if r.Nickname == "" || !signed["sreg.nickname"] {
-		return nil, errgo.New("sreg.nickname not specified")
-	}
+
 	var groups []string
 	if r.Groups != "" && signed["lp.is_member"] {
 		groups = strings.Split(r.Groups, ",")
