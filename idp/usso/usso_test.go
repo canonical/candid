@@ -227,7 +227,7 @@ func (s *ussoSuite) TestHandleNoExtensionsNotFound(c *gc.C) {
 	tc.Request.ParseForm()
 	rr := httptest.NewRecorder()
 	s.idp.Handle(tc, rr, tc.Request)
-	idptest.AssertLoginFailure(c, tc, `cannot get user details for "https://login.ubuntu.com/\+id/test": cannot find external id "https://login.ubuntu.com/\+id/test"`)
+	idptest.AssertLoginFailure(c, tc, `invalid user: username not specified`)
 	err, _ = tc.LoginFailureCall()
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrForbidden)
 }
