@@ -10,9 +10,9 @@ import (
 
 	"github.com/juju/cmd"
 	"github.com/juju/httprequest"
-	"github.com/juju/idmclient/idmtest"
 	"github.com/juju/idmclient/params"
 	"github.com/juju/testing"
+	"github.com/julienschmidt/httprouter"
 	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
 	errgo "gopkg.in/errgo.v1"
@@ -21,7 +21,6 @@ import (
 	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery/agent"
 
 	"github.com/CanonicalLtd/blues-identity/cmd/user-admin/internal/admincmd"
-	"github.com/CanonicalLtd/blues-identity/internal/identity"
 )
 
 type commandSuite struct {
@@ -81,58 +80,63 @@ func (s *commandSuite) RunContext(ctxt *cmd.Context, args ...string) int {
 // contain the required flags to use the admin.agent file for login.
 func (s *commandSuite) RunServer(c *gc.C, handler *handler) func(args ...string) (code int, stdout, stderr string) {
 	return func(args ...string) (code int, stdout, stderr string) {
-		server := newServer(handler)
+		server := newServer(c, handler)
 		defer server.Close()
 		ag := server.adminAgent()
 		err := admincmd.WriteAgentFile(filepath.Join(s.Dir, "admin.agent"), ag)
 		c.Assert(err, gc.Equals, nil)
-		s.PatchEnvironment("IDM_URL", server.idmServer.URL.String())
+		s.PatchEnvironment("IDM_URL", server.Location())
 		return s.Run(args...)
 	}
 }
 
 type server struct {
-	idmServer *idmtest.Server
-	handler   *handler
+	*AgentDischarger
+	bakery   *bakery.Bakery
+	adminKey *bakery.KeyPair
+	handler  *handler
 }
 
-func newServer(handler *handler) *server {
+func newServer(c *gc.C, handler *handler) *server {
+	adminKey, err := bakery.GenerateKey()
+	c.Assert(err, gc.Equals, nil)
 	srv := &server{
-		idmServer: idmtest.NewServer(),
-		handler:   handler,
+		AgentDischarger: NewAgentDischarger(),
+		adminKey:        adminKey,
+		handler:         handler,
 	}
-	for _, h := range identity.ReqServer.Handlers(srv.newHandler) {
-		srv.idmServer.Router.Handle(h.Method, h.Path, h.Handle)
+	srv.AgentDischarger.SetPublicKey("admin@idm", &adminKey.Public)
+	router := httprouter.New()
+	reqsrv := httprequest.Server{
+		ErrorMapper: httpbakery.ErrorToResponse,
 	}
-	srv.idmServer.AddUser("admin@idm")
+	for _, h := range reqsrv.Handlers(srv.newHandler) {
+		router.Handle(h.Method, h.Path, h.Handle)
+	}
+	bakeryKey, err := bakery.GenerateKey()
+	c.Assert(err, gc.Equals, nil)
+	srv.bakery = bakery.New(bakery.BakeryParams{
+		Key:            bakeryKey,
+		Locator:        srv,
+		IdentityClient: IdentityClient(srv.Location()),
+	})
+	srv.AgentDischarger.InteractiveDischarger.Mux.Handle("/v1/", router)
 	return srv
-}
-
-func (srv *server) Close() {
-	srv.idmServer.Close()
 }
 
 // adminAgent returns an agent Visitor holding
 // details of the admin agent.
 func (srv *server) adminAgent() *agent.Visitor {
 	var v agent.Visitor
-	key := srv.idmServer.UserPublicKey("admin@idm")
 	err := v.AddAgent(agent.Agent{
-		URL:      srv.idmServer.URL.String(),
+		URL:      srv.Location() + "/visit",
 		Username: "admin@idm",
-		Key:      key,
+		Key:      srv.adminKey,
 	})
 	if err != nil {
 		panic(err)
 	}
 	return &v
-}
-
-func (srv *server) ThirdPartyInfo(context.Context, string) (bakery.ThirdPartyInfo, error) {
-	return bakery.ThirdPartyInfo{
-		PublicKey: srv.idmServer.Bakery.Oven.Key().Public,
-		Version:   bakery.LatestVersion,
-	}, nil
 }
 
 func (srv *server) newHandler(p httprequest.Params) (*handler, context.Context, error) {
@@ -146,6 +150,7 @@ type handler struct {
 	modifyGroups func(*params.ModifyUserGroupsRequest) error
 	queryUsers   func(*params.QueryUsersRequest) ([]string, error)
 	setUser      func(*params.SetUserRequest) error
+	user         func(*params.UserRequest) (*params.User, error)
 	whoAmI       func(*params.WhoAmIRequest) (*params.WhoAmIResponse, error)
 }
 
@@ -161,6 +166,10 @@ func (h *handler) SetUser(req *params.SetUserRequest) error {
 	return h.setUser(req)
 }
 
+func (h *handler) User(req *params.UserRequest) (*params.User, error) {
+	return h.user(req)
+}
+
 func (h *handler) WhoAmI(p *params.WhoAmIRequest) (*params.WhoAmIResponse, error) {
 	return h.whoAmI(p)
 }
@@ -168,16 +177,13 @@ func (h *handler) WhoAmI(p *params.WhoAmIRequest) (*params.WhoAmIResponse, error
 var ages = time.Now().Add(time.Hour)
 
 func (srv *server) checkLogin(ctx context.Context, req *http.Request) error {
-	_, authErr := srv.idmServer.Bakery.Checker.Auth(httpbakery.RequestMacaroons(req)...).Allow(context.TODO(), bakery.LoginOp)
-	if authErr == nil {
-		return nil
-	}
+	_, authErr := srv.bakery.Checker.Auth(httpbakery.RequestMacaroons(req)...).Allow(context.TODO(), bakery.LoginOp)
 	derr, ok := errgo.Cause(authErr).(*bakery.DischargeRequiredError)
 	if !ok {
 		return errgo.Mask(authErr)
 	}
 	version := httpbakery.RequestVersion(req)
-	m, err := srv.idmServer.Bakery.Oven.NewMacaroon(ctx, version, ages, derr.Caveats, derr.Ops...)
+	m, err := srv.bakery.Oven.NewMacaroon(ctx, version, ages, derr.Caveats, derr.Ops...)
 	if err != nil {
 		return errgo.Notef(err, "cannot create macaroon")
 	}
