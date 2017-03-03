@@ -50,6 +50,7 @@ func New() cmd.Command {
 	supercmd.Register(newPutAgentCommand())
 	supercmd.Register(newFindCommand())
 	supercmd.Register(newRemoveGroupCommand())
+	supercmd.Register(newShowCommand())
 	return supercmd
 }
 
