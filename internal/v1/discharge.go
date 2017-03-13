@@ -61,23 +61,23 @@ func checkThirdPartyCaveat(ctx context.Context, h *handler, req *http.Request, c
 	if err != nil {
 		return nil, errgo.WithCausef(err, params.ErrBadRequest, "cannot parse caveat %q", ci.Condition)
 	}
-	checkDomain := false
 	domain := ""
 	if c, err := req.Cookie("domain"); err == nil && names.IsValidUserDomain(c.Value) {
 		domain = c.Value
 	}
 	switch cond {
 	case "is-authenticated-user":
-		if len(args) > 0 {
-			if args[0] != '@' {
-				return nil, checkers.ErrCaveatNotRecognized
-			}
-			if !names.IsValidUserDomain(args[1:]) {
-				return nil, errgo.WithCausef(err, params.ErrBadRequest, "invalid domain %q", args[1:])
-			}
-			domain = args[1:]
-			checkDomain = true
+		if len(args) == 0 {
+			break
 		}
+		if args[0] != '@' {
+			return nil, checkers.ErrCaveatNotRecognized
+		}
+		if !names.IsValidUserDomain(args[1:]) {
+			return nil, errgo.WithCausef(err, params.ErrBadRequest, "invalid domain %q", args[1:])
+		}
+		domain = args[1:]
+		ctx = store.ContextWithRequiredDomain(ctx, domain)
 	case "is-member-of":
 	default:
 		return nil, checkers.ErrCaveatNotRecognized
@@ -97,8 +97,10 @@ func checkThirdPartyCaveat(ctx context.Context, h *handler, req *http.Request, c
 		if _, err := h.store.GetIdentity(params.Username(user)); err != nil {
 			return nil, invalidUserf(err)
 		}
+		if err := store.CheckUserDomain(ctx, user); err != nil {
+			return nil, invalidUserf(err)
+		}
 		identity = store.Identity(user)
-
 	} else {
 		invalidUserf = func(err error) error {
 			return needLoginError(h, req, domain, &dischargeRequestInfo{
@@ -119,9 +121,6 @@ func checkThirdPartyCaveat(ctx context.Context, h *handler, req *http.Request, c
 	var cavs []checkers.Caveat
 	switch cond {
 	case "is-authenticated-user":
-		if checkDomain && !strings.HasSuffix(identity.Id(), "@"+domain) {
-			return nil, invalidUserf(errgo.Newf("%q not in domain %q", identity.Id(), domain))
-		}
 		cavs = []checkers.Caveat{
 			idmclient.UserDeclaration(identity.Id()),
 			checkers.TimeBeforeCaveat(time.Now().Add(24 * time.Hour)),

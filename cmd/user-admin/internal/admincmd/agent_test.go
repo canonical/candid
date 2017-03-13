@@ -123,7 +123,7 @@ func (c agentLoginIdentityClient) IdentityFromContext(ctx context.Context) (bake
 	}, nil
 }
 
-func (c agentLoginIdentityClient) DeclaredIdentity(declared map[string]string) (bakery.Identity, error) {
+func (c agentLoginIdentityClient) DeclaredIdentity(ctx context.Context, declared map[string]string) (bakery.Identity, error) {
 	username, ok := declared["agent-username"]
 	if !ok {
 		return nil, errgo.Newf("no declared user")
@@ -153,7 +153,7 @@ func (c identityClient) IdentityFromContext(ctx context.Context) (bakery.Identit
 }
 
 // DeclaredIdentity implements bakery.IdentityClient.DeclaredIdentity.
-func (c identityClient) DeclaredIdentity(declared map[string]string) (bakery.Identity, error) {
+func (c identityClient) DeclaredIdentity(ctx context.Context, declared map[string]string) (bakery.Identity, error) {
 	username, ok := declared["username"]
 	if !ok {
 		return nil, errgo.Newf("no declared user")

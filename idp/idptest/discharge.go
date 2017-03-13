@@ -18,6 +18,7 @@ import (
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
 	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
+	"gopkg.in/macaroon.v2-unstable"
 
 	"github.com/CanonicalLtd/blues-identity"
 	"github.com/CanonicalLtd/blues-identity/idp"
@@ -138,10 +139,23 @@ func (s *DischargeSuite) TearDownTest(c *gc.C) {
 }
 
 // AssertDischarge asserts that a discharge sent through s.BakeryClient
-// returns a macaroon that validates successfully against ch. If visit is
-// not nil then the clients WebPageVisitor will be set to visit before
+// returns a macaroon that validates successfully against ch. If visitor is
+// not nil then the clients WebPageVisitor will be set to visitor before
 // discharging.
 func (s *DischargeSuite) AssertDischarge(c *gc.C, visitor httpbakery.Visitor) {
+	b, ms, err := s.Discharge(c, "is-authenticated-user", visitor)
+
+	authInfo, err := b.Checker.Auth(ms).Allow(context.Background(), bakery.LoginOp)
+	c.Assert(err, gc.IsNil)
+	c.Assert(authInfo.Identity, gc.Not(gc.Equals), nil)
+	c.Logf("identity: %#v", authInfo.Identity)
+}
+
+// Discharge creates a new Bakery and discharges the given third party caveat condition
+// from a macaroon created in it. If visitor not nil then the clients WebPageVisitor will be
+// set to visitor before discharging.
+// It returns the Bakery instance and the discharged macaroon slice.
+func (s *DischargeSuite) Discharge(c *gc.C, condition string, visitor httpbakery.Visitor) (*bakery.Bakery, macaroon.Slice, error) {
 	ctx := context.TODO()
 	key, err := bakery.GenerateKey()
 	c.Assert(err, gc.IsNil)
@@ -156,7 +170,7 @@ func (s *DischargeSuite) AssertDischarge(c *gc.C, visitor httpbakery.Visitor) {
 		time.Now().Add(time.Minute),
 		[]checkers.Caveat{{
 			Location:  DischargeLocation,
-			Condition: "is-authenticated-user",
+			Condition: condition,
 		}},
 		bakery.LoginOp,
 	)
@@ -164,11 +178,7 @@ func (s *DischargeSuite) AssertDischarge(c *gc.C, visitor httpbakery.Visitor) {
 		defer testing.PatchValue(&s.BakeryClient.WebPageVisitor, visitor).Restore()
 	}
 	ms, err := s.BakeryClient.DischargeAll(ctx, m)
-	c.Assert(err, gc.IsNil)
-
-	authInfo, err := b.Checker.Auth(ms).Allow(ctx, bakery.LoginOp)
-	c.Assert(err, gc.IsNil)
-	c.Assert(authInfo.Identity, gc.Not(gc.Equals), nil)
+	return b, ms, err
 }
 
 type IdentityClient struct{}
@@ -180,7 +190,7 @@ func (c IdentityClient) IdentityFromContext(ctx context.Context) (bakery.Identit
 	}}, nil
 }
 
-func (c IdentityClient) DeclaredIdentity(declared map[string]string) (bakery.Identity, error) {
+func (c IdentityClient) DeclaredIdentity(ctx context.Context, declared map[string]string) (bakery.Identity, error) {
 	username, ok := declared["username"]
 	if !ok {
 		return nil, errgo.Newf("no declared user")
