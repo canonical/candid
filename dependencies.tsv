@@ -10,7 +10,7 @@ github.com/juju/gnuflag	git	4e76c56581859c14d9d87e1ddbe29e1c0f10195f	2016-08-09T
 github.com/juju/go4	git	40d72ab9641a2a8c36a9c46a51e28367115c8e59	2016-02-22T16:32:58Z
 github.com/juju/httpprof	git	14bf14c307672fd2456bdbf35d19cf0ccd3cf565	2014-12-17T16:00:36Z
 github.com/juju/httprequest	git	3ea2b017bff2bb2aee0d059eb61b7d4a7cd33c83	2017-02-02T18:11:39Z
-github.com/juju/idmclient	git	28fa02d555c0b59def4b301071285b3ac90f63c4	2017-01-27T13:36:59Z
+github.com/juju/idmclient	git	92bde328f3bb3a544854e322b4e6f41377122e19	2017-03-13T17:40:05Z
 github.com/juju/loggo	git	3b7ece48644d35850f4ced4c2cbc2cf8413f58e0	2016-08-18T02:57:24Z
 github.com/juju/persistent-cookiejar	git	5243747bf8f2d0897f6c7a52799327dc97d585e8	2016-11-15T13:33:28Z
 github.com/juju/retry	git	62c62032529169c7ec02fa48f93349604c345e1f	2015-10-29T02:48:21Z
@@ -42,7 +42,7 @@ gopkg.in/errgo.v1	git	442357a80af5c6bf9b6d51ae791a39c3421004f3	2016-12-22T12:58:
 gopkg.in/goose.v1	git	8f055ce635d660f9b7827a1ff398c360715df261	2016-11-30T14:51:16Z
 gopkg.in/juju/environschema.v1	git	7359fc7857abe2b11b5b3e23811a9c64cb6b01e0	2015-11-04T11:58:10Z
 gopkg.in/juju/names.v2	git	0847c26d322a121e52614f969fb82eae2820c715	2016-11-02T13:43:03Z
-gopkg.in/macaroon-bakery.v2-unstable	git	a766ab64310c9b958e9e09422de8a34903204095	2017-02-13T17:54:28Z
+gopkg.in/macaroon-bakery.v2-unstable	git	967fa3b5087b1d6c4930d6b6a9d0e6e254dc676a	2017-03-13T17:18:23Z
 gopkg.in/macaroon.v2-unstable	git	e4c879958311648cb7f2c2b97290bee05c02718d	2016-11-18T07:12:15Z
 gopkg.in/mgo.v2	git	f2b6f6c918c452ad107eec89615f074e3bd80e33	2016-08-18T01:52:18Z
 gopkg.in/natefinch/lumberjack.v2	git	514cbda263a734ae8caac038dadf05f8f3f9f738	2016-01-25T11:17:49Z

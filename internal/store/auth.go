@@ -281,10 +281,33 @@ func (c identityClient) IdentityFromContext(ctx context.Context) (_ident bakery.
 	}, nil
 }
 
-func (c identityClient) DeclaredIdentity(declared map[string]string) (bakery.Identity, error) {
+type requiredDomainKey struct{}
+
+// ContextWithRequiredDomain returns a context associated
+// with the given domain, such that declared identities
+// will only be allowed if they have that domain.
+func ContextWithRequiredDomain(ctx context.Context, domain string) context.Context {
+	return context.WithValue(ctx, requiredDomainKey{}, domain)
+}
+
+// CheckUserDomain checks that the given user name has
+// a valid domain name with respect to the given context
+// (see also ContextWithRequiredDomain).
+func CheckUserDomain(ctx context.Context, username string) error {
+	domain, ok := ctx.Value(requiredDomainKey{}).(string)
+	if ok && !strings.HasSuffix(username, "@"+domain) {
+		return errgo.Newf("%q not in required domain %q", username, domain)
+	}
+	return nil
+}
+
+func (c identityClient) DeclaredIdentity(ctx context.Context, declared map[string]string) (bakery.Identity, error) {
 	username, ok := declared["username"]
 	if !ok {
 		return nil, errgo.Newf("no declared user")
+	}
+	if err := CheckUserDomain(ctx, username); err != nil {
+		return nil, errgo.Mask(err)
 	}
 	return Identity(username), nil
 }

@@ -519,7 +519,7 @@ func (s *dischargeSuite) TestDischargeForUser(c *gc.C) {
 		username:         adminUsername,
 		password:         adminPassword,
 		dischargeForUser: "jbloggs@test",
-		expectErr:        `cannot get discharge from "https://idp.test": Post https://idp.test/discharge: cannot discharge: invalid username "jbloggs@test": "jbloggs@test" not in domain "test2"`,
+		expectErr:        `cannot get discharge from "https://idp.test": Post https://idp.test/discharge: cannot discharge: invalid username "jbloggs@test": "jbloggs@test" not in required domain "test2"`,
 	}, {
 		about:            "is-authenticated-user with invalid domain",
 		condition:        "is-authenticated-user @test-",
@@ -986,4 +986,26 @@ func (s *dischargeSuite) TestDomainInInteractionURLs(c *gc.C) {
 		c.Assert(err, gc.IsNil)
 		s.assertDischarged(c, ms, bakery.LoginOp, username)
 	}
+}
+
+func (s *dischargeSuite) TestDischargeWithDomainWithExistingNonDomainAuth(c *gc.C) {
+	// First log in successfully without a domain.
+	s.AssertDischarge(c, &test.Visitor{
+		&params.User{
+			Username:   "bob",
+			ExternalID: "bobexternal",
+		},
+	})
+	// Then try with a caveat that requires a domain.
+	b, ms, err := s.Discharge(c, "is-authenticated-user @somewhere", &test.Visitor{
+		&params.User{
+			Username:   "alice@somewhere",
+			ExternalID: "aliceexternal",
+		},
+	})
+	c.Assert(err, gc.Equals, nil)
+	authInfo, err := b.Checker.Auth(ms).Allow(context.Background(), bakery.LoginOp)
+	c.Assert(err, gc.IsNil)
+	c.Assert(authInfo.Identity, gc.Not(gc.Equals), nil)
+	c.Assert(authInfo.Identity.Id(), gc.Equals, "alice@somewhere")
 }
