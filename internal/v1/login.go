@@ -23,13 +23,6 @@ type loginRequest struct {
 
 // login handles the GET /v1/login endpoint that is used to log in to IdM.
 func (h *dischargeHandler) Login(p httprequest.Params, lr *loginRequest) error {
-	user, key, err := agent.LoginCookie(p.Request)
-	if err == nil && h.agentLogin(p, user, key) {
-		return nil
-	}
-	if err != nil && errgo.Cause(err) != agent.ErrNoAgentLoginCookie {
-		return errgo.Notef(err, "bad agent-login cookie")
-	}
 	// TODO should really be parsing the accept header properly here, but
 	// it's really complicated http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.1
 	// perhaps use http://godoc.org/bitbucket.org/ww/goautoneg for this.
@@ -50,6 +43,16 @@ func (h *dischargeHandler) Login(p httprequest.Params, lr *loginRequest) error {
 		}
 		return nil
 	}
+
+	// Check for an agent-login cookie, and use it if set.
+	user, key, err := agent.LoginCookie(p.Request)
+	if err == nil && h.agentLogin(p, user, key) {
+		return nil
+	}
+	if err != nil && errgo.Cause(err) != agent.ErrNoAgentLoginCookie {
+		return errgo.Notef(err, "bad agent-login cookie")
+	}
+
 	// Use the normal interactive login method.
 	var selected idp.IdentityProvider
 	for _, idp := range h.h.idps {
