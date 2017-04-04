@@ -14,6 +14,7 @@ import (
 	"launchpad.net/lpad"
 
 	"github.com/CanonicalLtd/blues-identity/idp"
+	"github.com/CanonicalLtd/blues-identity/idp/agent"
 	"github.com/CanonicalLtd/blues-identity/internal/debug"
 	"github.com/CanonicalLtd/blues-identity/internal/identity"
 	"github.com/CanonicalLtd/blues-identity/internal/v1"
@@ -96,6 +97,15 @@ type ServerParams struct {
 // stores its data in the given database. The handler will serve the specified
 // versions of the API.
 func NewServer(db *mgo.Database, params ServerParams, serveVersions ...string) (HandlerCloser, error) {
+	// Remove the agent identity provider if it is specified as it is no longer used.
+	idps := make([]idp.IdentityProvider, 0, len(params.IdentityProviders))
+	for _, idp := range params.IdentityProviders {
+		if idp == agent.IdentityProvider {
+			continue
+		}
+		idps = append(idps, idp)
+	}
+	params.IdentityProviders = idps
 	newAPIs := make(map[string]identity.NewAPIHandlerFunc)
 	for _, vers := range serveVersions {
 		newAPI := versions[vers]

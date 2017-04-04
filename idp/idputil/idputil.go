@@ -76,7 +76,7 @@ func WaitID(req *http.Request) string {
 	return req.Form.Get("waitid")
 }
 
-// URL creates a URL addressed to the fgiven path within the IDP handler
+// URL creates a URL addressed to the given path within the IDP handler
 // and adds the given waitid (when specified).
 func URL(ctx idp.Context, path, waitid string) string {
 	callback := ctx.URL(path)

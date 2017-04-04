@@ -21,7 +21,6 @@ import (
 	"github.com/CanonicalLtd/blues-identity"
 	"github.com/CanonicalLtd/blues-identity/config"
 	"github.com/CanonicalLtd/blues-identity/idp"
-	"github.com/CanonicalLtd/blues-identity/idp/agent"
 	_ "github.com/CanonicalLtd/blues-identity/idp/azure"
 	_ "github.com/CanonicalLtd/blues-identity/idp/keystone"
 	"github.com/CanonicalLtd/blues-identity/idp/usso"
@@ -155,5 +154,4 @@ func serve(confPath string) error {
 var defaultIDPs = []idp.IdentityProvider{
 	usso.IdentityProvider,
 	ussooauth.IdentityProvider,
-	agent.IdentityProvider,
 }

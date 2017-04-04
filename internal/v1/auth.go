@@ -50,6 +50,10 @@ func opForRequest(r interface{}) bakery.Op {
 		return store.UserOp(r.Username, store.ActionReadAdmin)
 	case *params.SetUserExtraInfoItemRequest:
 		return store.UserOp(r.Username, store.ActionWriteAdmin)
+	case *agentLoginCookieRequest:
+		return store.GlobalOp(store.ActionLogin)
+	case *agentLoginPostRequest:
+		return store.GlobalOp(store.ActionLogin)
 	case *loginRequest:
 		return store.GlobalOp(store.ActionLogin)
 	case *dischargeTokenForUserRequest:

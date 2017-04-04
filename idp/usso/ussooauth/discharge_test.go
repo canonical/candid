@@ -14,7 +14,6 @@ import (
 	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
 
 	"github.com/CanonicalLtd/blues-identity/idp"
-	"github.com/CanonicalLtd/blues-identity/idp/agent"
 	"github.com/CanonicalLtd/blues-identity/idp/idptest"
 	"github.com/CanonicalLtd/blues-identity/idp/usso/internal/mockusso"
 	"github.com/CanonicalLtd/blues-identity/idp/usso/ussooauth"
@@ -42,7 +41,6 @@ func (s *dischargeSuite) TearDownSuite(c *gc.C) {
 func (s *dischargeSuite) SetUpTest(c *gc.C) {
 	s.Suite.SetUpTest(c)
 	s.IDPs = []idp.IdentityProvider{
-		agent.IdentityProvider,
 		ussooauth.IdentityProvider,
 	}
 	s.DischargeSuite.SetUpTest(c)

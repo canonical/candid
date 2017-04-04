@@ -29,7 +29,6 @@ import (
 	"gopkg.in/macaroon.v2-unstable"
 
 	"github.com/CanonicalLtd/blues-identity/idp"
-	agentidp "github.com/CanonicalLtd/blues-identity/idp/agent"
 	"github.com/CanonicalLtd/blues-identity/idp/idptest"
 	"github.com/CanonicalLtd/blues-identity/idp/test"
 	"github.com/CanonicalLtd/blues-identity/internal/store"
@@ -53,7 +52,6 @@ var _ = gc.Suite(&dischargeSuite{})
 func (s *dischargeSuite) SetUpTest(c *gc.C) {
 	s.IDPs = []idp.IdentityProvider{
 		test.NewIdentityProvider(test.Params{Name: "test"}),
-		agentidp.IdentityProvider,
 	}
 	s.DischargeSuite.SetUpTest(c)
 	s.user = &params.User{
