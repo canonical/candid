@@ -3,6 +3,9 @@
 package admincmd
 
 import (
+	"fmt"
+	"io"
+	"strings"
 	"time"
 
 	"github.com/juju/cmd"
@@ -17,6 +20,7 @@ type findCommand struct {
 
 	out cmd.Output
 
+	detail            string
 	email             string
 	lastLoginDays     uint
 	lastDischargeDays uint
@@ -44,8 +48,14 @@ func (c *findCommand) Info() *cmd.Info {
 func (c *findCommand) SetFlags(f *gnuflag.FlagSet) {
 	c.idmCommand.SetFlags(f)
 
-	c.out.AddFlags(f, "smart", cmd.DefaultFormatters)
+	c.out.AddFlags(f, "tab", map[string]cmd.Formatter{
+		"yaml":  cmd.FormatYaml,
+		"json":  cmd.FormatJson,
+		"smart": cmd.FormatSmart,
+		"tab":   c.formatTab,
+	})
 
+	f.StringVar(&c.detail, "d", "", "include user details, comma separated list of external_id, email, gravatar_id, or fullname output is forced to tab separated")
 	f.StringVar(&c.email, "e", "", "email address of the user")
 	f.StringVar(&c.email, "email", "", "")
 	f.UintVar(&c.lastLoginDays, "last-login", 0, "users whose last successful login was within this number of days")
@@ -74,7 +84,35 @@ func (c *findCommand) Run(ctxt *cmd.Context) error {
 	if err != nil {
 		return errgo.Mask(err)
 	}
-	return c.out.Write(ctxt, usernames)
+	if "" == c.detail {
+		return c.out.Write(ctxt, usernames)
+	}
+	fields := strings.Split(c.detail, ",")
+	var user_output []map[string]string
+	for _, u := range usernames {
+		user_out := make(map[string]string)
+		user_out["username"] = u
+		user, err2 := client.User(context.Background(), &params.UserRequest{
+			Username: params.Username(u),
+		})
+		if err2 != nil {
+			fmt.Fprint(ctxt.Stderr, "%v ... continuing\n", err2)
+		}
+		for _, f := range fields {
+			switch strings.ToLower(strings.Trim(f, " ")) {
+			case "email":
+				user_out["email"] = user.Email
+			case "external_id":
+				user_out["external_id"] = user.ExternalID
+			case "fullname":
+				user_out["fullname"] = user.FullName
+			case "gravatar_id":
+				user_out["gravatar_id"] = user.GravatarID
+			}
+		}
+		user_output = append(user_output, user_out)
+	}
+	return c.out.Write(ctxt, user_output)
 }
 
 // daysAgo returns the current time less the given
@@ -88,4 +126,59 @@ func daysAgo(days uint) string {
 		panic(err)
 	}
 	return string(b)
+}
+
+func (c *findCommand) formatTab(writer io.Writer, value interface{}) error {
+	users, ok := value.([]map[string]string)
+	if ok {
+		return c.formatTabMap(writer, users)
+	}
+	userl, ok := value.([]string)
+	if ok {
+		return c.formatTabSlice(writer, userl)
+	}
+	return nil
+}
+
+func (c *findCommand) formatTabMap(writer io.Writer, users []map[string]string) error {
+	fields := []string{"username"}
+	for _, f := range strings.Split(c.detail, ",") {
+		fields = append(fields, f)
+	}
+	i := 0
+	s := len(fields)
+	for _, k := range fields {
+		io.WriteString(writer, k)
+		if i < s {
+			io.WriteString(writer, "\t")
+		}
+		i++
+	}
+	io.WriteString(writer, "\n")
+	ul := len(users)
+	for j, u := range users {
+		i = 0
+		s = len(users[0])
+		for _, k := range fields {
+			if u[k] == "" {
+				u[k] = "-"
+			}
+			io.WriteString(writer, u[k])
+			if i < s {
+				io.WriteString(writer, "\t")
+			}
+			i++
+		}
+		if j < ul {
+			io.WriteString(writer, "\n")
+		}
+	}
+	return nil
+}
+
+func (c *findCommand) formatTabSlice(writer io.Writer, users []string) error {
+	for _, u := range users {
+		io.WriteString(writer, u)
+	}
+	return nil
 }
