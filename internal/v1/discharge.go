@@ -12,6 +12,7 @@ import (
 	"github.com/juju/idmclient"
 	"github.com/juju/idmclient/params"
 	"golang.org/x/net/context"
+	"golang.org/x/net/trace"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/names.v2"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
@@ -39,18 +40,14 @@ type thirdPartyCaveatChecker struct {
 // It acquires a handler before checking the caveat, so that we have a
 // database connection for the purpose.
 func (c thirdPartyCaveatChecker) CheckThirdPartyCaveat(ctx context.Context, req *http.Request, ci *bakery.ThirdPartyCaveatInfo) ([]checkers.Caveat, error) {
-	h, ctx, err := c.handler.getHandler(
-		httprequest.Params{
-			Request: req,
-			Context: ctx,
-		},
-		req.URL.Path,
-	)
+	t := trace.New(req.URL.Path, "")
+	h, ctx, err := c.handler.getHandler(ctx, t)
 	if err != nil {
+		t.Finish()
 		return nil, errgo.Mask(err)
 	}
 	defer h.Close()
-	return checkThirdPartyCaveat(ctx, h, req, ci)
+	return checkThirdPartyCaveat(trace.NewContext(ctx, t), h, req, ci)
 }
 
 // checkThirdPartyCaveat checks the given caveat. This function is called

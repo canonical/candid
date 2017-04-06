@@ -1,6 +1,6 @@
 // Copyright 2015 Canonical Ltd.
 
-package agent_test
+package v1_test
 
 import (
 	"net/url"
@@ -14,29 +14,24 @@ import (
 	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
 	httpbakeryagent "gopkg.in/macaroon-bakery.v2-unstable/httpbakery/agent"
 
-	"github.com/CanonicalLtd/blues-identity/idp"
-	"github.com/CanonicalLtd/blues-identity/idp/agent"
 	"github.com/CanonicalLtd/blues-identity/idp/idptest"
 )
 
-type dischargeSuite struct {
+type agentSuite struct {
 	idptest.DischargeSuite
 	agentKey *bakery.KeyPair
 }
 
-var _ = gc.Suite(&dischargeSuite{})
+var _ = gc.Suite(&agentSuite{})
 
-func (s *dischargeSuite) SetUpTest(c *gc.C) {
-	s.IDPs = []idp.IdentityProvider{
-		agent.IdentityProvider,
-	}
+func (s *agentSuite) SetUpTest(c *gc.C) {
 	s.DischargeSuite.SetUpTest(c)
 	var err error
 	s.agentKey, err = bakery.GenerateKey()
 	c.Assert(err, gc.IsNil)
 }
 
-func (s *dischargeSuite) TestHTTPBakeryAgentDischarge(c *gc.C) {
+func (s *agentSuite) TestHTTPBakeryAgentDischarge(c *gc.C) {
 	err := s.IDMClient.SetUser(context.TODO(), &params.SetUserRequest{
 		Username: params.Username("test@admin@idm"),
 		User: params.User{
@@ -54,7 +49,12 @@ func (s *dischargeSuite) TestHTTPBakeryAgentDischarge(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 }
 
-func (s *dischargeSuite) TestLegacyAgentDischarge(c *gc.C) {
+func (s *agentSuite) TestGetAgentDischargeNoCookie(c *gc.C) {
+	err := s.HTTPRequestClient.Get(context.TODO(), s.Server.URL+"/v1/agent-login", nil)
+	c.Assert(err, gc.ErrorMatches, `Get http://.*/v1/agent-login: no agent-login cookie found`)
+}
+
+func (s *agentSuite) TestLegacyAgentDischarge(c *gc.C) {
 	err := s.IDMClient.SetUser(context.TODO(), &params.SetUserRequest{
 		Username: params.Username("test@admin@idm"),
 		User: params.User{

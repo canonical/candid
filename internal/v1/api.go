@@ -4,15 +4,20 @@ package v1
 
 import (
 	"html/template"
+	"time"
 
 	"github.com/juju/httprequest"
+	"github.com/juju/idmclient"
 	"github.com/juju/idmclient/params"
 	"github.com/juju/loggo"
 	"golang.org/x/net/context"
 	"golang.org/x/net/trace"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
+	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
 	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
+	"gopkg.in/macaroon.v2-unstable"
+	"gopkg.in/mgo.v2/bson"
 
 	"github.com/CanonicalLtd/blues-identity/idp"
 	"github.com/CanonicalLtd/blues-identity/internal/identity"
@@ -79,9 +84,10 @@ func (h *Handler) newHandler() interface{} {
 	}
 }
 
-func (h *Handler) getAuthorizedHandler(p httprequest.Params, traceFamily string, req interface{}) (*handler, context.Context, error) {
-	hnd, ctx, err := h.getHandler(p, traceFamily)
+func (h *Handler) getAuthorizedHandler(p httprequest.Params, t trace.Trace, req interface{}) (*handler, context.Context, error) {
+	hnd, ctx, err := h.getHandler(p.Context, t)
 	if err != nil {
+		t.Finish()
 		return nil, nil, errgo.Mask(err)
 	}
 	op := opForRequest(req)
@@ -90,7 +96,7 @@ func (h *Handler) getAuthorizedHandler(p httprequest.Params, traceFamily string,
 		hnd.Close()
 		return nil, nil, params.ErrUnauthorized
 	}
-	authInfo, err := hnd.store.Authorize(p.Context, p.Request, op)
+	authInfo, err := hnd.store.Authorize(ctx, p.Request, op)
 	if err != nil {
 		hnd.Close()
 		return nil, nil, errgo.Mask(err, errgo.Any)
@@ -106,27 +112,21 @@ func (h *Handler) getAuthorizedHandler(p httprequest.Params, traceFamily string,
 	return hnd, ctx, nil
 }
 
-func (h *Handler) getHandler(p httprequest.Params, traceFamily string) (*handler, context.Context, error) {
-	ctx := p.Context
-	t := trace.New(traceFamily, p.PathPattern)
-	st, err := h.storePool.Get()
+func (h *Handler) getHandler(ctx context.Context, t trace.Trace) (*handler, context.Context, error) {
+	hnd := h.handlerPool.Get().(*handler)
+	hnd.trace = t
+	var err error
+	hnd.store, err = h.storePool.Get()
 	if err != nil {
 		// TODO(mhilton) consider logging inside the pool.
-		t.LazyPrintf("cannot get store: %s", err)
-		if errgo.Cause(err) != params.ErrServiceUnavailable {
-			t.SetError()
-		}
-		t.Finish()
+		hnd.tracef(errgo.Cause(err) != params.ErrServiceUnavailable, "cannot get store: %s", err)
+		h.handlerPool.Put(h)
 		return nil, nil, errgo.NoteMask(err, "cannot get store", errgo.Any)
 	}
-	t.LazyPrintf("store acquired")
-	handler := h.handlerPool.Get().(*handler)
-	handler.store = st
-	handler.place = &place{st.Place}
-	handler.trace = t
-	ctx = trace.NewContext(p.Context, t)
-	ctx = store.ContextWithStore(ctx, st)
-	return handler, ctx, nil
+	hnd.tracef(false, "store acquired")
+	hnd.place = &place{hnd.store.Place}
+	ctx = store.ContextWithStore(ctx, hnd.store)
+	return hnd, ctx, nil
 }
 
 type handler struct {
@@ -136,22 +136,61 @@ type handler struct {
 	trace trace.Trace
 }
 
+// Close implements io.Closer. httprequest will automatically call this
+// once a request is complete.
+func (h *handler) Close() error {
+	h.h.storePool.Put(h.store)
+	h.store = nil
+	h.tracef(false, "store released")
+	if h.trace != nil {
+		h.trace.Finish()
+		h.trace = nil
+	}
+	h.place = nil
+	h.h.handlerPool.Put(h)
+	return nil
+}
+
+func (h *handler) tracef(setError bool, fmt string, args ...interface{}) {
+	if h.trace == nil {
+		return
+	}
+	h.trace.LazyPrintf(fmt, args...)
+	if setError {
+		h.trace.SetError()
+	}
+}
+
 // serviceURL creates an external URL addressed to the specified path
 // within the service.
 func (h *handler) serviceURL(path string) string {
 	return h.h.location + path
 }
 
-// Close implements io.Closer. httprequest will automatically call this
-// once a request is complete.
-func (h *handler) Close() error {
-	h.h.storePool.Put(h.store)
-	h.trace.LazyPrintf("store released")
-	h.trace.Finish()
-	h.store = nil
-	h.place = nil
-	h.trace = nil
-	h.h.handlerPool.Put(h)
+// completeLogin finishes a login attempt. A new macaroon will be minted
+// with the given version, username and expiry and used to complete the
+// rendezvous specified by the given waitid.
+func (h *handler) completeLogin(ctx context.Context, waitid string, v bakery.Version, username params.Username, expiry time.Time) error {
+	m, err := h.store.Bakery.Oven.NewMacaroon(
+		ctx,
+		v,
+		expiry,
+		[]checkers.Caveat{
+			idmclient.UserDeclaration(string(username)),
+		},
+		bakery.LoginOp,
+	)
+	if err != nil {
+		return errgo.Notef(err, "cannot mint identity macaroon")
+	}
+	if waitid != "" {
+		if err := h.place.Done(waitid, &loginInfo{
+			IdentityMacaroon: macaroon.Slice{m.M()},
+		}); err != nil {
+			return errgo.Notef(err, "cannot complete rendezvous")
+		}
+	}
+	h.store.UpdateIdentity(username, bson.D{{"$set", bson.D{{"lastlogin", time.Now()}}}})
 	return nil
 }
 
@@ -161,7 +200,8 @@ func (h *handler) Close() error {
 // so can be used to automatically derive the list of endpoints to add to
 // the router.
 func (h *Handler) apiHandler(p httprequest.Params, arg interface{}) (*apiHandler, context.Context, error) {
-	hnd, ctx, err := h.getAuthorizedHandler(p, "identity.internal.v1", arg)
+	t := trace.New("identity.internal.v1", p.PathPattern)
+	hnd, ctx, err := h.getAuthorizedHandler(p, t, arg)
 	if err != nil {
 		return nil, nil, errgo.Mask(err, errgo.Any)
 	}
@@ -189,7 +229,8 @@ func (h *apiHandler) Close() error {
 // so can be used to automatically derive the list of endpoints to add to
 // the router.
 func (h *Handler) dischargeHandler(p httprequest.Params, arg interface{}) (*dischargeHandler, context.Context, error) {
-	hnd, ctx, err := h.getAuthorizedHandler(p, p.Request.URL.Path, arg)
+	t := trace.New(p.Request.URL.Path, p.PathPattern)
+	hnd, ctx, err := h.getAuthorizedHandler(p, t, arg)
 	if err != nil {
 		logger.Infof("cannot get authorized handler for discharge handler (pathpat %q; arg %#v): %v", p.PathPattern, arg, err)
 		return nil, nil, errgo.Mask(err, errgo.Any)
@@ -198,7 +239,7 @@ func (h *Handler) dischargeHandler(p httprequest.Params, arg interface{}) (*disc
 	return &dischargeHandler{
 		handler: hnd,
 		monReq:  monitoring.NewRequest(&p),
-	}, ctx, nil
+	}, trace.NewContext(ctx, t), nil
 }
 
 type dischargeHandler struct {

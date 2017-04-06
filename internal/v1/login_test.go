@@ -3,6 +3,8 @@
 package v1_test
 
 import (
+	"encoding/json"
+	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -127,4 +129,19 @@ func (s *loginSuite) TestInteractiveIdentityProviderSelectionWithDomain(c *gc.C)
 	s.srv.ServeHTTP(rr, req)
 	c.Assert(rr.Code, gc.Equals, http.StatusFound)
 	c.Assert(rr.HeaderMap.Get("Location"), gc.Equals, location+"/v1/idp/test2/test-login")
+}
+
+func (s *loginSuite) TestLoginMethodsIncludesAgent(c *gc.C) {
+	rr := httptest.NewRecorder()
+	req, err := http.NewRequest("GET", "/v1/login", nil)
+	c.Assert(err, gc.Equals, nil)
+	req.Header.Set("Accept", "application/json")
+	s.srv.ServeHTTP(rr, req)
+	c.Assert(rr.Code, gc.Equals, http.StatusOK)
+	buf, err := ioutil.ReadAll(rr.Body)
+	c.Assert(err, gc.Equals, nil)
+	var lm params.LoginMethods
+	err = json.Unmarshal(buf, &lm)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(lm.Agent, gc.Equals, location+"/v1/agent-login")
 }
