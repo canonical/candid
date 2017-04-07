@@ -21,6 +21,7 @@ import (
 	"github.com/CanonicalLtd/blues-identity"
 	"github.com/CanonicalLtd/blues-identity/config"
 	"github.com/CanonicalLtd/blues-identity/idp"
+	_ "github.com/CanonicalLtd/blues-identity/idp/agent"
 	_ "github.com/CanonicalLtd/blues-identity/idp/azure"
 	_ "github.com/CanonicalLtd/blues-identity/idp/keystone"
 	"github.com/CanonicalLtd/blues-identity/idp/usso"
@@ -85,7 +86,7 @@ func serve(confPath string) error {
 	if len(conf.IdentityProviders) > 0 {
 		idps = make([]idp.IdentityProvider, len(conf.IdentityProviders))
 		for i, idp := range conf.IdentityProviders {
-			idps[i] = idp
+			idps[i] = idp.IdentityProvider
 		}
 	}
 	resourcePath := "."
