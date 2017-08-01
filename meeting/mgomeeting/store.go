@@ -5,11 +5,12 @@ package mgomeeting
 import (
 	"time"
 
+	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 
-	"github.com/CanonicalLtd/blues-identity/meeting"
+	"github.com/CanonicalLtd/blues-identity/mgoctx"
 )
 
 type doc struct {
@@ -18,25 +19,55 @@ type doc struct {
 	Created time.Time
 }
 
-type store struct {
-	coll *mgo.Collection
+// Store is an implementation of meeting.Store that uses a mongodb
+// collection for the persistent data store.
+type Store struct {
+	coll mgo.Collection
 }
 
-// NewStore returns an implementation of meeting.Store
-// that uses the given collection as a persistent data store.
-func NewStore(coll *mgo.Collection) meeting.Store {
-	return store{coll}
+var indexes = []mgo.Index{{
+	Key: []string{"addr", "created"},
+}, {
+	Key: []string{"created"},
+}}
+
+// NewStore returns an implementation of meeting.Store that uses the
+// given collection as a persistent data store.
+//
+// The session associated with the given collection will be copied before
+// use and the Store must be closed when finished with.
+func NewStore(coll *mgo.Collection) (*Store, error) {
+	coll = coll.With(coll.Database.Session.Copy())
+	for _, idx := range indexes {
+		if err := coll.EnsureIndex(idx); err != nil {
+			return nil, errgo.Mask(err)
+		}
+	}
+	return &Store{*coll}, nil
+}
+
+// Context implements meeting.Store.Context.
+func (s *Store) Context(ctx context.Context) (_ context.Context, cancel func()) {
+	sess, ok := s.session(ctx)
+	if ok {
+		return ctx, func() {}
+	}
+	return mgoctx.ContextWithSession(ctx, sess), sess.Close
 }
 
 // Put implements meeting.Store.Put.
-func (s store) Put(id, address string) error {
-	return s.put(id, address, time.Now())
+func (s *Store) Put(ctx context.Context, id, address string) error {
+	return s.put(ctx, id, address, time.Now())
 }
 
 // put is the internal version of Put which takes a time
 // for testing purposes.
-func (s store) put(id, address string, now time.Time) error {
-	err := s.coll.Insert(&doc{
+func (s *Store) put(ctx context.Context, id, address string, now time.Time) error {
+	sess, ok := s.session(ctx)
+	if !ok {
+		defer sess.Close()
+	}
+	err := s.coll.With(sess).Insert(&doc{
 		Id:      id,
 		Addr:    address,
 		Created: now,
@@ -47,29 +78,14 @@ func (s store) put(id, address string, now time.Time) error {
 	return nil
 }
 
-var indexes = []mgo.Index{{
-	Key: []string{"addr", "created"},
-}, {
-	Key: []string{"created"},
-}}
-
-// CreateCollection creates a collection for use as a Store
-// along with its required indexes. If the collection
-// has already been created, this does nothing.
-func CreateCollection(coll *mgo.Collection) error {
-	for _, idx := range indexes {
-		err := coll.EnsureIndex(idx)
-		if err != nil {
-			return errgo.Mask(err)
-		}
-	}
-	return nil
-}
-
 // Get implements meeting.Store.Get.
-func (s store) Get(id string) (address string, err error) {
+func (s *Store) Get(ctx context.Context, id string) (address string, err error) {
+	sess, ok := s.session(ctx)
+	if !ok {
+		defer sess.Close()
+	}
 	var entry doc
-	err = s.coll.FindId(id).One(&entry)
+	err = s.coll.With(sess).FindId(id).One(&entry)
 	if err == mgo.ErrNotFound {
 		err = errgo.Newf("rendezvous not found, probably expired")
 	}
@@ -80,12 +96,16 @@ func (s store) Get(id string) (address string, err error) {
 }
 
 // Remove implements meeting.Store.Remove.
-func (s store) Remove(id string) (time.Time, error) {
+func (s *Store) Remove(ctx context.Context, id string) (time.Time, error) {
+	sess, ok := s.session(ctx)
+	if !ok {
+		defer sess.Close()
+	}
 	var entry doc
 	change := mgo.Change{
 		Remove: true,
 	}
-	_, err := s.coll.FindId(id).Apply(change, &entry)
+	_, err := s.coll.With(sess).FindId(id).Apply(change, &entry)
 	if err == mgo.ErrNotFound {
 		return time.Time{}, nil
 	}
@@ -96,15 +116,19 @@ func (s store) Remove(id string) (time.Time, error) {
 }
 
 // RemoveOld implements meeting.Store.RemoveOld.
-func (s store) RemoveOld(addr string, olderThan time.Time) (ids []string, err error) {
+func (s *Store) RemoveOld(ctx context.Context, addr string, olderThan time.Time) (ids []string, err error) {
+	sess, ok := s.session(ctx)
+	if !ok {
+		defer sess.Close()
+	}
 	query := bson.D{{"created", bson.D{{"$lt", olderThan}}}}
 	if addr != "" {
 		query = append(query, bson.DocElem{"addr", addr})
 	}
-	iter := s.coll.Find(query).Select(nil).Iter()
+	iter := s.coll.With(sess).Find(query).Select(nil).Iter()
 	var entry doc
 	for iter.Next(&entry) {
-		err := s.coll.RemoveId(entry.Id)
+		err := s.coll.With(sess).RemoveId(entry.Id)
 		if err != nil {
 			return ids, errgo.Notef(err, "cannot remove %q", entry.Id)
 		}
@@ -116,7 +140,14 @@ func (s store) RemoveOld(addr string, olderThan time.Time) (ids []string, err er
 	return ids, nil
 }
 
-// Close implements meeting.Store.Close.
-// It is a no-op.
-func (s store) Close() {
+// Close cleans up resources associated with the mongodb session.
+func (s *Store) Close() {
+	s.coll.Database.Session.Close()
+}
+
+func (s *Store) session(ctx context.Context) (_ *mgo.Session, fromContext bool) {
+	if sess := mgoctx.SessionFromContext(ctx); sess != nil {
+		return sess, true
+	}
+	return s.coll.Database.Session.Copy(), false
 }

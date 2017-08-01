@@ -5,9 +5,9 @@ package mgomeeting
 import (
 	"time"
 
-	"github.com/CanonicalLtd/blues-identity/meeting"
+	"golang.org/x/net/context"
 )
 
-var PutAtTime = func(s meeting.Store, id, address string, now time.Time) error {
-	return s.(store).put(id, address, now)
+var PutAtTime = func(ctx context.Context, s *Store, id, address string, now time.Time) error {
+	return s.put(ctx, id, address, now)
 }

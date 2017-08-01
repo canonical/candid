@@ -115,12 +115,13 @@ func (p *monitoredSessionPool) Close() {
 
 // Pool provides a pool of *Store objects.
 type Pool struct {
+	// Place holds the server used to create
+	// InteractionRequired rendezvous.
+	Place        *meeting.Place
+	meetingStore *mgomeeting.Store
+
 	sessionPool *monitoredSessionPool
 	storePool   mempool.Pool
-
-	// meetingServer holds the server used to create
-	// InteractionRequired rendezvous.
-	meetingServer *meeting.Server
 
 	params       StoreParams
 	db           *mgo.Database
@@ -154,7 +155,11 @@ func NewPool(db *mgo.Database, sp StoreParams) (*Pool, error) {
 		return p.newStore()
 	}
 	var err error
-	p.meetingServer, err = meeting.NewServer(p.newMeetingStore, newMeetingMetrics(), p.params.PrivateAddr)
+	p.meetingStore, err = mgomeeting.NewStore(StoreDatabase{db}.Meeting())
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
+	p.Place, err = meeting.NewPlace(p.meetingStore, newMeetingMetrics(), p.params.PrivateAddr)
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}
@@ -210,17 +215,6 @@ func NewPool(db *mgo.Database, sp StoreParams) (*Pool, error) {
 	}
 
 	return p, nil
-}
-
-// newMeetingStore returns a new meeting.Store.
-func (p *Pool) newMeetingStore() meeting.Store {
-	session := p.getSessionNoLimit()
-	db := StoreDatabase{p.db.With(session)}
-	return &poolMeetingStore{
-		pool:    p,
-		session: session,
-		Store:   mgomeeting.NewStore(db.Meeting()),
-	}
 }
 
 func (p *Pool) newSession() limitpool.Item {
@@ -295,10 +289,8 @@ func (p *Pool) Stats() limitpool.Stats {
 // Close clears out the pool closing the contained stores and prevents
 // any new Stores from being added.
 func (p *Pool) Close() {
-	// Note that the meetingServer (indirectly) uses the session
-	// pool, so we need to close it down before closing the session
-	// pool.
-	p.meetingServer.Close()
+	p.Place.Close()
+	p.meetingStore.Close()
 	p.sessionPool.Close()
 	p.db.Session.Close()
 	if p.monitor != nil {
@@ -313,10 +305,6 @@ type Store struct {
 
 	// Bakery holds a *bakery.Bakery that can be used to make and check macaroons.
 	Bakery *bakery.Bakery
-
-	// Place holds the place where openid-callback rendezvous
-	// are created.
-	Place *meeting.Place
 
 	// pool holds the pool which created this Store.
 	pool *Pool
@@ -369,7 +357,6 @@ func (m *meetingMetrics) RequestsExpired(count int) {
 // (assuming the session is valid).
 func (s *Store) setSession(session *mgo.Session) {
 	s.DB.Database = s.pool.db.With(session)
-	s.Place = s.pool.meetingServer.Place(mgomeeting.NewStore(s.DB.Meeting()))
 	bp := s.pool.bakeryParams
 	bp.RootKeyStore = s.pool.rootKeys.NewStore(
 		s.DB.Macaroons(),
@@ -403,9 +390,6 @@ func (s *Store) ensureIndexes() error {
 		if err != nil {
 			return errgo.Mask(err)
 		}
-	}
-	if err := mgomeeting.CreateCollection(s.DB.Meeting()); err != nil {
-		return errgo.Mask(err)
 	}
 
 	return nil
@@ -653,20 +637,6 @@ func (s StoreDatabase) Collections() []*mgo.Collection {
 		cs[i] = f(s)
 	}
 	return cs
-}
-
-// poolMeetingStore implements meeting.Store by
-// wrapping the Store returned by mgomeeting
-// and returning its session to the session pool
-// when it is closed.
-type poolMeetingStore struct {
-	pool    *Pool
-	session *mgo.Session
-	meeting.Store
-}
-
-func (s *poolMeetingStore) Close() {
-	s.pool.putSession(s.session)
 }
 
 // uniqueStrings removes all duplicates from the supplied

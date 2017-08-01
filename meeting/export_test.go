@@ -3,18 +3,18 @@
 package meeting
 
 // ItemCount reports the number of items stored locally in the Place.
-func ItemCount(srv *Server) int {
-	srv.mu.Lock()
-	defer srv.mu.Unlock()
-	return len(srv.items)
+func ItemCount(p *Place) int {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return len(p.items)
 }
 
 var (
 	ExpiryDuration          = &expiryDuration
 	ReallyOldExpiryDuration = &reallyOldExpiryDuration
-	RunGC                   = (*Server).runGC
+	RunGC                   = (*Place).runGC
 )
 
-func NewServerNoGC(getStore func() Store, m Metrics, listenAddr string) (*Server, error) {
-	return newServer(getStore, m, listenAddr, false)
+func NewPlaceNoGC(s Store, m Metrics, listenAddr string) (*Place, error) {
+	return newPlace(s, m, listenAddr, false)
 }

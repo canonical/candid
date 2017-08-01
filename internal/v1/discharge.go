@@ -100,7 +100,7 @@ func checkThirdPartyCaveat(ctx context.Context, h *handler, req *http.Request, c
 		identity = store.Identity(user)
 	} else {
 		invalidUserf = func(err error) error {
-			return needLoginError(h, req, domain, &dischargeRequestInfo{
+			return needLoginError(ctx, h, req, domain, &dischargeRequestInfo{
 				Caveat:    ci.Caveat,
 				CaveatId:  ci.Id,
 				Condition: string(ci.Condition),
@@ -150,10 +150,10 @@ func (h *handler) updateDischargeTime(username params.Username) {
 // needLoginError returns an error suitable for returning
 // from a discharge request that can only be satisfied
 // if the user logs in.
-func needLoginError(h *handler, req *http.Request, domain string, info *dischargeRequestInfo, why error) error {
+func needLoginError(ctx context.Context, h *handler, req *http.Request, domain string, info *dischargeRequestInfo, why error) error {
 	// TODO(rog) If the user is already logged in (username != ""),
 	// we should perhaps just return an error here.
-	waitId, err := h.place.NewRendezvous(info)
+	waitId, err := h.h.place.NewRendezvous(ctx, info)
 	if err != nil {
 		return errgo.Notef(err, "cannot make rendezvous")
 	}
@@ -193,7 +193,7 @@ func (h *dischargeHandler) Wait(p httprequest.Params, w *waitRequest) (*waitResp
 		return nil, errgo.WithCausef(nil, params.ErrBadRequest, "wait id parameter not found")
 	}
 	// TODO don't wait forever here.
-	reqInfo, login, err := h.place.Wait(w.WaitID)
+	reqInfo, login, err := h.h.place.Wait(p.Context, w.WaitID)
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot wait")
 	}
