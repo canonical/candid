@@ -106,7 +106,7 @@ func (c *idpHandler) LoginSuccess(waitid string, username params.Username, expir
 func (c *idpHandler) LoginFailure(waitid string, err error) {
 	_, bakeryErr := httpbakery.ErrorToResponse(c, err)
 	if waitid != "" {
-		c.place.Done(waitid, &loginInfo{
+		c.h.place.Done(c, waitid, &loginInfo{
 			Error: bakeryErr.(*httpbakery.Error),
 		})
 	}

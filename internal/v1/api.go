@@ -24,6 +24,7 @@ import (
 	"github.com/CanonicalLtd/blues-identity/internal/mempool"
 	"github.com/CanonicalLtd/blues-identity/internal/monitoring"
 	"github.com/CanonicalLtd/blues-identity/internal/store"
+	"github.com/CanonicalLtd/blues-identity/mgoctx"
 )
 
 var logger = loggo.GetLogger("identity.internal.v1")
@@ -63,6 +64,7 @@ type Handler struct {
 	idps        []idp.IdentityProvider
 	template    *template.Template
 	key         *bakery.KeyPair
+	place       *place
 }
 
 // New returns a new instance of the v1 API handler.
@@ -73,6 +75,7 @@ func New(p *store.Pool, params identity.ServerParams) *Handler {
 		idps:      params.IdentityProviders,
 		template:  params.Template,
 		key:       params.Key,
+		place:     &place{p.Place},
 	}
 	h.handlerPool.New = h.newHandler
 	return h
@@ -124,15 +127,14 @@ func (h *Handler) getHandler(ctx context.Context, t trace.Trace) (*handler, cont
 		return nil, nil, errgo.NoteMask(err, "cannot get store", errgo.Any)
 	}
 	hnd.tracef(false, "store acquired")
-	hnd.place = &place{hnd.store.Place}
 	ctx = store.ContextWithStore(ctx, hnd.store)
+	ctx = mgoctx.ContextWithSession(ctx, hnd.store.DB.Session)
 	return hnd, ctx, nil
 }
 
 type handler struct {
 	h     *Handler
 	store *store.Store
-	place *place
 	trace trace.Trace
 }
 
@@ -146,7 +148,6 @@ func (h *handler) Close() error {
 		h.trace.Finish()
 		h.trace = nil
 	}
-	h.place = nil
 	h.h.handlerPool.Put(h)
 	return nil
 }
@@ -184,7 +185,7 @@ func (h *handler) completeLogin(ctx context.Context, waitid string, v bakery.Ver
 		return errgo.Notef(err, "cannot mint identity macaroon")
 	}
 	if waitid != "" {
-		if err := h.place.Done(waitid, &loginInfo{
+		if err := h.h.place.Done(ctx, waitid, &loginInfo{
 			IdentityMacaroon: macaroon.Slice{m.M()},
 		}); err != nil {
 			return errgo.Notef(err, "cannot complete rendezvous")

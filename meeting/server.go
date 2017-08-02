@@ -8,7 +8,7 @@ import (
 )
 
 type handler struct {
-	srv *Server
+	place *Place
 }
 
 type waitRequest struct {
@@ -21,8 +21,8 @@ type waitData struct {
 	Data1 []byte
 }
 
-func (h *handler) Wait(req *waitRequest) (*waitData, error) {
-	data0, data1, err := h.srv.localWait(req.Id, h.srv.getStore)
+func (h *handler) Wait(p httprequest.Params, req *waitRequest) (*waitData, error) {
+	data0, data1, err := h.place.localWait(p.Context, req.Id)
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}
@@ -43,7 +43,7 @@ type doneRequest struct {
 }
 
 func (h *handler) Done(req *doneRequest) error {
-	if err := h.srv.localDone(req.Id, req.Body.Data1); err != nil {
+	if err := h.place.localDone(req.Id, req.Body.Data1); err != nil {
 		return errgo.Mask(err)
 	}
 	return nil

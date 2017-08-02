@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"golang.org/x/net/context"
 	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
 	"gopkg.in/macaroon.v2-unstable"
 
@@ -34,24 +35,24 @@ type place struct {
 	place *meeting.Place
 }
 
-func (p *place) NewRendezvous(info *dischargeRequestInfo) (string, error) {
+func (p *place) NewRendezvous(ctx context.Context, info *dischargeRequestInfo) (string, error) {
 	reqData, err := json.Marshal(info)
 	if err != nil {
 		return "", fmt.Errorf("cannot marshal reqData: %v", err)
 	}
-	return p.place.NewRendezvous(reqData)
+	return p.place.NewRendezvous(ctx, reqData)
 }
 
-func (p *place) Done(waitId string, info *loginInfo) error {
+func (p *place) Done(ctx context.Context, waitId string, info *loginInfo) error {
 	data, err := json.Marshal(info)
 	if err != nil {
 		return fmt.Errorf("cannot marshal loginData: %v", err)
 	}
-	return p.place.Done(waitId, data)
+	return p.place.Done(ctx, waitId, data)
 }
 
-func (p *place) Wait(waitId string) (*dischargeRequestInfo, *loginInfo, error) {
-	reqData, loginData, err := p.place.Wait(waitId)
+func (p *place) Wait(ctx context.Context, waitId string) (*dischargeRequestInfo, *loginInfo, error) {
+	reqData, loginData, err := p.place.Wait(ctx, waitId)
 	if err != nil {
 		return nil, nil, fmt.Errorf("cannot wait: %v", err)
 	}

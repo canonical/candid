@@ -54,32 +54,39 @@ var (
 // Entries created in the store should be visible
 // to all participants.
 type Store interface {
+	// Context returns a context that is suitable for passing to the
+	// other store methods. Store methods called with such a context
+	// will be sequentially consistent; for example, a value that is
+	// Put will immediately be available from a Get method.
+	//
+	// The returned close function must be called when the returned
+	// context will no longer be used, to allow for any required
+	// cleanup.
+	Context(ctx context.Context) (_ context.Context, close func())
+
 	// Put associates an address with the given id.
-	Put(id, address string) error
+	Put(ctx context.Context, id, address string) error
 
 	// Get returns the address associated with the given id
 	// and removes the association.
-	Get(id string) (address string, err error)
+	Get(ctx context.Context, id string) (address string, err error)
 
 	// Remove removes the entry with the given id.
 	// It should not return an error if the entry has already
 	// been removed.
-	Remove(id string) (time.Time, error)
+	Remove(ctx context.Context, id string) (time.Time, error)
 
 	// RemoveOld removes entries with the given address that were created
 	// earlier than the given time. It returns any ids removed.
 	// If it encountered an error while deleting the ids, it
 	// may return a non-empty ids slice and a non-nil error.
-	RemoveOld(address string, olderThan time.Time) (ids []string, err error)
-
-	// Close closes the Store.
-	Close()
+	RemoveOld(ctx context.Context, address string, olderThan time.Time) (ids []string, err error)
 }
 
-// Server represents a rendezvous server.
-type Server struct {
+// Place represents a rendezvous place.
+type Place struct {
 	tomb      tomb.Tomb
-	getStore  func() Store
+	store     Store
 	localAddr string
 	listener  net.Listener
 	handler   *handler
@@ -95,71 +102,64 @@ type item struct {
 	data1 []byte
 }
 
-// Place represents a meeting place for any number
-// of rendezvous.
-type Place struct {
-	store Store
-	srv   *Server
-}
-
 type Metrics interface {
 	RequestCompleted(startTime time.Time)
 	RequestsExpired(count int)
 }
 
-// NewServer returns a new rendezvous server that listens on the given
-// address. When a store is required by a server request,
-// it will be acquired by calling getStore and closed after the
-// request has finished.
+// NewPlace returns a new rendezvous place using the given store that
+// listens on the given address.
 //
-// Note that listenAddr must also be sufficient for other
-// servers to use to contact this one.
-func NewServer(getStore func() Store, m Metrics, listenAddr string) (*Server, error) {
-	return newServer(getStore, m, listenAddr, true)
+// Note that listenAddr must also be sufficient for other servers to use
+// to contact this one.
+func NewPlace(s Store, m Metrics, listenAddr string) (*Place, error) {
+	return newPlace(s, m, listenAddr, true)
 }
 
-func newServer(getStore func() Store, m Metrics, listenAddr string, runGC bool) (*Server, error) {
+func newPlace(s Store, m Metrics, listenAddr string, runGC bool) (*Place, error) {
 	listener, err := net.Listen("tcp", net.JoinHostPort(listenAddr, "0"))
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot start listener")
 	}
 
-	srv := &Server{
-		getStore:  getStore,
+	p := &Place{
+		store:     s,
 		listener:  listener,
 		localAddr: listener.Addr().String(),
 		items:     make(map[string]*item),
 		metrics:   m,
 	}
-	srv.handler = &handler{
-		srv: srv,
+	p.handler = &handler{
+		place: p,
 	}
 	router := httprouter.New()
-	for _, h := range reqServer.Handlers(srv.newHandler) {
+	for _, h := range reqServer.Handlers(p.newHandler) {
 		router.Handle(h.Method, h.Path, h.Handle)
 	}
 	if runGC {
-		srv.tomb.Go(srv.gc)
+		p.tomb.Go(p.gc)
 	}
-	srv.tomb.Go(func() error {
-		http.Serve(srv.listener, router)
+	p.tomb.Go(func() error {
+		http.Serve(p.listener, router)
 		return nil
 	})
-	return srv, nil
+	return p, nil
 }
 
-// Close stops the server.
-func (srv *Server) Close() {
-	srv.listener.Close()
-	srv.tomb.Kill(nil)
-	srv.tomb.Wait()
+// Close shuts down the rendezvous place.
+func (p *Place) Close() {
+	p.listener.Close()
+	p.tomb.Kill(nil)
+	p.tomb.Wait()
 }
 
 // gc garbage collects expired rendezvous by polling occasionally.
-func (srv *Server) gc() error {
+func (p *Place) gc() error {
 	dying := false
 	for {
-		err := srv.runGC(dying, Clock.Now())
+		ctx, close := p.store.Context(context.Background())
+		err := p.runGC(ctx, dying, Clock.Now())
+		close()
 		if err != nil {
 			logger.Errorf("meeting GC: %v", err)
 		}
@@ -171,7 +171,7 @@ func (srv *Server) gc() error {
 		// up.
 		select {
 		case <-Clock.After(pollInterval):
-		case <-srv.tomb.Dying():
+		case <-p.tomb.Dying():
 			dying = true
 		}
 	}
@@ -179,10 +179,7 @@ func (srv *Server) gc() error {
 
 // runGC runs a single garbage collection at the given time.
 // If dying is true, it removes all entries in the server.
-func (srv *Server) runGC(dying bool, now time.Time) error {
-	store := srv.getStore()
-	defer store.Close()
-
+func (p *Place) runGC(ctx context.Context, dying bool, now time.Time) error {
 	var expiryTime time.Time
 	if dying {
 		// A little bit in the future so that we're sure to
@@ -191,81 +188,70 @@ func (srv *Server) runGC(dying bool, now time.Time) error {
 	} else {
 		expiryTime = now.Add(-expiryDuration)
 	}
-	ids, err := store.RemoveOld(srv.localAddr, expiryTime)
+	ids, err := p.store.RemoveOld(ctx, p.localAddr, expiryTime)
 	if len(ids) > 0 {
-		srv.mu.Lock()
+		p.mu.Lock()
 		for _, id := range ids {
-			delete(srv.items, id)
+			delete(p.items, id)
 		}
-		srv.mu.Unlock()
-		srv.metrics.RequestsExpired(len(ids))
+		p.mu.Unlock()
+		p.metrics.RequestsExpired(len(ids))
 	}
 	if err != nil {
 		return errgo.Notef(err, "cannot remove old entries")
 	}
-	ids, err = store.RemoveOld("", now.Add(-reallyOldExpiryDuration))
+	ids, err = p.store.RemoveOld(ctx, "", now.Add(-reallyOldExpiryDuration))
 	if err != nil {
 		return errgo.Notef(err, "cannot remove really old entries")
 	}
 	if len(ids) > 0 {
-		srv.metrics.RequestsExpired(len(ids))
+		p.metrics.RequestsExpired(len(ids))
 	}
 	return nil
 }
 
-// Place returns a new Place that can be used to
-// create and wait for rendezvous. When a store is
-// required by methods on Place, the given store
-// is used.
-func (srv *Server) Place(store Store) *Place {
-	return &Place{
-		store: store,
-		srv:   srv,
-	}
-}
-
 // localWait is the internal version of Place.Wait.
 // It only works if the given id is stored locally.
-func (srv *Server) localWait(id string, getStore func() Store) (data0, data1 []byte, err error) {
-	srv.mu.Lock()
-	item := srv.items[id]
-	srv.mu.Unlock()
+func (p *Place) localWait(ctx context.Context, id string) (data0, data1 []byte, err error) {
+	p.mu.Lock()
+	item := p.items[id]
+	p.mu.Unlock()
 	if item == nil {
 		return nil, nil, errgo.Newf("rendezvous %q not found", id)
 	}
 	// Wait for the channel to be closed by Done.
-	expired := false
+	ctx, cancel := context.WithTimeout(ctx, expiryDuration)
+	defer cancel()
+	var expiredErr error
 	select {
 	case <-item.c:
-	case <-Clock.After(expiryDuration):
-		expired = true
+	case <-ctx.Done():
+		expiredErr = ctx.Err()
 	}
-	// Note that we get the Store *after* waiting, so we
-	// don't tie up resources while waiting.
-	store := getStore()
-	defer store.Close()
-	srv.mu.Lock()
-	defer srv.mu.Unlock()
-	delete(srv.items, id)
-	t, err := store.Remove(id)
+	ctx, close := p.store.Context(ctx)
+	defer close()
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	delete(p.items, id)
+	t, err := p.store.Remove(ctx, id)
 	if err != nil {
 		logger.Errorf("cannot remove rendezvous %q: %v", id, err)
 	}
 	if !t.IsZero() {
-		srv.metrics.RequestCompleted(t)
+		p.metrics.RequestCompleted(t)
 	}
-	if expired {
-		return nil, nil, errgo.Newf("rendezvous has expired after %v", expiryDuration)
+	if expiredErr != nil {
+		return nil, nil, errgo.WithCausef(expiredErr, expiredErr, "rendezvous has expired")
 	}
 	return item.data0, item.data1, nil
 }
 
 // localDone is the internal version of Place.Done.
 // It only works if the given id is stored locally.
-func (srv *Server) localDone(id string, data []byte) error {
-	srv.mu.Lock()
-	defer srv.mu.Unlock()
-	item := srv.items[id]
+func (p *Place) localDone(id string, data []byte) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	item := p.items[id]
 
 	if item == nil {
 		return errgo.Newf("rendezvous %q not found", id)
@@ -280,14 +266,14 @@ func (srv *Server) localDone(id string, data []byte) error {
 	return nil
 }
 
-func (srv *Server) isLocal(id string) bool {
-	srv.mu.Lock()
-	defer srv.mu.Unlock()
-	return srv.items[id] != nil
+func (p *Place) isLocal(id string) bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.items[id] != nil
 }
 
-func (srv *Server) newHandler(p httprequest.Params) (*handler, context.Context, error) {
-	return srv.handler, p.Context, nil
+func (p *Place) newHandler(params httprequest.Params) (*handler, context.Context, error) {
+	return p.handler, params.Context, nil
 }
 
 var reqServer = httprequest.Server{
@@ -308,22 +294,21 @@ func newId() (string, error) {
 
 // NewRendezvous creates a new rendezvous holding
 // the given data. The rendezvous id is returned.
-func (p *Place) NewRendezvous(data []byte) (string, error) {
+func (p *Place) NewRendezvous(ctx context.Context, data []byte) (string, error) {
 	id, err := newId()
 	if err != nil {
 		return "", errgo.Mask(err)
 	}
-	srv := p.srv
-	srv.mu.Lock()
-	srv.items[id] = &item{
+	p.mu.Lock()
+	p.items[id] = &item{
 		c:     make(chan struct{}),
 		data0: data,
 	}
-	srv.mu.Unlock()
-	if err := p.store.Put(id, srv.localAddr); err != nil {
-		srv.mu.Lock()
-		defer srv.mu.Unlock()
-		delete(srv.items, id)
+	p.mu.Unlock()
+	if err := p.store.Put(ctx, id, p.localAddr); err != nil {
+		p.mu.Lock()
+		defer p.mu.Unlock()
+		delete(p.items, id)
 		return "", errgo.Notef(err, "cannot create entry for rendezvous")
 	}
 	return id, nil
@@ -332,19 +317,15 @@ func (p *Place) NewRendezvous(data []byte) (string, error) {
 // Wait waits for the rendezvous with the given id
 // and returns the data provided to NewRendezvous
 // and the data provided to Done.
-func (p *Place) Wait(id string) (data0, data1 []byte, err error) {
-	if p.srv.isLocal(id) {
-		return p.srv.localWait(id, func() Store {
-			// Note that the Place doesn't close its store,
-			// so neither should localWait.
-			return storeNopCloser{p.store}
-		})
+func (p *Place) Wait(ctx context.Context, id string) (data0, data1 []byte, err error) {
+	if p.isLocal(id) {
+		return p.localWait(ctx, id)
 	}
-	client, err := p.clientForId(id)
+	client, err := p.clientForId(ctx, id)
 	if err != nil {
 		return nil, nil, errgo.Mask(err)
 	}
-	resp, err := client.Wait(context.TODO(), &waitRequest{
+	resp, err := client.Wait(ctx, &waitRequest{
 		Id: id,
 	})
 	if err != nil {
@@ -356,15 +337,15 @@ func (p *Place) Wait(id string) (data0, data1 []byte, err error) {
 // Done marks the rendezvous with the given id as complete,
 // and provides it with the given data which will be
 // returned from Wait.
-func (p *Place) Done(id string, data []byte) error {
-	if p.srv.isLocal(id) {
-		return p.srv.localDone(id, data)
+func (p *Place) Done(ctx context.Context, id string, data []byte) error {
+	if p.isLocal(id) {
+		return p.localDone(id, data)
 	}
-	client, err := p.clientForId(id)
+	client, err := p.clientForId(ctx, id)
 	if err != nil {
 		return errgo.Mask(err)
 	}
-	if err := client.Done(context.TODO(), &doneRequest{
+	if err := client.Done(ctx, &doneRequest{
 		Id: id,
 		Body: doneData{
 			Data1: data,
@@ -375,8 +356,8 @@ func (p *Place) Done(id string, data []byte) error {
 	return nil
 }
 
-func (p *Place) clientForId(id string) (*client, error) {
-	addr, err := p.store.Get(id)
+func (p *Place) clientForId(ctx context.Context, id string) (*client, error) {
+	addr, err := p.store.Get(ctx, id)
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}
@@ -385,11 +366,4 @@ func (p *Place) clientForId(id string) (*client, error) {
 			BaseURL: "http://" + addr,
 		},
 	}, nil
-}
-
-type storeNopCloser struct {
-	Store
-}
-
-func (storeNopCloser) Close() {
 }
