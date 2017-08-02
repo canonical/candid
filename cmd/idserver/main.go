@@ -27,6 +27,9 @@ import (
 	"github.com/CanonicalLtd/blues-identity/idp/usso"
 	_ "github.com/CanonicalLtd/blues-identity/idp/usso/ussodischarge"
 	"github.com/CanonicalLtd/blues-identity/idp/usso/ussooauth"
+	"github.com/CanonicalLtd/blues-identity/internal/monitoring"
+	"github.com/CanonicalLtd/blues-identity/meeting"
+	"github.com/CanonicalLtd/blues-identity/meeting/mgomeeting"
 )
 
 var (
@@ -97,9 +100,20 @@ func serve(confPath string) error {
 	if err != nil {
 		return errgo.Notef(err, "cannot parse templates")
 	}
+	meetingStore, err := mgomeeting.NewStore(db.C("meeting"))
+	if err != nil {
+		return errgo.Notef(err, "cannot create meeting store")
+	}
+	defer meetingStore.Close()
+	meetingPlace, err := meeting.NewPlace(meetingStore, monitoring.NewMeetingMetrics(), conf.PrivateAddr)
+	if err != nil {
+		return errgo.Notef(err, "cannot create meeting place")
+	}
+	defer meetingPlace.Close()
 	srv, err := identity.NewServer(
 		db,
 		identity.ServerParams{
+			Place:        meetingPlace,
 			AuthUsername: conf.AuthUsername,
 			AuthPassword: conf.AuthPassword,
 			Key: &bakery.KeyPair{

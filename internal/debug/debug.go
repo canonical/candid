@@ -112,7 +112,9 @@ func (h *handler) meetingStatus() debugstatus.CheckerFunc {
 	return func() (key string, result debugstatus.CheckResult) {
 		result.Name = "count of meeting collection"
 		result.Passed = true
-		c, err := h.store.DB.Meeting().Count()
+		// TODO(mhilton) use a separate mechanism for this once
+		// all the mongodb changes have been made.
+		c, err := h.store.DB.C("meeting").Count()
 		result.Value = strconv.Itoa(c)
 		if err != nil {
 			result.Value = err.Error()

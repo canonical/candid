@@ -22,6 +22,9 @@ import (
 
 	"github.com/CanonicalLtd/blues-identity"
 	"github.com/CanonicalLtd/blues-identity/idp"
+	"github.com/CanonicalLtd/blues-identity/internal/monitoring"
+	"github.com/CanonicalLtd/blues-identity/meeting"
+	"github.com/CanonicalLtd/blues-identity/meeting/mgomeeting"
 )
 
 const (
@@ -73,8 +76,10 @@ type DischargeSuite struct {
 	// public key for DischargeLocation.
 	Locator bakery.ThirdPartyLocator
 
-	serverKey *bakery.KeyPair
-	srv       identity.HandlerCloser
+	serverKey    *bakery.KeyPair
+	srv          identity.HandlerCloser
+	meetingPlace *meeting.Place
+	meetingStore *mgomeeting.Store
 
 	adminAgentKey *bakery.KeyPair
 }
@@ -89,7 +94,12 @@ func (s *DischargeSuite) SetUpTest(c *gc.C) {
 	s.adminAgentKey, err = bakery.GenerateKey()
 	c.Assert(err, gc.IsNil)
 	db := s.Session.Copy().DB("idptest")
+	s.meetingStore, err = mgomeeting.NewStore(db.C("meeting"))
+	c.Assert(err, gc.IsNil)
+	s.meetingPlace, err = meeting.NewPlace(s.meetingStore, monitoring.NewMeetingMetrics(), "localhost")
+	c.Assert(err, gc.IsNil)
 	s.srv, err = identity.NewServer(db, identity.ServerParams{
+		Place:               s.meetingPlace,
 		AuthUsername:        authUsername,
 		AuthPassword:        authPassword,
 		Key:                 s.serverKey,
@@ -135,6 +145,8 @@ func (s *DischargeSuite) SetUpTest(c *gc.C) {
 func (s *DischargeSuite) TearDownTest(c *gc.C) {
 	s.Server.Close()
 	s.srv.Close()
+	s.meetingPlace.Close()
+	s.meetingStore.Close()
 	s.IsolatedMgoSuite.TearDownTest(c)
 }
 

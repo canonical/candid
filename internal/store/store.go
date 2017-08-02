@@ -22,8 +22,6 @@ import (
 	"github.com/CanonicalLtd/blues-identity/internal/limitpool"
 	"github.com/CanonicalLtd/blues-identity/internal/mempool"
 	"github.com/CanonicalLtd/blues-identity/internal/mongodoc"
-	"github.com/CanonicalLtd/blues-identity/meeting"
-	"github.com/CanonicalLtd/blues-identity/meeting/mgomeeting"
 )
 
 var logger = loggo.GetLogger("identity.internal.store")
@@ -115,11 +113,6 @@ func (p *monitoredSessionPool) Close() {
 
 // Pool provides a pool of *Store objects.
 type Pool struct {
-	// Place holds the server used to create
-	// InteractionRequired rendezvous.
-	Place        *meeting.Place
-	meetingStore *mgomeeting.Store
-
 	sessionPool *monitoredSessionPool
 	storePool   mempool.Pool
 
@@ -153,15 +146,6 @@ func NewPool(db *mgo.Database, sp StoreParams) (*Pool, error) {
 	p.storePool.New = func() interface{} {
 		logger.Infof("in storePool.New")
 		return p.newStore()
-	}
-	var err error
-	p.meetingStore, err = mgomeeting.NewStore(StoreDatabase{db}.Meeting())
-	if err != nil {
-		return nil, errgo.Mask(err)
-	}
-	p.Place, err = meeting.NewPlace(p.meetingStore, newMeetingMetrics(), p.params.PrivateAddr)
-	if err != nil {
-		return nil, errgo.Mask(err)
 	}
 
 	if p.params.Key == nil {
@@ -289,8 +273,6 @@ func (p *Pool) Stats() limitpool.Stats {
 // Close clears out the pool closing the contained stores and prevents
 // any new Stores from being added.
 func (p *Pool) Close() {
-	p.Place.Close()
-	p.meetingStore.Close()
 	p.sessionPool.Close()
 	p.db.Session.Close()
 	if p.monitor != nil {
@@ -316,40 +298,6 @@ func (p *Pool) newStore() *Store {
 	return &Store{
 		pool: p,
 	}
-}
-
-type meetingMetrics struct {
-	meetingCompleted prometheus.Summary
-	meetingsExpired  prometheus.Counter
-}
-
-func newMeetingMetrics() *meetingMetrics {
-	meetingCompleted := prometheus.NewSummary(prometheus.SummaryOpts{
-		Namespace: "blues_identity",
-		Subsystem: "rendevous",
-		Name:      "meetings_completed_times",
-		Help:      "The time between rendevous creation and its completion.",
-	})
-	prometheus.MustRegisterOrGet(meetingCompleted)
-	meetingsExpired := prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: "blues_identity",
-		Subsystem: "rendevous",
-		Name:      "meetings_expired_count",
-		Help:      "Count of rendevous which were never completed.",
-	})
-	prometheus.MustRegisterOrGet(meetingsExpired)
-	return &meetingMetrics{
-		meetingCompleted: meetingCompleted,
-		meetingsExpired:  meetingsExpired,
-	}
-}
-
-func (m *meetingMetrics) RequestCompleted(startTime time.Time) {
-	m.meetingCompleted.Observe(float64(time.Since(startTime)) / float64(time.Microsecond))
-}
-
-func (m *meetingMetrics) RequestsExpired(count int) {
-	m.meetingsExpired.Add(float64(count))
 }
 
 // setSession sets the mongo session associated with the Store.
@@ -612,10 +560,6 @@ func (s StoreDatabase) Macaroons() *mgo.Collection {
 	return s.C("macaroons")
 }
 
-func (s StoreDatabase) Meeting() *mgo.Collection {
-	return s.C("meeting")
-}
-
 // IdentityProviders returns the mongo collection where identity providers are stored.
 func (s StoreDatabase) IdentityProviders() *mgo.Collection {
 	return s.C("identity_providers")
@@ -626,7 +570,6 @@ func (s StoreDatabase) IdentityProviders() *mgo.Collection {
 // TODO consider adding other collections here.
 var allCollections = []func(StoreDatabase) *mgo.Collection{
 	StoreDatabase.Identities,
-	StoreDatabase.Meeting,
 }
 
 // Collections returns a slice of all the collections used

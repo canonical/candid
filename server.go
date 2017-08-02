@@ -18,6 +18,7 @@ import (
 	"github.com/CanonicalLtd/blues-identity/internal/debug"
 	"github.com/CanonicalLtd/blues-identity/internal/identity"
 	"github.com/CanonicalLtd/blues-identity/internal/v1"
+	"github.com/CanonicalLtd/blues-identity/meeting"
 )
 
 // Versions of the API that can be served.
@@ -43,6 +44,10 @@ func Versions() []string {
 
 // ServerParams contains configuration parameters for a server.
 type ServerParams struct {
+	// Place holds the meeting place that will be used for rendezvous
+	// within the identity server.
+	Place *meeting.Place
+
 	// AuthUsername holds the username for admin login.
 	AuthUsername string
 

@@ -75,7 +75,7 @@ func New(p *store.Pool, params identity.ServerParams) *Handler {
 		idps:      params.IdentityProviders,
 		template:  params.Template,
 		key:       params.Key,
-		place:     &place{p.Place},
+		place:     &place{params.Place},
 	}
 	h.handlerPool.New = h.newHandler
 	return h
