@@ -22,6 +22,7 @@ import (
 
 	"github.com/CanonicalLtd/blues-identity/idp"
 	"github.com/CanonicalLtd/blues-identity/internal/store"
+	"github.com/CanonicalLtd/blues-identity/meeting"
 )
 
 var logger = loggo.GetLogger("identity.internal.identity")
@@ -115,6 +116,10 @@ func (s *Server) Close() {
 
 // ServerParams contains configuration parameters for a server.
 type ServerParams struct {
+	// Place holds the meeting place that will be used for rendezvous
+	// within the identity server.
+	Place *meeting.Place
+
 	// AuthUsername holds the username for admin login.
 	AuthUsername string
 
