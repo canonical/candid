@@ -14,30 +14,27 @@ import (
 	"github.com/CanonicalLtd/blues-identity/store"
 )
 
-// Store is a store.Store implementation that uses a mongodb database to
+const identitiesCollection = "identities"
+
+// identityStore is a store.Store implementation that uses a mongodb database to
 // store the data.
-type Store struct {
-	db *mgo.Database
+type identityStore struct {
+	db *Database
 }
 
-// NewStore creates a new Store in the given database.
-func NewStore(db *mgo.Database) (*Store, error) {
-	store := &Store{
-		db: db,
-	}
-	ctx := ContextWithSession(context.Background(), db.Session)
-	if err := store.init(ctx); err != nil {
-		return nil, errgo.Mask(err)
-	}
-	return store, nil
+func (s *identityStore) Context(ctx context.Context) (_ context.Context, cancel func()) {
+	return s.db.context(ctx)
 }
 
 // Identity implements store.Store.Identity by retrieving the specified
 // identity from the mongodb database. The given context must have a
 // mgo.Session added using ContextWithSession.
-func (s *Store) Identity(ctx context.Context, identity *store.Identity) error {
+func (s *identityStore) Identity(ctx context.Context, identity *store.Identity) error {
+	coll := s.db.c(ctx, identitiesCollection)
+	defer coll.Database.Session.Close()
+
 	var doc identityDocument
-	if err := s.collection(ctx).Find(identityQuery(identity)).One(&doc); err != nil {
+	if err := coll.Find(identityQuery(identity)).One(&doc); err != nil {
 		if errgo.Cause(err) == mgo.ErrNotFound {
 			return store.NotFoundError(identity.ID, identity.ProviderID, identity.Username)
 		}
@@ -78,8 +75,11 @@ func identityQuery(identity *store.Identity) bson.D {
 // FindIdentities implements store.Store.FindIdentities by querying the
 // mongodb database. The given context must have a mgo.Session added
 // using ContextWithSession.
-func (s *Store) FindIdentities(ctx context.Context, ref *store.Identity, filter store.Filter, sort []store.Sort, skip, limit int) ([]store.Identity, error) {
-	q := s.collection(ctx).Find(makeQuery(ref, filter))
+func (s *identityStore) FindIdentities(ctx context.Context, ref *store.Identity, filter store.Filter, sort []store.Sort, skip, limit int) ([]store.Identity, error) {
+	coll := s.db.c(ctx, identitiesCollection)
+	defer coll.Database.Session.Close()
+
+	q := coll.Find(makeQuery(ref, filter))
 	if len(sort) > 0 {
 		ssort := make([]string, len(sort))
 		for i, s := range sort {
@@ -155,11 +155,14 @@ var comparisonOps = []string{
 // UpdateIdentity implements store.Store.UpdateIdentity by writing the
 // identity update to the mongodb database. The given context must have a
 // mgo.Session added using ContextWithSession.
-func (s *Store) UpdateIdentity(ctx context.Context, identity *store.Identity, update store.Update) error {
+func (s *identityStore) UpdateIdentity(ctx context.Context, identity *store.Identity, update store.Update) error {
+	coll := s.db.c(ctx, identitiesCollection)
+	defer coll.Database.Session.Close()
+
 	if identity.ID == "" && identity.ProviderID != "" {
-		return errgo.Mask(s.upsertIdentity(ctx, identity, update), errgo.Is(store.ErrDuplicateUsername))
+		return errgo.Mask(s.upsertIdentity(coll, identity, update), errgo.Is(store.ErrDuplicateUsername))
 	}
-	err := s.collection(ctx).Update(identityQuery(identity), identityUpdate(identity, update))
+	err := coll.Update(identityQuery(identity), identityUpdate(identity, update))
 	if err == nil {
 		return nil
 	}
@@ -172,8 +175,8 @@ func (s *Store) UpdateIdentity(ctx context.Context, identity *store.Identity, up
 	return errgo.Mask(err)
 }
 
-func (s *Store) upsertIdentity(ctx context.Context, identity *store.Identity, update store.Update) error {
-	changeInfo, err := s.collection(ctx).Upsert(bson.D{{"providerid", identity.ProviderID}}, identityUpdate(identity, update))
+func (s *identityStore) upsertIdentity(coll *mgo.Collection, identity *store.Identity, update store.Update) error {
+	changeInfo, err := coll.Upsert(bson.D{{"providerid", identity.ProviderID}}, identityUpdate(identity, update))
 	if err != nil {
 		if mgo.IsDup(err) {
 			return store.DuplicateUsernameError(identity.Username)
@@ -230,8 +233,8 @@ func encodePublicKeys(pks []bakery.PublicKey) []string {
 	return data
 }
 
-func (s *Store) init(ctx context.Context) error {
-	coll := s.collection(ctx)
+func ensureIdentityIndexes(db *mgo.Database) error {
+	coll := db.C(identitiesCollection)
 	indexes := []mgo.Index{{
 		Key:    []string{"username"},
 		Unique: true,
@@ -245,17 +248,4 @@ func (s *Store) init(ctx context.Context) error {
 		}
 	}
 	return nil
-}
-
-func (s *Store) collection(ctx context.Context) *mgo.Collection {
-	return s.db.C("identities").With(ctx.Value(sessionKey{}).(*mgo.Session))
-}
-
-type sessionKey struct{}
-
-// ContextWithSession adds the given session to the given context. This
-// session will be used by all Store methods when performing mongodb
-// operations.
-func ContextWithSession(ctx context.Context, s *mgo.Session) context.Context {
-	return context.WithValue(ctx, sessionKey{}, s)
 }

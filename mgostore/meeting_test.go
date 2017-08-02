@@ -1,6 +1,6 @@
 // Copyright 2015 Canonical Ltd.
 
-package mgomeeting_test
+package mgostore_test
 
 import (
 	"fmt"
@@ -11,19 +11,23 @@ import (
 	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
 
-	"github.com/CanonicalLtd/blues-identity/meeting/mgomeeting"
+	"github.com/CanonicalLtd/blues-identity/meeting"
+	"github.com/CanonicalLtd/blues-identity/mgostore"
 )
 
-type storeSuite struct {
+type meetingSuite struct {
 	testing.IsolatedMgoSuite
 }
 
-var _ = gc.Suite(&storeSuite{})
+var _ = gc.Suite(&meetingSuite{})
 
-func (s *storeSuite) TestPutGetRemove(c *gc.C) {
-	store, err := mgomeeting.NewStore(s.Session.DB("idm-test").C("foo"))
+func (s *meetingSuite) TestPutGetRemove(c *gc.C) {
+	db, err := mgostore.NewDatabase(s.Session.DB("idm-test"))
 	c.Assert(err, gc.IsNil)
-	defer store.Close()
+	defer db.Close()
+
+	var store meeting.Store
+	store = db.MeetingStore()
 
 	ctx := context.Background()
 
@@ -55,10 +59,13 @@ func (s *storeSuite) TestPutGetRemove(c *gc.C) {
 	c.Assert(addr, gc.Equals, "xaddr")
 }
 
-func (s *storeSuite) TestRemoveOld(c *gc.C) {
-	store, err := mgomeeting.NewStore(s.Session.DB("idm-test").C("foo"))
+func (s *meetingSuite) TestRemoveOld(c *gc.C) {
+	db, err := mgostore.NewDatabase(s.Session.DB("idm-test"))
 	c.Assert(err, gc.IsNil)
-	defer store.Close()
+	defer db.Close()
+
+	var store meeting.Store
+	store = db.MeetingStore()
 
 	ctx := context.Background()
 
@@ -67,12 +74,12 @@ func (s *storeSuite) TestRemoveOld(c *gc.C) {
 	allIds := make(map[string]bool)
 	for i := 0; i < 10; i++ {
 		id := fmt.Sprint("a", i)
-		err := mgomeeting.PutAtTime(ctx, store, id, "a", now.Add(time.Duration(-i)*time.Second))
+		err := mgostore.PutAtTime(ctx, store, id, "a", now.Add(time.Duration(-i)*time.Second))
 		c.Assert(err, gc.IsNil)
 		allIds[id] = true
 
 		id = fmt.Sprint("b", i)
-		err = mgomeeting.PutAtTime(ctx, store, id, "b", now.Add(time.Duration(-i)*time.Second))
+		err = mgostore.PutAtTime(ctx, store, id, "b", now.Add(time.Duration(-i)*time.Second))
 		c.Assert(err, gc.IsNil)
 		allIds[id] = true
 	}
@@ -105,10 +112,13 @@ func (s *storeSuite) TestRemoveOld(c *gc.C) {
 	}
 }
 
-func (s *storeSuite) TestContext(c *gc.C) {
-	store, err := mgomeeting.NewStore(s.Session.DB("idm-test").C("foo"))
+func (s *meetingSuite) TestContext(c *gc.C) {
+	db, err := mgostore.NewDatabase(s.Session.DB("idm-test"))
 	c.Assert(err, gc.IsNil)
-	defer store.Close()
+	defer db.Close()
+
+	var store meeting.Store
+	store = db.MeetingStore()
 
 	ctx, close := store.Context(context.Background())
 	defer close()
