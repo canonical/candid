@@ -20,6 +20,8 @@ import (
 	"gopkg.in/mgo.v2/bson"
 
 	"github.com/CanonicalLtd/blues-identity/idp"
+	"github.com/CanonicalLtd/blues-identity/internal/auth"
+	"github.com/CanonicalLtd/blues-identity/internal/auth/httpauth"
 	"github.com/CanonicalLtd/blues-identity/internal/identity"
 	"github.com/CanonicalLtd/blues-identity/internal/mempool"
 	"github.com/CanonicalLtd/blues-identity/internal/monitoring"
@@ -29,8 +31,8 @@ import (
 var logger = loggo.GetLogger("identity.internal.v1")
 
 // NewAPIHandler is an identity.NewAPIHandlerFunc.
-func NewAPIHandler(p *store.Pool, params identity.ServerParams) ([]httprequest.Handler, error) {
-	h := New(p, params)
+func NewAPIHandler(params identity.HandlerParams) ([]httprequest.Handler, error) {
+	h := New(params)
 	if err := h.initIDPs(); err != nil {
 		return nil, errgo.Mask(err)
 	}
@@ -62,19 +64,23 @@ type Handler struct {
 	location    string
 	idps        []idp.IdentityProvider
 	template    *template.Template
-	key         *bakery.KeyPair
 	place       *place
+	oven        *bakery.Oven
+	auth        *auth.Authorizer
+	reqAuth     *httpauth.Authorizer
 }
 
 // New returns a new instance of the v1 API handler.
-func New(p *store.Pool, params identity.ServerParams) *Handler {
+func New(params identity.HandlerParams) *Handler {
 	h := &Handler{
-		storePool: p,
+		storePool: params.Pool,
 		location:  params.Location,
 		idps:      params.IdentityProviders,
 		template:  params.Template,
-		key:       params.Key,
 		place:     &place{params.Place},
+		oven:      params.Oven,
+		auth:      params.Authorizer,
+		reqAuth:   httpauth.New(params.Oven, params.Authorizer),
 	}
 	h.handlerPool.New = h.newHandler
 	return h
@@ -98,13 +104,13 @@ func (h *Handler) getAuthorizedHandler(p httprequest.Params, t trace.Trace, req 
 		hnd.Close()
 		return nil, nil, params.ErrUnauthorized
 	}
-	authInfo, err := hnd.store.Authorize(ctx, p.Request, op)
+	authInfo, err := hnd.h.reqAuth.Auth(ctx, p.Request, op)
 	if err != nil {
 		hnd.Close()
 		return nil, nil, errgo.Mask(err, errgo.Any)
 	}
 	if authInfo.Identity != nil {
-		id, ok := authInfo.Identity.(store.Identity)
+		id, ok := authInfo.Identity.(auth.Identity)
 		if !ok {
 			hnd.Close()
 			return nil, nil, errgo.Newf("unexpected identity type %T", authInfo.Identity)
@@ -126,7 +132,7 @@ func (h *Handler) getHandler(ctx context.Context, t trace.Trace) (*handler, cont
 		return nil, nil, errgo.NoteMask(err, "cannot get store", errgo.Any)
 	}
 	hnd.tracef(false, "store acquired")
-	ctx = store.ContextWithStore(ctx, hnd.store)
+	ctx = auth.ContextWithStore(ctx, hnd.store)
 	return hnd, ctx, nil
 }
 
@@ -170,7 +176,7 @@ func (h *handler) serviceURL(path string) string {
 // with the given version, username and expiry and used to complete the
 // rendezvous specified by the given waitid.
 func (h *handler) completeLogin(ctx context.Context, waitid string, v bakery.Version, username params.Username, expiry time.Time) error {
-	m, err := h.store.Bakery.Oven.NewMacaroon(
+	m, err := h.h.oven.NewMacaroon(
 		ctx,
 		v,
 		expiry,
@@ -281,11 +287,11 @@ func (h *Handler) idpHandlers() []httprequest.Handler {
 
 type identityKey struct{}
 
-func contextWithIdentity(ctx context.Context, identity store.Identity) context.Context {
+func contextWithIdentity(ctx context.Context, identity auth.Identity) context.Context {
 	return context.WithValue(ctx, identityKey{}, identity)
 }
 
-func identityFromContext(ctx context.Context) store.Identity {
-	id, _ := ctx.Value(identityKey{}).(store.Identity)
+func identityFromContext(ctx context.Context) auth.Identity {
+	id, _ := ctx.Value(identityKey{}).(auth.Identity)
 	return id
 }

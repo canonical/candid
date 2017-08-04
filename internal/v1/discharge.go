@@ -21,7 +21,7 @@ import (
 	"gopkg.in/macaroon.v2-unstable"
 	"gopkg.in/mgo.v2/bson"
 
-	"github.com/CanonicalLtd/blues-identity/internal/store"
+	"github.com/CanonicalLtd/blues-identity/internal/auth"
 )
 
 const (
@@ -74,16 +74,16 @@ func checkThirdPartyCaveat(ctx context.Context, h *handler, req *http.Request, c
 			return nil, errgo.WithCausef(err, params.ErrBadRequest, "invalid domain %q", args[1:])
 		}
 		domain = args[1:]
-		ctx = store.ContextWithRequiredDomain(ctx, domain)
+		ctx = auth.ContextWithRequiredDomain(ctx, domain)
 	case "is-member-of":
 	default:
 		return nil, checkers.ErrCaveatNotRecognized
 	}
 
-	var identity store.Identity
+	var identity auth.Identity
 	var invalidUserf func(err error) error
 	if user := req.Form.Get("discharge-for-user"); user != "" {
-		_, err := h.store.Authorize(ctx, req, store.GlobalOp(store.ActionDischargeFor))
+		_, err := h.h.reqAuth.Auth(ctx, req, auth.GlobalOp(auth.ActionDischargeFor))
 		if err != nil {
 			return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized), isDischargeRequiredError)
 		}
@@ -94,10 +94,10 @@ func checkThirdPartyCaveat(ctx context.Context, h *handler, req *http.Request, c
 		if _, err := h.store.GetIdentity(params.Username(user)); err != nil {
 			return nil, invalidUserf(err)
 		}
-		if err := store.CheckUserDomain(ctx, user); err != nil {
+		if err := auth.CheckUserDomain(ctx, user); err != nil {
 			return nil, invalidUserf(err)
 		}
-		identity = store.Identity(user)
+		identity = auth.Identity(user)
 	} else {
 		invalidUserf = func(err error) error {
 			return needLoginError(ctx, h, req, domain, &dischargeRequestInfo{
@@ -107,11 +107,11 @@ func checkThirdPartyCaveat(ctx context.Context, h *handler, req *http.Request, c
 				Origin:    req.Header.Get("Origin"),
 			}, err)
 		}
-		userInfo, err := h.store.Authorize(ctx, req, bakery.LoginOp)
+		userInfo, err := h.h.reqAuth.Auth(ctx, req, bakery.LoginOp)
 		if err != nil {
 			return nil, invalidUserf(err)
 		}
-		identity = userInfo.Identity.(store.Identity)
+		identity = userInfo.Identity.(auth.Identity)
 	}
 	logger.Infof("authorization for %#v succeeded", identity)
 
@@ -202,7 +202,7 @@ func (h *dischargeHandler) Wait(p httprequest.Params, w *waitRequest) (*waitResp
 	}
 	// TODO we shouldn't need to manually resolve this caveat - the
 	// reqInfo macaroon should contain a bakery.Macaroon not a macaroon slice.
-	originCaveat := h.store.Bakery.Checker.Namespace().ResolveCaveat(httpbakery.ClientOriginCaveat(reqInfo.Origin))
+	originCaveat := auth.Checker.Namespace().ResolveCaveat(httpbakery.ClientOriginCaveat(reqInfo.Origin))
 	// Ensure the identity macaroon can only be used from the same
 	// origin as the original discharge request.
 	err = login.IdentityMacaroon[0].AddFirstPartyCaveat(originCaveat.Condition)
@@ -216,7 +216,7 @@ func (h *dischargeHandler) Wait(p httprequest.Params, w *waitRequest) (*waitResp
 	// same discharge checking that they would have gone
 	// through even if they had gone through the web
 	// login process.
-	cookie, err := httpbakery.NewCookie(h.store.Bakery.Checker.Namespace(), login.IdentityMacaroon)
+	cookie, err := httpbakery.NewCookie(auth.Checker.Namespace(), login.IdentityMacaroon)
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot make cookie")
 	}
@@ -228,7 +228,7 @@ func (h *dischargeHandler) Wait(p httprequest.Params, w *waitRequest) (*waitResp
 	m, err := bakery.Discharge(p.Context, bakery.DischargeParams{
 		Id:      reqInfo.CaveatId,
 		Caveat:  reqInfo.Caveat,
-		Key:     h.store.Bakery.Oven.Key(),
+		Key:     h.h.oven.Key(),
 		Checker: checker,
 	})
 	if err != nil {
@@ -273,7 +273,7 @@ func (h *dischargeHandler) DischargeTokenForUser(p httprequest.Params, r *discha
 	if err != nil {
 		return dischargeTokenForUserResponse{}, errgo.NoteMask(err, "cannot get identity", errgo.Is(params.ErrNotFound))
 	}
-	m, err := h.store.Bakery.Oven.NewMacaroon(
+	m, err := h.h.oven.NewMacaroon(
 		p.Context,
 		httpbakery.RequestVersion(p.Request),
 		time.Now().Add(dischargeTokenDuration),

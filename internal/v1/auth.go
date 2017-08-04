@@ -6,7 +6,7 @@ import (
 	"github.com/juju/idmclient/params"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
 
-	"github.com/CanonicalLtd/blues-identity/internal/store"
+	"github.com/CanonicalLtd/blues-identity/internal/auth"
 )
 
 // opForRequest returns the operation that will be performed
@@ -14,52 +14,52 @@ import (
 func opForRequest(r interface{}) bakery.Op {
 	switch r := r.(type) {
 	case *params.QueryUsersRequest:
-		return store.GlobalOp(store.ActionRead)
+		return auth.GlobalOp(auth.ActionRead)
 	case *params.UserRequest:
-		return store.UserOp(r.Username, store.ActionRead)
+		return auth.UserOp(r.Username, auth.ActionRead)
 	case *params.SetUserRequest:
 		if r.Owner != "" {
-			return store.UserOp(r.Owner, store.ActionCreateAgent)
+			return auth.UserOp(r.Owner, auth.ActionCreateAgent)
 		}
-		return store.UserOp(r.Username, store.ActionWriteAdmin)
+		return auth.UserOp(r.Username, auth.ActionWriteAdmin)
 	case *params.UserGroupsRequest:
-		return store.UserOp(r.Username, store.ActionReadGroups)
+		return auth.UserOp(r.Username, auth.ActionReadGroups)
 	case *params.SetUserGroupsRequest:
-		return store.UserOp(r.Username, store.ActionWriteGroups)
+		return auth.UserOp(r.Username, auth.ActionWriteGroups)
 	case *params.ModifyUserGroupsRequest:
-		return store.UserOp(r.Username, store.ActionWriteGroups)
+		return auth.UserOp(r.Username, auth.ActionWriteGroups)
 	case *params.UserIDPGroupsRequest:
-		return store.UserOp(r.Username, store.ActionReadGroups)
+		return auth.UserOp(r.Username, auth.ActionReadGroups)
 	case *params.WhoAmIRequest:
 		return bakery.LoginOp
 	case *params.SSHKeysRequest:
-		return store.UserOp(r.Username, store.ActionReadSSHKeys)
+		return auth.UserOp(r.Username, auth.ActionReadSSHKeys)
 	case *params.PutSSHKeysRequest:
-		return store.UserOp(r.Username, store.ActionWriteSSHKeys)
+		return auth.UserOp(r.Username, auth.ActionWriteSSHKeys)
 	case *params.DeleteSSHKeysRequest:
-		return store.UserOp(r.Username, store.ActionWriteSSHKeys)
+		return auth.UserOp(r.Username, auth.ActionWriteSSHKeys)
 	case *params.UserTokenRequest:
-		return store.UserOp(r.Username, store.ActionReadAdmin)
+		return auth.UserOp(r.Username, auth.ActionReadAdmin)
 	case *params.VerifyTokenRequest:
-		return store.GlobalOp(store.ActionVerify)
+		return auth.GlobalOp(auth.ActionVerify)
 	case *params.UserExtraInfoRequest:
-		return store.UserOp(r.Username, store.ActionReadAdmin)
+		return auth.UserOp(r.Username, auth.ActionReadAdmin)
 	case *params.SetUserExtraInfoRequest:
-		return store.UserOp(r.Username, store.ActionWriteAdmin)
+		return auth.UserOp(r.Username, auth.ActionWriteAdmin)
 	case *params.UserExtraInfoItemRequest:
-		return store.UserOp(r.Username, store.ActionReadAdmin)
+		return auth.UserOp(r.Username, auth.ActionReadAdmin)
 	case *params.SetUserExtraInfoItemRequest:
-		return store.UserOp(r.Username, store.ActionWriteAdmin)
+		return auth.UserOp(r.Username, auth.ActionWriteAdmin)
 	case *agentLoginCookieRequest:
-		return store.GlobalOp(store.ActionLogin)
+		return auth.GlobalOp(auth.ActionLogin)
 	case *agentLoginPostRequest:
-		return store.GlobalOp(store.ActionLogin)
+		return auth.GlobalOp(auth.ActionLogin)
 	case *loginRequest:
-		return store.GlobalOp(store.ActionLogin)
+		return auth.GlobalOp(auth.ActionLogin)
 	case *dischargeTokenForUserRequest:
-		return store.GlobalOp(store.ActionDischargeFor)
+		return auth.GlobalOp(auth.ActionDischargeFor)
 	case *waitRequest:
-		return store.GlobalOp(store.ActionLogin)
+		return auth.GlobalOp(auth.ActionLogin)
 	default:
 		logger.Infof("unknown API argument type %#v", r)
 	}

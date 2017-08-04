@@ -186,6 +186,7 @@ func (s *DischargeSuite) Discharge(c *gc.C, condition string, visitor httpbakery
 		}},
 		bakery.LoginOp,
 	)
+	c.Assert(err, gc.IsNil)
 	if visitor != nil {
 		defer testing.PatchValue(&s.BakeryClient.WebPageVisitor, visitor).Restore()
 	}

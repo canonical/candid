@@ -9,11 +9,13 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/gorilla/handlers"
 	"github.com/juju/loggo"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
+	"gopkg.in/macaroon-bakery.v2-unstable/bakery/mgorootkeystore"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/natefinch/lumberjack.v2"
 	"launchpad.net/lpad"
@@ -113,7 +115,10 @@ func serve(confPath string) error {
 	srv, err := identity.NewServer(
 		db,
 		identity.ServerParams{
-			Place:        meetingPlace,
+			Place: meetingPlace,
+			RootKeyStore: database.BakeryRootKeyStore(mgorootkeystore.Policy{
+				ExpiryDuration: 365 * 24 * time.Hour,
+			}),
 			AuthUsername: conf.AuthUsername,
 			AuthPassword: conf.AuthPassword,
 			Key: &bakery.KeyPair{

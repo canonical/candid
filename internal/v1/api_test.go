@@ -14,7 +14,9 @@ import (
 	"github.com/juju/testing/httptesting"
 	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
+	errgo "gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
+	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
 	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
 	"gopkg.in/macaroon.v2-unstable"
 	"gopkg.in/mgo.v2"
@@ -42,6 +44,7 @@ type apiSuite struct {
 	idps     []idp.IdentityProvider
 	server   *httptest.Server
 	template *template.Template
+	bakery   *bakery.Bakery
 }
 
 var _ = gc.Suite(&apiSuite{})
@@ -59,8 +62,14 @@ func (s *apiSuite) SetUpTest(c *gc.C) {
 
 	key, err := bakery.GenerateKey()
 	c.Assert(err, gc.IsNil)
+	rks := bakery.NewMemRootKeyStore()
+	s.bakery = bakery.New(bakery.BakeryParams{
+		RootKeyStore:   rks,
+		IdentityClient: testIdentityClient{},
+		Key:            key,
+	})
 	s.template = template.New("")
-	s.srv, s.pool = newServer(c, s.Session.Copy(), key, s.template, s.idps)
+	s.srv, s.pool = newServer(c, s.Session.Copy(), rks, s.template, s.idps)
 	s.keyPair = key
 	s.server = httptest.NewServer(s.srv)
 	s.PatchValue(&http.DefaultTransport, httptesting.URLRewritingTransport{
@@ -80,12 +89,12 @@ func fakeRedirectURL(_, _, _ string) (string, error) {
 	return "http://0.1.2.3/nowhere", nil
 }
 
-func newServer(c *gc.C, session *mgo.Session, key *bakery.KeyPair, t *template.Template, idps []idp.IdentityProvider) (*identity.Server, *store.Pool) {
+func newServer(c *gc.C, session *mgo.Session, rks bakery.RootKeyStore, t *template.Template, idps []idp.IdentityProvider) (*identity.Server, *store.Pool) {
 	db := session.DB("testing")
 	sp := identity.ServerParams{
+		RootKeyStore:      rks,
 		AuthUsername:      adminUsername,
 		AuthPassword:      adminPassword,
-		Key:               key,
 		Location:          location,
 		MaxMgoSessions:    50,
 		IdentityProviders: idps,
@@ -93,12 +102,7 @@ func newServer(c *gc.C, session *mgo.Session, key *bakery.KeyPair, t *template.T
 		Template:          t,
 	}
 	pool, err := store.NewPool(db, store.StoreParams{
-		AuthUsername:   sp.AuthUsername,
-		AuthPassword:   sp.AuthPassword,
-		Key:            sp.Key,
-		Location:       sp.Location,
 		MaxMgoSessions: sp.MaxMgoSessions,
-		PrivateAddr:    sp.PrivateAddr,
 	})
 	c.Assert(err, gc.IsNil)
 	srv, err := identity.New(
@@ -113,9 +117,7 @@ func newServer(c *gc.C, session *mgo.Session, key *bakery.KeyPair, t *template.T
 }
 
 func (s *apiSuite) assertMacaroon(c *gc.C, ms macaroon.Slice, expectUser string) {
-	store := s.pool.GetNoLimit()
-	defer s.pool.Put(store)
-	authInfo, err := store.Bakery.Checker.Auth(ms).Allow(context.TODO(), bakery.LoginOp)
+	authInfo, err := s.bakery.Checker.Auth(ms).Allow(context.TODO(), bakery.LoginOp)
 	c.Assert(err, gc.IsNil)
 	c.Assert(authInfo.Identity, gc.NotNil)
 	c.Assert(authInfo.Identity.Id(), gc.Equals, expectUser)
@@ -174,4 +176,17 @@ func marshal(c *gc.C, v interface{}) *bytes.Reader {
 	b, err := json.Marshal(v)
 	c.Assert(err, gc.Equals, nil)
 	return bytes.NewReader(b)
+}
+
+type testIdentityClient struct{}
+
+func (testIdentityClient) IdentityFromContext(context.Context) (bakery.Identity, []checkers.Caveat, error) {
+	return nil, nil, nil
+}
+
+func (testIdentityClient) DeclaredIdentity(_ context.Context, declared map[string]string) (bakery.Identity, error) {
+	if name, ok := declared["username"]; ok {
+		return bakery.SimpleIdentity(name), nil
+	}
+	return nil, errgo.New("no username declared")
 }

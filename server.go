@@ -48,6 +48,10 @@ type ServerParams struct {
 	// within the identity server.
 	Place *meeting.Place
 
+	// RootKeyStore holds the root key store that will be used to
+	// store macaroon root keys within the identity server.
+	RootKeyStore bakery.RootKeyStore
+
 	// AuthUsername holds the username for admin login.
 	AuthUsername string
 

@@ -4,6 +4,9 @@ package mgostore
 
 import (
 	"golang.org/x/net/context"
+	errgo "gopkg.in/errgo.v1"
+	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
+	"gopkg.in/macaroon-bakery.v2-unstable/bakery/mgorootkeystore"
 	mgo "gopkg.in/mgo.v2"
 
 	"github.com/CanonicalLtd/blues-identity/meeting"
@@ -14,7 +17,8 @@ import (
 // can be used as the persistent storage for the various types of store
 // required by the identity service.
 type Database struct {
-	db *mgo.Database
+	db       *mgo.Database
+	rootKeys *mgorootkeystore.RootKeys
 }
 
 // NewDatabase creates a new Database using the given *mgo.Database. The
@@ -29,7 +33,14 @@ func NewDatabase(db *mgo.Database) (*Database, error) {
 	if err := ensureMeetingIndexes(db); err != nil {
 		return nil, err
 	}
-	return &Database{db.With(db.Session.Copy())}, nil
+	rk := mgorootkeystore.NewRootKeys(1000) // TODO(mhilton) make this configurable?
+	if err := ensureBakeryIndexes(rk, db); err != nil {
+		return nil, errgo.Mask(err)
+	}
+	return &Database{
+		db:       db.With(db.Session.Copy()),
+		rootKeys: rk,
+	}, nil
 }
 
 // Close cleans up resources associated with the database.
@@ -84,4 +95,13 @@ func (d *Database) Store() store.Store {
 // database for persistent storage.
 func (d *Database) MeetingStore() meeting.Store {
 	return &meetingStore{d}
+}
+
+// BakeryRootKeyStore returns a new bakery.RootKeyStore implementation
+// using this database for persistent storage.
+func (d *Database) BakeryRootKeyStore(policy mgorootkeystore.Policy) bakery.RootKeyStore {
+	return &rootKeyStore{
+		db:     d,
+		policy: policy,
+	}
 }

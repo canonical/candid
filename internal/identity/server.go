@@ -21,6 +21,7 @@ import (
 	"launchpad.net/lpad"
 
 	"github.com/CanonicalLtd/blues-identity/idp"
+	"github.com/CanonicalLtd/blues-identity/internal/auth"
 	"github.com/CanonicalLtd/blues-identity/internal/store"
 	"github.com/CanonicalLtd/blues-identity/meeting"
 )
@@ -29,7 +30,7 @@ var logger = loggo.GetLogger("identity.internal.identity")
 
 // NewAPIHandlerFunc is a function that returns set of httprequest
 // handlers that uses the given Store pool, and server params.
-type NewAPIHandlerFunc func(*store.Pool, ServerParams) ([]httprequest.Handler, error)
+type NewAPIHandlerFunc func(HandlerParams) ([]httprequest.Handler, error)
 
 // New returns a handler that serves the given identity API versions using the
 // db to store identity data. The key of the versions map is the version name.
@@ -43,19 +44,47 @@ func New(db *mgo.Database, sp ServerParams, versions map[string]NewAPIHandlerFun
 	}
 	// Create the identities store.
 	pool, err := store.NewPool(db, store.StoreParams{
-		AuthUsername:        sp.AuthUsername,
-		AuthPassword:        sp.AuthPassword,
-		Key:                 sp.Key,
-		Location:            sp.Location,
 		ExternalGroupGetter: groupGetter,
 		MaxMgoSessions:      sp.MaxMgoSessions,
 		RequestTimeout:      sp.RequestTimeout,
-		PrivateAddr:         sp.PrivateAddr,
 		AdminAgentPublicKey: sp.AdminAgentPublicKey,
 	})
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot make store")
 	}
+
+	// Create the bakery parts.
+	if sp.Key == nil {
+		var err error
+		sp.Key, err = bakery.GenerateKey()
+		if err != nil {
+			return nil, errgo.Notef(err, "cannot generate key")
+		}
+	}
+	locator := bakery.NewThirdPartyStore()
+	locator.AddInfo(sp.Location, bakery.ThirdPartyInfo{
+		PublicKey: sp.Key.Public,
+		Version:   bakery.LatestVersion,
+	})
+	var rksf func([]bakery.Op) bakery.RootKeyStore
+	if sp.RootKeyStore != nil {
+		rksf = func([]bakery.Op) bakery.RootKeyStore {
+			return sp.RootKeyStore
+		}
+	}
+	oven := bakery.NewOven(bakery.OvenParams{
+		Namespace:          auth.Checker.Namespace(),
+		RootKeyStoreForOps: rksf,
+		Key:                sp.Key,
+		Locator:            locator,
+		Location:           "identity",
+	})
+	auth := auth.New(auth.Params{
+		AdminUsername:   sp.AuthUsername,
+		AdminPassword:   sp.AuthPassword,
+		Location:        sp.Location,
+		MacaroonOpStore: oven,
+	})
 
 	// Create the HTTP server.
 	srv := &Server{
@@ -74,7 +103,12 @@ func New(db *mgo.Database, sp ServerParams, versions map[string]NewAPIHandlerFun
 	srv.router.Handler("GET", "/metrics", prometheus.Handler())
 	srv.router.Handler("GET", "/static/*path", http.StripPrefix("/static", http.FileServer(sp.StaticFileSystem)))
 	for name, newAPI := range versions {
-		handlers, err := newAPI(pool, sp)
+		handlers, err := newAPI(HandlerParams{
+			ServerParams: sp,
+			Pool:         pool,
+			Oven:         oven,
+			Authorizer:   auth,
+		})
 		if err != nil {
 			return nil, errgo.Notef(err, "cannot create API %s", name)
 		}
@@ -119,6 +153,10 @@ type ServerParams struct {
 	// Place holds the meeting place that will be used for rendezvous
 	// within the identity server.
 	Place *meeting.Place
+
+	// RootKeyStore holds the root key store that will be used to
+	// store macaroon root keys within the identity server.
+	RootKeyStore bakery.RootKeyStore
 
 	// AuthUsername holds the username for admin login.
 	AuthUsername string
@@ -168,6 +206,22 @@ type ServerParams struct {
 	// Template contains a set of templates that are used to generate
 	// html output.
 	Template *template.Template
+}
+
+type HandlerParams struct {
+	ServerParams
+
+	// Pool contains a store.Pool that is used in handlers to get
+	// stores.
+	Pool *store.Pool
+
+	// Oven contains a bakery.Oven that should be used by handlers to
+	// mint new macaroons.
+	Oven *bakery.Oven
+
+	// Authorizer contains an auth.Authroizer that should be used by
+	// handlers to authorize requests.
+	Authorizer *auth.Authorizer
 }
 
 //notFound is the handler that is called when a handler cannot be found

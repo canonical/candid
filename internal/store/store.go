@@ -11,11 +11,9 @@ import (
 	"github.com/juju/idmclient/params"
 	"github.com/juju/loggo"
 	"github.com/prometheus/client_golang/prometheus"
-	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/names.v2"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
-	"gopkg.in/macaroon-bakery.v2-unstable/bakery/mgorootkeystore"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 
@@ -24,25 +22,14 @@ import (
 	"github.com/CanonicalLtd/blues-identity/internal/mongodoc"
 )
 
+const AdminUsername = "admin@idm"
+
 var logger = loggo.GetLogger("identity.internal.store")
 
 var ErrInvalidData = errgo.New("invalid data")
 
 // StoreParams contains configuration parameters for a store.
 type StoreParams struct {
-	// AuthUsername holds the username for admin login.
-	AuthUsername string
-
-	// AuthPassword holds the password for admin login.
-	AuthPassword string
-
-	// Key holds the keypair to use with the bakery service.
-	Key *bakery.KeyPair
-
-	// Location holds a URL representing the externally accessible
-	// base URL of the service, without a trailing slash.
-	Location string
-
 	// ExternalGroupGetter is used to retrieve external group information.
 	ExternalGroupGetter ExternalGroupGetter
 
@@ -53,11 +40,6 @@ type StoreParams struct {
 	// RequestTimeout holds the time to wait for a request to be able
 	// to start.
 	RequestTimeout time.Duration
-
-	// PrivateAddr should hold a dialable address that will be used
-	// for communication between identity servers. Note that this
-	// should not contain a port.
-	PrivateAddr string
 
 	// AdminAgentPublicKey contains the public key of the admin agent.
 	AdminAgentPublicKey *bakery.PublicKey
@@ -116,10 +98,8 @@ type Pool struct {
 	sessionPool *monitoredSessionPool
 	storePool   mempool.Pool
 
-	params       StoreParams
-	db           *mgo.Database
-	rootKeys     *mgorootkeystore.RootKeys
-	bakeryParams bakery.BakeryParams
+	params StoreParams
+	db     *mgo.Database
 
 	monitor *collectionMonitor
 }
@@ -129,9 +109,6 @@ func NewPool(db *mgo.Database, sp StoreParams) (*Pool, error) {
 	p := &Pool{
 		db:     db,
 		params: sp,
-	}
-	if sp.PrivateAddr == "" {
-		return nil, errgo.New("no private address configured")
 	}
 
 	sessionGauge := prometheus.NewGauge(prometheus.GaugeOpts{
@@ -148,38 +125,6 @@ func NewPool(db *mgo.Database, sp StoreParams) (*Pool, error) {
 		return p.newStore()
 	}
 
-	if p.params.Key == nil {
-		var err error
-		p.params.Key, err = bakery.GenerateKey()
-		if err != nil {
-			return nil, errgo.Notef(err, "cannot generate key")
-		}
-	}
-	locator := bakery.NewThirdPartyStore()
-	locator.AddInfo(p.params.Location, bakery.ThirdPartyInfo{
-		PublicKey: p.params.Key.Public,
-		Version:   bakery.LatestVersion,
-	})
-	p.rootKeys = mgorootkeystore.NewRootKeys(1000) // TODO(mhilton) make this configurable?
-
-	p.bakeryParams = bakery.BakeryParams{
-		Checker:        newChecker(),
-		Locator:        locator,
-		Key:            p.params.Key,
-		IdentityClient: identityClient{p.params.Location},
-		Authorizer: bakery.ACLAuthorizer{
-			AllowPublic: true,
-			GetACL: func(ctx context.Context, op bakery.Op) ([]string, error) {
-				store := storeFromContext(ctx)
-				if store == nil {
-					logger.Infof("GetACL found no store")
-					return nil, errgo.Newf("no store found")
-				}
-				return store.aclForOp(op)
-			},
-		},
-		Location: "identity",
-	}
 	s := p.GetNoLimit()
 	defer p.Put(s)
 	if err := s.ensureIndexes(); err != nil {
@@ -188,10 +133,6 @@ func NewPool(db *mgo.Database, sp StoreParams) (*Pool, error) {
 	if err := s.ensureAdminUser(sp); err != nil {
 		return nil, errgo.Notef(err, "cannot create admin user")
 	}
-	if err := p.rootKeys.EnsureIndex(s.DB.Macaroons()); err != nil {
-		return nil, errgo.Notef(err, "cannot ensure indexes")
-	}
-
 	p.monitor = newCollectionMonitor(p, "identities", "macaroons", "meeting")
 	if err := prometheus.Register(p.monitor); err != nil {
 		logger.Warningf("could not register collection monitor: %v", err)
@@ -285,9 +226,6 @@ type Store struct {
 	// DB holds the mongodb-backed identity store.
 	DB StoreDatabase
 
-	// Bakery holds a *bakery.Bakery that can be used to make and check macaroons.
-	Bakery *bakery.Bakery
-
 	// pool holds the pool which created this Store.
 	pool *Pool
 }
@@ -305,14 +243,6 @@ func (p *Pool) newStore() *Store {
 // (assuming the session is valid).
 func (s *Store) setSession(session *mgo.Session) {
 	s.DB.Database = s.pool.db.With(session)
-	bp := s.pool.bakeryParams
-	bp.RootKeyStore = s.pool.rootKeys.NewStore(
-		s.DB.Macaroons(),
-		mgorootkeystore.Policy{
-			ExpiryDuration: 365 * 24 * time.Hour,
-		},
-	)
-	s.Bakery = bakery.New(bp)
 }
 
 func (s *Store) ensureIndexes() error {
@@ -651,4 +581,18 @@ func (cm *collectionMonitor) Collect(c chan<- prometheus.Metric) {
 		}
 		c <- entry.m
 	}
+}
+
+// GetUserGroups retrieves externally stored groups for the user with the
+// given id.
+func GetUserGroups(store *Store, externalID string) []string {
+	var lpGroups []string
+	if getter := store.pool.params.ExternalGroupGetter; getter != nil {
+		var err error
+		lpGroups, err = getter.GetGroups(externalID)
+		if err != nil {
+			logger.Errorf("Failed to get launchpad groups for user: %s", err)
+		}
+	}
+	return lpGroups
 }
