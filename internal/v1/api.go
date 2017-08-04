@@ -24,7 +24,6 @@ import (
 	"github.com/CanonicalLtd/blues-identity/internal/mempool"
 	"github.com/CanonicalLtd/blues-identity/internal/monitoring"
 	"github.com/CanonicalLtd/blues-identity/internal/store"
-	"github.com/CanonicalLtd/blues-identity/mgoctx"
 )
 
 var logger = loggo.GetLogger("identity.internal.v1")
@@ -128,7 +127,6 @@ func (h *Handler) getHandler(ctx context.Context, t trace.Trace) (*handler, cont
 	}
 	hnd.tracef(false, "store acquired")
 	ctx = store.ContextWithStore(ctx, hnd.store)
-	ctx = mgoctx.ContextWithSession(ctx, hnd.store.DB.Session)
 	return hnd, ctx, nil
 }
 

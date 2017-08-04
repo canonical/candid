@@ -13,34 +13,43 @@ import (
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
 	"gopkg.in/mgo.v2/bson"
 
+	"github.com/CanonicalLtd/blues-identity/mgostore"
 	"github.com/CanonicalLtd/blues-identity/store"
-	"github.com/CanonicalLtd/blues-identity/store/mgostore"
 )
 
 var pk1 = bakery.MustGenerateKey().Public
 
-type mgostoreSuite struct {
+type storeSuite struct {
 	testing.IsolatedMgoSuite
-	store store.Store
+	db           *mgostore.Database
+	store        store.Store
+	context      context.Context
+	contextClose func()
 }
 
-var _ = gc.Suite(&mgostoreSuite{})
+var _ = gc.Suite(&storeSuite{})
 
-func (s *mgostoreSuite) SetUpTest(c *gc.C) {
+func (s *storeSuite) SetUpTest(c *gc.C) {
 	s.IsolatedMgoSuite.SetUpTest(c)
 	var err error
-	s.store, err = mgostore.NewStore(s.Session.DB("identity-test"))
+	s.db, err = mgostore.NewDatabase(s.Session.DB("idm-test"))
 	c.Assert(err, gc.Equals, nil)
+	s.store = s.db.Store()
+	s.context, s.contextClose = s.store.Context(context.Background())
 }
 
-func (s *mgostoreSuite) TestInsertIdentity(c *gc.C) {
-	ctx := mgostore.ContextWithSession(context.Background(), s.Session)
+func (s *storeSuite) TearDownTest(c *gc.C) {
+	s.contextClose()
+	s.db.Close()
+	s.IsolatedMgoSuite.TearDownTest(c)
+}
 
+func (s *storeSuite) TestInsertIdentity(c *gc.C) {
 	identity := store.Identity{
 		ProviderID: store.MakeProviderIdentity("test", "test-user"),
 		Username:   "test-user",
 	}
-	err := s.store.UpdateIdentity(ctx, &identity, store.Update{
+	err := s.store.UpdateIdentity(s.context, &identity, store.Update{
 		store.Username: store.Set,
 	})
 	c.Assert(err, gc.Equals, nil)
@@ -49,14 +58,12 @@ func (s *mgostoreSuite) TestInsertIdentity(c *gc.C) {
 	identity2 := store.Identity{
 		ID: identity.ID,
 	}
-	err = s.store.Identity(ctx, &identity2)
+	err = s.store.Identity(s.context, &identity2)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(identity2, jc.DeepEquals, identity)
 }
 
-func (s *mgostoreSuite) TestUpdateIdentity(c *gc.C) {
-	ctx := mgostore.ContextWithSession(context.Background(), s.Session)
-
+func (s *storeSuite) TestUpdateIdentity(c *gc.C) {
 	identity := store.Identity{
 		ProviderID: store.MakeProviderIdentity("test", "test-user"),
 		Username:   "test-user",
@@ -68,7 +75,7 @@ func (s *mgostoreSuite) TestUpdateIdentity(c *gc.C) {
 		PublicKeys: []bakery.PublicKey{pk1},
 		LastLogin:  bson.Now(),
 	}
-	err := s.store.UpdateIdentity(ctx, &identity, store.Update{
+	err := s.store.UpdateIdentity(s.context, &identity, store.Update{
 		store.Username:     store.Set,
 		store.Name:         store.Set,
 		store.PublicKeys:   store.Set,
@@ -86,7 +93,7 @@ func (s *mgostoreSuite) TestUpdateIdentity(c *gc.C) {
 		"ef1": {"v1"},
 	}
 	identity.LastDischarge = bson.Now()
-	err = s.store.UpdateIdentity(ctx, &identity, store.Update{
+	err = s.store.UpdateIdentity(s.context, &identity, store.Update{
 		store.Name:          store.Clear,
 		store.Groups:        store.Push,
 		store.PublicKeys:    store.Pull,
@@ -99,7 +106,7 @@ func (s *mgostoreSuite) TestUpdateIdentity(c *gc.C) {
 	identity2 := store.Identity{
 		ID: identity.ID,
 	}
-	err = s.store.Identity(ctx, &identity2)
+	err = s.store.Identity(s.context, &identity2)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(identity2, jc.DeepEquals, store.Identity{
 		ID:            identity.ID,
@@ -118,14 +125,12 @@ func (s *mgostoreSuite) TestUpdateIdentity(c *gc.C) {
 	})
 }
 
-func (s *mgostoreSuite) TestUpdateDuplicateUser(c *gc.C) {
-	ctx := mgostore.ContextWithSession(context.Background(), s.Session)
-
+func (s *storeSuite) TestUpdateDuplicateUser(c *gc.C) {
 	identity := store.Identity{
 		ProviderID: store.MakeProviderIdentity("test", "test-user-1"),
 		Username:   "test-user",
 	}
-	err := s.store.UpdateIdentity(ctx, &identity, store.Update{
+	err := s.store.UpdateIdentity(s.context, &identity, store.Update{
 		store.Username: store.Set,
 	})
 	c.Assert(err, gc.Equals, nil)
@@ -134,27 +139,25 @@ func (s *mgostoreSuite) TestUpdateDuplicateUser(c *gc.C) {
 		ProviderID: store.MakeProviderIdentity("test", "test-user-2"),
 		Username:   "test-user-2",
 	}
-	err = s.store.UpdateIdentity(ctx, &identity2, store.Update{
+	err = s.store.UpdateIdentity(s.context, &identity2, store.Update{
 		store.Username: store.Set,
 	})
 	c.Assert(err, gc.Equals, nil)
 
 	identity2.Username = "test-user"
-	err = s.store.UpdateIdentity(ctx, &identity2, store.Update{
+	err = s.store.UpdateIdentity(s.context, &identity2, store.Update{
 		store.Username: store.Set,
 	})
 	c.Assert(errgo.Cause(err), gc.Equals, store.ErrDuplicateUsername)
 	c.Assert(err, gc.ErrorMatches, `username test-user already in use`)
 }
 
-func (s *mgostoreSuite) TestUpsertDuplicateUser(c *gc.C) {
-	ctx := mgostore.ContextWithSession(context.Background(), s.Session)
-
+func (s *storeSuite) TestUpsertDuplicateUser(c *gc.C) {
 	identity := store.Identity{
 		ProviderID: store.MakeProviderIdentity("test", "test-user-1"),
 		Username:   "test-user",
 	}
-	err := s.store.UpdateIdentity(ctx, &identity, store.Update{
+	err := s.store.UpdateIdentity(s.context, &identity, store.Update{
 		store.Username: store.Set,
 	})
 	c.Assert(err, gc.Equals, nil)
@@ -163,42 +166,36 @@ func (s *mgostoreSuite) TestUpsertDuplicateUser(c *gc.C) {
 		ProviderID: store.MakeProviderIdentity("test", "test-user-2"),
 		Username:   "test-user",
 	}
-	err = s.store.UpdateIdentity(ctx, &identity2, store.Update{
+	err = s.store.UpdateIdentity(s.context, &identity2, store.Update{
 		store.Username: store.Set,
 	})
 	c.Assert(errgo.Cause(err), gc.Equals, store.ErrDuplicateUsername)
 	c.Assert(err, gc.ErrorMatches, `username test-user already in use`)
 }
 
-func (s *mgostoreSuite) TestUpdateNotFound(c *gc.C) {
-	ctx := mgostore.ContextWithSession(context.Background(), s.Session)
-
+func (s *storeSuite) TestUpdateNotFound(c *gc.C) {
 	identity := store.Identity{
 		Username: "test-user",
 	}
-	err := s.store.UpdateIdentity(ctx, &identity, store.Update{
+	err := s.store.UpdateIdentity(s.context, &identity, store.Update{
 		store.Username: store.Set,
 	})
 	c.Assert(errgo.Cause(err), gc.Equals, store.ErrNotFound)
 	c.Assert(err, gc.ErrorMatches, `user test-user not found`)
 }
 
-func (s *mgostoreSuite) TestUpdateNotFoundNoQuery(c *gc.C) {
-	ctx := mgostore.ContextWithSession(context.Background(), s.Session)
-
+func (s *storeSuite) TestUpdateNotFoundNoQuery(c *gc.C) {
 	identity := store.Identity{
 		Name: "Test User",
 	}
-	err := s.store.UpdateIdentity(ctx, &identity, store.Update{
+	err := s.store.UpdateIdentity(s.context, &identity, store.Update{
 		store.Name: store.Set,
 	})
 	c.Assert(errgo.Cause(err), gc.Equals, store.ErrNotFound)
 	c.Assert(err, gc.ErrorMatches, `identity not specified`)
 }
 
-func (s *mgostoreSuite) TestIdentity(c *gc.C) {
-	ctx := mgostore.ContextWithSession(context.Background(), s.Session)
-
+func (s *storeSuite) TestIdentity(c *gc.C) {
 	identity := store.Identity{
 		ProviderID:    store.MakeProviderIdentity("test", "test-user"),
 		Username:      "test-user",
@@ -215,7 +212,7 @@ func (s *mgostoreSuite) TestIdentity(c *gc.C) {
 			"ef1": {"ef1v1", "ef1v2"},
 		},
 	}
-	err := s.store.UpdateIdentity(ctx, &identity, store.Update{
+	err := s.store.UpdateIdentity(s.context, &identity, store.Update{
 		store.Username:      store.Set,
 		store.Name:          store.Set,
 		store.Email:         store.Set,
@@ -231,52 +228,46 @@ func (s *mgostoreSuite) TestIdentity(c *gc.C) {
 	identity2 := store.Identity{
 		ID: identity.ID,
 	}
-	err = s.store.Identity(ctx, &identity2)
+	err = s.store.Identity(s.context, &identity2)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(identity2, jc.DeepEquals, identity)
 
 	identity3 := store.Identity{
 		ProviderID: identity.ProviderID,
 	}
-	err = s.store.Identity(ctx, &identity3)
+	err = s.store.Identity(s.context, &identity3)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(identity3, jc.DeepEquals, identity)
 
 	identity4 := store.Identity{
 		Username: identity.Username,
 	}
-	err = s.store.Identity(ctx, &identity4)
+	err = s.store.Identity(s.context, &identity4)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(identity4, jc.DeepEquals, identity)
 }
 
-func (s *mgostoreSuite) TestIdentityNotFound(c *gc.C) {
-	ctx := mgostore.ContextWithSession(context.Background(), s.Session)
-
+func (s *storeSuite) TestIdentityNotFound(c *gc.C) {
 	identity := store.Identity{
 		Username: "no-such-user",
 	}
-	err := s.store.Identity(ctx, &identity)
+	err := s.store.Identity(s.context, &identity)
 	c.Assert(errgo.Cause(err), gc.Equals, store.ErrNotFound)
 	c.Assert(err, gc.ErrorMatches, `user no-such-user not found`)
 }
 
-func (s *mgostoreSuite) TestIdentityNotFoundNoQuery(c *gc.C) {
-	ctx := mgostore.ContextWithSession(context.Background(), s.Session)
-
+func (s *storeSuite) TestIdentityNotFoundNoQuery(c *gc.C) {
 	identity := store.Identity{}
-	err := s.store.Identity(ctx, &identity)
+	err := s.store.Identity(s.context, &identity)
 	c.Assert(errgo.Cause(err), gc.Equals, store.ErrNotFound)
 	c.Assert(err, gc.ErrorMatches, `identity not specified`)
 }
 
-func (s *mgostoreSuite) TestIdentityNotFoundBadID(c *gc.C) {
-	ctx := mgostore.ContextWithSession(context.Background(), s.Session)
-
+func (s *storeSuite) TestIdentityNotFoundBadID(c *gc.C) {
 	identity := store.Identity{
 		ID: "1234",
 	}
-	err := s.store.Identity(ctx, &identity)
+	err := s.store.Identity(s.context, &identity)
 	c.Assert(errgo.Cause(err), gc.Equals, store.ErrNotFound)
 	c.Assert(err, gc.ErrorMatches, `identity "1234" not found`)
 }
@@ -484,9 +475,7 @@ var findIdentitiesTests = []struct {
 	expect: []int{6, 5, 4},
 }}
 
-func (s *mgostoreSuite) TestFindIdentities(c *gc.C) {
-	ctx := mgostore.ContextWithSession(context.Background(), s.Session)
-
+func (s *storeSuite) TestFindIdentities(c *gc.C) {
 	for i := range testIdentities {
 		var update store.Update
 		if testIdentities[i].Username != "" {
@@ -516,13 +505,13 @@ func (s *mgostoreSuite) TestFindIdentities(c *gc.C) {
 		if len(testIdentities[i].ExtraInfo) > 0 {
 			update[store.ExtraInfo] = store.Set
 		}
-		err := s.store.UpdateIdentity(ctx, &testIdentities[i], update)
+		err := s.store.UpdateIdentity(s.context, &testIdentities[i], update)
 		c.Assert(err, gc.Equals, nil)
 	}
 
 	for i, test := range findIdentitiesTests {
 		c.Logf("%d. %s", i, test.about)
-		identities, err := s.store.FindIdentities(ctx, &test.ref, test.filter, test.sort, test.skip, test.limit)
+		identities, err := s.store.FindIdentities(s.context, &test.ref, test.filter, test.sort, test.skip, test.limit)
 		c.Assert(err, gc.Equals, nil)
 		c.Assert(len(identities), gc.Equals, len(test.expect))
 		for i, identity := range identities {

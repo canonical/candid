@@ -24,7 +24,7 @@ import (
 	"github.com/CanonicalLtd/blues-identity/idp"
 	"github.com/CanonicalLtd/blues-identity/internal/monitoring"
 	"github.com/CanonicalLtd/blues-identity/meeting"
-	"github.com/CanonicalLtd/blues-identity/meeting/mgomeeting"
+	"github.com/CanonicalLtd/blues-identity/mgostore"
 )
 
 const (
@@ -79,7 +79,7 @@ type DischargeSuite struct {
 	serverKey    *bakery.KeyPair
 	srv          identity.HandlerCloser
 	meetingPlace *meeting.Place
-	meetingStore *mgomeeting.Store
+	database     *mgostore.Database
 
 	adminAgentKey *bakery.KeyPair
 }
@@ -94,9 +94,9 @@ func (s *DischargeSuite) SetUpTest(c *gc.C) {
 	s.adminAgentKey, err = bakery.GenerateKey()
 	c.Assert(err, gc.IsNil)
 	db := s.Session.Copy().DB("idptest")
-	s.meetingStore, err = mgomeeting.NewStore(db.C("meeting"))
+	s.database, err = mgostore.NewDatabase(db)
 	c.Assert(err, gc.IsNil)
-	s.meetingPlace, err = meeting.NewPlace(s.meetingStore, monitoring.NewMeetingMetrics(), "localhost")
+	s.meetingPlace, err = meeting.NewPlace(s.database.MeetingStore(), monitoring.NewMeetingMetrics(), "localhost")
 	c.Assert(err, gc.IsNil)
 	s.srv, err = identity.NewServer(db, identity.ServerParams{
 		Place:               s.meetingPlace,
@@ -146,7 +146,7 @@ func (s *DischargeSuite) TearDownTest(c *gc.C) {
 	s.Server.Close()
 	s.srv.Close()
 	s.meetingPlace.Close()
-	s.meetingStore.Close()
+	s.database.Close()
 	s.IsolatedMgoSuite.TearDownTest(c)
 }
 

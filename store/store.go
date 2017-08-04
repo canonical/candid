@@ -88,6 +88,17 @@ type Sort struct {
 // Store is the interface that represents the data storage mechanism for
 // the identity manager.
 type Store interface {
+	// Context returns a context that is suitable for passing to the
+	// other store methods. Store methods called with such a context
+	// will be sequentially consistent; for example, a value that is
+	// set in UpdateIdentity will immediately be available from
+	// Identity.
+	// 
+	// The returned close function must be called when the returned
+	// context will no longer be used, to allow for any required
+	// cleanup.
+	Context(ctx context.Context) (_ context.Context, close func())
+
 	// Identity reads the given identity from persistant storage and
 	// completes all the fields. The given identity will be matched
 	// using the first non-zero value of ID, ProviderID or Username.
