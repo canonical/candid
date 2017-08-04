@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/CanonicalLtd/blues-identity/internal/store"
 	"github.com/juju/httprequest"
 	"github.com/juju/idmclient/params"
 	"github.com/juju/utils"
@@ -16,6 +15,8 @@ import (
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
 	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
 	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery/agent"
+
+	"github.com/CanonicalLtd/blues-identity/internal/auth"
 )
 
 const (
@@ -80,8 +81,8 @@ func (h *dischargeHandler) agentLogin(ctx context.Context, req *http.Request, wa
 	}
 	vers := httpbakery.RequestVersion(req)
 	ctx = httpbakery.ContextWithRequest(ctx, req)
-	ctx = store.ContextWithStore(ctx, h.store)
-	_, err := h.store.Bakery.Checker.Auth(httpbakery.RequestMacaroons(req)...).Allow(ctx, loginOp)
+	ctx = auth.ContextWithStore(ctx, h.store)
+	_, err := h.h.auth.Auth(ctx, httpbakery.RequestMacaroons(req), loginOp)
 	if err == nil {
 		if err := h.completeLogin(ctx, waitID, vers, user, time.Now().Add(agentMacaroonDuration)); err != nil {
 			return nil, errgo.Mask(err)
@@ -113,13 +114,13 @@ func (h *dischargeHandler) agentLogin(ctx context.Context, req *http.Request, wa
 // agentMacaroon creates a new macaroon containing a local third-party
 // caveat addressed to the specified agent.
 func (h *dischargeHandler) agentMacaroon(ctx context.Context, vers bakery.Version, op bakery.Op, user params.Username, key *bakery.PublicKey) (*bakery.Macaroon, error) {
-	m, err := h.store.Bakery.Oven.NewMacaroon(
+	m, err := h.h.oven.NewMacaroon(
 		ctx,
 		vers,
 		time.Now().Add(agentLoginMacaroonDuration),
 		[]checkers.Caveat{
 			bakery.LocalThirdPartyCaveat(key, vers),
-			store.UserHasPublicKeyCaveat(user, key),
+			auth.UserHasPublicKeyCaveat(user, key),
 		},
 		op,
 	)

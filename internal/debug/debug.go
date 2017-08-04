@@ -21,8 +21,8 @@ import (
 
 var logger = loggo.GetLogger("identity.internal.debug")
 
-func NewAPIHandler(pool *store.Pool, params identity.ServerParams) ([]httprequest.Handler, error) {
-	h := newDebugAPIHandler(pool, params)
+func NewAPIHandler(params identity.HandlerParams) ([]httprequest.Handler, error) {
+	h := newDebugAPIHandler(params)
 	handlers := []httprequest.Handler{{
 		Method: "GET",
 		Path:   "/debug/login",
@@ -38,7 +38,7 @@ func NewAPIHandler(pool *store.Pool, params identity.ServerParams) ([]httpreques
 	return handlers, nil
 }
 
-func newDebugAPIHandler(pool *store.Pool, params identity.ServerParams) *debugAPIHandler {
+func newDebugAPIHandler(params identity.HandlerParams) *debugAPIHandler {
 	nonceDB := ""
 	for _, idp := range params.IdentityProviders {
 		if idp.Name() == "usso" {
@@ -47,8 +47,8 @@ func newDebugAPIHandler(pool *store.Pool, params identity.ServerParams) *debugAP
 		}
 	}
 	return &debugAPIHandler{
-		pool:    pool,
-		params:  params,
+		pool:    params.Pool,
+		params:  params.ServerParams,
 		nonceDB: nonceDB,
 	}
 }

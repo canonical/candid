@@ -14,6 +14,7 @@ import (
 	"gopkg.in/mgo.v2"
 
 	"github.com/CanonicalLtd/blues-identity/idp"
+	"github.com/CanonicalLtd/blues-identity/internal/auth"
 	"github.com/CanonicalLtd/blues-identity/internal/identity"
 	"github.com/CanonicalLtd/blues-identity/internal/store"
 	"github.com/CanonicalLtd/blues-identity/internal/v1"
@@ -29,9 +30,7 @@ var _ = gc.Suite(&idpSuite{})
 
 func (s *idpSuite) SetUpTest(c *gc.C) {
 	s.IsolatedMgoSuite.SetUpTest(c)
-	key, err := bakery.GenerateKey()
-	c.Assert(err, gc.IsNil)
-	s.hnd, s.pool = s.newHandler(c, s.Session.Copy(), key)
+	s.hnd, s.pool = s.newHandler(c, s.Session.Copy())
 }
 
 func (s *idpSuite) TearDownTest(c *gc.C) {
@@ -39,26 +38,33 @@ func (s *idpSuite) TearDownTest(c *gc.C) {
 	s.IsolatedMgoSuite.TearDownTest(c)
 }
 
-func (s *idpSuite) newHandler(c *gc.C, session *mgo.Session, key *bakery.KeyPair) (*v1.Handler, *store.Pool) {
+func (s *idpSuite) newHandler(c *gc.C, session *mgo.Session) (*v1.Handler, *store.Pool) {
 	db := session.DB("testing")
 	sp := identity.ServerParams{
 		AuthUsername:   adminUsername,
 		AuthPassword:   adminPassword,
-		Key:            key,
 		Location:       location,
 		MaxMgoSessions: 50,
 		PrivateAddr:    "localhost",
 	}
 	pool, err := store.NewPool(db, store.StoreParams{
-		AuthUsername:   sp.AuthUsername,
-		AuthPassword:   sp.AuthPassword,
-		Key:            sp.Key,
-		Location:       sp.Location,
 		MaxMgoSessions: sp.MaxMgoSessions,
-		PrivateAddr:    sp.PrivateAddr,
+	})
+	oven := bakery.NewOven(bakery.OvenParams{
+		Location: "identity",
+	})
+	auth := auth.New(auth.Params{
+		AdminUsername:   adminUsername,
+		AdminPassword:   adminPassword,
+		MacaroonOpStore: oven,
 	})
 	c.Assert(err, gc.IsNil)
-	hnd := v1.New(pool, sp)
+	hnd := v1.New(identity.HandlerParams{
+		ServerParams: sp,
+		Pool:         pool,
+		Oven:         oven,
+		Authorizer:   auth,
+	})
 	return hnd, pool
 }
 
@@ -288,16 +294,19 @@ func (s *idpSuite) TestInit(c *gc.C) {
 	}
 	key, err := bakery.GenerateKey()
 	c.Assert(err, gc.IsNil)
-	_, err = v1.NewAPIHandler(s.pool, identity.ServerParams{
-		AuthUsername:   adminUsername,
-		AuthPassword:   adminPassword,
-		Key:            key,
-		Location:       location,
-		MaxMgoSessions: 50,
-		PrivateAddr:    "localhost",
-		IdentityProviders: []idp.IdentityProvider{
-			tidp,
+	_, err = v1.NewAPIHandler(identity.HandlerParams{
+		ServerParams: identity.ServerParams{
+			AuthUsername:   adminUsername,
+			AuthPassword:   adminPassword,
+			Key:            key,
+			Location:       location,
+			MaxMgoSessions: 50,
+			PrivateAddr:    "localhost",
+			IdentityProviders: []idp.IdentityProvider{
+				tidp,
+			},
 		},
+		Pool: s.pool,
 	})
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(hasRun, gc.Equals, true)
@@ -315,16 +324,19 @@ func (s *idpSuite) TestInitError(c *gc.C) {
 	}
 	key, err := bakery.GenerateKey()
 	c.Assert(err, gc.IsNil)
-	_, err = v1.NewAPIHandler(s.pool, identity.ServerParams{
-		AuthUsername:   adminUsername,
-		AuthPassword:   adminPassword,
-		Key:            key,
-		Location:       location,
-		MaxMgoSessions: 50,
-		PrivateAddr:    "localhost",
-		IdentityProviders: []idp.IdentityProvider{
-			tidp,
+	_, err = v1.NewAPIHandler(identity.HandlerParams{
+		ServerParams: identity.ServerParams{
+			AuthUsername:   adminUsername,
+			AuthPassword:   adminPassword,
+			Key:            key,
+			Location:       location,
+			MaxMgoSessions: 50,
+			PrivateAddr:    "localhost",
+			IdentityProviders: []idp.IdentityProvider{
+				tidp,
+			},
 		},
+		Pool: s.pool,
 	})
 	c.Assert(err, gc.ErrorMatches, "test error")
 	c.Assert(hasRun, gc.Equals, true)

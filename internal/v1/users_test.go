@@ -24,6 +24,7 @@ import (
 	"gopkg.in/macaroon.v2-unstable"
 	"gopkg.in/mgo.v2/bson"
 
+	"github.com/CanonicalLtd/blues-identity/internal/auth"
 	"github.com/CanonicalLtd/blues-identity/internal/mongodoc"
 	"github.com/CanonicalLtd/blues-identity/internal/store"
 )
@@ -1344,8 +1345,6 @@ func (s *usersSuite) TestUserIDPGroups(c *gc.C) {
 }
 
 func (s *usersSuite) TestUserGroups(c *gc.C) {
-	st := s.pool.GetNoLimit()
-	defer s.pool.Put(st)
 	s.createUser(c, &params.User{
 		Username:   "test",
 		ExternalID: "http://example.com/test",
@@ -1378,7 +1377,7 @@ func (s *usersSuite) TestUserGroups(c *gc.C) {
 		Email:      "grouplister@example.com",
 		FullName:   "Group Lister",
 		IDPGroups: []string{
-			store.GroupListGroup,
+			auth.GroupListGroup,
 		},
 	})
 	s.createUser(c, &params.User{
@@ -1452,7 +1451,7 @@ func (s *usersSuite) TestUserGroups(c *gc.C) {
 		if test.password != "" {
 			un = test.username
 		} else if test.username != "" {
-			cookies = cookiesForUser(st, test.username)
+			cookies = cookiesForUser(s.bakery, test.username)
 		}
 		httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 			Handler:      s.srv,
@@ -1467,8 +1466,6 @@ func (s *usersSuite) TestUserGroups(c *gc.C) {
 }
 
 func (s *usersSuite) TestWhoAmIWithAuthenticatedUser(c *gc.C) {
-	st := s.pool.GetNoLimit()
-	defer s.pool.Put(st)
 	s.createUser(c, &params.User{
 		Username:   "bob",
 		ExternalID: "http://example.com/bob",
@@ -1478,7 +1475,7 @@ func (s *usersSuite) TestWhoAmIWithAuthenticatedUser(c *gc.C) {
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Handler: s.srv,
 		URL:     apiURL("whoami"),
-		Cookies: cookiesForUser(st, "bob"),
+		Cookies: cookiesForUser(s.bakery, "bob"),
 		ExpectBody: params.WhoAmIResponse{
 			User: "bob",
 		},
@@ -1486,8 +1483,6 @@ func (s *usersSuite) TestWhoAmIWithAuthenticatedUser(c *gc.C) {
 }
 
 func (s *usersSuite) TestWhoAmIWithNoUser(c *gc.C) {
-	st := s.pool.GetNoLimit()
-	defer s.pool.Put(st)
 	rec := httptesting.DoRequest(c, httptesting.DoRequestParams{
 		Handler: s.srv,
 		URL:     apiURL("whoami"),
@@ -1550,8 +1545,6 @@ var setUserGroupsTests = []struct {
 }}
 
 func (s *usersSuite) TestSetUserGroups(c *gc.C) {
-	store := s.pool.GetNoLimit()
-	defer s.pool.Put(store)
 	for i, test := range setUserGroupsTests {
 		c.Logf("test %d. %s", i, test.about)
 		username := params.Username(fmt.Sprintf("test-%d", i))
@@ -1564,7 +1557,7 @@ func (s *usersSuite) TestSetUserGroups(c *gc.C) {
 		}
 		var cookies []*http.Cookie
 		if test.username == "" {
-			cookies = cookiesForUser(store, string(username))
+			cookies = cookiesForUser(s.bakery, string(username))
 		}
 		httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 			Handler:      s.srv,
@@ -1671,8 +1664,6 @@ var modifyUserGroupsTests = []struct {
 }}
 
 func (s *usersSuite) TestModifyUserGroups(c *gc.C) {
-	store := s.pool.GetNoLimit()
-	defer s.pool.Put(store)
 	for i, test := range modifyUserGroupsTests {
 		c.Logf("test %d. %s", i, test.about)
 		username := params.Username(fmt.Sprintf("test-%d", i))
@@ -1685,7 +1676,7 @@ func (s *usersSuite) TestModifyUserGroups(c *gc.C) {
 		}
 		var cookies []*http.Cookie
 		if test.username == "" {
-			cookies = cookiesForUser(store, string(username))
+			cookies = cookiesForUser(s.bakery, string(username))
 		}
 		httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 			Handler:  s.srv,
@@ -1927,8 +1918,6 @@ func (s *usersSuite) TestExtraInfo(c *gc.C) {
 }
 
 func (s *usersSuite) TestMultipleEndpointAccess(c *gc.C) {
-	store := s.pool.GetNoLimit()
-	defer s.pool.Put(store)
 	s.createIdentity(c, &mongodoc.Identity{
 		Username:   "test",
 		ExternalID: "https://example.com/test",
@@ -1948,7 +1937,7 @@ func (s *usersSuite) TestMultipleEndpointAccess(c *gc.C) {
 
 	u, err := url.Parse(location)
 	c.Assert(err, gc.IsNil)
-	client.Client.Jar.SetCookies(u, cookiesForUser(store, "jbloggs1@test"))
+	client.Client.Jar.SetCookies(u, cookiesForUser(s.bakery, "jbloggs1@test"))
 	req, err := http.NewRequest("GET", location+"/v1/u/jbloggs1@test/groups", nil)
 	c.Assert(err, gc.IsNil)
 	resp, err := client.Do(req)
@@ -1973,17 +1962,17 @@ func (s *usersSuite) TestMultipleEndpointAccess(c *gc.C) {
 	})
 }
 
-func cookiesForUser(st *store.Store, username string) []*http.Cookie {
-	m := macaroonForUser(st, username)
-	cookie, err := httpbakery.NewCookie(st.Bakery.Checker.Namespace(), macaroon.Slice{m.M()})
+func cookiesForUser(b *bakery.Bakery, username string) []*http.Cookie {
+	m := macaroonForUser(b, username)
+	cookie, err := httpbakery.NewCookie(b.Checker.Namespace(), macaroon.Slice{m.M()})
 	if err != nil {
 		panic(err)
 	}
 	return []*http.Cookie{cookie}
 }
 
-func macaroonForUser(st *store.Store, username string) *bakery.Macaroon {
-	m, err := st.Bakery.Oven.NewMacaroon(context.TODO(), bakery.LatestVersion, time.Now().Add(time.Minute), []checkers.Caveat{
+func macaroonForUser(b *bakery.Bakery, username string) *bakery.Macaroon {
+	m, err := b.Oven.NewMacaroon(context.TODO(), bakery.LatestVersion, time.Now().Add(time.Minute), []checkers.Caveat{
 		checkers.DeclaredCaveat("username", username),
 	}, bakery.LoginOp)
 	if err != nil {

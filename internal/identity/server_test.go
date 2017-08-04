@@ -20,7 +20,6 @@ import (
 	gc "gopkg.in/check.v1"
 
 	"github.com/CanonicalLtd/blues-identity/internal/identity"
-	"github.com/CanonicalLtd/blues-identity/internal/store"
 )
 
 type serverSuite struct {
@@ -45,7 +44,7 @@ type versionResponse struct {
 func (s *serverSuite) TestNewServerWithVersions(c *gc.C) {
 	db := s.Session.Copy().DB("foo")
 	serveVersion := func(vers string) identity.NewAPIHandlerFunc {
-		return func(*store.Pool, identity.ServerParams) ([]httprequest.Handler, error) {
+		return func(identity.HandlerParams) ([]httprequest.Handler, error) {
 			return []httprequest.Handler{{
 				Method: "GET",
 				Path:   "/" + vers + "/*path",
@@ -103,7 +102,7 @@ func (s *serverSuite) TestNewServerWithVersions(c *gc.C) {
 func (s *serverSuite) TestServerHasAccessControlAllowHeaders(c *gc.C) {
 	db := s.Session.Copy().DB("foo")
 	impl := map[string]identity.NewAPIHandlerFunc{
-		"/a": func(*store.Pool, identity.ServerParams) ([]httprequest.Handler, error) {
+		"/a": func(identity.HandlerParams) ([]httprequest.Handler, error) {
 			return []httprequest.Handler{{
 				Method: "GET",
 				Path:   "/a",
@@ -148,7 +147,7 @@ func (s *serverSuite) TestServerPanicRecovery(c *gc.C) {
 	loggo.RegisterWriter("test", w)
 	db := s.Session.Copy().DB("foo")
 	impl := map[string]identity.NewAPIHandlerFunc{
-		"/a": func(*store.Pool, identity.ServerParams) ([]httprequest.Handler, error) {
+		"/a": func(identity.HandlerParams) ([]httprequest.Handler, error) {
 			return []httprequest.Handler{{
 				Method: "GET",
 				Path:   "/a",
@@ -179,7 +178,7 @@ func (s *serverSuite) TestServerPanicRecovery(c *gc.C) {
 func (s *serverSuite) TestServerStaticFiles(c *gc.C) {
 	db := s.Session.Copy().DB("foo")
 	serveVersion := func(vers string) identity.NewAPIHandlerFunc {
-		return func(*store.Pool, identity.ServerParams) ([]httprequest.Handler, error) {
+		return func(identity.HandlerParams) ([]httprequest.Handler, error) {
 			return []httprequest.Handler{{
 				Method: "GET",
 				Path:   "/" + vers + "/*path",

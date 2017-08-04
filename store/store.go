@@ -93,7 +93,7 @@ type Store interface {
 	// will be sequentially consistent; for example, a value that is
 	// set in UpdateIdentity will immediately be available from
 	// Identity.
-	// 
+	//
 	// The returned close function must be called when the returned
 	// context will no longer be used, to allow for any required
 	// cleanup.

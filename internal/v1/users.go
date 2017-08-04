@@ -17,8 +17,10 @@ import (
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
 	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
+	macaroon "gopkg.in/macaroon.v2-unstable"
 	"gopkg.in/mgo.v2/bson"
 
+	"github.com/CanonicalLtd/blues-identity/internal/auth"
 	"github.com/CanonicalLtd/blues-identity/internal/mongodoc"
 	"github.com/CanonicalLtd/blues-identity/internal/store"
 )
@@ -138,7 +140,7 @@ func checkMemberOfAllGroups(ctx context.Context, groups []string) error {
 		return errgo.Notef(err, "cannot get groups")
 	}
 	// Admins are considered to be a member of all groups.
-	for _, g := range store.AdminACL {
+	for _, g := range auth.AdminACL {
 		if string(id) == g {
 			return nil
 		}
@@ -189,7 +191,7 @@ func (h *apiHandler) WhoAmI(p httprequest.Params, arg *params.WhoAmIRequest) (pa
 // UserGroups serves the GET /u/$username/groups endpoint, and returns
 // the list of groups associated with the user.
 func (h *apiHandler) UserGroups(p httprequest.Params, r *params.UserGroupsRequest) ([]string, error) {
-	groups, err := store.Identity(r.Username).Groups(p.Context)
+	groups, err := auth.Identity(r.Username).Groups(p.Context)
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
@@ -279,7 +281,7 @@ func (h *apiHandler) UserToken(p httprequest.Params, r *params.UserTokenRequest)
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
-	m, err := h.store.Bakery.Oven.NewMacaroon(
+	m, err := h.h.oven.NewMacaroon(
 		p.Context,
 		httpbakery.RequestVersion(p.Request),
 		time.Now().Add(24*time.Hour),
@@ -296,7 +298,7 @@ func (h *apiHandler) UserToken(p httprequest.Params, r *params.UserTokenRequest)
 
 func (h *apiHandler) VerifyToken(p httprequest.Params, r *params.VerifyTokenRequest) (map[string]string, error) {
 	ctx := httpbakery.ContextWithRequest(p.Context, p.Request)
-	authInfo, err := h.store.Bakery.Checker.Auth(r.Macaroons).Allow(ctx, bakery.LoginOp)
+	authInfo, err := h.h.auth.Auth(ctx, []macaroon.Slice{r.Macaroons}, bakery.LoginOp)
 	if err != nil {
 		// TODO only return ErrForbidden when the error is because of bad macaroons.
 		return nil, errgo.WithCausef(err, params.ErrForbidden, `verification failure`)
@@ -393,7 +395,7 @@ func userFromIdentity(ctx context.Context, id *mongodoc.Identity) (*params.User,
 			publicKeys[i] = &pk
 		}
 	}
-	groups, err := store.Identity(id.Username).Groups(ctx)
+	groups, err := auth.Identity(id.Username).Groups(ctx)
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}

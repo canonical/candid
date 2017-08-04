@@ -38,7 +38,6 @@ func (s *storeSuite) SetUpTest(c *gc.C) {
 	var err error
 	s.pool, err = store.NewPool(s.Session.Copy().DB("store-tests"), store.StoreParams{
 		MaxMgoSessions: 10,
-		PrivateAddr:    "localhost",
 	})
 	c.Assert(err, gc.IsNil)
 }
@@ -877,7 +876,6 @@ func (s *storeSuite) TestGetStoreFromPool(c *gc.C) {
 	p, err := store.NewPool(s.Session.Copy().DB("store-launchpad-tests"),
 		store.StoreParams{
 			MaxMgoSessions: 2,
-			PrivateAddr:    "localhost",
 		},
 	)
 	c.Assert(err, gc.IsNil)
@@ -899,7 +897,6 @@ func (s *storeSuite) TestGetStoreFromPoolLimit(c *gc.C) {
 		store.StoreParams{
 			MaxMgoSessions: 1,
 			RequestTimeout: 100 * time.Millisecond,
-			PrivateAddr:    "localhost",
 		},
 	)
 	c.Assert(err, gc.IsNil)
@@ -916,7 +913,6 @@ func (s *storeSuite) TestGetStoreFromPoolPutBeforeTimeout(c *gc.C) {
 		store.StoreParams{
 			MaxMgoSessions: 1,
 			RequestTimeout: time.Second,
-			PrivateAddr:    "localhost",
 		},
 	)
 	c.Assert(err, gc.IsNil)

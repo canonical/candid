@@ -76,12 +76,7 @@ func newServer(c *gc.C, session *mgo.Session, key *bakery.KeyPair, teams []strin
 		DebugTeams: teams,
 	}
 	pool, err := store.NewPool(db, store.StoreParams{
-		AuthUsername:   sp.AuthUsername,
-		AuthPassword:   sp.AuthPassword,
-		Key:            sp.Key,
-		Location:       sp.Location,
 		MaxMgoSessions: sp.MaxMgoSessions,
-		PrivateAddr:    sp.PrivateAddr,
 	})
 	c.Assert(err, gc.IsNil)
 	srv, err := identity.New(
