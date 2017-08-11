@@ -7,9 +7,7 @@ import (
 	"net/http/httptest"
 
 	"github.com/garyburd/go-oauth/oauth"
-	"github.com/juju/idmclient/params"
 	gc "gopkg.in/check.v1"
-	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
 	"gopkg.in/yaml.v2"
 
 	"github.com/CanonicalLtd/blues-identity/config"
@@ -17,18 +15,39 @@ import (
 	"github.com/CanonicalLtd/blues-identity/idp/idptest"
 	"github.com/CanonicalLtd/blues-identity/idp/usso/internal/mockusso"
 	"github.com/CanonicalLtd/blues-identity/idp/usso/ussooauth"
+	"github.com/CanonicalLtd/blues-identity/store"
 )
 
 type ussooauthSuite struct {
-	mockusso.Suite
+	idptest.Suite
+	mockUSSOSuite mockusso.Suite
+
 	idp idp.IdentityProvider
 }
 
 var _ = gc.Suite(&ussooauthSuite{})
 
+func (s *ussooauthSuite) SetUpSuite(c *gc.C) {
+	s.Suite.SetUpSuite(c)
+	s.mockUSSOSuite.SetUpSuite(c)
+}
+
+func (s *ussooauthSuite) TearDownSuite(c *gc.C) {
+	s.mockUSSOSuite.TearDownSuite(c)
+	s.Suite.TearDownSuite(c)
+}
+
 func (s *ussooauthSuite) SetUpTest(c *gc.C) {
 	s.Suite.SetUpTest(c)
+	s.mockUSSOSuite.SetUpTest(c)
 	s.idp = ussooauth.IdentityProvider
+	err := s.idp.Init(s.Ctx, s.InitParams(c, "https://idp.test"))
+	c.Assert(err, gc.Equals, nil)
+}
+
+func (s *ussooauthSuite) TearDownTest(c *gc.C) {
+	s.mockUSSOSuite.TearDownTest(c)
+	s.Suite.TearDownTest(c)
 }
 
 func (s *ussooauthSuite) TestConfig(c *gc.C) {
@@ -56,26 +75,27 @@ func (s *ussooauthSuite) TestInteractive(c *gc.C) {
 }
 
 func (s *ussooauthSuite) TestURL(c *gc.C) {
-	tc := &idptest.TestContext{
-		URLPrefix: "https://idp.test",
-	}
-	t := s.idp.URL(tc, "1")
+	t := s.idp.URL("1")
 	c.Assert(t, gc.Equals, "https://idp.test/oauth?waitid=1")
 }
 
 func (s *ussooauthSuite) TestHandleSuccess(c *gc.C) {
-	tc := &idptest.TestContext{
-		URLPrefix: "https://idp.test",
-		Bakery_:   bakery.New(bakery.BakeryParams{}),
-	}
-	err := tc.UpdateUser(&params.User{
-		ExternalID: "https://login.ubuntu.com/+id/test",
-		Username:   params.Username("test"),
-		FullName:   "Test User",
-		Email:      "test@example.com",
-	})
-	c.Assert(err, gc.IsNil)
-	s.MockUSSO.AddUser(&mockusso.User{
+	err := s.Store.UpdateIdentity(
+		s.Ctx,
+		&store.Identity{
+			ProviderID: store.MakeProviderIdentity("usso", "https://login.ubuntu.com/+id/test"),
+			Username:   "test",
+			Name:       "Test User",
+			Email:      "test@example.com",
+		},
+		store.Update{
+			store.Username: store.Set,
+			store.Name:     store.Set,
+			store.Email:    store.Set,
+		},
+	)
+	c.Assert(err, gc.Equals, nil)
+	s.mockUSSOSuite.MockUSSO.AddUser(&mockusso.User{
 		ID:             "test",
 		NickName:       "test",
 		FullName:       "Test User",
@@ -91,43 +111,41 @@ func (s *ussooauthSuite) TestHandleSuccess(c *gc.C) {
 		},
 		SignatureMethod: oauth.HMACSHA1,
 	}
-	tc.Request, err = http.NewRequest("GET", "http://example.com/oauth?waitid=2", nil)
-	c.Assert(err, gc.IsNil)
+	req, err := http.NewRequest("GET", "http://example.com/oauth?waitid=2", nil)
+	c.Assert(err, gc.Equals, nil)
 	err = oc.SetAuthorizationHeader(
-		tc.Request.Header,
+		req.Header,
 		&oauth.Credentials{
 			Token:  "test-token",
 			Secret: "secret2",
 		},
-		tc.Request.Method,
-		tc.Request.URL,
+		req.Method,
+		req.URL,
 		nil,
 	)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	rr := httptest.NewRecorder()
-	s.idp.Handle(tc, rr, tc.Request)
-	idptest.AssertLoginSuccess(c, tc, "test")
-	idptest.AssertUser(c, tc, &params.User{
-		ExternalID: "https://login.ubuntu.com/+id/test",
-		Username:   params.Username("test"),
-		FullName:   "Test User",
-		Email:      "test@example.com",
-	})
-	c.Assert(rr.Body.String(), gc.Equals, "login successful as user test\n")
+	s.idp.Handle(s.Ctx, rr, req)
+	s.AssertLoginSuccess(c, "test")
 }
 
 func (s *ussooauthSuite) TestHandleVerifyFail(c *gc.C) {
-	tc := &idptest.TestContext{
-		URLPrefix: "https://idp.test",
-	}
-	err := tc.UpdateUser(&params.User{
-		ExternalID: "https://login.ubuntu.com/+id/test",
-		Username:   params.Username("test"),
-		FullName:   "Test User",
-		Email:      "test@example.com",
-	})
-	c.Assert(err, gc.IsNil)
-	s.MockUSSO.AddUser(&mockusso.User{
+	err := s.Store.UpdateIdentity(
+		s.Ctx,
+		&store.Identity{
+			ProviderID: store.MakeProviderIdentity("usso", "https://login.ubuntu.com/+id/test"),
+			Username:   "test",
+			Name:       "Test User",
+			Email:      "test@example.com",
+		},
+		store.Update{
+			store.Username: store.Set,
+			store.Name:     store.Set,
+			store.Email:    store.Set,
+		},
+	)
+	c.Assert(err, gc.Equals, nil)
+	s.mockUSSOSuite.MockUSSO.AddUser(&mockusso.User{
 		ID:             "test",
 		NickName:       "test",
 		FullName:       "Test User",
@@ -143,20 +161,20 @@ func (s *ussooauthSuite) TestHandleVerifyFail(c *gc.C) {
 		},
 		SignatureMethod: oauth.HMACSHA1,
 	}
-	tc.Request, err = http.NewRequest("GET", "http://example.com/oauth?waitid=2", nil)
-	c.Assert(err, gc.IsNil)
+	req, err := http.NewRequest("GET", "http://example.com/oauth?waitid=2", nil)
+	c.Assert(err, gc.Equals, nil)
 	err = oc.SetAuthorizationHeader(
-		tc.Request.Header,
+		req.Header,
 		&oauth.Credentials{
 			Token:  "test-token2",
 			Secret: "secret2",
 		},
-		tc.Request.Method,
-		tc.Request.URL,
+		req.Method,
+		req.URL,
 		nil,
 	)
 	c.Assert(err, gc.IsNil)
 	rr := httptest.NewRecorder()
-	s.idp.Handle(tc, rr, tc.Request)
-	idptest.AssertLoginFailure(c, tc, `invalid OAuth credentials`)
+	s.idp.Handle(s.Ctx, rr, req)
+	s.AssertLoginFailureMatches(c, `invalid OAuth credentials`)
 }

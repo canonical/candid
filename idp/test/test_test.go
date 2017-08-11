@@ -14,16 +14,17 @@ import (
 	"github.com/juju/testing/httptesting"
 	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
-	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
 	"gopkg.in/yaml.v2"
 
 	"github.com/CanonicalLtd/blues-identity/config"
 	"github.com/CanonicalLtd/blues-identity/idp"
 	"github.com/CanonicalLtd/blues-identity/idp/idptest"
 	"github.com/CanonicalLtd/blues-identity/idp/test"
+	"github.com/CanonicalLtd/blues-identity/store"
 )
 
 type testSuite struct {
+	idptest.Suite
 	idp idp.IdentityProvider
 }
 
@@ -42,6 +43,7 @@ identity-providers:
 }
 
 func (s *testSuite) SetUpTest(c *gc.C) {
+	s.Suite.SetUpTest(c)
 	s.idp = test.NewIdentityProvider(test.Params{
 		Name: "test",
 	})
@@ -60,24 +62,22 @@ func (s *testSuite) TestInteractive(c *gc.C) {
 }
 
 func (s *testSuite) TestURL(c *gc.C) {
-	tc := &idptest.TestContext{
-		URLPrefix: "https://idp.test",
-	}
-	u := s.idp.URL(tc, "1")
+	ctx := context.Background()
+	err := s.idp.Init(ctx, s.InitParams(c, "https://idp.test"))
+	c.Assert(err, gc.Equals, nil)
+	u := s.idp.URL("1")
 	c.Assert(u, gc.Equals, "https://idp.test/test-login?waitid=1")
 }
 
 func (s *testSuite) TestHandleGet(c *gc.C) {
-	tc := &idptest.TestContext{
-		Context:   context.Background(),
-		URLPrefix: "https://idp.test",
-		Request: &http.Request{
-			Method: "GET",
-		},
-	}
+	ctx := context.Background()
+	err := s.idp.Init(ctx, s.InitParams(c, "https://idp.test"))
+	c.Assert(err, gc.Equals, nil)
 	rr := httptest.NewRecorder()
-	s.idp.Handle(tc, rr, tc.Request)
-	idptest.AssertLoginInProgress(c, tc)
+	req, err := http.NewRequest("GET", "/", nil)
+	c.Assert(err, gc.Equals, nil)
+	s.idp.Handle(ctx, rr, req)
+	s.AssertLoginNotComplete(c)
 	httptesting.AssertJSONResponse(c, rr, http.StatusOK,
 		test.TestInteractiveLoginResponse{
 			URL: "https://idp.test/test-login",
@@ -87,52 +87,40 @@ func (s *testSuite) TestHandleGet(c *gc.C) {
 
 var handleTests = []struct {
 	about       string
-	createUser  *params.User
+	createUser  *store.Identity
 	req         *http.Request
-	expectUser  *params.User
+	expectUser  string
 	expectError string
 }{{
 	about: "login new user",
 	req: testLogin(&params.User{
 		Username:   "test1",
-		ExternalID: "https://example.com/+id/1",
+		ExternalID: "test:1",
 		FullName:   "Test One",
 	}),
-	expectUser: &params.User{
-		Username:   "test1",
-		ExternalID: "https://example.com/+id/1",
-		FullName:   "Test One",
-	},
+	expectUser: "test1",
 }, {
 	about: "login username",
-	createUser: &params.User{
+	createUser: &store.Identity{
+		ProviderID: store.MakeProviderIdentity("test", "2"),
 		Username:   "test2",
-		ExternalID: "https://example.com/+id/2",
-		FullName:   "Test Two",
+		Name:       "Test Two",
 	},
 	req: testLogin(&params.User{
 		Username: "test2",
 	}),
-	expectUser: &params.User{
-		Username:   "test2",
-		ExternalID: "https://example.com/+id/2",
-		FullName:   "Test Two",
-	},
+	expectUser: "test2",
 }, {
 	about: "login external id",
-	createUser: &params.User{
+	createUser: &store.Identity{
+		ProviderID: store.MakeProviderIdentity("test", "3"),
 		Username:   "test3",
-		ExternalID: "https://example.com/+id/3",
-		FullName:   "Test Three",
+		Name:       "Test Three",
 	},
 	req: testLogin(&params.User{
-		ExternalID: "https://example.com/+id/3",
+		ExternalID: "test:3",
 	}),
-	expectUser: &params.User{
-		Username:   "test3",
-		ExternalID: "https://example.com/+id/3",
-		FullName:   "Test Three",
-	},
+	expectUser: "test3",
 }, {
 	about: "unsupported method",
 	req: &http.Request{
@@ -151,49 +139,48 @@ var handleTests = []struct {
 	req: testLogin(&params.User{
 		Username: "test4",
 	}),
-	expectError: `cannot find user "test4"`,
+	expectError: `user test4 not found`,
 }, {
 	about: "login external id not found",
 	req: testLogin(&params.User{
-		ExternalID: "https://example.com/+id/5",
+		ExternalID: "test:5",
 	}),
-	expectError: `cannot find external id "https://example.com/\+id/5"`,
+	expectError: `identity "test:5" not found`,
 }, {
 	about: "login upsert clash",
-	createUser: &params.User{
+	createUser: &store.Identity{
+		ProviderID: store.MakeProviderIdentity("test", "6"),
 		Username:   "test6",
-		ExternalID: "https://example.com/+id/6",
-		FullName:   "Test Six",
+		Name:       "Test Six",
 	},
 	req: testLogin(&params.User{
-		Username:   "test7",
-		ExternalID: "https://example.com/+id/6",
+		Username:   "test6",
+		ExternalID: "test:7",
 		FullName:   "Test Seven",
 	}),
-	expectError: `external id "https://example.com/\+id/6" already used`,
+	expectError: `username test6 already in use`,
 }}
 
 func (s *testSuite) TestHandle(c *gc.C) {
+	ctx := context.Background()
 	for i, test := range handleTests {
 		c.Logf("%d. %s", i, test.about)
-		tc := &idptest.TestContext{
-			Context:   context.Background(),
-			Bakery_:   bakery.New(bakery.BakeryParams{}),
-			URLPrefix: "https://idp.test",
-			Request:   test.req,
-		}
 		if test.createUser != nil {
-			err := tc.UpdateUser(test.createUser)
-			c.Assert(err, gc.IsNil)
+			err := s.Store.UpdateIdentity(ctx, test.createUser, store.Update{
+				store.Username: store.Set,
+				store.Name:     store.Set,
+			})
+			c.Assert(err, gc.Equals, nil)
 		}
+		err := s.idp.Init(ctx, s.InitParams(c, "https://idp.test"))
+		c.Assert(err, gc.Equals, nil)
 		rr := httptest.NewRecorder()
-		s.idp.Handle(tc, rr, tc.Request)
+		s.idp.Handle(ctx, rr, test.req)
 		if test.expectError != "" {
-			idptest.AssertLoginFailure(c, tc, test.expectError)
+			s.AssertLoginFailureMatches(c, test.expectError)
 			continue
 		}
-		idptest.AssertLoginSuccess(c, tc, test.expectUser.Username)
-		idptest.AssertUser(c, tc, test.expectUser)
+		s.AssertLoginSuccess(c, test.expectUser)
 	}
 }
 
@@ -202,7 +189,7 @@ func testLogin(u *params.User) *http.Request {
 	if err != nil {
 		panic(err)
 	}
-	req, err := http.NewRequest("POST", "https://idp.test/test-login", bytes.NewReader(body))
+	req, err := http.NewRequest("POST", "/test-login", bytes.NewReader(body))
 	if err != nil {
 		panic(err)
 	}

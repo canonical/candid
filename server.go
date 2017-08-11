@@ -6,12 +6,10 @@ import (
 	"html/template"
 	"net/http"
 	"sort"
-	"time"
 
+	"github.com/juju/utils/debugstatus"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
-	"gopkg.in/mgo.v2"
-	"launchpad.net/lpad"
 
 	"github.com/CanonicalLtd/blues-identity/idp"
 	"github.com/CanonicalLtd/blues-identity/idp/agent"
@@ -19,6 +17,7 @@ import (
 	"github.com/CanonicalLtd/blues-identity/internal/identity"
 	"github.com/CanonicalLtd/blues-identity/internal/v1"
 	"github.com/CanonicalLtd/blues-identity/meeting"
+	"github.com/CanonicalLtd/blues-identity/store"
 )
 
 // Versions of the API that can be served.
@@ -44,13 +43,16 @@ func Versions() []string {
 
 // ServerParams contains configuration parameters for a server.
 type ServerParams struct {
-	// Place holds the meeting place that will be used for rendezvous
-	// within the identity server.
-	Place *meeting.Place
+	// MeetingStore holds the storage that will be used to store
+	// rendezvous information.
+	MeetingStore meeting.Store
 
 	// RootKeyStore holds the root key store that will be used to
 	// store macaroon root keys within the identity server.
 	RootKeyStore bakery.RootKeyStore
+
+	// Store holds the identities store for the identity server.
+	Store store.Store
 
 	// AuthUsername holds the username for admin login.
 	AuthUsername string
@@ -64,18 +66,6 @@ type ServerParams struct {
 	// Location holds a URL representing the externally accessible
 	// base URL of the service, without a trailing slash.
 	Location string
-
-	// Launchpad holds the address of the launchpad server to use to
-	// get group information.
-	Launchpad lpad.APIBase
-
-	// MaxMgoSession holds the maximum number of concurrent mgo
-	// sessions.
-	MaxMgoSessions int
-
-	// RequestTimeout holds the time to wait for a request to be able
-	// to start.
-	RequestTimeout time.Duration
 
 	// PrivateAddr should hold a dialable address that will be used
 	// for communication between identity servers. Note that this
@@ -100,12 +90,16 @@ type ServerParams struct {
 	// Template contains a set of templates that are used to generate
 	// html output.
 	Template *template.Template
+
+	// DebugStatusCheckerFuncs contains functions that will be
+	// executed as part of a /debug/status check.
+	DebugStatusCheckerFuncs []debugstatus.CheckerFunc
 }
 
 // NewServer returns a new handler that handles identity service requests and
 // stores its data in the given database. The handler will serve the specified
 // versions of the API.
-func NewServer(db *mgo.Database, params ServerParams, serveVersions ...string) (HandlerCloser, error) {
+func NewServer(params ServerParams, serveVersions ...string) (HandlerCloser, error) {
 	// Remove the agent identity provider if it is specified as it is no longer used.
 	idps := make([]idp.IdentityProvider, 0, len(params.IdentityProviders))
 	for _, idp := range params.IdentityProviders {
@@ -123,7 +117,7 @@ func NewServer(db *mgo.Database, params ServerParams, serveVersions ...string) (
 		}
 		newAPIs[vers] = newAPI
 	}
-	return identity.New(db, identity.ServerParams(params), newAPIs)
+	return identity.New(identity.ServerParams(params), newAPIs)
 }
 
 type HandlerCloser interface {

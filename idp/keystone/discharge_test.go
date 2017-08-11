@@ -9,7 +9,6 @@ import (
 	"regexp"
 
 	"github.com/juju/httprequest"
-	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
 	envschemaform "gopkg.in/juju/environschema.v1/form"
@@ -17,14 +16,14 @@ import (
 	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery/form"
 
 	"github.com/CanonicalLtd/blues-identity/idp"
-	"github.com/CanonicalLtd/blues-identity/idp/idptest"
 	"github.com/CanonicalLtd/blues-identity/idp/idputil"
 	"github.com/CanonicalLtd/blues-identity/idp/keystone"
 	"github.com/CanonicalLtd/blues-identity/idp/keystone/internal/mockkeystone"
+	"github.com/CanonicalLtd/blues-identity/internal/idmtest"
 )
 
 type dischargeSuite struct {
-	idptest.DischargeSuite
+	idmtest.DischargeSuite
 	server *mockkeystone.Server
 	params keystone.Params
 }
@@ -50,7 +49,7 @@ func (s *dischargeSuite) TearDownSuite(c *gc.C) {
 }
 
 func (s *dischargeSuite) SetUpTest(c *gc.C) {
-	s.IDPs = []idp.IdentityProvider{
+	s.Params.IdentityProviders = []idp.IdentityProvider{
 		keystone.NewIdentityProvider(s.params),
 		keystone.NewUserpassIdentityProvider(
 			keystone.Params{
@@ -73,16 +72,13 @@ func (s *dischargeSuite) SetUpTest(c *gc.C) {
 }
 
 func (s *dischargeSuite) TestInteractiveDischarge(c *gc.C) {
-	s.AssertDischarge(c, idptest.VisitorFunc(s.visitInteractive))
+	s.AssertDischarge(c, idmtest.VisitorFunc(s.visitInteractive))
 }
 
 var urlRegexp = regexp.MustCompile(`[Aa][Cc][Tt][Ii][Oo][Nn]="(.*)"`)
 
 func (s *dischargeSuite) visitInteractive(u *url.URL) error {
-	client := http.Client{
-		Transport: s.RoundTripper,
-	}
-	resp, err := client.Get(u.String())
+	resp, err := http.Get(u.String())
 	if err != nil {
 		return err
 	}
@@ -95,7 +91,7 @@ func (s *dischargeSuite) visitInteractive(u *url.URL) error {
 	if len(sm) < 2 {
 		return errgo.Newf("could not find URL: %q", body)
 	}
-	resp, err = client.PostForm(string(sm[1]), url.Values{
+	resp, err = http.PostForm(string(sm[1]), url.Values{
 		"username": []string{"testuser"},
 		"password": []string{"testpass"},
 	})
@@ -110,15 +106,14 @@ func (s *dischargeSuite) visitInteractive(u *url.URL) error {
 }
 
 func (s *dischargeSuite) TestFormDischarge(c *gc.C) {
-	s.BakeryClient.WebPageVisitor = httpbakery.NewMultiVisitor(
+	s.AssertDischarge(c, httpbakery.NewMultiVisitor(
 		form.Visitor{
 			Filler: keystoneFormFiller{
 				username: "testuser",
 				password: "testpass",
 			},
 		},
-	)
-	s.AssertDischarge(c, nil)
+	))
 }
 
 type keystoneFormFiller struct {
@@ -139,7 +134,7 @@ func (h keystoneFormFiller) Fill(f envschemaform.Form) (map[string]interface{}, 
 }
 
 func (s *dischargeSuite) TestTokenDischarge(c *gc.C) {
-	s.AssertDischarge(c, idptest.VisitorFunc(s.visitToken))
+	s.AssertDischarge(c, idmtest.VisitorFunc(s.visitToken))
 }
 
 type tokenLoginRequest struct {
@@ -148,8 +143,9 @@ type tokenLoginRequest struct {
 }
 
 func (s *dischargeSuite) visitToken(u *url.URL) error {
+	client := &httprequest.Client{}
 	var lm map[string]string
-	if err := idputil.GetLoginMethods(context.TODO(), s.HTTPRequestClient, u, &lm); err != nil {
+	if err := idputil.GetLoginMethods(s.Ctx, client, u, &lm); err != nil {
 		return errgo.Mask(err)
 	}
 	if lm["token"] == "" {
@@ -157,7 +153,7 @@ func (s *dischargeSuite) visitToken(u *url.URL) error {
 	}
 	var req tokenLoginRequest
 	req.Token.Login.ID = "789"
-	if err := s.HTTPRequestClient.CallURL(context.TODO(), lm["token"], &req, nil); err != nil {
+	if err := client.CallURL(s.Ctx, lm["token"], &req, nil); err != nil {
 		return errgo.Mask(err)
 	}
 	return nil

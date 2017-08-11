@@ -27,12 +27,7 @@ func (h *dischargeHandler) Login(p httprequest.Params, lr *loginRequest) error {
 	if p.Request.Header.Get("Accept") == "application/json" {
 		methods := map[string]string{"agent": h.agentURL(lr.WaitID)}
 		for _, idp := range h.h.idps {
-			ctxt := &idpHandler{
-				Context: p.Context,
-				handler: h.handler,
-				idp:     idp,
-			}
-			methods[idp.Name()] = idp.URL(ctxt, lr.WaitID)
+			methods[idp.Name()] = idp.URL(lr.WaitID)
 		}
 		err := httprequest.WriteJSON(p.Response, http.StatusOK, methods)
 		if err != nil {
@@ -80,12 +75,7 @@ func (h *dischargeHandler) Login(p httprequest.Params, lr *loginRequest) error {
 	if selected == nil {
 		return errgo.Newf("no interactive login methods found")
 	}
-	ctxt := &idpHandler{
-		Context: p.Context,
-		handler: h.handler,
-		idp:     selected,
-	}
-	url := selected.URL(ctxt, lr.WaitID)
+	url := selected.URL(lr.WaitID)
 	http.Redirect(p.Response, p.Request, url, http.StatusFound)
 	return nil
 }

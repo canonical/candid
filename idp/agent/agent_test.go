@@ -7,6 +7,7 @@ import (
 	"gopkg.in/yaml.v2"
 
 	"github.com/CanonicalLtd/blues-identity/config"
+	"github.com/CanonicalLtd/blues-identity/idp"
 	"github.com/CanonicalLtd/blues-identity/idp/agent"
 )
 
@@ -39,11 +40,11 @@ func (s *agentSuite) TestInteractive(c *gc.C) {
 }
 
 func (s *agentSuite) TestURL(c *gc.C) {
-	u := agent.IdentityProvider.URL(nil, "1")
+	u := agent.IdentityProvider.URL("1")
 	c.Assert(u, gc.Equals, "")
 }
 
 func (s *agentSuite) TestInitProducesError(c *gc.C) {
-	err := agent.IdentityProvider.Init(nil)
+	err := agent.IdentityProvider.Init(nil, idp.InitParams{})
 	c.Assert(err, gc.ErrorMatches, "agent login IDP no longer supported")
 }

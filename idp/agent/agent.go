@@ -6,6 +6,7 @@ package agent
 import (
 	"net/http"
 
+	"golang.org/x/net/context"
 	errgo "gopkg.in/errgo.v1"
 
 	"github.com/CanonicalLtd/blues-identity/config"
@@ -49,16 +50,16 @@ func (*identityProvider) Interactive() bool {
 	return false
 }
 
-// URL gets the login URL to use this identity provider.
-func (*identityProvider) URL(ctx idp.Context, waitID string) string {
-	return ""
-}
-
 // Init implements idp.IdentityProvider.Init by doing nothing.
-func (*identityProvider) Init(idp.Context) error {
+func (*identityProvider) Init(context.Context, idp.InitParams) error {
 	return errgo.New("agent login IDP no longer supported")
 }
 
+// URL gets the login URL to use this identity provider.
+func (*identityProvider) URL(string) string {
+	return ""
+}
+
 // Handle handles the agent login process.
-func (a *identityProvider) Handle(rctx idp.RequestContext, w http.ResponseWriter, req *http.Request) {
+func (a *identityProvider) Handle(context.Context, http.ResponseWriter, *http.Request) {
 }

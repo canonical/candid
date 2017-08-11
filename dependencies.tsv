@@ -12,6 +12,7 @@ github.com/juju/httpprof	git	14bf14c307672fd2456bdbf35d19cf0ccd3cf565	2014-12-17
 github.com/juju/httprequest	git	3ea2b017bff2bb2aee0d059eb61b7d4a7cd33c83	2017-02-02T18:11:39Z
 github.com/juju/idmclient	git	92bde328f3bb3a544854e322b4e6f41377122e19	2017-03-13T17:40:05Z
 github.com/juju/loggo	git	8232ab8918d91c72af1a9fb94d3edbe31d88b790	2017-06-05T01:46:07Z
+github.com/juju/names	git	8a0aa0963bbacdc790914892e9ff942e94d6f795	2016-03-30T15:05:33Z
 github.com/juju/persistent-cookiejar	git	5243747bf8f2d0897f6c7a52799327dc97d585e8	2016-11-15T13:33:28Z
 github.com/juju/retry	git	62c62032529169c7ec02fa48f93349604c345e1f	2015-10-29T02:48:21Z
 github.com/juju/schema	git	075de04f9b7d7580d60a1e12a0b3f50bb18e6998	2016-04-20T04:42:03Z
@@ -50,4 +51,3 @@ gopkg.in/retry.v1	git	c09f6b86ba4d5d2cf5bdf0665364aec9fd4815db	2016-10-25T18:14:
 gopkg.in/square/go-jose.v2	git	296c7f1463ec9b712176dc804dea0173d06dc728	2016-11-17T00:42:38Z
 gopkg.in/tomb.v2	git	14b3d72120e8d10ea6e6b7f87f7175734b1faab8	2014-06-26T14:46:23Z
 gopkg.in/yaml.v2	git	a83829b6f1293c91addabc89d0571c246397bbf4	2016-03-01T20:40:22Z
-launchpad.net/lpad	bzr	gustavo@niemeyer.net-20131113112110-fqow8xpml1pxyutb	65

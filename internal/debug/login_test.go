@@ -10,36 +10,64 @@ import (
 	"net/url"
 	"time"
 
+	"github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/testing/httptesting"
 	"golang.org/x/crypto/nacl/box"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
+	"gopkg.in/macaroon-bakery.v2-unstable/bakery/mgorootkeystore"
 
 	"github.com/CanonicalLtd/blues-identity/internal/debug"
+	"github.com/CanonicalLtd/blues-identity/internal/identity"
+	"github.com/CanonicalLtd/blues-identity/internal/idmtest"
+	"github.com/CanonicalLtd/blues-identity/mgostore"
 )
 
 type loginSuite struct {
-	apiSuite
+	testing.IsolatedMgoSuite
+	idmtest.ServerSuite
+
+	db *mgostore.Database
 }
 
 var _ = gc.Suite(&loginSuite{})
 
-func (s *loginSuite) SetUpSuite(c *gc.C) {
-	s.apiSuite.SetUpSuite(c)
-	s.teams = []string{"debuggers"}
+func (s *loginSuite) SetUpTest(c *gc.C) {
+	s.IsolatedMgoSuite.SetUpTest(c)
+	var err error
+	s.db, err = mgostore.NewDatabase(s.Session.DB("idm-test"))
+	c.Assert(err, gc.Equals, nil)
+
+	s.Params.MeetingStore = s.db.MeetingStore()
+	s.Params.RootKeyStore = s.db.BakeryRootKeyStore(mgorootkeystore.Policy{ExpiryDuration: time.Minute})
+	s.Params.Store = s.db.Store()
+	s.Params.DebugStatusCheckerFuncs = s.db.DebugStatusCheckerFuncs()
+	s.Params.Key, err = bakery.GenerateKey()
+	c.Assert(err, gc.Equals, nil)
+	s.Params.DebugTeams = []string{"debuggers"}
+
+	s.Versions = map[string]identity.NewAPIHandlerFunc{
+		version: debug.NewAPIHandler,
+	}
+	s.ServerSuite.SetUpTest(c)
 }
 
+func (s *loginSuite) TearDownTest(c *gc.C) {
+	s.ServerSuite.TearDownTest(c)
+	s.db.Close()
+	s.IsolatedMgoSuite.TearDownTest(c)
+}
 func (s *loginSuite) TestCookieEncodeDecode(c *gc.C) {
 	c1 := &debug.Cookie{
 		ExpireTime: time.Now(),
 		ID:         "https://example.com/ID",
 		Teams:      []string{"t1", "t2"},
 	}
-	v, err := debug.EncodeCookie(s.keyPair, c1)
+	v, err := debug.EncodeCookie(s.Params.Key, c1)
 	c.Assert(err, jc.ErrorIsNil)
-	c2, err := debug.DecodeCookie(s.keyPair, v)
+	c2, err := debug.DecodeCookie(s.Params.Key, v)
 	c.Assert(err, jc.ErrorIsNil)
 	c.Assert(c1.ExpireTime.Equal(c1.ExpireTime), gc.Equals, true, gc.Commentf("expire times not equal expecting: %s, obtained: %s", c1.ExpireTime, c2.ExpireTime))
 	c1.ExpireTime = time.Time{}
@@ -131,7 +159,7 @@ func (s *loginSuite) TestCheckLogin(c *gc.C) {
 		c.Logf("%d. %s", i, test.about)
 		var cookies []*http.Cookie
 		if test.cookieValue != nil {
-			value, err := test.cookieValue(s.keyPair)
+			value, err := test.cookieValue(s.Params.Key)
 			c.Assert(err, gc.IsNil)
 			cookies = append(cookies, &http.Cookie{
 				Name:  "debug-login",
@@ -139,8 +167,7 @@ func (s *loginSuite) TestCheckLogin(c *gc.C) {
 			})
 		}
 		resp := httptesting.Do(c, httptesting.DoRequestParams{
-			Handler: s.srv,
-			URL:     "/debug/pprof/",
+			URL:     s.URL + "/debug/pprof/",
 			Do:      doNoRedirect,
 			Cookies: cookies,
 		})

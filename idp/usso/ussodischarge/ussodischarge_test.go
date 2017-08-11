@@ -14,10 +14,7 @@ import (
 	"net/http/httptest"
 	"time"
 
-	"github.com/juju/idmclient/params"
 	udclient "github.com/juju/idmclient/ussodischarge"
-	"github.com/juju/testing"
-	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
 	macaroon "gopkg.in/macaroon.v2-unstable"
@@ -27,25 +24,19 @@ import (
 	"github.com/CanonicalLtd/blues-identity/idp"
 	"github.com/CanonicalLtd/blues-identity/idp/idptest"
 	"github.com/CanonicalLtd/blues-identity/idp/usso/ussodischarge"
+	"github.com/CanonicalLtd/blues-identity/store"
 )
 
 type ussoMacaroonSuite struct {
-	testing.IsolatedMgoSuite
-	idp    idp.IdentityProvider
-	bakery *bakery.Bakery
+	idptest.Suite
+	idp idp.IdentityProvider
 }
 
 var _ = gc.Suite(&ussoMacaroonSuite{})
 
 func (s *ussoMacaroonSuite) SetUpTest(c *gc.C) {
-	s.IsolatedMgoSuite.SetUpTest(c)
-	key, err := bakery.GenerateKey()
-	c.Assert(err, gc.Equals, nil)
-
-	s.bakery = bakery.New(bakery.BakeryParams{
-		Key: key,
-	})
-	c.Assert(err, gc.Equals, nil)
+	s.Suite.SetUpTest(c)
+	var err error
 	s.idp, err = ussodischarge.NewIdentityProvider(ussodischarge.Params{
 		URL:    "https://login.staging.ubuntu.com",
 		Domain: "ussotest",
@@ -53,6 +44,8 @@ func (s *ussoMacaroonSuite) SetUpTest(c *gc.C) {
 			PublicKey: testKey.PublicKey,
 		},
 	})
+	c.Assert(err, gc.Equals, nil)
+	err = s.idp.Init(s.Ctx, s.InitParams(c, "https://idp.test"))
 	c.Assert(err, gc.Equals, nil)
 }
 
@@ -93,25 +86,15 @@ func (s *ussoMacaroonSuite) TestInteractive(c *gc.C) {
 }
 
 func (s *ussoMacaroonSuite) TestURL(c *gc.C) {
-	tc := &idptest.TestContext{
-		URLPrefix: "https://idp.test",
-		Database_: s.Session.DB("test"),
-	}
-	t := s.idp.URL(tc, "1")
+	t := s.idp.URL("1")
 	c.Assert(t, gc.Equals, "https://idp.test/login?waitid=1")
 }
 
 func (s *ussoMacaroonSuite) TestHandleGetSuccess(c *gc.C) {
-	req, err := http.NewRequest("GET", "https://idp.test", nil)
+	req, err := http.NewRequest("GET", "/", nil)
 	c.Assert(err, gc.Equals, nil)
-	tc := &idptest.TestContext{
-		URLPrefix: "https://idp.test",
-		Bakery_:   s.bakery,
-		Database_: s.Session.DB("test"),
-		Request:   req,
-	}
 	rr := httptest.NewRecorder()
-	s.idp.Handle(tc, rr, tc.Request)
+	s.idp.Handle(s.Ctx, rr, req)
 	c.Assert(rr.Code, gc.Equals, http.StatusOK, gc.Commentf("%s", rr.Body))
 	var mresp udclient.MacaroonResponse
 	err = json.Unmarshal(rr.Body.Bytes(), &mresp)
@@ -137,7 +120,10 @@ func (s *ussoMacaroonSuite) TestHandleGetSuccess(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 	md.Bind(m.Signature())
 	ms := macaroon.Slice{m, md}
-	authInfo, err := s.bakery.Checker.Auth(ms).Allow(context.TODO(), ussodischarge.USSOLoginOp)
+	checker := bakery.NewChecker(bakery.CheckerParams{
+		MacaroonOpStore: s.Oven,
+	})
+	authInfo, err := checker.Auth(ms).Allow(s.Ctx, ussodischarge.USSOLoginOp)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(authInfo.Identity, gc.Equals, nil)
 }
@@ -149,7 +135,7 @@ var postTests = []struct {
 	lastAuth     string
 	expires      string
 	extraCaveats []string
-	expectUser   *params.User
+	expectUser   *store.Identity
 	expectError  string
 }{{
 	about: "success",
@@ -162,10 +148,10 @@ var postTests = []struct {
 	validSince: timeString(-time.Hour),
 	lastAuth:   timeString(-time.Minute),
 	expires:    timeString(time.Hour),
-	expectUser: &params.User{
+	expectUser: &store.Identity{
+		ProviderID: store.MakeProviderIdentity("ussotest", "1234567"),
 		Username:   "1234567@ussotest",
-		ExternalID: "ussotest-openid:1234567",
-		FullName:   "Test User",
+		Name:       "Test User",
 		Email:      "testuser@example.com",
 	},
 }, {
@@ -256,7 +242,9 @@ var postTests = []struct {
 func (s *ussoMacaroonSuite) TestHandlePost(c *gc.C) {
 	for i, test := range postTests {
 		c.Logf("%d. %s", i, test.about)
-		bm, err := s.bakery.Oven.NewMacaroon(context.TODO(), bakery.Version1, time.Now().Add(time.Minute), nil, ussodischarge.USSOLoginOp)
+		err := s.idp.Init(s.Ctx, s.InitParams(c, "https://idp.test"))
+		c.Assert(err, gc.Equals, nil)
+		bm, err := s.Oven.NewMacaroon(s.Ctx, bakery.Version1, time.Now().Add(time.Minute), nil, ussodischarge.USSOLoginOp)
 		c.Assert(err, gc.Equals, nil)
 		m := bm.M()
 		if test.account != nil {
@@ -286,25 +274,18 @@ func (s *ussoMacaroonSuite) TestHandlePost(c *gc.C) {
 		}
 		buf, err := json.Marshal(body)
 		c.Assert(err, gc.Equals, nil)
-		req, err := http.NewRequest("POST", "https://idp.test", bytes.NewReader(buf))
+		req, err := http.NewRequest("POST", "/", bytes.NewReader(buf))
 		c.Assert(err, gc.Equals, nil)
 		req.Header.Set("Content-Type", "application/json")
-		tc := &idptest.TestContext{
-			Context:   context.Background(),
-			URLPrefix: "https://idp.test",
-			Bakery_:   s.bakery,
-			Database_: s.Session.DB("test"),
-			Request:   req,
-		}
-		tc.Request.ParseForm()
+		req.ParseForm()
 		rr := httptest.NewRecorder()
-		s.idp.Handle(tc, rr, tc.Request)
+		s.idp.Handle(s.Ctx, rr, req)
 		if test.expectError != "" {
-			idptest.AssertLoginFailure(c, tc, test.expectError)
+			s.AssertLoginFailureMatches(c, test.expectError)
 			continue
 		}
-		idptest.AssertLoginSuccess(c, tc, test.expectUser.Username)
-		idptest.AssertUser(c, tc, test.expectUser)
+		s.AssertLoginSuccess(c, test.expectUser.Username)
+		s.AssertUser(c, test.expectUser)
 	}
 }
 

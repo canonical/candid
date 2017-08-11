@@ -3,7 +3,10 @@
 package mgostore
 
 import (
+	"strconv"
 	"time"
+
+	"github.com/juju/utils/debugstatus"
 
 	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
@@ -125,4 +128,18 @@ func ensureMeetingIndexes(db *mgo.Database) error {
 		}
 	}
 	return nil
+}
+
+func (d *Database) meetingStatus() (key string, result debugstatus.CheckResult) {
+	result.Name = "count of meeting collection"
+	result.Passed = true
+	coll := d.c(context.Background(), meetingCollection)
+	defer coll.Database.Session.Close()
+	c, err := coll.Count()
+	result.Value = strconv.Itoa(c)
+	if err != nil {
+		result.Value = err.Error()
+		result.Passed = false
+	}
+	return "meeting_count", result
 }

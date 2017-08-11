@@ -123,6 +123,7 @@ func (s *identityStore) FindIdentities(ctx context.Context, ref *store.Identity,
 
 func makeQuery(ref *store.Identity, filter store.Filter) bson.D {
 	query := make(bson.D, 0, store.NumFields)
+	query = appendComparison(query, fieldNames[store.ProviderID], filter[store.ProviderID], ref.ProviderID)
 	query = appendComparison(query, fieldNames[store.Username], filter[store.Username], ref.Username)
 	query = appendComparison(query, fieldNames[store.Name], filter[store.Name], ref.Name)
 	query = appendComparison(query, fieldNames[store.Email], filter[store.Email], ref.Email)
@@ -199,27 +200,11 @@ func identityUpdate(identity *store.Identity, update store.Update) updateDocumen
 	doc.addUpdate(update[store.PublicKeys], fieldNames[store.PublicKeys], encodePublicKeys(identity.PublicKeys))
 	doc.addUpdate(update[store.LastLogin], fieldNames[store.LastLogin], identity.LastLogin)
 	doc.addUpdate(update[store.LastDischarge], fieldNames[store.LastDischarge], identity.LastDischarge)
-	switch update[store.ProviderInfo] {
-	case store.NoUpdate:
-	case store.Set, store.Clear:
-		doc.addUpdate(update[store.ProviderInfo], fieldNames[store.ProviderInfo], identity.ProviderInfo)
-	case store.Push, store.Pull:
-		for k, v := range identity.ProviderInfo {
-			doc.addUpdate(update[store.ProviderInfo], fieldNames[store.ProviderInfo]+"."+k, v)
-		}
-	default:
-		panic("invalid update operation")
+	for k, v := range identity.ProviderInfo {
+		doc.addUpdate(update[store.ProviderInfo], fieldNames[store.ProviderInfo]+"."+k, v)
 	}
-	switch update[store.ExtraInfo] {
-	case store.NoUpdate:
-	case store.Set, store.Clear:
-		doc.addUpdate(update[store.ExtraInfo], fieldNames[store.ExtraInfo], identity.ExtraInfo)
-	case store.Push, store.Pull:
-		for k, v := range identity.ExtraInfo {
-			doc.addUpdate(update[store.ExtraInfo], fieldNames[store.ExtraInfo]+"."+k, v)
-		}
-	default:
-		panic("invalid update operation")
+	for k, v := range identity.ExtraInfo {
+		doc.addUpdate(update[store.ExtraInfo], fieldNames[store.ExtraInfo]+"."+k, v)
 	}
 	return doc
 }

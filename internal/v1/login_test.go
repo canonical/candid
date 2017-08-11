@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
-	"net/http/httptest"
 	"net/url"
 	"time"
 
@@ -16,17 +15,17 @@ import (
 
 	"github.com/CanonicalLtd/blues-identity/idp"
 	"github.com/CanonicalLtd/blues-identity/idp/test"
+	"github.com/CanonicalLtd/blues-identity/store"
 )
 
 type loginSuite struct {
 	apiSuite
-	netSrv *httptest.Server
 }
 
 var _ = gc.Suite(&loginSuite{})
 
-func (s *loginSuite) SetUpSuite(c *gc.C) {
-	s.apiSuite.idps = []idp.IdentityProvider{
+func (s *loginSuite) SetUpTest(c *gc.C) {
+	s.Params.IdentityProviders = []idp.IdentityProvider{
 		test.NewIdentityProvider(test.Params{
 			Name: "test",
 		}),
@@ -35,21 +34,7 @@ func (s *loginSuite) SetUpSuite(c *gc.C) {
 			Domain: "test2",
 		}),
 	}
-	s.apiSuite.SetUpSuite(c)
-}
-
-func (s *loginSuite) SetUpTest(c *gc.C) {
 	s.apiSuite.SetUpTest(c)
-	s.netSrv = httptest.NewServer(s.srv)
-}
-
-func (s *loginSuite) TearDownTest(c *gc.C) {
-	s.netSrv.Close()
-	s.apiSuite.TearDownTest(c)
-}
-
-func (s *loginSuite) TearDownSuite(c *gc.C) {
-	s.apiSuite.TearDownSuite(c)
 }
 
 func (s *loginSuite) TestInteractiveLogin(c *gc.C) {
@@ -58,21 +43,22 @@ func (s *loginSuite) TestInteractiveLogin(c *gc.C) {
 	visitor := test.Visitor{
 		User: &params.User{
 			Username:   "test",
-			ExternalID: "http://example.com/+id/test",
+			ExternalID: "test:test",
 			FullName:   "Test User",
 			Email:      "test@example.com",
 			IDPGroups:  []string{"test1", "test2"},
 		},
 	}
-	u, err := url.Parse(location + "/v1/idp/test/login")
-	c.Assert(err, gc.IsNil)
+	u, err := url.Parse(s.URL + "/v1/idp/test/login")
+	c.Assert(err, gc.Equals, nil)
 	err = visitor.VisitWebPage(testContext, client, map[string]*url.URL{httpbakery.UserInteractionMethod: u})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(jar.cookies, gc.HasLen, 0)
-	st := s.pool.GetNoLimit()
-	defer st.Close()
-	id, err := st.GetIdentity("test")
-	c.Assert(err, gc.IsNil)
+	id := store.Identity{
+		ProviderID: "test:test",
+	}
+	err = s.Params.Store.Identity(testContext, &id)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(id.LastLogin.After(time.Now().Add(-1*time.Second)), gc.Equals, true)
 }
 
@@ -82,21 +68,22 @@ func (s *loginSuite) TestNonInteractiveLogin(c *gc.C) {
 	visitor := test.Visitor{
 		User: &params.User{
 			Username:   "test",
-			ExternalID: "http://example.com/+id/test",
+			ExternalID: "test:test",
 			FullName:   "Test User",
 			Email:      "test@example.com",
 			IDPGroups:  []string{"test1", "test2"},
 		},
 	}
-	u, err := url.Parse(location + "/v1/idp/test/login")
-	c.Assert(err, gc.IsNil)
+	u, err := url.Parse(s.URL + "/v1/idp/test/login")
+	c.Assert(err, gc.Equals, nil)
 	err = visitor.VisitWebPage(testContext, client, map[string]*url.URL{"test": u})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(jar.cookies, gc.HasLen, 0)
-	st := s.pool.GetNoLimit()
-	defer st.Close()
-	id, err := st.GetIdentity("test")
-	c.Assert(err, gc.IsNil)
+	id := store.Identity{
+		ProviderID: "test:test",
+	}
+	err = s.Params.Store.Identity(testContext, &id)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(id.LastLogin.After(time.Now().Add(-1*time.Second)), gc.Equals, true)
 }
 
@@ -106,42 +93,44 @@ func (s *loginSuite) TestLoginFailure(c *gc.C) {
 	visitor := test.Visitor{
 		User: &params.User{},
 	}
-	u, err := url.Parse(location + "/v1/idp/test/login")
-	c.Assert(err, gc.IsNil)
+	u, err := url.Parse(s.URL + "/v1/idp/test/login")
+	c.Assert(err, gc.Equals, nil)
 	err = visitor.VisitWebPage(testContext, client, map[string]*url.URL{httpbakery.UserInteractionMethod: u})
-	c.Assert(err, gc.ErrorMatches, `Post https:.*: user "" not found: not found`)
+	c.Assert(err, gc.ErrorMatches, `Post .*/v1/idp/test/test-login: identity not specified`)
 	c.Assert(jar.cookies, gc.HasLen, 0)
 }
 
 func (s *loginSuite) TestInteractiveIdentityProviderSelection(c *gc.C) {
-	rr := httptest.NewRecorder()
-	req, err := http.NewRequest("GET", "/v1/login", nil)
-	c.Assert(err, gc.Equals, nil)
-	s.srv.ServeHTTP(rr, req)
-	c.Assert(rr.Code, gc.Equals, http.StatusFound)
-	c.Assert(rr.HeaderMap.Get("Location"), gc.Equals, location+"/v1/idp/test/test-login")
+	resp := s.getNoRedirect(c, "/v1/login")
+	defer resp.Body.Close()
+	c.Assert(resp.StatusCode, gc.Equals, http.StatusFound)
+	c.Assert(resp.Header.Get("Location"), gc.Equals, s.URL+"/v1/idp/test/test-login")
 }
 
 func (s *loginSuite) TestInteractiveIdentityProviderSelectionWithDomain(c *gc.C) {
-	rr := httptest.NewRecorder()
-	req, err := http.NewRequest("GET", "/v1/login?domain=test2", nil)
-	c.Assert(err, gc.Equals, nil)
-	s.srv.ServeHTTP(rr, req)
-	c.Assert(rr.Code, gc.Equals, http.StatusFound)
-	c.Assert(rr.HeaderMap.Get("Location"), gc.Equals, location+"/v1/idp/test2/test-login")
+	resp := s.getNoRedirect(c, "/v1/login?domain=test2")
+	defer resp.Body.Close()
+	c.Assert(resp.StatusCode, gc.Equals, http.StatusFound)
+	c.Assert(resp.Header.Get("Location"), gc.Equals, s.URL+"/v1/idp/test2/test-login")
 }
 
 func (s *loginSuite) TestLoginMethodsIncludesAgent(c *gc.C) {
-	rr := httptest.NewRecorder()
 	req, err := http.NewRequest("GET", "/v1/login", nil)
 	c.Assert(err, gc.Equals, nil)
 	req.Header.Set("Accept", "application/json")
-	s.srv.ServeHTTP(rr, req)
-	c.Assert(rr.Code, gc.Equals, http.StatusOK)
-	buf, err := ioutil.ReadAll(rr.Body)
+	resp := s.Do(c, req)
+	defer resp.Body.Close()
+	c.Assert(resp.StatusCode, gc.Equals, http.StatusOK)
+	buf, err := ioutil.ReadAll(resp.Body)
 	c.Assert(err, gc.Equals, nil)
 	var lm params.LoginMethods
 	err = json.Unmarshal(buf, &lm)
 	c.Assert(err, gc.Equals, nil)
-	c.Assert(lm.Agent, gc.Equals, location+"/v1/agent-login")
+	c.Assert(lm.Agent, gc.Equals, s.URL+"/v1/agent-login")
+}
+
+func (s *loginSuite) getNoRedirect(c *gc.C, path string) *http.Response {
+	req, err := http.NewRequest("GET", path, nil)
+	c.Assert(err, gc.Equals, nil)
+	return s.RoundTrip(c, req)
 }

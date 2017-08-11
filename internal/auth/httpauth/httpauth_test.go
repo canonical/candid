@@ -6,7 +6,6 @@ import (
 	"net/http"
 
 	"github.com/juju/idmclient/params"
-	"github.com/juju/testing"
 	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
@@ -15,14 +14,13 @@ import (
 
 	"github.com/CanonicalLtd/blues-identity/internal/auth"
 	"github.com/CanonicalLtd/blues-identity/internal/auth/httpauth"
-	"github.com/CanonicalLtd/blues-identity/internal/mongodoc"
-	"github.com/CanonicalLtd/blues-identity/internal/store"
+	"github.com/CanonicalLtd/blues-identity/internal/idmtest"
 )
 
 type authSuite struct {
-	testing.IsolatedMgoSuite
-	pool       *store.Pool
+	idmtest.StoreSuite
 	oven       *bakery.Oven
+	auth       *auth.Authorizer
 	authorizer *httpauth.Authorizer
 }
 
@@ -31,15 +29,9 @@ var _ = gc.Suite(&authSuite{})
 const identityLocation = "https://identity.test/id"
 
 func (s *authSuite) SetUpTest(c *gc.C) {
-	s.IsolatedMgoSuite.SetUpTest(c)
-	var err error
-	s.pool, err = store.NewPool(
-		s.Session.Copy().DB("idm-test"),
-		store.StoreParams{},
-	)
-	c.Assert(err, gc.IsNil)
+	s.StoreSuite.SetUpTest(c)
 	key, err := bakery.GenerateKey()
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	locator := bakery.NewThirdPartyStore()
 	locator.AddInfo(identityLocation, bakery.ThirdPartyInfo{
 		PublicKey: key.Public,
@@ -50,30 +42,18 @@ func (s *authSuite) SetUpTest(c *gc.C) {
 		Locator:  locator,
 		Location: "identity",
 	})
-	authorizer := auth.New(auth.Params{
+	s.auth = auth.New(auth.Params{
 		AdminUsername:   "test-admin",
 		AdminPassword:   "open sesame",
 		Location:        identityLocation,
+		Store:           s.Store,
 		MacaroonOpStore: s.oven,
 	})
-	s.authorizer = httpauth.New(s.oven, authorizer)
+	s.authorizer = httpauth.New(s.oven, s.auth)
 }
 
 func (s *authSuite) TearDownTest(c *gc.C) {
-	s.pool.Close()
-	s.IsolatedMgoSuite.TearDownTest(c)
-}
-
-func (s *authSuite) createIdentity(c *gc.C, doc *mongodoc.Identity) {
-	store := s.pool.GetNoLimit()
-	defer s.pool.Put(store)
-	if doc.ExternalID != "" {
-		err := store.UpsertUser(doc)
-		c.Assert(err, gc.IsNil)
-	} else {
-		err := store.UpsertAgent(doc)
-		c.Assert(err, gc.IsNil)
-	}
+	s.StoreSuite.TearDownTest(c)
 }
 
 func (s *authSuite) TestAuthorizeWithAdminCredentials(c *gc.C) {
@@ -101,8 +81,6 @@ func (s *authSuite) TestAuthorizeWithAdminCredentials(c *gc.C) {
 	}}
 	for i, test := range tests {
 		c.Logf("test %d. %s", i, test.about)
-		st := s.pool.GetNoLimit()
-		defer s.pool.Put(st)
 		req, _ := http.NewRequest("GET", "/", nil)
 		for attr, val := range test.header {
 			req.Header[attr] = val
@@ -114,13 +92,11 @@ func (s *authSuite) TestAuthorizeWithAdminCredentials(c *gc.C) {
 			continue
 		}
 		c.Assert(err, gc.Equals, nil)
-		c.Assert(authInfo.Identity, gc.Equals, auth.Identity(store.AdminUsername))
+		c.Assert(authInfo.Identity.Id(), gc.Equals, auth.AdminUsername)
 	}
 }
 
 func (s *authSuite) TestAuthorizeMacaroonRequired(c *gc.C) {
-	store := s.pool.GetNoLimit()
-	defer s.pool.Put(store)
 	req, err := http.NewRequest("GET", "http://example.com/v1/test", nil)
 	c.Assert(err, gc.IsNil)
 	authInfo, err := s.authorizer.Auth(context.Background(), req, bakery.LoginOp)

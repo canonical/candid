@@ -19,9 +19,9 @@ import (
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
 	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
 	"gopkg.in/macaroon.v2-unstable"
-	"gopkg.in/mgo.v2/bson"
 
 	"github.com/CanonicalLtd/blues-identity/internal/auth"
+	"github.com/CanonicalLtd/blues-identity/store"
 )
 
 const (
@@ -80,7 +80,7 @@ func checkThirdPartyCaveat(ctx context.Context, h *handler, req *http.Request, c
 		return nil, checkers.ErrCaveatNotRecognized
 	}
 
-	var identity auth.Identity
+	var identity *auth.Identity
 	var invalidUserf func(err error) error
 	if user := req.Form.Get("discharge-for-user"); user != "" {
 		_, err := h.h.reqAuth.Auth(ctx, req, auth.GlobalOp(auth.ActionDischargeFor))
@@ -90,14 +90,13 @@ func checkThirdPartyCaveat(ctx context.Context, h *handler, req *http.Request, c
 		invalidUserf = func(err error) error {
 			return errgo.WithCausef(err, params.ErrBadRequest, "invalid username %q", user)
 		}
-		// We've bypassed the usual authorization logic, so make sure that the identity actually exists.
-		if _, err := h.store.GetIdentity(params.Username(user)); err != nil {
+		identity, err = h.h.auth.Identity(ctx, user)
+		if err != nil {
 			return nil, invalidUserf(err)
 		}
 		if err := auth.CheckUserDomain(ctx, user); err != nil {
 			return nil, invalidUserf(err)
 		}
-		identity = auth.Identity(user)
 	} else {
 		invalidUserf = func(err error) error {
 			return needLoginError(ctx, h, req, domain, &dischargeRequestInfo{
@@ -111,7 +110,7 @@ func checkThirdPartyCaveat(ctx context.Context, h *handler, req *http.Request, c
 		if err != nil {
 			return nil, invalidUserf(err)
 		}
-		identity = userInfo.Identity.(auth.Identity)
+		identity = userInfo.Identity.(*auth.Identity)
 	}
 	logger.Infof("authorization for %#v succeeded", identity)
 
@@ -132,16 +131,20 @@ func checkThirdPartyCaveat(ctx context.Context, h *handler, req *http.Request, c
 		}
 		// TODO should this be time-limited?
 	}
-	h.updateDischargeTime(params.Username(identity.Id()))
+	h.updateDischargeTime(ctx, params.Username(identity.Id()))
 	return cavs, nil
 }
 
-func (h *handler) updateDischargeTime(username params.Username) {
-	err := h.store.UpdateIdentity(username, bson.D{{
-		"$set", bson.D{{
-			"lastdischarge", time.Now(),
-		}},
-	}})
+func (h *handler) updateDischargeTime(ctx context.Context, username params.Username) {
+	err := h.h.store.UpdateIdentity(
+		ctx,
+		&store.Identity{
+			Username:      string(username),
+			LastDischarge: time.Now(),
+		}, store.Update{
+			store.LastDischarge: store.Set,
+		},
+	)
 	if err != nil {
 		logger.Infof("unexpected error updating last discharge time: %s", err)
 	}
@@ -202,7 +205,7 @@ func (h *dischargeHandler) Wait(p httprequest.Params, w *waitRequest) (*waitResp
 	}
 	// TODO we shouldn't need to manually resolve this caveat - the
 	// reqInfo macaroon should contain a bakery.Macaroon not a macaroon slice.
-	originCaveat := auth.Checker.Namespace().ResolveCaveat(httpbakery.ClientOriginCaveat(reqInfo.Origin))
+	originCaveat := auth.Namespace.ResolveCaveat(httpbakery.ClientOriginCaveat(reqInfo.Origin))
 	// Ensure the identity macaroon can only be used from the same
 	// origin as the original discharge request.
 	err = login.IdentityMacaroon[0].AddFirstPartyCaveat(originCaveat.Condition)
@@ -216,7 +219,7 @@ func (h *dischargeHandler) Wait(p httprequest.Params, w *waitRequest) (*waitResp
 	// same discharge checking that they would have gone
 	// through even if they had gone through the web
 	// login process.
-	cookie, err := httpbakery.NewCookie(auth.Checker.Namespace(), login.IdentityMacaroon)
+	cookie, err := httpbakery.NewCookie(auth.Namespace, login.IdentityMacaroon)
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot make cookie")
 	}
@@ -269,7 +272,9 @@ type dischargeTokenForUserResponse struct {
 
 // DischargeTokenForUser serves an HTTP endpoint that will create a discharge token for a user.
 func (h *dischargeHandler) DischargeTokenForUser(p httprequest.Params, r *dischargeTokenForUserRequest) (dischargeTokenForUserResponse, error) {
-	_, err := h.store.GetIdentity(r.Username)
+	err := h.h.store.Identity(p.Context, &store.Identity{
+		Username: string(r.Username),
+	})
 	if err != nil {
 		return dischargeTokenForUserResponse{}, errgo.NoteMask(err, "cannot get identity", errgo.Is(params.ErrNotFound))
 	}

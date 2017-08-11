@@ -6,75 +6,49 @@ package idp
 import (
 	"html/template"
 	"net/http"
-	"time"
 
-	"github.com/juju/idmclient/params"
 	"golang.org/x/net/context"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
-	"gopkg.in/mgo.v2"
+
+	"github.com/CanonicalLtd/blues-identity/store"
 )
 
-// Context provides information about the identity-manager context
-// into which the identity provider is placed.
-type Context interface {
-	context.Context
+// A LoginCompleter is used by the identity providers to finish login
+// attempts.
+type LoginCompleter interface {
+	// Success is used by an identity provider to indicate that a
+	// successful login has been completed for the given identity.
+	Success(ctx context.Context, w http.ResponseWriter, req *http.Request, waitid string, id *store.Identity)
 
-	// URL returns a URL addressed to path within the identity provider.
-	URL(path string) string
-
-	// Key returns the identity server's public/private key pair.
-	Key() *bakery.KeyPair
-
-	// Database returns a mgo.Database that the identity provider may use to
-	// store any necessary state data.
-	Database() *mgo.Database
+	// Failure is used by an identity provider to indicate that a
+	// login attempt has failed with the specified error.
+	Failure(ctx context.Context, w http.ResponseWriter, req *http.Request, waitid string, err error)
 }
 
-// RequestContext provides information about the identity-manager context
-// of a particular identity provider request.
-type RequestContext interface {
-	Context
+// InitParams are passed to the identity provider to initialise it.
+type InitParams struct {
+	// Store contains the identity store being used in the identity
+	// server.
+	Store store.Store
 
-	// RequestURL gets the original URL used to initiate the request
-	RequestURL() string
+	// Oven contains an oven that may be used in the identity
+	// provider to mint new macaroons.
+	Oven *bakery.Oven
 
-	// Path returns the part of the path following the part that
-	// directed the request to this IDP handler.
-	Path() string
+	// Key contains the identity server's public/private key pair.
+	Key *bakery.KeyPair
 
-	// Bakery returns a *bakery.Bakery that the identity provider
-	// can use to mint new macaroons.
-	Bakery() *bakery.Bakery
+	// URLPrefix contains the prefix of all requests to the Handle
+	// method. The URL.Path parameter in the request passed to handle
+	// will contain only the part after this prefix.
+	URLPrefix string
 
-	// Template returns the template with the given name from the set
-	// of templates configured in the server, or nil if there is no
-	// such template.
-	Template(name string) *template.Template
+	// LoginCompleter is the LoginCompleter that the identity
+	// provider should use to complete login requests.
+	LoginCompleter LoginCompleter
 
-	// LoginSuccess completes a login request successfully. The user
-	// with the given username will have their last login time
-	// updated in the database. A new identity macaroon will be minted
-	// for the user with the given expiry time.
-	//
-	// LoginSuccess will return true if the login was completed
-	// successfully so that the IDP may return an appropriate success
-	// response to the interracting client. If there was an error
-	// completing the login attempt, an error will have automatically
-	// been returned to the client and false will be returned.
-	LoginSuccess(waitid string, user params.Username, expiry time.Time) bool
-
-	// LoginFailure fails a login request.
-	LoginFailure(waitid string, err error)
-
-	// UpdateUser creates or updates the record for the given user in
-	// the database.
-	UpdateUser(*params.User) error
-
-	// FindUserByName finds the user with the given username.
-	FindUserByName(params.Username) (*params.User, error)
-
-	// FindUserByExternalId finds the user with the given external Id.
-	FindUserByExternalId(string) (*params.User, error)
+	// Template contains the templates loaded in the identity server.
+	Template *template.Template
 }
 
 // IdentityProvider is the interface that is satisfied by all identity providers.
@@ -102,17 +76,18 @@ type IdentityProvider interface {
 	// providers final location, any initialization tasks that depend
 	// on having access to the final URL, or the per identity
 	// provider database should be performed here.
-	Init(ctx Context) error
+	Init(ctx context.Context, params InitParams) error
 
 	// URL returns the URL to use to attempt a login with this
 	// identity provider. If the identity provider is interactive
 	// then the user will be automatically redirected to the URL.
 	// Otherwise the URL is returned in the response to a
 	// request for login methods.
-	URL(ctx Context, waitid string) string
+	URL(waitid string) string
 
 	// Handle handles any requests sent to the identity provider's
-	// endpoints. All URLs returned by Context.URL will be directed
-	// to Handle. The given request will have had ParseForm called.
-	Handle(ctx RequestContext, w http.ResponseWriter, req *http.Request)
+	// endpoints. The URL.Path in the request will contain only the
+	// handler local path, that is the part after URLPrefix above.
+	// The given request will have had ParseForm called.
+	Handle(ctx context.Context, w http.ResponseWriter, req *http.Request)
 }

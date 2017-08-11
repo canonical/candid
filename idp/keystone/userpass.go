@@ -8,6 +8,7 @@ import (
 	"github.com/juju/httprequest"
 	"github.com/juju/idmclient/params"
 	"github.com/juju/schema"
+	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
 	gooseidentity "gopkg.in/goose.v1/identity"
 	"gopkg.in/juju/environschema.v1"
@@ -45,19 +46,19 @@ func (*userpassIdentityProvider) Interactive() bool {
 }
 
 // Handle implements idp.IdentityProvider.Handle.
-func (idp *userpassIdentityProvider) Handle(ctx idp.RequestContext, w http.ResponseWriter, req *http.Request) {
+func (idp *userpassIdentityProvider) Handle(ctx context.Context, w http.ResponseWriter, req *http.Request) {
 	if req.Method != "POST" {
 		httprequest.WriteJSON(w, http.StatusOK, keystoneSchemaResponse)
 		return
 	}
 	var lr form.LoginRequest
 	if err := httprequest.Unmarshal(idputil.RequestParams(ctx, w, req), &lr); err != nil {
-		ctx.LoginFailure(idputil.WaitID(req), errgo.WithCausef(err, params.ErrBadRequest, "cannot unmarshal login request"))
+		idp.initParams.LoginCompleter.Failure(ctx, w, req, idputil.WaitID(req), errgo.WithCausef(err, params.ErrBadRequest, "cannot unmarshal login request"))
 		return
 	}
 	form, err := keystoneFieldsChecker.Coerce(lr.Body.Form, nil)
 	if err != nil {
-		ctx.LoginFailure(idputil.WaitID(req), errgo.Notef(err, "cannot validate form"))
+		idp.initParams.LoginCompleter.Failure(ctx, w, req, idputil.WaitID(req), errgo.Notef(err, "cannot validate form"))
 		return
 	}
 	m := form.(map[string]interface{})
