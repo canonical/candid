@@ -3,6 +3,7 @@
 package store
 
 import (
+	"strings"
 	"time"
 
 	"golang.org/x/net/context"
@@ -35,9 +36,15 @@ const (
 	NoUpdate Operation = iota
 
 	// Set overrides the value of the field with the specified value.
+	//
+	// For the ProviderInfo and ExtraInfo fields the values are
+	// replaced on each specified key individually.
 	Set
 
 	// Clear removes the field from the document.
+	//
+	// For the ProviderInfo and ExtraInfo fields the values are
+	// cleared on each specified key individually.
 	Clear
 
 	// Push ensures that all the values in the field are added to any
@@ -139,6 +146,13 @@ type ProviderIdentity string
 // provider name and provider-specific identity.
 func MakeProviderIdentity(provider, id string) ProviderIdentity {
 	return ProviderIdentity(provider + ":" + id)
+}
+
+// Split splits a ProviderIdentity into provider and id parts.
+func (p ProviderIdentity) Split() (provider, id string) {
+	s := string(p)
+	n := strings.IndexByte(s, ':')
+	return s[:n], s[n+1:]
 }
 
 // Identity represents an identity in the store.

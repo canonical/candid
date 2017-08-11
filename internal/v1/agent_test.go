@@ -12,68 +12,50 @@ import (
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
 	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
-	httpbakeryagent "gopkg.in/macaroon-bakery.v2-unstable/httpbakery/agent"
+	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery/agent"
 
-	"github.com/CanonicalLtd/blues-identity/idp/idptest"
+	"github.com/CanonicalLtd/blues-identity/internal/auth"
+	"github.com/CanonicalLtd/blues-identity/internal/idmtest"
 )
 
 type agentSuite struct {
-	idptest.DischargeSuite
-	agentKey *bakery.KeyPair
+	idmtest.DischargeSuite
 }
 
 var _ = gc.Suite(&agentSuite{})
 
-func (s *agentSuite) SetUpTest(c *gc.C) {
-	s.DischargeSuite.SetUpTest(c)
-	var err error
-	s.agentKey, err = bakery.GenerateKey()
-	c.Assert(err, gc.IsNil)
-}
-
 func (s *agentSuite) TestHTTPBakeryAgentDischarge(c *gc.C) {
-	err := s.IDMClient.SetUser(context.TODO(), &params.SetUserRequest{
-		Username: params.Username("test@admin@idm"),
-		User: params.User{
-			Username: params.Username("test@admin@idm"),
-			Owner:    "admin@idm",
-			PublicKeys: []*bakery.PublicKey{
-				&s.agentKey.Public,
-			},
-		},
-	})
-	c.Assert(err, gc.IsNil)
-	s.BakeryClient.Key = s.agentKey
-	httpbakeryagent.SetUpAuth(s.BakeryClient, idptest.DischargeLocation, "test@admin@idm")
-	s.AssertDischarge(c, nil)
-	c.Assert(err, gc.IsNil)
+	username, key := s.CreateAgent(c, "bob", auth.AdminUsername)
+	client := s.Client(nil)
+	client.Key = key
+	err := agent.SetUpAuth(client, s.URL, username)
+	c.Assert(err, gc.Equals, nil)
+	ms, err := s.Discharge(c, "is-authenticated-user", client)
+	c.Assert(err, gc.Equals, nil)
+	_, err = s.Bakery.Checker.Auth(ms).Allow(context.Background(), bakery.LoginOp)
+	c.Assert(err, gc.Equals, nil)
 }
 
 func (s *agentSuite) TestGetAgentDischargeNoCookie(c *gc.C) {
-	err := s.HTTPRequestClient.Get(context.TODO(), s.Server.URL+"/v1/agent-login", nil)
+	client := &httprequest.Client{
+		BaseURL: s.URL,
+	}
+	err := client.Get(context.Background(), "/v1/agent-login", nil)
 	c.Assert(err, gc.ErrorMatches, `Get http://.*/v1/agent-login: no agent-login cookie found`)
 }
 
 func (s *agentSuite) TestLegacyAgentDischarge(c *gc.C) {
-	err := s.IDMClient.SetUser(context.TODO(), &params.SetUserRequest{
-		Username: params.Username("test@admin@idm"),
-		User: params.User{
-			Username: params.Username("test@admin@idm"),
-			Owner:    "admin@idm",
-			PublicKeys: []*bakery.PublicKey{
-				&s.agentKey.Public,
-			},
-		},
+	username, key := s.CreateAgent(c, "bob", auth.AdminUsername)
+	client := s.Client(nil)
+	client.Key = key
+	client.WebPageVisitor = httpbakery.NewMultiVisitor(&agentVisitor{
+		params.Username(username),
+		&key.Public,
 	})
-	c.Assert(err, gc.IsNil)
-	s.BakeryClient.Key = s.agentKey
-	s.AssertDischarge(c,
-		httpbakery.NewMultiVisitor(&agentVisitor{
-			"test@admin@idm",
-			&s.agentKey.Public,
-		}),
-	)
-	c.Assert(err, gc.IsNil)
+	ms, err := s.Discharge(c, "is-authenticated-user", client)
+	c.Assert(err, gc.Equals, nil)
+	_, err = s.Bakery.Checker.Auth(ms).Allow(context.Background(), bakery.LoginOp)
+	c.Assert(err, gc.Equals, nil)
 }
 
 type agentLoginRequest struct {

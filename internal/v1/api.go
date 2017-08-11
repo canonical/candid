@@ -4,6 +4,7 @@ package v1
 
 import (
 	"html/template"
+	"sync"
 	"time"
 
 	"github.com/juju/httprequest"
@@ -17,15 +18,14 @@ import (
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
 	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
 	"gopkg.in/macaroon.v2-unstable"
-	"gopkg.in/mgo.v2/bson"
 
 	"github.com/CanonicalLtd/blues-identity/idp"
 	"github.com/CanonicalLtd/blues-identity/internal/auth"
 	"github.com/CanonicalLtd/blues-identity/internal/auth/httpauth"
 	"github.com/CanonicalLtd/blues-identity/internal/identity"
-	"github.com/CanonicalLtd/blues-identity/internal/mempool"
 	"github.com/CanonicalLtd/blues-identity/internal/monitoring"
-	"github.com/CanonicalLtd/blues-identity/internal/store"
+	"github.com/CanonicalLtd/blues-identity/meeting"
+	"github.com/CanonicalLtd/blues-identity/store"
 )
 
 var logger = loggo.GetLogger("identity.internal.v1")
@@ -33,7 +33,11 @@ var logger = loggo.GetLogger("identity.internal.v1")
 // NewAPIHandler is an identity.NewAPIHandlerFunc.
 func NewAPIHandler(params identity.HandlerParams) ([]httprequest.Handler, error) {
 	h := New(params)
-	if err := h.initIDPs(); err != nil {
+	ctx, close := h.store.Context(context.Background())
+	defer close()
+	ctx, close = h.meetingStore.Context(ctx)
+	defer close()
+	if err := h.initIDPs(ctx); err != nil {
 		return nil, errgo.Mask(err)
 	}
 	handlers := identity.ReqServer.Handlers(h.apiHandler)
@@ -57,30 +61,32 @@ func NewAPIHandler(params identity.HandlerParams) ([]httprequest.Handler, error)
 	return handlers, nil
 }
 
-// Handler handles the /v1 api requests. Handler implements http.Handler
+// Handler handles the /v1 api requests.
 type Handler struct {
-	storePool   *store.Pool
-	handlerPool mempool.Pool
-	location    string
-	idps        []idp.IdentityProvider
-	template    *template.Template
-	place       *place
-	oven        *bakery.Oven
-	auth        *auth.Authorizer
-	reqAuth     *httpauth.Authorizer
+	handlerPool  sync.Pool
+	location     string
+	idps         []idp.IdentityProvider
+	template     *template.Template
+	store        store.Store
+	meetingStore meeting.Store
+	place        *place
+	oven         *bakery.Oven
+	auth         *auth.Authorizer
+	reqAuth      *httpauth.Authorizer
 }
 
 // New returns a new instance of the v1 API handler.
 func New(params identity.HandlerParams) *Handler {
 	h := &Handler{
-		storePool: params.Pool,
-		location:  params.Location,
-		idps:      params.IdentityProviders,
-		template:  params.Template,
-		place:     &place{params.Place},
-		oven:      params.Oven,
-		auth:      params.Authorizer,
-		reqAuth:   httpauth.New(params.Oven, params.Authorizer),
+		location:     params.Location,
+		idps:         params.IdentityProviders,
+		template:     params.Template,
+		store:        params.Store,
+		meetingStore: params.MeetingStore,
+		place:        &place{params.MeetingPlace},
+		oven:         params.Oven,
+		auth:         params.Authorizer,
+		reqAuth:      httpauth.New(params.Oven, params.Authorizer),
 	}
 	h.handlerPool.New = h.newHandler
 	return h
@@ -99,7 +105,7 @@ func (h *Handler) getAuthorizedHandler(p httprequest.Params, t trace.Trace, req 
 		return nil, nil, errgo.Mask(err)
 	}
 	op := opForRequest(req)
-	logger.Infof("opForRequest %#v -> %#v", req, op)
+	logger.Debugf("opForRequest %#v -> %#v", req, op)
 	if op.Entity == "" {
 		hnd.Close()
 		return nil, nil, params.ErrUnauthorized
@@ -110,7 +116,7 @@ func (h *Handler) getAuthorizedHandler(p httprequest.Params, t trace.Trace, req 
 		return nil, nil, errgo.Mask(err, errgo.Any)
 	}
 	if authInfo.Identity != nil {
-		id, ok := authInfo.Identity.(auth.Identity)
+		id, ok := authInfo.Identity.(*auth.Identity)
 		if !ok {
 			hnd.Close()
 			return nil, nil, errgo.Newf("unexpected identity type %T", authInfo.Identity)
@@ -123,31 +129,28 @@ func (h *Handler) getAuthorizedHandler(p httprequest.Params, t trace.Trace, req 
 func (h *Handler) getHandler(ctx context.Context, t trace.Trace) (*handler, context.Context, error) {
 	hnd := h.handlerPool.Get().(*handler)
 	hnd.trace = t
-	var err error
-	hnd.store, err = h.storePool.Get()
-	if err != nil {
-		// TODO(mhilton) consider logging inside the pool.
-		hnd.tracef(errgo.Cause(err) != params.ErrServiceUnavailable, "cannot get store: %s", err)
-		h.handlerPool.Put(h)
-		return nil, nil, errgo.NoteMask(err, "cannot get store", errgo.Any)
+	ctx, close1 := h.store.Context(ctx)
+	ctx, close2 := h.meetingStore.Context(ctx)
+	hnd.close = func() {
+		close2()
+		close1()
 	}
-	hnd.tracef(false, "store acquired")
-	ctx = auth.ContextWithStore(ctx, hnd.store)
 	return hnd, ctx, nil
 }
 
 type handler struct {
 	h     *Handler
-	store *store.Store
 	trace trace.Trace
+	close func()
 }
 
 // Close implements io.Closer. httprequest will automatically call this
 // once a request is complete.
 func (h *handler) Close() error {
-	h.h.storePool.Put(h.store)
-	h.store = nil
-	h.tracef(false, "store released")
+	if h.close != nil {
+		h.close()
+		h.close = nil
+	}
 	if h.trace != nil {
 		h.trace.Finish()
 		h.trace = nil
@@ -168,15 +171,21 @@ func (h *handler) tracef(setError bool, fmt string, args ...interface{}) {
 
 // serviceURL creates an external URL addressed to the specified path
 // within the service.
+func (h *Handler) serviceURL(path string) string {
+	return h.location + path
+}
+
+// serviceURL creates an external URL addressed to the specified path
+// within the service.
 func (h *handler) serviceURL(path string) string {
-	return h.h.location + path
+	return h.h.serviceURL(path)
 }
 
 // completeLogin finishes a login attempt. A new macaroon will be minted
 // with the given version, username and expiry and used to complete the
 // rendezvous specified by the given waitid.
-func (h *handler) completeLogin(ctx context.Context, waitid string, v bakery.Version, username params.Username, expiry time.Time) error {
-	m, err := h.h.oven.NewMacaroon(
+func (h *Handler) completeLogin(ctx context.Context, waitid string, v bakery.Version, username params.Username, expiry time.Time) error {
+	m, err := h.oven.NewMacaroon(
 		ctx,
 		v,
 		expiry,
@@ -189,13 +198,18 @@ func (h *handler) completeLogin(ctx context.Context, waitid string, v bakery.Ver
 		return errgo.Notef(err, "cannot mint identity macaroon")
 	}
 	if waitid != "" {
-		if err := h.h.place.Done(ctx, waitid, &loginInfo{
+		if err := h.place.Done(ctx, waitid, &loginInfo{
 			IdentityMacaroon: macaroon.Slice{m.M()},
 		}); err != nil {
 			return errgo.Notef(err, "cannot complete rendezvous")
 		}
 	}
-	h.store.UpdateIdentity(username, bson.D{{"$set", bson.D{{"lastlogin", time.Now()}}}})
+	h.store.UpdateIdentity(ctx, &store.Identity{
+		Username:  string(username),
+		LastLogin: time.Now(),
+	}, store.Update{
+		store.LastLogin: store.Set,
+	})
 	return nil
 }
 
@@ -287,11 +301,11 @@ func (h *Handler) idpHandlers() []httprequest.Handler {
 
 type identityKey struct{}
 
-func contextWithIdentity(ctx context.Context, identity auth.Identity) context.Context {
+func contextWithIdentity(ctx context.Context, identity *auth.Identity) context.Context {
 	return context.WithValue(ctx, identityKey{}, identity)
 }
 
-func identityFromContext(ctx context.Context) auth.Identity {
-	id, _ := ctx.Value(identityKey{}).(auth.Identity)
+func identityFromContext(ctx context.Context) *auth.Identity {
+	id, _ := ctx.Value(identityKey{}).(*auth.Identity)
 	return id
 }

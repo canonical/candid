@@ -10,13 +10,13 @@ import (
 	"gopkg.in/errgo.v1"
 
 	"github.com/CanonicalLtd/blues-identity/idp"
-	"github.com/CanonicalLtd/blues-identity/idp/idptest"
 	"github.com/CanonicalLtd/blues-identity/idp/usso"
 	"github.com/CanonicalLtd/blues-identity/idp/usso/internal/mockusso"
+	"github.com/CanonicalLtd/blues-identity/internal/idmtest"
 )
 
 type dischargeSuite struct {
-	idptest.DischargeSuite
+	idmtest.DischargeSuite
 	mockusso.Suite
 }
 
@@ -34,7 +34,7 @@ func (s *dischargeSuite) TearDownSuite(c *gc.C) {
 
 func (s *dischargeSuite) SetUpTest(c *gc.C) {
 	s.Suite.SetUpTest(c)
-	s.IDPs = []idp.IdentityProvider{
+	s.Params.IdentityProviders = []idp.IdentityProvider{
 		usso.IdentityProvider,
 	}
 	s.DischargeSuite.SetUpTest(c)
@@ -54,15 +54,13 @@ func (s *dischargeSuite) TestInteractiveDischarge(c *gc.C) {
 		Groups:   []string{"test1", "test2"},
 	})
 	s.MockUSSO.SetLoginUser("test")
-	s.AssertDischarge(c, idptest.VisitorFunc(s.visitWebPage(c)))
+	s.AssertDischarge(c, idmtest.VisitorFunc(s.visitWebPage(c)))
 }
 
 func (s *dischargeSuite) visitWebPage(c *gc.C) func(u *url.URL) error {
 	return func(u *url.URL) error {
 		c.Logf("visiting %s", u)
-		client := http.Client{
-			Transport: s.RoundTripper,
-		}
+		client := http.Client{}
 		resp, err := client.Get(u.String())
 		if err != nil {
 			c.Logf("error: %s", err)

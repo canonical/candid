@@ -8,10 +8,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/juju/idmclient/params"
-	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
-	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
 	"gopkg.in/yaml.v2"
 
 	"github.com/CanonicalLtd/blues-identity/config"
@@ -20,9 +17,11 @@ import (
 	keystoneidp "github.com/CanonicalLtd/blues-identity/idp/keystone"
 	"github.com/CanonicalLtd/blues-identity/idp/keystone/internal/keystone"
 	"github.com/CanonicalLtd/blues-identity/idp/keystone/internal/mockkeystone"
+	"github.com/CanonicalLtd/blues-identity/store"
 )
 
 type keystoneSuite struct {
+	idptest.Suite
 	server *mockkeystone.Server
 	params keystoneidp.Params
 	idp    idp.IdentityProvider
@@ -31,6 +30,7 @@ type keystoneSuite struct {
 var _ = gc.Suite(&keystoneSuite{})
 
 func (s *keystoneSuite) SetUpSuite(c *gc.C) {
+	s.Suite.SetUpSuite(c)
 	s.server = mockkeystone.NewServer()
 	s.params = keystoneidp.Params{
 		Name:        "openstack",
@@ -44,10 +44,18 @@ func (s *keystoneSuite) SetUpSuite(c *gc.C) {
 
 func (s *keystoneSuite) TearDownSuite(c *gc.C) {
 	s.server.Close()
+	s.Suite.TearDownSuite(c)
 }
 
 func (s *keystoneSuite) SetUpTest(c *gc.C) {
+	s.Suite.SetUpTest(c)
 	s.idp = keystoneidp.NewIdentityProvider(s.params)
+	err := s.idp.Init(s.Ctx, s.InitParams(c, "https://idp.test"))
+	c.Assert(err, gc.Equals, nil)
+}
+
+func (s *keystoneSuite) TearDownTest(c *gc.C) {
+	s.Suite.TearDownTest(c)
 }
 
 func (s *keystoneSuite) TestKeystoneIdentityProviderName(c *gc.C) {
@@ -70,26 +78,17 @@ func (s *keystoneSuite) TestKeystoneIdentityProviderUseNameForDescription(c *gc.
 }
 
 func (s *keystoneSuite) TestKeystoneIdentityProviderURL(c *gc.C) {
-	tc := &idptest.TestContext{
-		Context:   context.Background(),
-		URLPrefix: "https://idp.test",
-	}
-	u := s.idp.URL(tc, "1")
+	u := s.idp.URL("1")
 	c.Assert(u, gc.Equals, "https://idp.test/login?waitid=1")
 }
 
 func (s *keystoneSuite) TestKeystoneIdentityProviderHandleGet(c *gc.C) {
-	req, err := http.NewRequest("GET", "https://idp.test/login?waitid=1", nil)
+	req, err := http.NewRequest("GET", "/login?waitid=1", nil)
 	c.Assert(err, gc.IsNil)
 	req.ParseForm()
-	tc := &idptest.TestContext{
-		Context:   context.Background(),
-		URLPrefix: "https://idp.test",
-		Request:   req,
-	}
 	rr := httptest.NewRecorder()
-	s.idp.Handle(tc, rr, tc.Request)
-	idptest.AssertLoginInProgress(c, tc)
+	s.idp.Handle(s.Ctx, rr, req)
+	s.AssertLoginNotComplete(c)
 	c.Assert(rr.Code, gc.Equals, http.StatusOK)
 	c.Assert(rr.HeaderMap.Get("Content-Type"), gc.Equals, "text/html;charset=UTF-8")
 	c.Assert(rr.Body.String(), gc.Equals, `<!doctype html>
@@ -107,7 +106,7 @@ func (s *keystoneSuite) TestKeystoneIdentityProviderHandleGet(c *gc.C) {
 }
 
 func (s *keystoneSuite) TestKeystoneIdentityProviderHandlePost(c *gc.C) {
-	req, err := http.NewRequest("POST", "https://idp.test/login?waitid=1",
+	req, err := http.NewRequest("POST", "/login?waitid=1",
 		strings.NewReader(
 			url.Values{
 				"username": {"testuser"},
@@ -118,24 +117,18 @@ func (s *keystoneSuite) TestKeystoneIdentityProviderHandlePost(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.ParseForm()
-	tc := &idptest.TestContext{
-		Context: context.Background(),
-		Request: req,
-		Bakery_: bakery.New(bakery.BakeryParams{}),
-	}
 	rr := httptest.NewRecorder()
-	s.idp.Handle(tc, rr, tc.Request)
-	idptest.AssertLoginSuccess(c, tc, "testuser@openstack")
-	idptest.AssertUser(c, tc, &params.User{
-		Username:   params.Username("testuser@openstack"),
-		ExternalID: "abc@openstack",
-		IDPGroups:  []string{"abc_project@openstack"},
+	s.idp.Handle(s.Ctx, rr, req)
+	s.AssertLoginSuccess(c, "testuser@openstack")
+	s.AssertUser(c, &store.Identity{
+		ProviderID: store.MakeProviderIdentity("openstack", "abc@openstack"),
+		Username:   "testuser@openstack",
+		Groups:     []string{"abc_project@openstack"},
 	})
-	c.Assert(rr.Body.String(), gc.Equals, "login successful as user testuser@openstack\n")
 }
 
 func (s *keystoneSuite) TestKeystoneIdentityProviderHandlePostBadPassword(c *gc.C) {
-	req, err := http.NewRequest("POST", "https://idp.test/login?waitid=1",
+	req, err := http.NewRequest("POST", "/login?waitid=1",
 		strings.NewReader(
 			url.Values{
 				"username": {"testuser"},
@@ -146,19 +139,13 @@ func (s *keystoneSuite) TestKeystoneIdentityProviderHandlePostBadPassword(c *gc.
 	c.Assert(err, gc.IsNil)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.ParseForm()
-	tc := &idptest.TestContext{
-		Context:   context.Background(),
-		URLPrefix: "https://idp.test",
-		Request:   req,
-		Bakery_:   bakery.New(bakery.BakeryParams{}),
-	}
 	rr := httptest.NewRecorder()
-	s.idp.Handle(tc, rr, tc.Request)
-	idptest.AssertLoginFailure(c, tc, `cannot log in: Post http.*: invalid credentials`)
+	s.idp.Handle(s.Ctx, rr, req)
+	s.AssertLoginFailureMatches(c, `cannot log in: Post http.*: invalid credentials`)
 }
 
 func (s *keystoneSuite) TestKeystoneIdentityProviderHandlePostNoTenants(c *gc.C) {
-	req, err := http.NewRequest("POST", "https://idp.test/login?waitid=1",
+	req, err := http.NewRequest("POST", "/login?waitid=1",
 		strings.NewReader(
 			url.Values{
 				"username": {"testuser2"},
@@ -169,19 +156,24 @@ func (s *keystoneSuite) TestKeystoneIdentityProviderHandlePostNoTenants(c *gc.C)
 	c.Assert(err, gc.IsNil)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.ParseForm()
-	tc := &idptest.TestContext{
-		Context:   context.Background(),
-		URLPrefix: "https://idp.test",
-		Request:   req,
-		Bakery_:   bakery.New(bakery.BakeryParams{}),
-	}
 	rr := httptest.NewRecorder()
-	s.idp.Handle(tc, rr, tc.Request)
-	idptest.AssertLoginFailure(c, tc, `cannot get tenants: Get .*: bad token`)
+	s.idp.Handle(s.Ctx, rr, req)
+	s.AssertLoginFailureMatches(c, `cannot get tenants: Get .*: bad token`)
 }
 
 func (s *keystoneSuite) TestKeystoneIdentityProviderHandleExistingUser(c *gc.C) {
-	req, err := http.NewRequest("POST", "https://idp.test/login?waitid=1",
+	err := s.Store.UpdateIdentity(
+		s.Ctx,
+		&store.Identity{
+			ProviderID: store.MakeProviderIdentity("keystone2", "testuser@openstack"),
+			Username:   "testuser@openstack",
+		},
+		store.Update{
+			store.Username: store.Set,
+		},
+	)
+	c.Assert(err, gc.Equals, nil)
+	req, err := http.NewRequest("POST", "/login?waitid=1",
 		strings.NewReader(
 			url.Values{
 				"username": {"testuser"},
@@ -189,23 +181,12 @@ func (s *keystoneSuite) TestKeystoneIdentityProviderHandleExistingUser(c *gc.C) 
 			}.Encode(),
 		),
 	)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.ParseForm()
-	tc := &idptest.TestContext{
-		Context:   context.Background(),
-		URLPrefix: "https://idp.test",
-		Request:   req,
-		Bakery_:   bakery.New(bakery.BakeryParams{}),
-	}
-	err = tc.UpdateUser(&params.User{
-		Username:   params.Username("testuser@openstack"),
-		ExternalID: "some other thing",
-	})
-	c.Assert(err, gc.IsNil)
 	rr := httptest.NewRecorder()
-	s.idp.Handle(tc, rr, tc.Request)
-	idptest.AssertLoginFailure(c, tc, `cannot update identity: username "testuser@openstack" already used`)
+	s.idp.Handle(s.Ctx, rr, req)
+	s.AssertLoginFailureMatches(c, `cannot update identity: username testuser@openstack already in use`)
 }
 
 var configTests = []struct {

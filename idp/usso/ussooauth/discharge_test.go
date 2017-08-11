@@ -14,13 +14,14 @@ import (
 	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
 
 	"github.com/CanonicalLtd/blues-identity/idp"
-	"github.com/CanonicalLtd/blues-identity/idp/idptest"
 	"github.com/CanonicalLtd/blues-identity/idp/usso/internal/mockusso"
 	"github.com/CanonicalLtd/blues-identity/idp/usso/ussooauth"
+	"github.com/CanonicalLtd/blues-identity/internal/idmtest"
+	"github.com/CanonicalLtd/blues-identity/store"
 )
 
 type dischargeSuite struct {
-	idptest.DischargeSuite
+	idmtest.DischargeSuite
 	mockusso.Suite
 	client *oauth.Client
 	token  *oauth.Credentials
@@ -40,7 +41,7 @@ func (s *dischargeSuite) TearDownSuite(c *gc.C) {
 
 func (s *dischargeSuite) SetUpTest(c *gc.C) {
 	s.Suite.SetUpTest(c)
-	s.IDPs = []idp.IdentityProvider{
+	s.Params.IdentityProviders = []idp.IdentityProvider{
 		ussooauth.IdentityProvider,
 	}
 	s.DischargeSuite.SetUpTest(c)
@@ -52,19 +53,23 @@ func (s *dischargeSuite) TearDownTest(c *gc.C) {
 }
 
 func (s *dischargeSuite) TestDischarge(c *gc.C) {
-	err := s.IDMClient.SetUser(context.TODO(), &params.SetUserRequest{
-		Username: "test",
-		User: params.User{
+	err := s.Params.Store.UpdateIdentity(
+		s.Ctx,
+		&store.Identity{
+			ProviderID: store.MakeProviderIdentity("usso", "https://login.ubuntu.com/+id/1234"),
 			Username:   "test",
-			ExternalID: "https://login.ubuntu.com/+id/1234",
+			Name:       "Test User",
 			Email:      "test@example.com",
-			FullName:   "Test User",
-			IDPGroups: []string{
-				"test",
-			},
+			Groups:     []string{"test"},
 		},
-	})
-	c.Assert(err, gc.IsNil)
+		store.Update{
+			store.Username: store.Set,
+			store.Name:     store.Set,
+			store.Email:    store.Set,
+			store.Groups:   store.Set,
+		},
+	)
+	c.Assert(err, gc.Equals, nil)
 	s.MockUSSO.AddUser(&mockusso.User{
 		ID:       "1234",
 		NickName: "test",

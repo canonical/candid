@@ -81,10 +81,9 @@ func (h *dischargeHandler) agentLogin(ctx context.Context, req *http.Request, wa
 	}
 	vers := httpbakery.RequestVersion(req)
 	ctx = httpbakery.ContextWithRequest(ctx, req)
-	ctx = auth.ContextWithStore(ctx, h.store)
 	_, err := h.h.auth.Auth(ctx, httpbakery.RequestMacaroons(req), loginOp)
 	if err == nil {
-		if err := h.completeLogin(ctx, waitID, vers, user, time.Now().Add(agentMacaroonDuration)); err != nil {
+		if err := h.h.completeLogin(ctx, waitID, vers, user, time.Now().Add(agentMacaroonDuration)); err != nil {
 			return nil, errgo.Mask(err)
 		}
 		return &params.AgentLoginResponse{

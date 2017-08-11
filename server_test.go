@@ -16,6 +16,7 @@ import (
 	"github.com/CanonicalLtd/blues-identity/idp"
 	_ "github.com/CanonicalLtd/blues-identity/idp/agent"
 	_ "github.com/CanonicalLtd/blues-identity/idp/test"
+	"github.com/CanonicalLtd/blues-identity/internal/idmtest"
 	"github.com/CanonicalLtd/blues-identity/version"
 )
 
@@ -24,13 +25,13 @@ func TestPackage(t *testing.T) {
 }
 
 type serverSuite struct {
-	jujutesting.IsolatedMgoSuite
+	idmtest.StoreSuite
 }
 
 var _ = gc.Suite(&serverSuite{})
 
 func (s *serverSuite) TestNewServerWithNoVersions(c *gc.C) {
-	h, err := identity.NewServer(s.Session.DB("foo"), identity.ServerParams{
+	h, err := identity.NewServer(identity.ServerParams{
 		PrivateAddr: "localhost",
 	})
 	c.Assert(err, gc.ErrorMatches, `identity server must serve at least one version of the API`)
@@ -38,9 +39,15 @@ func (s *serverSuite) TestNewServerWithNoVersions(c *gc.C) {
 }
 
 func (s *serverSuite) TestNewServerWithUnregisteredVersion(c *gc.C) {
-	h, err := identity.NewServer(s.Session.DB("foo"), identity.ServerParams{
-		PrivateAddr: "localhost",
-	}, "wrong")
+	h, err := identity.NewServer(
+		identity.ServerParams{
+			Store:        s.Store,
+			MeetingStore: s.MeetingStore,
+			RootKeyStore: s.BakeryRootKeyStore,
+			PrivateAddr:  "localhost",
+		},
+		"wrong",
+	)
 	c.Assert(err, gc.ErrorMatches, `unknown version "wrong"`)
 	c.Assert(h, gc.IsNil)
 }
@@ -55,12 +62,15 @@ func (s *serverSuite) TestVersions(c *gc.C) {
 }
 
 func (s *serverSuite) TestNewServerWithVersions(c *gc.C) {
-	h, err := identity.NewServer(s.Session.Copy().DB("foo"),
+	h, err := identity.NewServer(
 		identity.ServerParams{
-			MaxMgoSessions: 300,
-			PrivateAddr:    "localhost",
+			Store:        s.Store,
+			MeetingStore: s.MeetingStore,
+			RootKeyStore: s.BakeryRootKeyStore,
+			PrivateAddr:  "localhost",
 		},
-		identity.Debug)
+		identity.Debug,
+	)
 	c.Assert(err, gc.IsNil)
 	defer h.Close()
 
@@ -83,13 +93,16 @@ func (s *serverSuite) TestNewServerRemovesAgentIDP(c *gc.C) {
 	}
 	// The agent identity provider will error on initialisation if it
 	// is not removed from the set.
-	h, err := identity.NewServer(s.Session.Copy().DB("foo"),
+	h, err := identity.NewServer(
 		identity.ServerParams{
-			MaxMgoSessions:    300,
+			Store:             s.Store,
+			MeetingStore:      s.MeetingStore,
+			RootKeyStore:      s.BakeryRootKeyStore,
 			PrivateAddr:       "localhost",
 			IdentityProviders: idps,
 		},
-		identity.V1)
+		identity.V1,
+	)
 	c.Assert(err, gc.IsNil)
 	h.Close()
 }

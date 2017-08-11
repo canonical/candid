@@ -3,20 +3,15 @@
 package usso_test
 
 import (
-	"errors"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 
-	"github.com/juju/idmclient/params"
-	"github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/testing/httptesting"
 	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
-	"gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
-	mgo "gopkg.in/mgo.v2"
 	"gopkg.in/yaml.v2"
 
 	"github.com/CanonicalLtd/blues-identity/config"
@@ -24,35 +19,39 @@ import (
 	"github.com/CanonicalLtd/blues-identity/idp/idptest"
 	"github.com/CanonicalLtd/blues-identity/idp/usso"
 	"github.com/CanonicalLtd/blues-identity/idp/usso/internal/mockusso"
+	"github.com/CanonicalLtd/blues-identity/store"
 )
 
 type ussoSuite struct {
-	mockusso.Suite
-	testing.IsolatedMgoSuite
+	idptest.Suite
+	mockUSSOSuite mockusso.Suite
+
 	idp idp.IdentityProvider
 }
 
 var _ = gc.Suite(&ussoSuite{})
 
 func (s *ussoSuite) SetUpSuite(c *gc.C) {
-	s.IsolatedMgoSuite.SetUpSuite(c)
 	s.Suite.SetUpSuite(c)
+	s.mockUSSOSuite.SetUpSuite(c)
 }
 
 func (s *ussoSuite) TearDownSuite(c *gc.C) {
+	s.mockUSSOSuite.TearDownSuite(c)
 	s.Suite.TearDownSuite(c)
-	s.IsolatedMgoSuite.TearDownSuite(c)
 }
 
 func (s *ussoSuite) SetUpTest(c *gc.C) {
-	s.IsolatedMgoSuite.SetUpTest(c)
 	s.Suite.SetUpTest(c)
+	s.mockUSSOSuite.SetUpTest(c)
 	s.idp = usso.IdentityProvider
+	err := s.idp.Init(s.Ctx, s.InitParams(c, "https://idp.test"))
+	c.Assert(err, gc.Equals, nil)
 }
 
 func (s *ussoSuite) TearDownTest(c *gc.C) {
+	s.mockUSSOSuite.TearDownTest(c)
 	s.Suite.TearDownTest(c)
-	s.IsolatedMgoSuite.TearDownTest(c)
 }
 
 func (s *ussoSuite) TestConfig(c *gc.C) {
@@ -80,28 +79,12 @@ func (s *ussoSuite) TestInteractive(c *gc.C) {
 }
 
 func (s *ussoSuite) TestURL(c *gc.C) {
-	tc := &idptest.TestContext{
-		Context:   context.Background(),
-		URLPrefix: "https://idp.test",
-	}
-	c.Assert(s.idp.URL(tc, "1"), gc.Equals, "https://idp.test/login?waitid=1")
+	c.Assert(s.idp.URL("1"), gc.Equals, "https://idp.test/login?waitid=1")
 }
 
 func (s *ussoSuite) TestRedirect(c *gc.C) {
-	req, err := http.NewRequest("", "https://idp.test?waitid=1", nil)
+	u, err := url.Parse(s.ussoURL(c, s.Ctx, "1"))
 	c.Assert(err, gc.Equals, nil)
-	tc := &idptest.TestContext{
-		Context:   context.Background(),
-		URLPrefix: "https://idp.test",
-		Database_: s.Session.DB("test"),
-		Request:   req,
-	}
-	tc.Request.ParseForm()
-	rr := httptest.NewRecorder()
-	s.idp.Handle(tc, rr, tc.Request)
-	c.Assert(rr.Code, gc.Equals, http.StatusFound)
-	u, err := url.Parse(rr.Header().Get("Location"))
-	c.Assert(err, gc.IsNil)
 	c.Assert(u.Host, gc.Equals, "login.ubuntu.com")
 	c.Assert(u.Path, gc.Equals, "/+openid")
 	q := u.Query()
@@ -120,125 +103,65 @@ func (s *ussoSuite) TestRedirect(c *gc.C) {
 }
 
 func (s *ussoSuite) TestHandleSuccess(c *gc.C) {
-	db := s.Session.DB("test")
-	tc := &idptest.TestContext{
-		Context:   context.Background(),
-		URLPrefix: "https://idp.test",
-		Bakery_:   bakery.New(bakery.BakeryParams{}),
-		Database_: db,
-	}
-	s.MockUSSO.AddUser(&mockusso.User{
+	s.mockUSSOSuite.MockUSSO.AddUser(&mockusso.User{
 		ID:       "test",
 		NickName: "test",
 		FullName: "Test User",
 		Email:    "test@example.com",
 	})
-	s.MockUSSO.SetLoginUser("test")
-	cl := http.Client{
-		CheckRedirect: func(*http.Request, []*http.Request) error {
-			return errors.New("no redirect")
-		},
-	}
-	resp, err := cl.Get(s.ussoURL(c, "https://idp.test", db, "2"))
+	s.mockUSSOSuite.MockUSSO.SetLoginUser("test")
+	resp := s.roundTrip(c, s.ussoURL(c, s.Ctx, "2"))
 	defer resp.Body.Close()
-	tc.Request, err = http.NewRequest("GET", resp.Header.Get("Location"), nil)
-	c.Assert(err, gc.IsNil)
-	tc.Request.ParseForm()
-	rr := httptest.NewRecorder()
-	s.idp.Handle(tc, rr, tc.Request)
-	idptest.AssertLoginSuccess(c, tc, "test")
-	idptest.AssertUser(c, tc, &params.User{
-		Username:   params.Username("test"),
-		ExternalID: "https://login.ubuntu.com/+id/test",
-		FullName:   "Test User", Email: "test@example.com",
-	})
-	c.Assert(rr.Body.String(), gc.Equals, "login successful as user test\n")
+	s.get(c, s.Ctx, resp.Header.Get("Location"))
+	s.AssertLoginSuccess(c, "test")
 }
 
 func (s *ussoSuite) TestHandleSuccessNoExtensions(c *gc.C) {
-	db := s.Session.DB("test")
-	tc := &idptest.TestContext{
-		Context:   context.Background(),
-		URLPrefix: "https://idp.test",
-		Bakery_:   bakery.New(bakery.BakeryParams{}),
-		Database_: db,
-	}
-	err := tc.UpdateUser(&params.User{
-		ExternalID: "https://login.ubuntu.com/+id/test",
-		Username:   params.Username("test"),
-		FullName:   "Test User",
-		Email:      "test@example.com",
-	})
-	c.Assert(err, gc.IsNil)
-	s.MockUSSO.AddUser(&mockusso.User{
+	err := s.Store.UpdateIdentity(
+		s.Ctx,
+		&store.Identity{
+			ProviderID: store.MakeProviderIdentity("usso", "https://login.ubuntu.com/+id/test"),
+			Username:   "test",
+			Name:       "Test User",
+			Email:      "test@example.com",
+		},
+		store.Update{
+			store.Username: store.Set,
+			store.Name:     store.Set,
+			store.Email:    store.Set,
+		},
+	)
+	c.Assert(err, gc.Equals, nil)
+	s.mockUSSOSuite.MockUSSO.AddUser(&mockusso.User{
 		ID:       "test",
 		NickName: "test",
 		FullName: "Test User",
 		Email:    "test@example.com",
 	})
-	s.MockUSSO.SetLoginUser("test")
-	s.MockUSSO.ExcludeExtensions()
-	cl := http.Client{
-		CheckRedirect: func(*http.Request, []*http.Request) error {
-			return errors.New("no redirect")
-		},
-	}
-	resp, err := cl.Get(s.ussoURL(c, "https://idp.test", db, "3"))
+	s.mockUSSOSuite.MockUSSO.SetLoginUser("test")
+	s.mockUSSOSuite.MockUSSO.ExcludeExtensions()
+	resp := s.roundTrip(c, s.ussoURL(c, s.Ctx, "3"))
 	defer resp.Body.Close()
-	tc.Request, err = http.NewRequest("GET", resp.Header.Get("Location"), nil)
-	c.Assert(err, gc.IsNil)
-	tc.Request.ParseForm()
-	rr := httptest.NewRecorder()
-	s.idp.Handle(tc, rr, tc.Request)
-	idptest.AssertLoginSuccess(c, tc, "test")
-	idptest.AssertUser(c, tc, &params.User{
-		ExternalID: "https://login.ubuntu.com/+id/test",
-		Username:   params.Username("test"),
-		FullName:   "Test User",
-		Email:      "test@example.com",
-	})
-	c.Assert(rr.Body.String(), gc.Equals, "login successful as user test\n")
+	s.get(c, s.Ctx, resp.Header.Get("Location"))
+	s.AssertLoginSuccess(c, "test")
 }
 
 func (s *ussoSuite) TestHandleNoExtensionsNotFound(c *gc.C) {
-	db := s.Session.DB("test")
-	tc := &idptest.TestContext{
-		Context:   context.Background(),
-		URLPrefix: "https://idp.test",
-		Database_: db,
-	}
-	s.MockUSSO.AddUser(&mockusso.User{
+	s.mockUSSOSuite.MockUSSO.AddUser(&mockusso.User{
 		ID:       "test",
 		NickName: "test",
 		FullName: "Test User",
 		Email:    "test@example.com",
 	})
-	s.MockUSSO.SetLoginUser("test")
-	s.MockUSSO.ExcludeExtensions()
-	cl := http.Client{
-		CheckRedirect: func(*http.Request, []*http.Request) error {
-			return errors.New("no redirect")
-		},
-	}
-	resp, err := cl.Get(s.ussoURL(c, "https://idp.test", db, "4"))
+	s.mockUSSOSuite.MockUSSO.SetLoginUser("test")
+	s.mockUSSOSuite.MockUSSO.ExcludeExtensions()
+	resp := s.roundTrip(c, s.ussoURL(c, s.Ctx, "4"))
 	defer resp.Body.Close()
-	tc.Request, err = http.NewRequest("GET", resp.Header.Get("Location"), nil)
-	c.Assert(err, gc.IsNil)
-	tc.Request.ParseForm()
-	rr := httptest.NewRecorder()
-	s.idp.Handle(tc, rr, tc.Request)
-	idptest.AssertLoginFailure(c, tc, `invalid user: username not specified`)
-	err, _ = tc.LoginFailureCall()
-	c.Assert(errgo.Cause(err), gc.Equals, params.ErrForbidden)
+	s.get(c, s.Ctx, resp.Header.Get("Location"))
+	s.AssertLoginFailureMatches(c, `invalid user: username not specified`)
 }
 
 func (s *ussoSuite) TestInteractiveLoginFromDifferentProvider(c *gc.C) {
-	db := s.Session.DB("test")
-	tc := &idptest.TestContext{
-		Context:   context.Background(),
-		URLPrefix: "https://idp.test",
-		Database_: db,
-	}
 	mockUSSO := mockusso.New("https://login.badplace.com")
 	server := httptest.NewServer(mockUSSO)
 	defer server.Close()
@@ -268,64 +191,51 @@ func (s *ussoSuite) TestInteractiveLoginFromDifferentProvider(c *gc.C) {
 		Path:     "/+openid",
 		RawQuery: v.Encode(),
 	}
-	cl := http.Client{
-		CheckRedirect: func(*http.Request, []*http.Request) error {
-			return errors.New("no redirect")
-		},
-	}
-	resp, err := cl.Get(u.String())
+	resp := s.roundTrip(c, u.String())
 	defer resp.Body.Close()
-	tc.Request, err = http.NewRequest("GET", resp.Header.Get("Location"), nil)
-	c.Assert(err, gc.IsNil)
-	tc.Request.ParseForm()
-	rr := httptest.NewRecorder()
-	s.idp.Handle(tc, rr, tc.Request)
-	idptest.AssertLoginFailure(c, tc, `.*rejecting login from https://login\.badplace\.com/\+openid`)
+	s.get(c, s.Ctx, resp.Header.Get("Location"))
+	s.AssertLoginFailureMatches(c, `.*rejecting login from https://login\.badplace\.com/\+openid`)
 }
 
 func (s *ussoSuite) TestHandleUpdateUserError(c *gc.C) {
-	db := s.Session.DB("test")
-	tc := &idptest.TestContext{
-		Context:   context.Background(),
-		URLPrefix: "https://idp.test",
-		Bakery_:   bakery.New(bakery.BakeryParams{}),
-		Database_: db,
-	}
-	s.MockUSSO.AddUser(&mockusso.User{
+	s.mockUSSOSuite.MockUSSO.AddUser(&mockusso.User{
 		ID:       "test",
 		NickName: "test-",
 		FullName: "Test User",
 		Email:    "test@example.com",
 	})
-	s.MockUSSO.SetLoginUser("test")
-	cl := http.Client{
-		CheckRedirect: func(*http.Request, []*http.Request) error {
-			return errors.New("no redirect")
-		},
-	}
-	resp, err := cl.Get(s.ussoURL(c, "https://idp.test", db, "5"))
+	s.mockUSSOSuite.MockUSSO.SetLoginUser("test")
+	resp := s.roundTrip(c, s.ussoURL(c, s.Ctx, "5"))
 	defer resp.Body.Close()
-	tc.Request, err = http.NewRequest("GET", resp.Header.Get("Location"), nil)
-	c.Assert(err, gc.IsNil)
-	tc.Request.ParseForm()
-	tc.UpdateUserError = errgo.New(`invalid username "test-"`)
-	rr := httptest.NewRecorder()
-	s.idp.Handle(tc, rr, tc.Request)
-	idptest.AssertLoginFailure(c, tc, `invalid username "test-"`)
+	s.get(c, s.Ctx, resp.Header.Get("Location"))
+	s.AssertLoginFailureMatches(c, `invalid user: invalid username "test-"`)
 }
 
-func (s *ussoSuite) ussoURL(c *gc.C, prefix string, db *mgo.Database, waitid string) string {
-	tc := &idptest.TestContext{
-		Context:   context.Background(),
-		URLPrefix: prefix,
-		Database_: db,
-	}
-	var err error
-	tc.Request, err = http.NewRequest("", s.idp.URL(tc, waitid), nil)
-	c.Assert(err, gc.Equals, nil)
-	tc.Request.ParseForm()
-	rr := httptest.NewRecorder()
-	s.idp.Handle(tc, rr, tc.Request)
+// ussoURL gets a request addressed to the MockUSSO server with the given wait ID.
+func (s *ussoSuite) ussoURL(c *gc.C, ctx context.Context, waitid string) string {
+	rr := s.get(c, ctx, "/?waitid="+waitid)
 	c.Assert(rr.Code, gc.Equals, http.StatusFound)
 	return rr.Header().Get("Location")
+}
+
+// get performs a "GET" requests on the idp's Handle method with the
+// given path.
+func (s *ussoSuite) get(c *gc.C, ctx context.Context, path string) *httptest.ResponseRecorder {
+	path = strings.TrimPrefix(path, "https://idp.test")
+	req, err := http.NewRequest("GET", path, nil)
+	c.Assert(err, gc.Equals, nil)
+	req.ParseForm()
+	rr := httptest.NewRecorder()
+	s.idp.Handle(ctx, rr, req)
+	return rr
+}
+
+// roundTrip uses http.DefaultTransport to perform a GET request as a
+// single round trip to the given URL.
+func (s *ussoSuite) roundTrip(c *gc.C, url string) *http.Response {
+	req, err := http.NewRequest("GET", url, nil)
+	c.Assert(err, gc.Equals, nil)
+	resp, err := http.DefaultTransport.RoundTrip(req)
+	c.Assert(err, gc.Equals, nil)
+	return resp
 }

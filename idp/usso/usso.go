@@ -13,13 +13,15 @@ import (
 	"github.com/juju/httprequest"
 	"github.com/juju/idmclient/params"
 	"github.com/juju/loggo"
-	"github.com/yohcop/openid-go"
+	"github.com/juju/names"
+	openid "github.com/yohcop/openid-go"
+	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
 
 	"github.com/CanonicalLtd/blues-identity/config"
 	"github.com/CanonicalLtd/blues-identity/idp"
 	"github.com/CanonicalLtd/blues-identity/idp/idputil"
-	"github.com/CanonicalLtd/blues-identity/idp/usso/internal/mgononcestore"
+	"github.com/CanonicalLtd/blues-identity/store"
 )
 
 var logger = loggo.GetLogger("identity.idp.usso")
@@ -33,7 +35,7 @@ func init() {
 // IdentityProvider is an idp.IdentityProvider that provides
 // authentication via Ubuntu SSO.
 var IdentityProvider idp.IdentityProvider = &identityProvider{
-	noncePool:      mgononcestore.New(mgononcestore.Params{}),
+	nonceStore:     openid.NewSimpleNonceStore(),
 	discoveryCache: openid.NewSimpleDiscoveryCache(),
 }
 
@@ -49,8 +51,11 @@ const openIdRequestedTeams = "blues-development,charm-beta"
 
 // USSOIdentityProvider allows login using Ubuntu SSO credentials.
 type identityProvider struct {
-	noncePool      *mgononcestore.Pool
+	// TODO (mhilton) provide a new mechanism for this.
+	// noncePool      *mgononcestore.Pool
+	nonceStore     openid.NonceStore
 	discoveryCache *openid.SimpleDiscoveryCache
+	initParams     idp.InitParams
 }
 
 // Name gives the name of the identity provider (usso).
@@ -73,36 +78,41 @@ func (*identityProvider) Interactive() bool {
 	return true
 }
 
-// URL gets the login URL to use this identity provider.
-func (*identityProvider) URL(c idp.Context, waitID string) string {
-	return idputil.URL(c, "/login", waitID)
-}
-
 // Init initialises this identity provider
-func (*identityProvider) Init(c idp.Context) error {
+func (idp *identityProvider) Init(_ context.Context, params idp.InitParams) error {
+	idp.initParams = params
 	return nil
 }
 
+// URL gets the login URL to use this identity provider.
+func (idp *identityProvider) URL(waitID string) string {
+	return idputil.URL(idp.initParams.URLPrefix, "/login", waitID)
+}
+
 // Handle handles the Ubuntu SSO login process.
-func (idp *identityProvider) Handle(ctx idp.RequestContext, w http.ResponseWriter, req *http.Request) {
-	logger.Debugf("handling %s", ctx.Path())
-	switch ctx.Path() {
+func (idp *identityProvider) Handle(ctx context.Context, w http.ResponseWriter, req *http.Request) {
+	logger.Debugf("handling %s", req.URL.Path)
+	switch req.URL.Path {
 	case "/callback":
-		idp.callback(ctx, w, req)
+		if err := idp.callback(ctx, w, req); err != nil {
+			idp.initParams.LoginCompleter.Failure(ctx, w, req, idputil.WaitID(req), err)
+		}
 	default:
-		idp.login(ctx, w, req)
+		if err := idp.login(ctx, w, req); err != nil {
+			idp.initParams.LoginCompleter.Failure(ctx, w, req, idputil.WaitID(req), err)
+		}
 	}
 }
 
-func (idp *identityProvider) login(ctx idp.RequestContext, w http.ResponseWriter, req *http.Request) {
-	realm := ctx.URL("/callback")
+func (idp *identityProvider) login(ctx context.Context, w http.ResponseWriter, req *http.Request) error {
+	realm := idp.initParams.URLPrefix + "/callback"
 	callback := realm
 	if waitid := idputil.WaitID(req); waitid != "" {
 		callback += "?waitid=" + waitid
 	}
 	u, err := openid.RedirectURL(ussoURL, callback, realm)
 	if err != nil {
-		ctx.LoginFailure(idputil.WaitID(req), err)
+		return errgo.Mask(err)
 	}
 	ext := url.Values{}
 	ext.Set("openid.ns.sreg", "http://openid.net/extensions/sreg/1.1")
@@ -110,6 +120,7 @@ func (idp *identityProvider) login(ctx idp.RequestContext, w http.ResponseWriter
 	ext.Set("openid.ns.lp", "http://ns.launchpad.net/2007/openid-teams")
 	ext.Set("openid.lp.query_membership", openIdRequestedTeams)
 	http.Redirect(w, req, fmt.Sprintf("%s&%s", u, ext.Encode()), http.StatusFound)
+	return nil
 }
 
 // ussoCallbackRequest documents the /v1/idp/usso/callback endpoint. This
@@ -125,18 +136,14 @@ type callbackRequest struct {
 	Groups     string `httprequest:"openid.lp.is_member,form"`
 }
 
-func (idp *identityProvider) callback(ctx idp.RequestContext, w http.ResponseWriter, req *http.Request) {
+func (idp *identityProvider) callback(ctx context.Context, w http.ResponseWriter, req *http.Request) error {
 	var r callbackRequest
 	if err := httprequest.Unmarshal(idputil.RequestParams(ctx, w, req), &r); err != nil {
-		ctx.LoginFailure(idputil.WaitID(req), err)
-		return
+		return errgo.Mask(err)
 	}
-	ns := idp.noncePool.Store(ctx.Database())
-	defer ns.Close()
-	u, err := url.Parse(ctx.RequestURL())
+	u, err := url.Parse(idp.initParams.URLPrefix + req.URL.String())
 	if err != nil {
-		ctx.LoginFailure(idputil.WaitID(req), err)
-		return
+		return errgo.Mask(err)
 	}
 	// openid.Verify gets the endpoint name from openid.endpoint, but
 	// the spec says it's openid.op_endpoint. Munge it in to make
@@ -149,15 +156,13 @@ func (idp *identityProvider) callback(ctx idp.RequestContext, w http.ResponseWri
 	id, err := openid.Verify(
 		u.String(),
 		idp.discoveryCache,
-		ns,
+		idp.nonceStore,
 	)
 	if err != nil {
-		ctx.LoginFailure(idputil.WaitID(req), err)
-		return
+		return errgo.Mask(err)
 	}
 	if r.OPEndpoint != ussoURL+"/+openid" {
-		ctx.LoginFailure(idputil.WaitID(req), errgo.WithCausef(nil, params.ErrForbidden, "rejecting login from %s", r.OPEndpoint))
-		return
+		return errgo.WithCausef(nil, params.ErrForbidden, "rejecting login from %s", r.OPEndpoint)
 	}
 	user, err := userFromCallback(&r)
 	// If userFromCallback returns an error it is because the
@@ -167,30 +172,44 @@ func (idp *identityProvider) callback(ctx idp.RequestContext, w http.ResponseWri
 	// identity cannot be created. It is still possible to log the
 	// user in if the identity already exists.
 	if err != nil {
-		if user, err := ctx.FindUserByExternalId(id); err == nil {
-			idputil.LoginUser(ctx, idputil.WaitID(req), w, user)
-			return
+		identity := store.Identity{
+			ProviderID: store.MakeProviderIdentity("usso", id),
 		}
-		ctx.LoginFailure(idputil.WaitID(req), errgo.WithCausef(err, params.ErrForbidden, "invalid user"))
-		return
+		serr := idp.initParams.Store.Identity(ctx, &identity)
+		if serr == nil {
+			idp.initParams.LoginCompleter.Success(ctx, w, req, idputil.WaitID(req), &identity)
+			return nil
+		}
+		if errgo.Cause(serr) != store.ErrNotFound {
+			return errgo.Mask(serr)
+		}
+		return errgo.WithCausef(err, params.ErrForbidden, "invalid user")
 	}
-	err = ctx.UpdateUser(user)
-	if err != nil {
-		ctx.LoginFailure(idputil.WaitID(req), err)
-		return
+
+	if err := idp.initParams.Store.UpdateIdentity(ctx, user, store.Update{
+		store.Username: store.Set,
+		store.Name:     store.Set,
+		store.Email:    store.Set,
+		store.Groups:   store.Push,
+	}); err != nil {
+		return errgo.Mask(err)
 	}
-	idputil.LoginUser(ctx, idputil.WaitID(req), w, user)
+	idp.initParams.LoginCompleter.Success(ctx, w, req, idputil.WaitID(req), user)
+	return nil
 }
 
 // userFromCallback creates a new user document from the callback
 // parameters.
-func userFromCallback(r *callbackRequest) (*params.User, error) {
+func userFromCallback(r *callbackRequest) (*store.Identity, error) {
 	signed := make(map[string]bool)
 	for _, f := range strings.Split(r.Signed, ",") {
 		signed[f] = true
 	}
 	if r.Nickname == "" || !signed["sreg.nickname"] {
 		return nil, errgo.New("username not specified")
+	}
+	if !names.IsValidUser(r.Nickname) {
+		return nil, errgo.Newf("invalid username %q", r.Nickname)
 	}
 	if r.Email == "" || !signed["sreg.email"] {
 		return nil, errgo.New("email address not specified")
@@ -203,11 +222,11 @@ func userFromCallback(r *callbackRequest) (*params.User, error) {
 	if r.Groups != "" && signed["lp.is_member"] {
 		groups = strings.Split(r.Groups, ",")
 	}
-	return &params.User{
-		Username:   params.Username(r.Nickname),
-		ExternalID: r.ExternalID,
+	return &store.Identity{
+		ProviderID: store.MakeProviderIdentity("usso", r.ExternalID),
+		Username:   r.Nickname,
 		Email:      r.Email,
-		FullName:   r.Fullname,
-		IDPGroups:  groups,
+		Name:       r.Fullname,
+		Groups:     groups,
 	}, nil
 }

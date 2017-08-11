@@ -4,10 +4,8 @@ package auth
 
 import (
 	"bytes"
-	"sort"
 	"strings"
 
-	"github.com/CanonicalLtd/blues-identity/internal/store"
 	"github.com/juju/idmclient/params"
 	"github.com/juju/loggo"
 	"golang.org/x/net/context"
@@ -16,6 +14,8 @@ import (
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
 	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
 	macaroon "gopkg.in/macaroon.v2-unstable"
+
+	"github.com/CanonicalLtd/blues-identity/store"
 )
 
 var logger = loggo.GetLogger("identity.internal.auth")
@@ -31,9 +31,13 @@ const (
 	kindUser   = "u"
 )
 
-// Checker contains the first party caveat checker that will be used by
-// the Authorizer.
-var Checker = newChecker()
+// Namespace contains the checkers.Namespace supported by the identity
+// service.
+var Namespace = checkers.NewNamespace(map[string]string{
+	checkers.StdNamespace:        "",
+	httpbakery.CheckersNamespace: "http",
+	checkersNamespace:            "",
+})
 
 // The following constants define possible operation actions.
 const (
@@ -60,6 +64,8 @@ type Authorizer struct {
 	adminPassword string
 	location      string
 	checker       *bakery.Checker
+	store         store.Store
+	groupGetters  map[string]GroupGetter
 }
 
 // Params specifify the configuration parameters for a new Authroizer.
@@ -80,6 +86,14 @@ type Params struct {
 	// MacaroonOpStore is the store of macaroon operations and root
 	// keys.
 	MacaroonOpStore bakery.MacaroonOpStore
+
+	// Store is the identity store.
+	Store store.Store
+
+	// GroupGetters are used to update the stored list of groups for
+	// an identity. The map key is the provider name in the
+	// identity's provider id.
+	GroupGetters map[string]GroupGetter
 }
 
 // New creates a new Authorizer for authorizing identity server
@@ -89,9 +103,11 @@ func New(params Params) *Authorizer {
 		adminUsername: params.AdminUsername,
 		adminPassword: params.AdminPassword,
 		location:      params.Location,
+		store:         params.Store,
+		groupGetters:  params.GroupGetters,
 	}
 	a.checker = bakery.NewChecker(bakery.CheckerParams{
-		Checker: Checker,
+		Checker: newChecker(a),
 		Authorizer: bakery.ACLAuthorizer{
 			AllowPublic: true,
 			GetACL: func(ctx context.Context, op bakery.Op) ([]string, error) {
@@ -158,6 +174,29 @@ func (a *Authorizer) aclForOp(ctx context.Context, op bakery.Op) ([]string, erro
 	return nil, nil
 }
 
+// SetAdminPublicKey configures the public key on the admin user. This is
+// to allow agent login as the admin user.
+func (a *Authorizer) SetAdminPublicKey(ctx context.Context, pk *bakery.PublicKey) error {
+	var pks []bakery.PublicKey
+	if pk != nil {
+		pks = append(pks, *pk)
+	}
+	return errgo.Mask(a.store.UpdateIdentity(
+		ctx,
+		&store.Identity{
+			ProviderID: store.MakeProviderIdentity("idm", "admin"),
+			Username:   AdminUsername,
+			Groups:     []string{AdminUsername},
+			PublicKeys: pks,
+		},
+		store.Update{
+			store.Username:   store.Set,
+			store.Groups:     store.Set,
+			store.PublicKeys: store.Set,
+		},
+	))
+}
+
 // Auth checks that client, as identified by the given context and
 // macaroons, is authorized to perform the given operations. It may
 // return an bakery.DischargeRequiredError when further checks are
@@ -179,6 +218,22 @@ func isDischargeRequiredError(err error) bool {
 	return ok
 }
 
+// Identity creates a new identity for the user with the given username,
+// such a user must exist in the store.
+func (a *Authorizer) Identity(ctx context.Context, username string) (*Identity, error) {
+	id := &Identity{
+		id: store.Identity{
+			Username: username,
+		},
+		store:        a.store,
+		groupGetters: a.groupGetters,
+	}
+	if err := id.lookup(ctx); err != nil {
+		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	}
+	return id, nil
+}
+
 // UserHasPublicKeyCaveat creates a first-party caveat that ensures that
 // the given user is associated with the given public key.
 func UserHasPublicKeyCaveat(user params.Username, pk *bakery.PublicKey) checkers.Caveat {
@@ -191,42 +246,34 @@ func UserHasPublicKeyCaveat(user params.Username, pk *bakery.PublicKey) checkers
 const checkersNamespace = "jujucharms.com/identity"
 const userHasPublicKeyCondition = "user-has-public-key"
 
-func newChecker() *checkers.Checker {
+func newChecker(a *Authorizer) *checkers.Checker {
 	checker := httpbakery.NewChecker()
 	checker.Namespace().Register(checkersNamespace, "")
-	checker.Register(userHasPublicKeyCondition, checkersNamespace, checkUserHasPublicKey)
+	checker.Register(userHasPublicKeyCondition, checkersNamespace, a.checkUserHasPublicKey)
 	return checker
 }
 
 // checkUserHasPublicKey checks the "user-has-public-key" caveat.
-func checkUserHasPublicKey(ctxt context.Context, cond, arg string) error {
-	store := storeFromContext(ctxt)
-	if store == nil {
-		return errgo.Newf("no store in context")
-	}
+func (a *Authorizer) checkUserHasPublicKey(ctx context.Context, cond, arg string) error {
 	parts := strings.Fields(arg)
 	if len(parts) != 2 {
 		return errgo.New("caveat badly formatted")
 	}
-	var username params.Username
-	err := username.UnmarshalText([]byte(parts[0]))
-	if err != nil {
-		return errgo.Mask(err)
-	}
 	var publicKey bakery.PublicKey
-	err = publicKey.UnmarshalText([]byte(parts[1]))
-	if err != nil {
+	if err := publicKey.UnmarshalText([]byte(parts[1])); err != nil {
 		return errgo.Notef(err, "invalid public key %q", parts[1])
 	}
-	id, err := store.GetIdentity(username)
-	if err != nil {
-		if errgo.Cause(err) != params.ErrNotFound {
+	identity := store.Identity{
+		Username: parts[0],
+	}
+	if err := a.store.Identity(ctx, &identity); err != nil {
+		if errgo.Cause(err) != store.ErrNotFound {
 			return errgo.Mask(err)
 		}
 		return errgo.Newf("public key not valid for user")
 	}
-	for _, pk := range id.PublicKeys {
-		if !bytes.Equal(pk.Key, publicKey.Key[:]) {
+	for _, pk := range identity.PublicKeys {
+		if !bytes.Equal(pk.Key[:], publicKey.Key[:]) {
 			continue
 		}
 		return nil
@@ -251,7 +298,13 @@ func (c identityClient) IdentityFromContext(ctx context.Context) (_ident bakery.
 	if username, password, ok := userCredentialsFromContext(ctx); ok {
 		if username == c.a.adminUsername && password == c.a.adminPassword {
 			logger.Debugf("admin login success as %q", AdminUsername)
-			return Identity(AdminUsername), nil, nil
+			return &Identity{
+				id: store.Identity{
+					Username: AdminUsername,
+				},
+				store:        c.a.store,
+				groupGetters: c.a.groupGetters,
+			}, nil, nil
 		}
 		return nil, nil, errgo.WithCausef(nil, params.ErrUnauthorized, "invalid credentials")
 	}
@@ -287,31 +340,39 @@ func (c identityClient) DeclaredIdentity(ctx context.Context, declared map[strin
 	if err := CheckUserDomain(ctx, username); err != nil {
 		return nil, errgo.Mask(err)
 	}
-	return Identity(username), nil
+	return &Identity{
+		id: store.Identity{
+			Username: username,
+		},
+		store:        c.a.store,
+		groupGetters: c.a.groupGetters,
+	}, nil
 }
 
 // An Identity is the implementation of bakery.Identity used in the
 // identity server.
-type Identity string
+type Identity struct {
+	id           store.Identity
+	store        store.Store
+	groupGetters map[string]GroupGetter
+}
 
 // Id implements bakery.Identity.Id.
-func (id Identity) Id() string {
-	return string(id)
+func (id *Identity) Id() string {
+	return string(id.id.Username)
 }
 
 // Domain implements bakery.Identity.Domain.
-func (id Identity) Domain() string {
+func (id *Identity) Domain() string {
 	return ""
 }
 
 // Allow implements bakery.ACLIdentity.Allow by checking whether the
 // given identity is in any of the required groups or users.
-// It uses the store associated with the context (see ContextWithStore)
-// to retrieve the groups.
-func (id Identity) Allow(ctx context.Context, acl []string) (bool, error) {
+func (id *Identity) Allow(ctx context.Context, acl []string) (bool, error) {
 	logger.Debugf("Identity.Allow %q, acl %q {", id, acl)
 	defer logger.Debugf("}")
-	if ok, isTrivial := trivialAllow(string(id), acl); isTrivial {
+	if ok, isTrivial := trivialAllow(id.id.Username, acl); isTrivial {
 		logger.Debugf("trivial %v", ok)
 		return ok, nil
 	}
@@ -333,48 +394,34 @@ func (id Identity) Allow(ctx context.Context, acl []string) (bool, error) {
 }
 
 // Groups returns all the groups associated with the user.
-// It uses the store associated with the context (see ContextWithStore)
-// to retrieve the groups.
-func (id Identity) Groups(ctx context.Context) ([]string, error) {
-	st := storeFromContext(ctx)
-	if st == nil {
-		return nil, errgo.New("no store found in context")
-	}
-	idDoc, err := st.GetIdentity(params.Username(id))
-	if err != nil {
+// TODO (mhilton) document group getting.
+func (id *Identity) Groups(ctx context.Context) ([]string, error) {
+	if err := id.lookup(ctx); err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
-	var groups []string
-	switch {
-	case idDoc.ExternalID != "":
-		lpGroups := store.GetUserGroups(st, idDoc.ExternalID)
-		groups = uniqueStrings(append(idDoc.Groups, lpGroups...))
-	case idDoc.Owner != "":
-		groups = filterGroups(ctx, idDoc.Groups, idDoc.Owner)
+	groups := id.id.Groups
+	provider, _ := id.id.ProviderID.Split()
+	if gg := id.groupGetters[provider]; gg != nil {
+		var err error
+		groups, err = gg.GetGroups(ctx, &id.id)
+		if err != nil {
+			logger.Warningf("error getting groups: %s", err)
+		}
 	}
 	return groups, nil
 }
 
-// filterGroups removes any entry in groups that is not in the owner's groups set.
-func filterGroups(ctx context.Context, groups []string, owner string) []string {
-	if owner == AdminUsername {
-		// Admin is in every group by definition.
-		return groups
-	}
-	ownerGroups, err := Identity(owner).Groups(ctx)
-	if err != nil {
-		logger.Errorf("cannot get owner group information: %s", err)
+func (id *Identity) lookup(ctx context.Context) error {
+	if id.id.ID != "" {
 		return nil
 	}
-	filtered := make([]string, 0, len(groups))
-	for _, g := range groups {
-		for _, g1 := range ownerGroups {
-			if g == g1 {
-				filtered = append(filtered, g)
-			}
+	if err := id.store.Identity(ctx, &id.id); err != nil {
+		if errgo.Cause(err) == store.ErrNotFound {
+			return errgo.WithCausef(err, params.ErrNotFound, "")
 		}
+		return errgo.Mask(err)
 	}
-	return filtered
+	return nil
 }
 
 // trivialAllow reports whether the username should be allowed
@@ -415,22 +462,12 @@ func splitEntity(entity string) (string, string) {
 	return entity, ""
 }
 
-// uniqueStrings removes all duplicates from the supplied
-// string slice, updating the slice in place.
-// The values will be in lexicographic order.
-func uniqueStrings(ss []string) []string {
-	if len(ss) < 2 {
-		return ss
-	}
-	sort.Strings(ss)
-	prev := ss[0]
-	out := ss[:1]
-	for _, s := range ss[1:] {
-		if s == prev {
-			continue
-		}
-		out = append(out, s)
-		prev = s
-	}
-	return out
+// A GroupGetter is used to update the groups associated with an
+// identity.
+type GroupGetter interface {
+	// GetGroups returns the group information for the given
+	// identity. If a non-nil error is returned it will be logged,
+	// but the list of groups will still be taken as the set of
+	// groups to be associated with the identity.
+	GetGroups(context.Context, *store.Identity) ([]string, error)
 }

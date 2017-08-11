@@ -7,6 +7,7 @@ import (
 
 	"github.com/juju/httprequest"
 	"github.com/juju/idmclient/params"
+	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
 
 	"github.com/CanonicalLtd/blues-identity/config"
@@ -40,10 +41,10 @@ func (*tokenIdentityProvider) Interactive() bool {
 }
 
 // Handle implements idp.IdentityProvider.Handle.
-func (idp *tokenIdentityProvider) Handle(ctx idp.RequestContext, w http.ResponseWriter, req *http.Request) {
+func (idp *tokenIdentityProvider) Handle(ctx context.Context, w http.ResponseWriter, req *http.Request) {
 	var lr tokenLoginRequest
 	if err := httprequest.Unmarshal(idputil.RequestParams(ctx, w, req), &lr); err != nil {
-		ctx.LoginFailure(idputil.WaitID(req), errgo.WithCausef(err, params.ErrBadRequest, "cannot unmarshal login request"))
+		idp.initParams.LoginCompleter.Failure(ctx, w, req, idputil.WaitID(req), errgo.WithCausef(err, params.ErrBadRequest, "cannot unmarshal login request"))
 		return
 	}
 	idp.doLogin(ctx, w, req, keystone.Auth{

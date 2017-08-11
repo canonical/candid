@@ -7,23 +7,22 @@ import (
 	"html/template"
 	"net/http"
 	"runtime/debug"
-	"time"
 
 	"github.com/juju/httprequest"
 	"github.com/juju/idmclient/params"
 	"github.com/juju/loggo"
+	"github.com/juju/utils/debugstatus"
 	"github.com/julienschmidt/httprouter"
 	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
-	"gopkg.in/mgo.v2"
-	"launchpad.net/lpad"
 
 	"github.com/CanonicalLtd/blues-identity/idp"
 	"github.com/CanonicalLtd/blues-identity/internal/auth"
-	"github.com/CanonicalLtd/blues-identity/internal/store"
+	"github.com/CanonicalLtd/blues-identity/internal/monitoring"
 	"github.com/CanonicalLtd/blues-identity/meeting"
+	"github.com/CanonicalLtd/blues-identity/store"
 )
 
 var logger = loggo.GetLogger("identity.internal.identity")
@@ -34,23 +33,9 @@ type NewAPIHandlerFunc func(HandlerParams) ([]httprequest.Handler, error)
 
 // New returns a handler that serves the given identity API versions using the
 // db to store identity data. The key of the versions map is the version name.
-func New(db *mgo.Database, sp ServerParams, versions map[string]NewAPIHandlerFunc) (*Server, error) {
+func New(sp ServerParams, versions map[string]NewAPIHandlerFunc) (*Server, error) {
 	if len(versions) == 0 {
 		return nil, errgo.Newf("identity server must serve at least one version of the API")
-	}
-	var groupGetter store.ExternalGroupGetter
-	if sp.Launchpad != "" {
-		groupGetter = store.NewLaunchpadGroups(sp.Launchpad, 10*time.Minute)
-	}
-	// Create the identities store.
-	pool, err := store.NewPool(db, store.StoreParams{
-		ExternalGroupGetter: groupGetter,
-		MaxMgoSessions:      sp.MaxMgoSessions,
-		RequestTimeout:      sp.RequestTimeout,
-		AdminAgentPublicKey: sp.AdminAgentPublicKey,
-	})
-	if err != nil {
-		return nil, errgo.Notef(err, "cannot make store")
 	}
 
 	// Create the bakery parts.
@@ -73,7 +58,7 @@ func New(db *mgo.Database, sp ServerParams, versions map[string]NewAPIHandlerFun
 		}
 	}
 	oven := bakery.NewOven(bakery.OvenParams{
-		Namespace:          auth.Checker.Namespace(),
+		Namespace:          auth.Namespace,
 		RootKeyStoreForOps: rksf,
 		Key:                sp.Key,
 		Locator:            locator,
@@ -84,12 +69,21 @@ func New(db *mgo.Database, sp ServerParams, versions map[string]NewAPIHandlerFun
 		AdminPassword:   sp.AuthPassword,
 		Location:        sp.Location,
 		MacaroonOpStore: oven,
+		Store:           sp.Store,
 	})
+	if err := auth.SetAdminPublicKey(context.Background(), sp.AdminAgentPublicKey); err != nil {
+		return nil, errgo.Mask(err)
+	}
+
+	place, err := meeting.NewPlace(sp.MeetingStore, monitoring.NewMeetingMetrics(), sp.PrivateAddr)
+	if err != nil {
+		return nil, errgo.Notef(err, "cannot create meeting place")
+	}
 
 	// Create the HTTP server.
 	srv := &Server{
-		router: httprouter.New(),
-		pool:   pool,
+		router:       httprouter.New(),
+		meetingPlace: place,
 	}
 	// Disable the automatic rerouting in order to maintain
 	// compatibility. It might be worthwhile relaxing this in the
@@ -105,9 +99,9 @@ func New(db *mgo.Database, sp ServerParams, versions map[string]NewAPIHandlerFun
 	for name, newAPI := range versions {
 		handlers, err := newAPI(HandlerParams{
 			ServerParams: sp,
-			Pool:         pool,
 			Oven:         oven,
 			Authorizer:   auth,
+			MeetingPlace: place,
 		})
 		if err != nil {
 			return nil, errgo.Notef(err, "cannot create API %s", name)
@@ -121,8 +115,8 @@ func New(db *mgo.Database, sp ServerParams, versions map[string]NewAPIHandlerFun
 
 // Server serves the identity endpoints.
 type Server struct {
-	router *httprouter.Router
-	pool   *store.Pool
+	router       *httprouter.Router
+	meetingPlace *meeting.Place
 }
 
 // ServeHTTP implements http.Handler.
@@ -145,18 +139,21 @@ func (srv *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 // Close  closes any resources held by this Handler.
 func (s *Server) Close() {
 	logger.Debugf("Closing Server")
-	s.pool.Close()
+	s.meetingPlace.Close()
 }
 
 // ServerParams contains configuration parameters for a server.
 type ServerParams struct {
-	// Place holds the meeting place that will be used for rendezvous
-	// within the identity server.
-	Place *meeting.Place
+	// MeetingStore holds the storage that will be used to store
+	// rendezvous information.
+	MeetingStore meeting.Store
 
 	// RootKeyStore holds the root key store that will be used to
 	// store macaroon root keys within the identity server.
 	RootKeyStore bakery.RootKeyStore
+
+	// Store holds the identities store for the identity server.
+	Store store.Store
 
 	// AuthUsername holds the username for admin login.
 	AuthUsername string
@@ -170,18 +167,6 @@ type ServerParams struct {
 	// Location holds a URL representing the externally accessible
 	// base URL of the service, without a trailing slash.
 	Location string
-
-	// Launchpad holds the address of the launchpad server to use to
-	// get group information.
-	Launchpad lpad.APIBase
-
-	// MaxMgoSession holds the maximum number of concurrent mgo
-	// sessions.
-	MaxMgoSessions int
-
-	// RequestTimeout holds the time to wait for a request to be able
-	// to start.
-	RequestTimeout time.Duration
 
 	// PrivateAddr should hold a dialable address that will be used
 	// for communication between identity servers. Note that this
@@ -206,14 +191,14 @@ type ServerParams struct {
 	// Template contains a set of templates that are used to generate
 	// html output.
 	Template *template.Template
+
+	// DebugStatusCheckerFuncs contains functions that will be
+	// executed as part of a /debug/status check.
+	DebugStatusCheckerFuncs []debugstatus.CheckerFunc
 }
 
 type HandlerParams struct {
 	ServerParams
-
-	// Pool contains a store.Pool that is used in handlers to get
-	// stores.
-	Pool *store.Pool
 
 	// Oven contains a bakery.Oven that should be used by handlers to
 	// mint new macaroons.
@@ -222,6 +207,10 @@ type HandlerParams struct {
 	// Authorizer contains an auth.Authroizer that should be used by
 	// handlers to authorize requests.
 	Authorizer *auth.Authorizer
+
+	// MeetingPlace contains the meeting place that should be used by
+	// handlers to complete rendezvous.
+	MeetingPlace *meeting.Place
 }
 
 //notFound is the handler that is called when a handler cannot be found

@@ -9,10 +9,7 @@ import (
 	"net/http/httptest"
 	"strings"
 
-	"github.com/juju/idmclient/params"
-	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
-	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
 	"gopkg.in/yaml.v2"
 
 	"github.com/CanonicalLtd/blues-identity/config"
@@ -20,9 +17,11 @@ import (
 	"github.com/CanonicalLtd/blues-identity/idp/idptest"
 	keystoneidp "github.com/CanonicalLtd/blues-identity/idp/keystone"
 	"github.com/CanonicalLtd/blues-identity/idp/keystone/internal/mockkeystone"
+	"github.com/CanonicalLtd/blues-identity/store"
 )
 
 type tokenSuite struct {
+	idptest.Suite
 	server *mockkeystone.Server
 	params keystoneidp.Params
 	idp    idp.IdentityProvider
@@ -31,6 +30,7 @@ type tokenSuite struct {
 var _ = gc.Suite(&tokenSuite{})
 
 func (s *tokenSuite) SetUpSuite(c *gc.C) {
+	s.Suite.SetUpSuite(c)
 	s.server = mockkeystone.NewServer()
 	s.params = keystoneidp.Params{
 		Name:        "openstack",
@@ -44,10 +44,18 @@ func (s *tokenSuite) SetUpSuite(c *gc.C) {
 
 func (s *tokenSuite) TearDownSuite(c *gc.C) {
 	s.server.Close()
+	s.Suite.TearDownSuite(c)
 }
 
 func (s *tokenSuite) SetUpTest(c *gc.C) {
+	s.Suite.SetUpTest(c)
 	s.idp = keystoneidp.NewTokenIdentityProvider(s.params)
+	err := s.idp.Init(s.Ctx, s.InitParams(c, "https://idp.test"))
+	c.Assert(err, gc.Equals, nil)
+}
+
+func (s *tokenSuite) TearDownTest(c *gc.C) {
+	s.Suite.TearDownTest(c)
 }
 
 func (s *tokenSuite) TestKeystoneTokenIdentityProviderInteractive(c *gc.C) {
@@ -62,21 +70,14 @@ func (s *tokenSuite) TestKeystoneTokenIdentityProviderHandle(c *gc.C) {
 	req, err := http.NewRequest("POST", "https://idp.test/login?waitid=1", bytes.NewReader(body))
 	c.Assert(err, gc.IsNil)
 	req.Header.Set("Content-Type", "application/json")
-	tc := &idptest.TestContext{
-		Context:   context.Background(),
-		URLPrefix: "https://idp.test",
-		Bakery_:   bakery.New(bakery.BakeryParams{}),
-		Request:   req,
-	}
 	rr := httptest.NewRecorder()
-	s.idp.Handle(tc, rr, tc.Request)
-	idptest.AssertLoginSuccess(c, tc, "testuser@openstack")
-	idptest.AssertUser(c, tc, &params.User{
-		Username:   params.Username("testuser@openstack"),
-		ExternalID: "abc@openstack",
-		IDPGroups:  []string{"abc_project@openstack"},
+	s.idp.Handle(s.Ctx, rr, req)
+	s.AssertLoginSuccess(c, "testuser@openstack")
+	s.AssertUser(c, &store.Identity{
+		ProviderID: store.MakeProviderIdentity("openstack", "abc@openstack"),
+		Username:   "testuser@openstack",
+		Groups:     []string{"abc_project@openstack"},
 	})
-	c.Assert(rr.Body.String(), gc.Equals, "login successful as user testuser@openstack\n")
 }
 
 func (s *tokenSuite) TestKeystoneTokenIdentityProviderHandleBadToken(c *gc.C) {
@@ -87,30 +88,18 @@ func (s *tokenSuite) TestKeystoneTokenIdentityProviderHandleBadToken(c *gc.C) {
 	req, err := http.NewRequest("POST", "https://idp.test/login?waitid=1", bytes.NewReader(body))
 	c.Assert(err, gc.IsNil)
 	req.Header.Set("Content-Type", "application/json")
-	tc := &idptest.TestContext{
-		Context:   context.Background(),
-		URLPrefix: "https://idp.test",
-		Bakery_:   bakery.New(bakery.BakeryParams{}),
-		Request:   req,
-	}
 	rr := httptest.NewRecorder()
-	s.idp.Handle(tc, rr, tc.Request)
-	idptest.AssertLoginFailure(c, tc, `cannot log in: Post http.*: invalid credentials`)
+	s.idp.Handle(s.Ctx, rr, req)
+	s.AssertLoginFailureMatches(c, `cannot log in: Post http.*: invalid credentials`)
 }
 
 func (s *tokenSuite) TestKeystoneTokenIdentityProviderHandleBadRequest(c *gc.C) {
 	req, err := http.NewRequest("POST", "https://idp.test/login?waitid=1", strings.NewReader("{"))
 	c.Assert(err, gc.IsNil)
 	req.Header.Set("Content-Type", "application/json")
-	tc := &idptest.TestContext{
-		Context:   context.Background(),
-		URLPrefix: "https://idp.test",
-		Bakery_:   bakery.New(bakery.BakeryParams{}),
-		Request:   req,
-	}
 	rr := httptest.NewRecorder()
-	s.idp.Handle(tc, rr, tc.Request)
-	idptest.AssertLoginFailure(c, tc, `cannot unmarshal login request: cannot unmarshal into field Token: cannot unmarshal request body: unexpected end of JSON input`)
+	s.idp.Handle(s.Ctx, rr, req)
+	s.AssertLoginFailureMatches(c, `cannot unmarshal login request: cannot unmarshal into field Token: cannot unmarshal request body: unexpected end of JSON input`)
 }
 
 func (s *tokenSuite) TestRegisterConfig(c *gc.C) {

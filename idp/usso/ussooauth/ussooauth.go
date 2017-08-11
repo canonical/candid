@@ -13,11 +13,13 @@ import (
 	"net/url"
 	"regexp"
 
+	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
 
 	"github.com/CanonicalLtd/blues-identity/config"
 	"github.com/CanonicalLtd/blues-identity/idp"
 	"github.com/CanonicalLtd/blues-identity/idp/idputil"
+	"github.com/CanonicalLtd/blues-identity/store"
 )
 
 func init() {
@@ -28,7 +30,7 @@ func init() {
 
 // IdentityProvider is an idp.IdentityProvider that provides
 // authentication via Ubuntu SSO using OAuth.
-var IdentityProvider idp.IdentityProvider = (*identityProvider)(nil)
+var IdentityProvider idp.IdentityProvider = &identityProvider{}
 
 const (
 	ussoURL = "https://login.ubuntu.com"
@@ -36,7 +38,9 @@ const (
 
 // identityProvider allows login using request signing with
 // Ubuntu SSO OAuth tokens.
-type identityProvider struct{}
+type identityProvider struct {
+	initParams idp.InitParams
+}
 
 // Name gives the name of the identity provider (usso_oauth).
 func (*identityProvider) Name() string {
@@ -58,29 +62,32 @@ func (*identityProvider) Interactive() bool {
 	return false
 }
 
-// URL gets the login URL to use this identity provider.
-func (*identityProvider) URL(ctx idp.Context, waitID string) string {
-	return idputil.URL(ctx, "/oauth", waitID)
-}
-
 // Init initialises the identity provider.
-func (*identityProvider) Init(c idp.Context) error {
+func (idp *identityProvider) Init(_ context.Context, params idp.InitParams) error {
+	idp.initParams = params
 	return nil
 }
 
+// URL gets the login URL to use this identity provider.
+func (idp *identityProvider) URL(waitID string) string {
+	return idputil.URL(idp.initParams.URLPrefix, "/oauth", waitID)
+}
+
 // Handle handles the Ubuntu SSO OAuth login process.
-func (*identityProvider) Handle(ctx idp.RequestContext, w http.ResponseWriter, req *http.Request) {
-	id, err := verifyOAuthSignature(ctx.RequestURL(), req)
+func (idp *identityProvider) Handle(ctx context.Context, w http.ResponseWriter, req *http.Request) {
+	id, err := verifyOAuthSignature(idp.initParams.URLPrefix+req.URL.Path, req)
 	if err != nil {
-		ctx.LoginFailure(idputil.WaitID(req), err)
+		idp.initParams.LoginCompleter.Failure(ctx, w, req, idputil.WaitID(req), err)
 		return
 	}
-	u, err := ctx.FindUserByExternalId(id)
-	if err != nil {
-		ctx.LoginFailure(idputil.WaitID(req), errgo.Notef(err, "cannot get user details for %q", id))
+	identity := store.Identity{
+		ProviderID: store.MakeProviderIdentity("usso", id),
+	}
+	if err := idp.initParams.Store.Identity(ctx, &identity); err != nil {
+		idp.initParams.LoginCompleter.Failure(ctx, w, req, idputil.WaitID(req), errgo.Notef(err, "cannot get user details for %q", id))
 		return
 	}
-	idputil.LoginUser(ctx, idputil.WaitID(req), w, u)
+	idp.initParams.LoginCompleter.Success(ctx, w, req, idputil.WaitID(req), &identity)
 }
 
 var consumerKeyRegexp = regexp.MustCompile(`oauth_consumer_key="([^"]*)"`)

@@ -101,7 +101,7 @@ func (h *debugAPIHandler) checkLogin(r *http.Request) error {
 	if err != nil {
 		return errgo.WithCausef(err, h.loginRequired(r), "no cookie")
 	}
-	cookie, err := decodeCookie(h.params.Key, c.Value)
+	cookie, err := decodeCookie(h.key, c.Value)
 	if err != nil {
 		return errgo.WithCausef(nil, h.loginRequired(r), "%s", err.Error())
 	}
@@ -109,7 +109,7 @@ func (h *debugAPIHandler) checkLogin(r *http.Request) error {
 		return errgo.WithCausef(nil, h.loginRequired(r), "cookie expired")
 	}
 	for _, t1 := range cookie.Teams {
-		for _, t2 := range h.params.DebugTeams {
+		for _, t2 := range h.teams {
 			if t1 == t2 {
 				return nil
 			}
@@ -125,16 +125,16 @@ var ussoClient = openid.NewClient(usso.ProductionUbuntuSSOServer, nil, nil)
 func (h *debugAPIHandler) loginRequired(r *http.Request) *loginRequiredError {
 	return &loginRequiredError{
 		redirectURL: ussoClient.RedirectURL(&openid.Request{
-			ReturnTo: h.params.Location + "/debug/login?return_to=" + url.QueryEscape(h.params.Location+r.URL.String()),
-			Realm:    h.params.Location + "/debug",
-			Teams:    h.params.DebugTeams,
+			ReturnTo: h.location + "/debug/login?return_to=" + url.QueryEscape(h.location+r.URL.String()),
+			Realm:    h.location + "/debug",
+			Teams:    h.teams,
 		}),
 	}
 }
 
 // login handles callbacks from an Ubuntu SSO login attempt.
 func (h *debugAPIHandler) login(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
-	url := h.params.Location + r.URL.String()
+	url := h.location + r.URL.String()
 	resp, err := ussoClient.Verify(url)
 	if err != nil {
 		w.WriteHeader(http.StatusUnauthorized)
@@ -142,7 +142,7 @@ func (h *debugAPIHandler) login(w http.ResponseWriter, r *http.Request, _ httpro
 		return
 	}
 	for _, t1 := range resp.Teams {
-		for _, t2 := range h.params.DebugTeams {
+		for _, t2 := range h.teams {
 			if t1 == t2 {
 				h.loginSuccess(w, r, resp)
 				return
@@ -160,7 +160,7 @@ func (h *debugAPIHandler) loginSuccess(w http.ResponseWriter, r *http.Request, r
 		ID:         resp.ID,
 		Teams:      resp.Teams,
 	}
-	value, err := encodeCookie(h.params.Key, c)
+	value, err := encodeCookie(h.key, c)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		fmt.Fprintf(w, "cannot create cookie: %s", err)

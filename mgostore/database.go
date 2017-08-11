@@ -3,6 +3,7 @@
 package mgostore
 
 import (
+	"github.com/juju/utils/debugstatus"
 	"golang.org/x/net/context"
 	errgo "gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
@@ -104,4 +105,36 @@ func (d *Database) BakeryRootKeyStore(policy mgorootkeystore.Policy) bakery.Root
 		db:     d,
 		policy: policy,
 	}
+}
+
+// DebugStatusCheckerFuncs returns a set of debugstatus.CheckerFuncs that
+// can be used to provide a status of the database in the /debug/status
+// endpoint.
+func (d *Database) DebugStatusCheckerFuncs() []debugstatus.CheckerFunc {
+	return []debugstatus.CheckerFunc{
+		debugstatus.MongoCollections(collector{d.db}),
+		d.meetingStatus,
+	}
+}
+
+type collector struct {
+	db *mgo.Database
+}
+
+// Collections implements debugstatus.Collector.Collections.
+func (c collector) Collections() []*mgo.Collection {
+	return []*mgo.Collection{
+		c.db.C(macaroonCollection),
+		c.db.C(meetingCollection),
+		c.db.C(identitiesCollection),
+	}
+}
+
+// CollectionNames implements debugstatus.Collector.CollectionNames by
+// wrapping the CollectionNames method of mgo.Database with some session
+// handling code.
+func (c collector) CollectionNames() ([]string, error) {
+	s := c.db.Session.Copy()
+	defer s.Close()
+	return c.db.With(s).CollectionNames()
 }

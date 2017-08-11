@@ -26,10 +26,12 @@ import (
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
+	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
 
 	"github.com/CanonicalLtd/blues-identity/config"
 	"github.com/CanonicalLtd/blues-identity/idp"
 	"github.com/CanonicalLtd/blues-identity/idp/idputil"
+	"github.com/CanonicalLtd/blues-identity/store"
 )
 
 var logger = loggo.GetLogger("identity.idp.usso.ussodischarge")
@@ -118,51 +120,63 @@ func NewIdentityProvider(p Params) (idp.IdentityProvider, error) {
 // SSO by requiring the client to discharge a macaroon addressed directly
 // to UbuntuSSO.
 type identityProvider struct {
-	hostname string
-	params   Params
+	hostname    string
+	params      Params
+	initParams  idp.InitParams
+	ussoChecker *ussoCaveatChecker
+	checker     *bakery.Checker
 }
 
 // Name gives the name of the identity provider (usso).
-func (idp identityProvider) Name() string {
+func (*identityProvider) Name() string {
 	return "usso_macaroon"
 }
 
 // Domain implements idp.IdentityProvider.Domain
-func (idp identityProvider) Domain() string {
+func (idp *identityProvider) Domain() string {
 	return idp.params.Domain
 }
 
 // Description gives a description of the identity provider.
-func (identityProvider) Description() string {
+func (*identityProvider) Description() string {
 	return "Ubuntu SSO macaroon discharge authentication"
 }
 
 // Interactive specifies that this identity provider is not interactive.
-func (identityProvider) Interactive() bool {
+func (*identityProvider) Interactive() bool {
 	return false
 }
 
-// URL gets the login URL to use this identity provider.
-func (identityProvider) URL(ctx idp.Context, waitID string) string {
-	return idputil.URL(ctx, "/login", waitID)
-}
-
 // Init initialises the identity provider.
-func (identityProvider) Init(c idp.Context) error {
+func (idp *identityProvider) Init(_ context.Context, params idp.InitParams) error {
+	idp.initParams = params
+	idp.ussoChecker = &ussoCaveatChecker{
+		fallback:  httpbakery.NewChecker(),
+		namespace: idp.hostname,
+	}
+	idp.checker = bakery.NewChecker(bakery.CheckerParams{
+		Checker:         idp.ussoChecker,
+		MacaroonOpStore: params.Oven,
+	})
 	return nil
 }
 
+// URL gets the login URL to use this identity provider.
+func (idp *identityProvider) URL(waitID string) string {
+	return idputil.URL(idp.initParams.URLPrefix, "/login", waitID)
+}
+
 // Handle handles the Ubuntu SSO Macaroon login process.
-func (idp identityProvider) Handle(ctx idp.RequestContext, w http.ResponseWriter, req *http.Request) {
+func (idp *identityProvider) Handle(ctx context.Context, w http.ResponseWriter, req *http.Request) {
 	if err := idp.handle(ctx, w, req); err != nil {
-		ctx.LoginFailure(idputil.WaitID(req), err)
+		idp.initParams.LoginCompleter.Failure(ctx, w, req, idputil.WaitID(req), err)
 	}
 }
 
-func (idp identityProvider) handle(ctx idp.RequestContext, w http.ResponseWriter, req *http.Request) error {
+func (idp identityProvider) handle(ctx context.Context, w http.ResponseWriter, req *http.Request) error {
 	switch req.Method {
 	case "GET":
-		m, err := idp.ussoMacaroon(ctx, ctx.Bakery().Oven)
+		m, err := idp.ussoMacaroon(ctx)
 		if err != nil {
 			return err
 		}
@@ -170,28 +184,42 @@ func (idp identityProvider) handle(ctx idp.RequestContext, w http.ResponseWriter
 			Macaroon: m,
 		})
 	case "POST":
-		user, err := idp.verifyUSSOMacaroon(ctx, ctx.Bakery().Checker, req)
+		user, err := idp.verifyUSSOMacaroon(ctx, req)
 		if err != nil {
 			return err
 		}
-		err = ctx.UpdateUser(user)
+		err = idp.initParams.Store.UpdateIdentity(
+			ctx,
+			user,
+			store.Update{
+				store.Username: store.Set,
+				store.Name:     store.Set,
+				store.Email:    store.Set,
+			},
+		)
 		if err != nil {
 			return err
 		}
-		idputil.LoginUser(ctx, idputil.WaitID(req), w, user)
+		idp.initParams.LoginCompleter.Success(ctx, w, req, idputil.WaitID(req), user)
 	default:
 		return errgo.WithCausef(nil, params.ErrBadRequest, "unexpected method %q", req.Method)
 	}
 	return nil
 }
 
-func (idp identityProvider) ussoMacaroon(ctx context.Context, oven *bakery.Oven) (*bakery.Macaroon, error) {
+func (idp *identityProvider) ussoMacaroon(ctx context.Context) (*bakery.Macaroon, error) {
 	fail := func(err error) (*bakery.Macaroon, error) {
 		return nil, err
 	}
 	// Mint a macaroon that's only good for USSO discharge and can't
 	// used for normal login.
-	m, err := oven.NewMacaroon(ctx, bakery.Version1, time.Now().Add(ussoMacaroonDuration), nil, ussoLoginOp)
+	m, err := idp.initParams.Oven.NewMacaroon(
+		ctx,
+		bakery.Version1,
+		time.Now().Add(ussoMacaroonDuration),
+		nil,
+		ussoLoginOp,
+	)
 	if err != nil {
 		return fail(errgo.Mask(err))
 	}
@@ -237,32 +265,23 @@ type ussoCaveatID struct {
 	Version int    `json:"version"`
 }
 
-func (idp identityProvider) verifyUSSOMacaroon(ctx context.Context, c0 *bakery.Checker, req *http.Request) (*params.User, error) {
+func (idp *identityProvider) verifyUSSOMacaroon(ctx context.Context, req *http.Request) (*store.Identity, error) {
 	var lr ussodischarge.LoginRequest
 	if err := httprequest.Unmarshal(idputil.RequestParams(ctx, nil, req), &lr); err != nil {
 		return nil, errgo.Mask(err)
 	}
-	// Make a copy of the checker so that we can use our USSO-specific first
-	// party caveat checker.
-	c := *c0
-	checker := &ussoCaveatChecker{
-		fallback:  c.FirstPartyCaveatChecker,
-		namespace: idp.hostname,
-	}
-	c.FirstPartyCaveatChecker = checker
-
-	_, err := c.Auth(lr.Login.Macaroons).Allow(ctx, ussoLoginOp)
+	_, err := idp.checker.Auth(lr.Login.Macaroons).Allow(ctx, ussoLoginOp)
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrBadRequest))
 	}
-	if checker.accountInfo == nil || checker.accountInfo.OpenID == "" {
+	if idp.ussoChecker.accountInfo == nil || idp.ussoChecker.accountInfo.OpenID == "" {
 		return nil, errgo.WithCausef(nil, params.ErrBadRequest, "account information not specified")
 	}
-	return &params.User{
-		Username:   params.Username(checker.accountInfo.OpenID + "@" + idp.params.Domain),
-		ExternalID: fmt.Sprintf("%s-openid:%s", idp.params.Domain, checker.accountInfo.OpenID),
-		FullName:   checker.accountInfo.DisplayName,
-		Email:      checker.accountInfo.Email,
+	return &store.Identity{
+		ProviderID: store.MakeProviderIdentity(idp.params.Domain, idp.ussoChecker.accountInfo.OpenID),
+		Username:   idp.ussoChecker.accountInfo.OpenID + "@" + idp.params.Domain,
+		Name:       idp.ussoChecker.accountInfo.DisplayName,
+		Email:      idp.ussoChecker.accountInfo.Email,
 	}, nil
 }
 

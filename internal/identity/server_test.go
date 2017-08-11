@@ -13,24 +13,25 @@ import (
 	"github.com/juju/httprequest"
 	"github.com/juju/idmclient/params"
 	"github.com/juju/loggo"
-	"github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/testing/httptesting"
 	"github.com/julienschmidt/httprouter"
 	gc "gopkg.in/check.v1"
 
 	"github.com/CanonicalLtd/blues-identity/internal/identity"
+	"github.com/CanonicalLtd/blues-identity/internal/idmtest"
 )
 
 type serverSuite struct {
-	testing.IsolatedMgoSuite
+	idmtest.StoreSuite
 }
 
 var _ = gc.Suite(&serverSuite{})
 
 func (s *serverSuite) TestNewServerWithNoVersions(c *gc.C) {
-	h, err := identity.New(s.Session.DB("foo"), identity.ServerParams{
-		PrivateAddr: "localhost",
+	h, err := identity.New(identity.ServerParams{
+		Store:        s.Store,
+		MeetingStore: s.MeetingStore,
 	}, nil)
 	c.Assert(err, gc.ErrorMatches, `identity server must serve at least one version of the API`)
 	c.Assert(h, gc.IsNil)
@@ -42,7 +43,6 @@ type versionResponse struct {
 }
 
 func (s *serverSuite) TestNewServerWithVersions(c *gc.C) {
-	db := s.Session.Copy().DB("foo")
 	serveVersion := func(vers string) identity.NewAPIHandlerFunc {
 		return func(identity.HandlerParams) ([]httprequest.Handler, error) {
 			return []httprequest.Handler{{
@@ -62,8 +62,9 @@ func (s *serverSuite) TestNewServerWithVersions(c *gc.C) {
 		}
 	}
 
-	h, err := identity.New(db, identity.ServerParams{
-		PrivateAddr: "localhost",
+	h, err := identity.New(identity.ServerParams{
+		Store:        s.Store,
+		MeetingStore: s.MeetingStore,
 	}, map[string]identity.NewAPIHandlerFunc{
 		"version1": serveVersion("version1"),
 	})
@@ -73,8 +74,9 @@ func (s *serverSuite) TestNewServerWithVersions(c *gc.C) {
 	assertDoesNotServeVersion(c, h, "version2")
 	assertDoesNotServeVersion(c, h, "version3")
 
-	h, err = identity.New(db, identity.ServerParams{
-		PrivateAddr: "localhost",
+	h, err = identity.New(identity.ServerParams{
+		Store:        s.Store,
+		MeetingStore: s.MeetingStore,
 	}, map[string]identity.NewAPIHandlerFunc{
 		"version1": serveVersion("version1"),
 		"version2": serveVersion("version2"),
@@ -85,8 +87,9 @@ func (s *serverSuite) TestNewServerWithVersions(c *gc.C) {
 	assertServesVersion(c, h, "version2")
 	assertDoesNotServeVersion(c, h, "version3")
 
-	h, err = identity.New(db, identity.ServerParams{
-		PrivateAddr: "localhost",
+	h, err = identity.New(identity.ServerParams{
+		Store:        s.Store,
+		MeetingStore: s.MeetingStore,
 	}, map[string]identity.NewAPIHandlerFunc{
 		"version1": serveVersion("version1"),
 		"version2": serveVersion("version2"),
@@ -100,7 +103,6 @@ func (s *serverSuite) TestNewServerWithVersions(c *gc.C) {
 }
 
 func (s *serverSuite) TestServerHasAccessControlAllowHeaders(c *gc.C) {
-	db := s.Session.Copy().DB("foo")
 	impl := map[string]identity.NewAPIHandlerFunc{
 		"/a": func(identity.HandlerParams) ([]httprequest.Handler, error) {
 			return []httprequest.Handler{{
@@ -112,8 +114,9 @@ func (s *serverSuite) TestServerHasAccessControlAllowHeaders(c *gc.C) {
 		},
 	}
 
-	h, err := identity.New(db, identity.ServerParams{
-		PrivateAddr: "localhost",
+	h, err := identity.New(identity.ServerParams{
+		Store:        s.Store,
+		MeetingStore: s.MeetingStore,
 	}, impl)
 	c.Assert(err, gc.IsNil)
 	defer h.Close()
@@ -145,7 +148,6 @@ func (s *serverSuite) TestServerHasAccessControlAllowHeaders(c *gc.C) {
 func (s *serverSuite) TestServerPanicRecovery(c *gc.C) {
 	w := new(loggo.TestWriter)
 	loggo.RegisterWriter("test", w)
-	db := s.Session.Copy().DB("foo")
 	impl := map[string]identity.NewAPIHandlerFunc{
 		"/a": func(identity.HandlerParams) ([]httprequest.Handler, error) {
 			return []httprequest.Handler{{
@@ -158,8 +160,9 @@ func (s *serverSuite) TestServerPanicRecovery(c *gc.C) {
 		},
 	}
 
-	h, err := identity.New(db, identity.ServerParams{
-		PrivateAddr: "localhost",
+	h, err := identity.New(identity.ServerParams{
+		Store:        s.Store,
+		MeetingStore: s.MeetingStore,
 	}, impl)
 	c.Assert(err, gc.IsNil)
 	defer h.Close()
@@ -176,7 +179,6 @@ func (s *serverSuite) TestServerPanicRecovery(c *gc.C) {
 }
 
 func (s *serverSuite) TestServerStaticFiles(c *gc.C) {
-	db := s.Session.Copy().DB("foo")
 	serveVersion := func(vers string) identity.NewAPIHandlerFunc {
 		return func(identity.HandlerParams) ([]httprequest.Handler, error) {
 			return []httprequest.Handler{{
@@ -196,8 +198,9 @@ func (s *serverSuite) TestServerStaticFiles(c *gc.C) {
 		}
 	}
 	path := c.MkDir()
-	h, err := identity.New(db, identity.ServerParams{
-		PrivateAddr:      "localhost",
+	h, err := identity.New(identity.ServerParams{
+		Store:            s.Store,
+		MeetingStore:     s.MeetingStore,
 		StaticFileSystem: http.Dir(path),
 	}, map[string]identity.NewAPIHandlerFunc{
 		"version1": serveVersion("version1"),

@@ -11,6 +11,7 @@ import (
 
 	"github.com/coreos/go-oidc"
 	"github.com/juju/idmclient/params"
+	"golang.org/x/net/context"
 	"golang.org/x/oauth2"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/names.v2"
@@ -18,6 +19,7 @@ import (
 	"github.com/CanonicalLtd/blues-identity/idp"
 	"github.com/CanonicalLtd/blues-identity/idp/idputil"
 	"github.com/CanonicalLtd/blues-identity/idp/idputil/secret"
+	"github.com/CanonicalLtd/blues-identity/store"
 )
 
 type OpenIDConnectParams struct {
@@ -55,10 +57,11 @@ func NewOpenIDConnectIdentityProvider(params OpenIDConnectParams) idp.IdentityPr
 }
 
 type openidConnectIdentityProvider struct {
-	params   OpenIDConnectParams
-	provider *oidc.Provider
-	config   *oauth2.Config
-	codec    *secret.Codec
+	params     OpenIDConnectParams
+	initParams idp.InitParams
+	provider   *oidc.Provider
+	config     *oauth2.Config
+	codec      *secret.Codec
 }
 
 // Name implements idp.IdentityProvider.Name.
@@ -81,14 +84,10 @@ func (*openidConnectIdentityProvider) Interactive() bool {
 	return true
 }
 
-// URL implements idp.IdentityProvider.URL.
-func (*openidConnectIdentityProvider) URL(ctx idp.Context, waitID string) string {
-	return idputil.URL(ctx, "/login", waitID)
-}
-
 // Init implements idp.IdentityProvider.Init by performing discovery on
 // the issuer and set up the identity provider.
-func (idp *openidConnectIdentityProvider) Init(ctx idp.Context) error {
+func (idp *openidConnectIdentityProvider) Init(ctx context.Context, params idp.InitParams) error {
+	idp.initParams = params
 	var err error
 	idp.provider, err = oidc.NewProvider(ctx, idp.params.Issuer)
 	if err != nil {
@@ -98,32 +97,37 @@ func (idp *openidConnectIdentityProvider) Init(ctx idp.Context) error {
 		ClientID:     idp.params.ClientID,
 		ClientSecret: idp.params.ClientSecret,
 		Endpoint:     idp.provider.Endpoint(),
-		RedirectURL:  ctx.URL("/callback"),
+		RedirectURL:  idp.initParams.URLPrefix + "/callback",
 		Scopes:       []string{oidc.ScopeOpenID, "profile"},
 	}
-	idp.codec = secret.NewCodec(ctx.Key())
+	idp.codec = secret.NewCodec(idp.initParams.Key)
 	return nil
 }
 
+// URL implements idp.IdentityProvider.URL.
+func (idp *openidConnectIdentityProvider) URL(waitID string) string {
+	return idputil.URL(idp.initParams.URLPrefix, "/login", waitID)
+}
+
 // Handle implements idp.IdentityProvider.Handle.
-func (idp *openidConnectIdentityProvider) Handle(ctx idp.RequestContext, w http.ResponseWriter, req *http.Request) {
-	switch ctx.Path() {
+func (idp *openidConnectIdentityProvider) Handle(ctx context.Context, w http.ResponseWriter, req *http.Request) {
+	switch req.URL.Path {
 	case "/callback":
 		if waitid, err := idp.callback(ctx, w, req); err != nil {
-			ctx.LoginFailure(waitid, err)
+			idp.initParams.LoginCompleter.Failure(ctx, w, req, waitid, err)
 		}
 	case "/register":
 		if waitid, err := idp.register(ctx, w, req); err != nil {
-			ctx.LoginFailure(waitid, err)
+			idp.initParams.LoginCompleter.Failure(ctx, w, req, waitid, err)
 		}
 	default:
 		if err := idp.login(ctx, w, req); err != nil {
-			ctx.LoginFailure(idputil.WaitID(req), err)
+			idp.initParams.LoginCompleter.Failure(ctx, w, req, idputil.WaitID(req), err)
 		}
 	}
 }
 
-func (idp *openidConnectIdentityProvider) login(ctx idp.RequestContext, w http.ResponseWriter, req *http.Request) error {
+func (idp *openidConnectIdentityProvider) login(ctx context.Context, w http.ResponseWriter, req *http.Request) error {
 	waitid := idputil.WaitID(req)
 	err := idp.newSession(ctx, w, waitid)
 	if err != nil {
@@ -134,7 +138,7 @@ func (idp *openidConnectIdentityProvider) login(ctx idp.RequestContext, w http.R
 	return nil
 }
 
-func (idp *openidConnectIdentityProvider) callback(ctx idp.RequestContext, w http.ResponseWriter, req *http.Request) (string, error) {
+func (idp *openidConnectIdentityProvider) callback(ctx context.Context, w http.ResponseWriter, req *http.Request) (string, error) {
 	waitid, err := idp.getSession(ctx, req)
 	if err != nil {
 		return waitid, errgo.WithCausef(err, params.ErrBadRequest, "")
@@ -158,14 +162,15 @@ func (idp *openidConnectIdentityProvider) callback(ctx idp.RequestContext, w htt
 	if err != nil {
 		return waitid, errgo.Mask(err)
 	}
-	externalID := fmt.Sprintf("openid-connect:%s:%s", id.Issuer, id.Subject)
-	u, err := ctx.FindUserByExternalId(externalID)
-	if err == nil {
+	user := store.Identity{
+		ProviderID: store.MakeProviderIdentity(idp.Name(), fmt.Sprintf("%s:%s", id.Issuer, id.Subject)),
+	}
+	if err := idp.initParams.Store.Identity(ctx, &user); err == nil {
 		idp.deleteSession(ctx, w)
-		idputil.LoginUser(ctx, waitid, w, u)
+		idp.initParams.LoginCompleter.Success(ctx, w, req, waitid, &user)
 		return "", nil
 	}
-	if errgo.Cause(err) != params.ErrNotFound {
+	if errgo.Cause(err) != store.ErrNotFound {
 		return waitid, errgo.Mask(err)
 	}
 	var claims claims
@@ -174,7 +179,7 @@ func (idp *openidConnectIdentityProvider) callback(ctx idp.RequestContext, w htt
 	}
 	state, err := idp.codec.Encode(registrationState{
 		WaitID:     waitid,
-		ExternalID: externalID,
+		ProviderID: user.ProviderID,
 	})
 	preferredUsername := ""
 	if names.IsValidUserName(claims.PreferredUsername) {
@@ -186,10 +191,10 @@ func (idp *openidConnectIdentityProvider) callback(ctx idp.RequestContext, w htt
 		Domain:   idp.params.Domain,
 		FullName: claims.FullName,
 		Email:    claims.Email,
-	}))
+	}, idp.initParams.Template))
 }
 
-func (idp *openidConnectIdentityProvider) register(ctx idp.RequestContext, w http.ResponseWriter, req *http.Request) (string, error) {
+func (idp *openidConnectIdentityProvider) register(ctx context.Context, w http.ResponseWriter, req *http.Request) (string, error) {
 	waitid, err := idp.getSession(ctx, req)
 	if err != nil {
 		return waitid, errgo.WithCausef(err, params.ErrBadRequest, "")
@@ -201,15 +206,15 @@ func (idp *openidConnectIdentityProvider) register(ctx idp.RequestContext, w htt
 	if state.WaitID != waitid {
 		return waitid, errgo.WithCausef(err, params.ErrBadRequest, "invalid registration state")
 	}
-	u := &params.User{
-		ExternalID: state.ExternalID,
-		FullName:   req.Form.Get("fullname"),
+	u := &store.Identity{
+		ProviderID: state.ProviderID,
+		Name:       req.Form.Get("fullname"),
 		Email:      req.Form.Get("email"),
 	}
-	u, err = idp.registerUser(ctx, req.Form.Get("username"), u)
+	err = idp.registerUser(ctx, req.Form.Get("username"), u)
 	if err == nil {
 		idp.deleteSession(ctx, w)
-		idputil.LoginUser(ctx, waitid, w, u)
+		idp.initParams.LoginCompleter.Success(ctx, w, req, waitid, u)
 		return waitid, nil
 	}
 	if errgo.Cause(err) != errInvalidUser {
@@ -222,43 +227,36 @@ func (idp *openidConnectIdentityProvider) register(ctx idp.RequestContext, w htt
 		Domain:   idp.params.Domain,
 		FullName: req.Form.Get("fullname"),
 		Email:    req.Form.Get("email"),
-	}))
+	}, idp.initParams.Template))
 }
 
 var errInvalidUser = errgo.New("invalid user")
 
-func (idp *openidConnectIdentityProvider) registerUser(ctx idp.RequestContext, username string, u *params.User) (*params.User, error) {
+func (idp *openidConnectIdentityProvider) registerUser(ctx context.Context, username string, u *store.Identity) error {
 	if !names.IsValidUserName(username) {
-		return nil, errgo.WithCausef(nil, errInvalidUser, "invalid user name. The username must contain only A-Z, a-z, 0-9, '.', '-', & '+', and must start and end with a letter or number.")
+		return errgo.WithCausef(nil, errInvalidUser, "invalid user name. The username must contain only A-Z, a-z, 0-9, '.', '-', & '+', and must start and end with a letter or number.")
 	}
 	if idputil.ReservedUsernames[username] {
-		return nil, errgo.WithCausef(nil, errInvalidUser, "username %s is not allowed, please choose another.", username)
+		return errgo.WithCausef(nil, errInvalidUser, "username %s is not allowed, please choose another.", username)
 	}
 	u.Username = joinDomain(username, idp.params.Domain)
-	err := ctx.UpdateUser(u)
+	err := idp.initParams.Store.UpdateIdentity(ctx, u, store.Update{
+		store.Username: store.Set,
+		store.Name:     store.Set,
+		store.Email:    store.Set,
+	})
 	if err == nil {
-		return u, nil
+		return nil
 	}
-	if errgo.Cause(err) != params.ErrAlreadyExists {
-		return nil, errgo.Mask(err)
+	if errgo.Cause(err) != store.ErrDuplicateUsername {
+		return errgo.Mask(err)
 	}
-	// If the record already exists, either we have registered as
-	// part of another login, or the username is already taken. If
-	// it's the former complete the login using the previously chosen
-	// username. If the latter then ask the user again.
-	u, err = ctx.FindUserByExternalId(u.ExternalID)
-	if err == nil {
-		return u, nil
-	}
-	if errgo.Cause(err) != params.ErrNotFound {
-		return nil, errgo.Mask(err)
-	}
-	return nil, errgo.WithCausef(nil, errInvalidUser, "Username already taken, please pick a different one.")
+	return errgo.WithCausef(nil, errInvalidUser, "Username already taken, please pick a different one.")
 }
 
 // newSession stores the state data for this login session in an
 // encrypted session cookie.
-func (idp *openidConnectIdentityProvider) newSession(ctx idp.RequestContext, w http.ResponseWriter, waitid string) error {
+func (idp *openidConnectIdentityProvider) newSession(ctx context.Context, w http.ResponseWriter, waitid string) error {
 	sessionCookie := sessionCookie{
 		WaitID:  waitid,
 		Expires: time.Now().Add(15 * time.Minute),
@@ -276,7 +274,7 @@ func (idp *openidConnectIdentityProvider) newSession(ctx idp.RequestContext, w h
 
 // getSession retrieves and validats the current session cookie for the
 // login session and returns the associated waitid.
-func (idp *openidConnectIdentityProvider) getSession(ctx idp.RequestContext, req *http.Request) (string, error) {
+func (idp *openidConnectIdentityProvider) getSession(ctx context.Context, req *http.Request) (string, error) {
 	c, err := req.Cookie(idp.sessionCookieName())
 	if err == http.ErrNoCookie {
 		return "", errgo.Notef(err, "no login session")
@@ -296,7 +294,7 @@ func (idp *openidConnectIdentityProvider) getSession(ctx idp.RequestContext, req
 
 // deleteSession removes the session cookie for the current login
 // session.
-func (idp *openidConnectIdentityProvider) deleteSession(ctx idp.RequestContext, w http.ResponseWriter) {
+func (idp *openidConnectIdentityProvider) deleteSession(ctx context.Context, w http.ResponseWriter) {
 	http.SetCookie(w, &http.Cookie{
 		Name: idp.sessionCookieName(),
 	})
@@ -322,16 +320,16 @@ type claims struct {
 
 // joinDomain creates a new params.Username with the given name and
 // (optional) domain.
-func joinDomain(name, domain string) params.Username {
+func joinDomain(name, domain string) string {
 	if domain == "" {
-		return params.Username(name)
+		return name
 	}
-	return params.Username(fmt.Sprintf("%s@%s", name, domain))
+	return fmt.Sprintf("%s@%s", name, domain)
 }
 
 // registrationState holds state information about a registration that is
 // in progress.
 type registrationState struct {
-	WaitID     string `json:"wid"`
-	ExternalID string `json:"eid"`
+	WaitID     string                 `json:"wid"`
+	ProviderID store.ProviderIdentity `json:"pid"`
 }

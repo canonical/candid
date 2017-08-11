@@ -18,7 +18,6 @@ import (
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery/mgorootkeystore"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/natefinch/lumberjack.v2"
-	"launchpad.net/lpad"
 
 	"github.com/CanonicalLtd/blues-identity"
 	"github.com/CanonicalLtd/blues-identity/config"
@@ -29,8 +28,6 @@ import (
 	"github.com/CanonicalLtd/blues-identity/idp/usso"
 	_ "github.com/CanonicalLtd/blues-identity/idp/usso/ussodischarge"
 	"github.com/CanonicalLtd/blues-identity/idp/usso/ussooauth"
-	"github.com/CanonicalLtd/blues-identity/internal/monitoring"
-	"github.com/CanonicalLtd/blues-identity/meeting"
 	"github.com/CanonicalLtd/blues-identity/mgostore"
 )
 
@@ -107,15 +104,11 @@ func serve(confPath string) error {
 		return errgo.Notef(err, "cannot create meeting store")
 	}
 	defer database.Close()
-	meetingPlace, err := meeting.NewPlace(database.MeetingStore(), monitoring.NewMeetingMetrics(), conf.PrivateAddr)
-	if err != nil {
-		return errgo.Notef(err, "cannot create meeting place")
-	}
-	defer meetingPlace.Close()
+
 	srv, err := identity.NewServer(
-		db,
 		identity.ServerParams{
-			Place: meetingPlace,
+			Store:        database.Store(),
+			MeetingStore: database.MeetingStore(),
 			RootKeyStore: database.BakeryRootKeyStore(mgorootkeystore.Policy{
 				ExpiryDuration: 365 * 24 * time.Hour,
 			}),
@@ -125,16 +118,14 @@ func serve(confPath string) error {
 				Private: *conf.PrivateKey,
 				Public:  *conf.PublicKey,
 			},
-			Location:            conf.Location,
-			Launchpad:           lpad.Production,
-			MaxMgoSessions:      conf.MaxMgoSessions,
-			RequestTimeout:      conf.RequestTimeout.Duration,
-			IdentityProviders:   idps,
-			PrivateAddr:         conf.PrivateAddr,
-			DebugTeams:          conf.DebugTeams,
-			AdminAgentPublicKey: conf.AdminAgentPublicKey,
-			StaticFileSystem:    http.Dir(filepath.Join(resourcePath, "static")),
-			Template:            t,
+			Location:                conf.Location,
+			IdentityProviders:       idps,
+			PrivateAddr:             conf.PrivateAddr,
+			DebugTeams:              conf.DebugTeams,
+			AdminAgentPublicKey:     conf.AdminAgentPublicKey,
+			StaticFileSystem:        http.Dir(filepath.Join(resourcePath, "static")),
+			Template:                t,
+			DebugStatusCheckerFuncs: database.DebugStatusCheckerFuncs(),
 		},
 		identity.V1,
 		identity.Debug,

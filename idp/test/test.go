@@ -18,6 +18,7 @@ import (
 	"github.com/CanonicalLtd/blues-identity/config"
 	"github.com/CanonicalLtd/blues-identity/idp"
 	"github.com/CanonicalLtd/blues-identity/idp/idputil"
+	"github.com/CanonicalLtd/blues-identity/store"
 )
 
 func init() {
@@ -51,7 +52,8 @@ func NewIdentityProvider(p Params) idp.IdentityProvider {
 }
 
 type identityProvider struct {
-	params Params
+	params     Params
+	initParams idp.InitParams
 }
 
 // Name implements idp.IdentityProvider.Name.
@@ -74,14 +76,15 @@ func (*identityProvider) Interactive() bool {
 	return true
 }
 
-// URL gets the login URL to use this identity provider.
-func (*identityProvider) URL(c idp.Context, waitID string) string {
-	return idputil.URL(c, "/test-login", waitID)
+// Init implements idp.IdentityProvider.Init.
+func (idp *identityProvider) Init(ctx context.Context, params idp.InitParams) error {
+	idp.initParams = params
+	return nil
 }
 
-// Init implements idp.IdentityProvider.Init.
-func (*identityProvider) Init(c idp.Context) error {
-	return nil
+// URL gets the login URL to use this identity provider.
+func (idp *identityProvider) URL(waitID string) string {
+	return idputil.URL(idp.initParams.URLPrefix, "/test-login", waitID)
 }
 
 type testInteractiveLoginResponse struct {
@@ -94,41 +97,79 @@ type testLoginRequest struct {
 }
 
 // Handle handles the login process.
-func (idp *identityProvider) Handle(ctx idp.RequestContext, w http.ResponseWriter, req *http.Request) {
+func (idp *identityProvider) Handle(ctx context.Context, w http.ResponseWriter, req *http.Request) {
+	id, err := idp.handle(ctx, w, req)
+	if err != nil {
+		idp.initParams.LoginCompleter.Failure(ctx, w, req, idputil.WaitID(req), err)
+	} else if id != nil {
+		idp.initParams.LoginCompleter.Success(ctx, w, req, idputil.WaitID(req), id)
+	}
+}
+
+func (idp *identityProvider) handle(ctx context.Context, w http.ResponseWriter, req *http.Request) (*store.Identity, error) {
 	switch req.Method {
 	case "GET":
 		httprequest.WriteJSON(w, http.StatusOK, testInteractiveLoginResponse{
-			URL: idp.URL(ctx, idputil.WaitID(req)),
+			URL: idp.URL(idputil.WaitID(req)),
 		})
 	case "POST":
-		var lr testLoginRequest
-		if err := httprequest.Unmarshal(idputil.RequestParams(ctx, w, req), &lr); err != nil {
-			ctx.LoginFailure(idputil.WaitID(req), err)
-			return
-		}
-		u := lr.User
-		if u.ExternalID == "" {
-			var err error
-			u, err = ctx.FindUserByName(u.Username)
-			if err != nil {
-				ctx.LoginFailure(idputil.WaitID(req), err)
-				return
-			}
-		} else if u.Username == "" {
-			var err error
-			u, err = ctx.FindUserByExternalId(u.ExternalID)
-			if err != nil {
-				ctx.LoginFailure(idputil.WaitID(req), err)
-				return
-			}
-		} else if err := ctx.UpdateUser(u); err != nil {
-			ctx.LoginFailure(idputil.WaitID(req), err)
-			return
-		}
-		idputil.LoginUser(ctx, idputil.WaitID(req), w, u)
+		return idp.handlePost(ctx, w, req)
 	default:
-		ctx.LoginFailure(idputil.WaitID(req), errgo.WithCausef(nil, params.ErrMethodNotAllowed, "%s not allowed", req.Method))
+		return nil, errgo.WithCausef(nil, params.ErrMethodNotAllowed, "%s not allowed", req.Method)
 	}
+	return nil, nil
+}
+
+func (idp *identityProvider) handlePost(ctx context.Context, w http.ResponseWriter, req *http.Request) (*store.Identity, error) {
+	var lr testLoginRequest
+	if err := httprequest.Unmarshal(idputil.RequestParams(ctx, w, req), &lr); err != nil {
+		return nil, err
+	}
+	if lr.User.ExternalID != "" && lr.User.Username != "" {
+		if err := idp.updateUser(ctx, lr.User); err != nil {
+			return nil, errgo.Mask(err, errgo.Is(params.ErrAlreadyExists))
+		}
+	}
+	id := store.Identity{
+		ProviderID: store.ProviderIdentity(lr.User.ExternalID),
+		Username:   string(lr.User.Username),
+	}
+	if err := idp.initParams.Store.Identity(ctx, &id); err != nil {
+		if errgo.Cause(err) == store.ErrNotFound {
+			return nil, errgo.WithCausef(err, params.ErrNotFound, "")
+		}
+		return nil, errgo.Mask(err)
+	}
+	return &id, nil
+}
+
+func (idp *identityProvider) updateUser(ctx context.Context, u *params.User) error {
+	id := store.Identity{
+		ProviderID: store.ProviderIdentity(u.ExternalID),
+		Username:   string(u.Username),
+		Name:       u.FullName,
+		Email:      u.Email,
+		Groups:     u.IDPGroups,
+	}
+	update := store.Update{
+		store.Username: store.Set,
+	}
+	if id.Name != "" {
+		update[store.Name] = store.Set
+	}
+	if id.Email != "" {
+		update[store.Email] = store.Set
+	}
+	if len(id.Groups) > 0 {
+		update[store.Groups] = store.Set
+	}
+	if err := idp.initParams.Store.UpdateIdentity(ctx, &id, update); err != nil {
+		if errgo.Cause(err) == store.ErrDuplicateUsername {
+			return errgo.WithCausef(err, params.ErrAlreadyExists, "")
+		}
+		return errgo.Mask(err)
+	}
+	return nil
 }
 
 var _ httpbakery.Visitor = Visitor{}

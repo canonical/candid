@@ -5,47 +5,21 @@
 package idputil
 
 import (
+	"html/template"
 	"net/http"
 	"net/url"
-	"time"
 
 	"github.com/juju/httprequest"
-	"github.com/juju/idmclient/params"
 	"github.com/juju/loggo"
 	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
-
-	"github.com/CanonicalLtd/blues-identity/idp"
 )
 
 var logger = loggo.GetLogger("identity.idp.idputil")
 
-const (
-	// identityMacaroonDuration is the length of time for which an
-	// identity macaroon is valid.
-	identityMacaroonDuration = 28 * 24 * time.Hour
-)
-
 var ReservedUsernames = map[string]bool{
 	"admin":    true,
 	"everyone": true,
-}
-
-// LoginUser completes a successful login for the specified user. A new
-// identity macaroon is generated for the user and an appropriate message
-// will be returned for the login request.
-func LoginUser(ctx idp.RequestContext, waitid string, w http.ResponseWriter, u *params.User) {
-	if !ctx.LoginSuccess(waitid, params.Username(u.Username), time.Now().Add(identityMacaroonDuration)) {
-		return
-	}
-	t := ctx.Template("login")
-	if t == nil {
-		return
-	}
-	w.Header().Set("Content-Type", "text/html;charset=utf-8")
-	if err := t.Execute(w, u); err != nil {
-		logger.Errorf("error processing login template: %s", err)
-	}
 }
 
 // GetLoginMethods uses c to perform a request to get the list of
@@ -78,8 +52,8 @@ func WaitID(req *http.Request) string {
 
 // URL creates a URL addressed to the given path within the IDP handler
 // and adds the given waitid (when specified).
-func URL(ctx idp.Context, path, waitid string) string {
-	callback := ctx.URL(path)
+func URL(prefix, path, waitid string) string {
+	callback := prefix + path
 	if waitid != "" {
 		callback += "?waitid=" + waitid
 	}
@@ -114,8 +88,8 @@ type RegistrationParams struct {
 
 // RegistrationForm writes a registration form to the given writer using
 // the given parameters.
-func RegistrationForm(ctx idp.RequestContext, w http.ResponseWriter, params RegistrationParams) error {
-	t := ctx.Template("register")
+func RegistrationForm(ctx context.Context, w http.ResponseWriter, params RegistrationParams, t *template.Template) error {
+	t = t.Lookup("register")
 	if t == nil {
 		errgo.New("registration template not found")
 	}
