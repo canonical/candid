@@ -1,6 +1,6 @@
 // Copyright 2015 Canonical Ltd.
 
-package v1
+package discharger
 
 import (
 	"net/http"
@@ -14,19 +14,19 @@ import (
 
 // loginRequest is a request to start a login to the identity manager.
 type loginRequest struct {
-	httprequest.Route `httprequest:"GET /v1/login"`
+	httprequest.Route `httprequest:"GET /login"`
 	Domain            string `httprequest:"domain,form"`
 	WaitID            string `httprequest:"waitid,form"`
 }
 
 // login handles the GET /v1/login endpoint that is used to log in to IdM.
-func (h *dischargeHandler) Login(p httprequest.Params, lr *loginRequest) error {
+func (h *handler) Login(p httprequest.Params, lr *loginRequest) error {
 	// TODO should really be parsing the accept header properly here, but
 	// it's really complicated http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.1
 	// perhaps use http://godoc.org/bitbucket.org/ww/goautoneg for this.
 	if p.Request.Header.Get("Accept") == "application/json" {
 		methods := map[string]string{"agent": h.agentURL(lr.WaitID)}
-		for _, idp := range h.h.idps {
+		for _, idp := range h.params.IdentityProviders {
 			methods[idp.Name()] = idp.URL(lr.WaitID)
 		}
 		err := httprequest.WriteJSON(p.Response, http.StatusOK, methods)
@@ -53,7 +53,7 @@ func (h *dischargeHandler) Login(p httprequest.Params, lr *loginRequest) error {
 
 	// Use the normal interactive login method.
 	var selected idp.IdentityProvider
-	for _, idp := range h.h.idps {
+	for _, idp := range h.params.IdentityProviders {
 		if !idp.Interactive() {
 			continue
 		}

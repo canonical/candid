@@ -1,6 +1,6 @@
 // Copyright 2014 Canonical Ltd.
 
-package v1
+package discharger
 
 import (
 	"net/http"
@@ -21,6 +21,8 @@ import (
 	"gopkg.in/macaroon.v2-unstable"
 
 	"github.com/CanonicalLtd/blues-identity/internal/auth"
+	"github.com/CanonicalLtd/blues-identity/internal/auth/httpauth"
+	"github.com/CanonicalLtd/blues-identity/internal/identity"
 	"github.com/CanonicalLtd/blues-identity/store"
 )
 
@@ -33,27 +35,24 @@ const (
 // thirdPartyCaveatChecker implements an
 // httpbakery.ThirdPartyCaveatChecker for the identity service.
 type thirdPartyCaveatChecker struct {
-	handler *Handler
+	params  identity.HandlerParams
+	reqAuth *httpauth.Authorizer
+	place   *place
 }
 
 // CheckThirdPartyCaveat implements httpbakery.ThirdPartyCaveatChecker.
 // It acquires a handler before checking the caveat, so that we have a
 // database connection for the purpose.
-func (c thirdPartyCaveatChecker) CheckThirdPartyCaveat(ctx context.Context, req *http.Request, ci *bakery.ThirdPartyCaveatInfo) ([]checkers.Caveat, error) {
+func (c *thirdPartyCaveatChecker) CheckThirdPartyCaveat(ctx context.Context, req *http.Request, ci *bakery.ThirdPartyCaveatInfo) ([]checkers.Caveat, error) {
 	t := trace.New(req.URL.Path, "")
-	h, ctx, err := c.handler.getHandler(ctx, t)
-	if err != nil {
-		t.Finish()
-		return nil, errgo.Mask(err)
-	}
-	defer h.Close()
-	return checkThirdPartyCaveat(trace.NewContext(ctx, t), h, req, ci)
+	defer t.Finish()
+	return c.checkThirdPartyCaveat(trace.NewContext(ctx, t), req, ci)
 }
 
 // checkThirdPartyCaveat checks the given caveat. This function is called
 // by the httpbakery discharge logic. See httpbakery.DischargeHandler
 // for futher details.
-func checkThirdPartyCaveat(ctx context.Context, h *handler, req *http.Request, ci *bakery.ThirdPartyCaveatInfo) ([]checkers.Caveat, error) {
+func (c *thirdPartyCaveatChecker) checkThirdPartyCaveat(ctx context.Context, req *http.Request, ci *bakery.ThirdPartyCaveatInfo) ([]checkers.Caveat, error) {
 	cond, args, err := checkers.ParseCaveat(string(ci.Condition))
 	if err != nil {
 		return nil, errgo.WithCausef(err, params.ErrBadRequest, "cannot parse caveat %q", ci.Condition)
@@ -83,14 +82,14 @@ func checkThirdPartyCaveat(ctx context.Context, h *handler, req *http.Request, c
 	var identity *auth.Identity
 	var invalidUserf func(err error) error
 	if user := req.Form.Get("discharge-for-user"); user != "" {
-		_, err := h.h.reqAuth.Auth(ctx, req, auth.GlobalOp(auth.ActionDischargeFor))
+		_, err := c.reqAuth.Auth(ctx, req, auth.GlobalOp(auth.ActionDischargeFor))
 		if err != nil {
 			return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized), isDischargeRequiredError)
 		}
 		invalidUserf = func(err error) error {
 			return errgo.WithCausef(err, params.ErrBadRequest, "invalid username %q", user)
 		}
-		identity, err = h.h.auth.Identity(ctx, user)
+		identity, err = c.params.Authorizer.Identity(ctx, user)
 		if err != nil {
 			return nil, invalidUserf(err)
 		}
@@ -99,14 +98,14 @@ func checkThirdPartyCaveat(ctx context.Context, h *handler, req *http.Request, c
 		}
 	} else {
 		invalidUserf = func(err error) error {
-			return needLoginError(ctx, h, req, domain, &dischargeRequestInfo{
+			return c.needLoginError(ctx, req, domain, &dischargeRequestInfo{
 				Caveat:    ci.Caveat,
 				CaveatId:  ci.Id,
 				Condition: string(ci.Condition),
 				Origin:    req.Header.Get("Origin"),
 			}, err)
 		}
-		userInfo, err := h.h.reqAuth.Auth(ctx, req, bakery.LoginOp)
+		userInfo, err := c.reqAuth.Auth(ctx, req, bakery.LoginOp)
 		if err != nil {
 			return nil, invalidUserf(err)
 		}
@@ -131,15 +130,15 @@ func checkThirdPartyCaveat(ctx context.Context, h *handler, req *http.Request, c
 		}
 		// TODO should this be time-limited?
 	}
-	h.updateDischargeTime(ctx, params.Username(identity.Id()))
+	c.updateDischargeTime(ctx, identity.Id())
 	return cavs, nil
 }
 
-func (h *handler) updateDischargeTime(ctx context.Context, username params.Username) {
-	err := h.h.store.UpdateIdentity(
+func (c *thirdPartyCaveatChecker) updateDischargeTime(ctx context.Context, username string) {
+	err := c.params.Store.UpdateIdentity(
 		ctx,
 		&store.Identity{
-			Username:      string(username),
+			Username:      username,
 			LastDischarge: time.Now(),
 		}, store.Update{
 			store.LastDischarge: store.Set,
@@ -153,18 +152,18 @@ func (h *handler) updateDischargeTime(ctx context.Context, username params.Usern
 // needLoginError returns an error suitable for returning
 // from a discharge request that can only be satisfied
 // if the user logs in.
-func needLoginError(ctx context.Context, h *handler, req *http.Request, domain string, info *dischargeRequestInfo, why error) error {
+func (c *thirdPartyCaveatChecker) needLoginError(ctx context.Context, req *http.Request, domain string, info *dischargeRequestInfo, why error) error {
 	// TODO(rog) If the user is already logged in (username != ""),
 	// we should perhaps just return an error here.
-	waitId, err := h.h.place.NewRendezvous(ctx, info)
+	waitId, err := c.place.NewRendezvous(ctx, info)
 	if err != nil {
 		return errgo.Notef(err, "cannot make rendezvous")
 	}
-	visitURL := h.serviceURL("/v1/login?waitid=" + waitId)
+	visitURL := c.params.Location + "/login?waitid=" + waitId
 	if domain != "" {
 		visitURL += "&domain=" + url.QueryEscape(domain)
 	}
-	waitURL := h.serviceURL("/v1/wait?waitid=" + waitId)
+	waitURL := c.params.Location + "/wait?waitid=" + waitId
 	return httpbakery.NewInteractionRequiredError(visitURL, waitURL, why, req)
 }
 
@@ -172,7 +171,7 @@ func needLoginError(ctx context.Context, h *handler, req *http.Request, domain s
 // complete. Discharging caveats will normally be handled by the bakery
 // it would be unusual to use this type directly in client software.
 type waitRequest struct {
-	httprequest.Route `httprequest:"GET /v1/wait"`
+	httprequest.Route `httprequest:"GET /wait"`
 	WaitID            string `httprequest:"waitid,form"`
 }
 
@@ -191,12 +190,12 @@ type waitResponse struct {
 
 // serveWait serves an HTTP endpoint that waits until a macaroon
 // has been discharged, and returns the discharge macaroon.
-func (h *dischargeHandler) Wait(p httprequest.Params, w *waitRequest) (*waitResponse, error) {
+func (h *handler) Wait(p httprequest.Params, w *waitRequest) (*waitResponse, error) {
 	if w.WaitID == "" {
 		return nil, errgo.WithCausef(nil, params.ErrBadRequest, "wait id parameter not found")
 	}
 	// TODO don't wait forever here.
-	reqInfo, login, err := h.h.place.Wait(p.Context, w.WaitID)
+	reqInfo, login, err := h.params.place.Wait(p.Context, w.WaitID)
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot wait")
 	}
@@ -225,14 +224,13 @@ func (h *dischargeHandler) Wait(p httprequest.Params, w *waitRequest) (*waitResp
 	}
 	cookie.Name = "macaroon-identity"
 	p.Request.AddCookie(cookie)
-	checker := bakery.ThirdPartyCaveatCheckerFunc(func(ctx context.Context, ci *bakery.ThirdPartyCaveatInfo) ([]checkers.Caveat, error) {
-		return checkThirdPartyCaveat(ctx, h.handler, p.Request, ci)
-	})
 	m, err := bakery.Discharge(p.Context, bakery.DischargeParams{
-		Id:      reqInfo.CaveatId,
-		Caveat:  reqInfo.Caveat,
-		Key:     h.h.oven.Key(),
-		Checker: checker,
+		Id:     reqInfo.CaveatId,
+		Caveat: reqInfo.Caveat,
+		Key:    h.params.Key,
+		Checker: bakery.ThirdPartyCaveatCheckerFunc(func(ctx context.Context, ci *bakery.ThirdPartyCaveatInfo) ([]checkers.Caveat, error) {
+			return h.params.checker.checkThirdPartyCaveat(ctx, p.Request, ci)
+		}),
 	})
 	if err != nil {
 		return nil, errgo.NoteMask(err, "cannot discharge", errgo.Any)
@@ -254,44 +252,6 @@ func (h *dischargeHandler) Wait(p httprequest.Params, w *waitRequest) (*waitResp
 	return &waitResponse{
 		Macaroon:       m,
 		DischargeToken: login.IdentityMacaroon,
-	}, nil
-}
-
-// dischargeTokenForUserRequest is the request sent to get a discharge token for a user.
-// This is only allowed for admin.
-type dischargeTokenForUserRequest struct {
-	httprequest.Route `httprequest:"GET /v1/discharge-token-for-user"`
-	Username          params.Username `httprequest:"username,form"`
-}
-
-// dischargeTokenForUserResponse holds the response for the discharge token for user endpoint
-// containing a discharge token for the user requested.
-type dischargeTokenForUserResponse struct {
-	DischargeToken *bakery.Macaroon
-}
-
-// DischargeTokenForUser serves an HTTP endpoint that will create a discharge token for a user.
-func (h *dischargeHandler) DischargeTokenForUser(p httprequest.Params, r *dischargeTokenForUserRequest) (dischargeTokenForUserResponse, error) {
-	err := h.h.store.Identity(p.Context, &store.Identity{
-		Username: string(r.Username),
-	})
-	if err != nil {
-		return dischargeTokenForUserResponse{}, errgo.NoteMask(err, "cannot get identity", errgo.Is(params.ErrNotFound))
-	}
-	m, err := h.h.oven.NewMacaroon(
-		p.Context,
-		httpbakery.RequestVersion(p.Request),
-		time.Now().Add(dischargeTokenDuration),
-		[]checkers.Caveat{
-			idmclient.UserDeclaration(string(r.Username)),
-		},
-		bakery.LoginOp,
-	)
-	if err != nil {
-		return dischargeTokenForUserResponse{}, errgo.NoteMask(err, "cannot create discharge token", errgo.Any)
-	}
-	return dischargeTokenForUserResponse{
-		DischargeToken: m,
 	}, nil
 }
 

@@ -14,6 +14,7 @@ import (
 	"github.com/CanonicalLtd/blues-identity/idp"
 	"github.com/CanonicalLtd/blues-identity/idp/agent"
 	"github.com/CanonicalLtd/blues-identity/internal/debug"
+	"github.com/CanonicalLtd/blues-identity/internal/discharger"
 	"github.com/CanonicalLtd/blues-identity/internal/identity"
 	"github.com/CanonicalLtd/blues-identity/internal/v1"
 	"github.com/CanonicalLtd/blues-identity/meeting"
@@ -22,13 +23,15 @@ import (
 
 // Versions of the API that can be served.
 const (
-	V1    = "v1"
-	Debug = "debug"
+	Debug      = "debug"
+	Discharger = "discharger"
+	V1         = "v1"
 )
 
 var versions = map[string]identity.NewAPIHandlerFunc{
-	V1:    v1.NewAPIHandler,
-	Debug: debug.NewAPIHandler,
+	Debug:      debug.NewAPIHandler,
+	Discharger: discharger.NewAPIHandler,
+	V1:         v1.NewAPIHandler,
 }
 
 // Versions returns all known API version strings in alphabetical order.

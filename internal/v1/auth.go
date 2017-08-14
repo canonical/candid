@@ -50,16 +50,8 @@ func opForRequest(r interface{}) bakery.Op {
 		return auth.UserOp(r.Username, auth.ActionReadAdmin)
 	case *params.SetUserExtraInfoItemRequest:
 		return auth.UserOp(r.Username, auth.ActionWriteAdmin)
-	case *agentLoginCookieRequest:
-		return auth.GlobalOp(auth.ActionLogin)
-	case *agentLoginPostRequest:
-		return auth.GlobalOp(auth.ActionLogin)
-	case *loginRequest:
-		return auth.GlobalOp(auth.ActionLogin)
-	case *dischargeTokenForUserRequest:
+	case *params.DischargeTokenForUserRequest:
 		return auth.GlobalOp(auth.ActionDischargeFor)
-	case *waitRequest:
-		return auth.GlobalOp(auth.ActionLogin)
 	default:
 		logger.Infof("unknown API argument type %#v", r)
 	}

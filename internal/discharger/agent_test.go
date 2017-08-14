@@ -1,6 +1,6 @@
 // Copyright 2015 Canonical Ltd.
 
-package v1_test
+package discharger_test
 
 import (
 	"net/url"
@@ -40,8 +40,8 @@ func (s *agentSuite) TestGetAgentDischargeNoCookie(c *gc.C) {
 	client := &httprequest.Client{
 		BaseURL: s.URL,
 	}
-	err := client.Get(context.Background(), "/v1/agent-login", nil)
-	c.Assert(err, gc.ErrorMatches, `Get http://.*/v1/agent-login: no agent-login cookie found`)
+	err := client.Get(context.Background(), "/login/agent", nil)
+	c.Assert(err, gc.ErrorMatches, `Get http://.*/login/agent: no agent-login cookie found`)
 }
 
 func (s *agentSuite) TestLegacyAgentDischarge(c *gc.C) {

@@ -1,6 +1,6 @@
 // Copyright 2014 Canonical Ltd.
 
-package v1
+package discharger
 
 import (
 	"encoding/json"

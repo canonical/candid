@@ -15,7 +15,6 @@ import (
 	macaroon "gopkg.in/macaroon.v2-unstable"
 
 	"github.com/CanonicalLtd/blues-identity/internal/auth"
-	"github.com/CanonicalLtd/blues-identity/internal/v1"
 	"github.com/CanonicalLtd/blues-identity/store"
 )
 
@@ -580,7 +579,7 @@ func (s *usersSuite) TestDischargeToken(c *gc.C) {
 		BaseURL: s.URL,
 		Doer:    s.AdminClient(),
 	}
-	var resp v1.DischargeTokenForUserResponse
+	var resp params.DischargeTokenForUserResponse
 	err = client.Get(s.Ctx, "/v1/discharge-token-for-user?username=jbloggs", &resp)
 	c.Assert(err, gc.Equals, nil)
 

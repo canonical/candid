@@ -58,7 +58,7 @@ type versionResponse struct {
 }
 
 func (s *serverSuite) TestVersions(c *gc.C) {
-	c.Assert(identity.Versions(), gc.DeepEquals, []string{"debug", "v1"})
+	c.Assert(identity.Versions(), gc.DeepEquals, []string{"debug", "discharger", "v1"})
 }
 
 func (s *serverSuite) TestNewServerWithVersions(c *gc.C) {

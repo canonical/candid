@@ -15,8 +15,8 @@ import (
 	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
 	macaroon "gopkg.in/macaroon.v2-unstable"
 
+	"github.com/CanonicalLtd/blues-identity/internal/discharger"
 	"github.com/CanonicalLtd/blues-identity/internal/identity"
-	"github.com/CanonicalLtd/blues-identity/internal/v1"
 	"github.com/CanonicalLtd/blues-identity/mgostore"
 )
 
@@ -34,7 +34,7 @@ type DischargeSuite struct {
 // and serves it.
 func (s *DischargeSuite) SetUpTest(c *gc.C) {
 	s.Versions = map[string]identity.NewAPIHandlerFunc{
-		"v1": v1.NewAPIHandler,
+		"discharger": discharger.NewAPIHandler,
 	}
 	s.StoreServerSuite.SetUpTest(c)
 	var err error
