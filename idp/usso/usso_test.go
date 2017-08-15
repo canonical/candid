@@ -3,6 +3,7 @@
 package usso_test
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -209,6 +210,42 @@ func (s *ussoSuite) TestHandleUpdateUserError(c *gc.C) {
 	defer resp.Body.Close()
 	s.get(c, s.Ctx, resp.Header.Get("Location"))
 	s.AssertLoginFailureMatches(c, `invalid user: invalid username "test-"`)
+}
+
+func (s *ussoSuite) TestGetGroups(c *gc.C) {
+	var lp *httptest.Server
+	lp = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		c.Logf("path: %s", r.URL.Path)
+		switch r.URL.Path {
+		case "/people":
+			r.ParseForm()
+			c.Check(r.Form.Get("ws.op"), gc.Equals, "getByOpenIDIdentifier")
+			c.Check(r.Form.Get("identifier"), gc.Equals, "https://login.launchpad.net/+id/test")
+			w.Header().Set("Content-Type", "application/json")
+			fmt.Fprintf(w, `{"name": "test", "super_teams_collection_link": "https://api.launchpad.net/devel/test/super_teams"}`)
+		case "/test/super_teams":
+			w.Header().Set("Content-Type", "application/json")
+			fmt.Fprintf(w, `{"total_size":3,"start":0,"entries": [{"name": "test1"},{"name":"test2"}]}`)
+		}
+	}))
+	defer lp.Close()
+
+	rt := httptesting.URLRewritingTransport{
+		MatchPrefix:  "https://api.launchpad.net/devel",
+		Replace:      lp.URL,
+		RoundTripper: http.DefaultTransport,
+	}
+	savedTransport := http.DefaultTransport
+	defer func() {
+		http.DefaultTransport = savedTransport
+	}()
+	http.DefaultTransport = rt
+
+	groups, err := s.idp.GetGroups(context.Background(), &store.Identity{
+		ProviderID: store.MakeProviderIdentity("usso", "https://login.ubuntu.com/+id/test"),
+	})
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(groups, jc.DeepEquals, []string{"test1", "test2"})
 }
 
 // ussoURL gets a request addressed to the MockUSSO server with the given wait ID.

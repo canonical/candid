@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/juju/idmclient/params"
+	jc "github.com/juju/testing/checkers"
 	"github.com/juju/testing/httptesting"
 	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
@@ -25,7 +26,8 @@ import (
 
 type testSuite struct {
 	idptest.Suite
-	idp idp.IdentityProvider
+	idp    idp.IdentityProvider
+	groups []string
 }
 
 var _ = gc.Suite(&testSuite{})
@@ -45,8 +47,13 @@ identity-providers:
 func (s *testSuite) SetUpTest(c *gc.C) {
 	s.Suite.SetUpTest(c)
 	s.idp = test.NewIdentityProvider(test.Params{
-		Name: "test",
+		Name:      "test",
+		GetGroups: s.getGroups,
 	})
+}
+
+func (s *testSuite) getGroups(*store.Identity) ([]string, error) {
+	return s.groups, nil
 }
 
 func (s *testSuite) TestName(c *gc.C) {
@@ -195,4 +202,11 @@ func testLogin(u *params.User) *http.Request {
 	}
 	req.Header.Set("Content-Type", "application/json")
 	return req
+}
+
+func (s *testSuite) TestGetGroups(c *gc.C) {
+	s.groups = []string{"g1", "g2"}
+	groups, err := s.idp.GetGroups(context.Background(), nil)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(groups, jc.DeepEquals, []string{"g1", "g2"})
 }

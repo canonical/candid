@@ -109,6 +109,11 @@ func (idp *openidConnectIdentityProvider) URL(waitID string) string {
 	return idputil.URL(idp.initParams.URLPrefix, "/login", waitID)
 }
 
+//  GetGroups implements idp.IdentityProvider.GetGroups.
+func (*openidConnectIdentityProvider) GetGroups(context.Context, *store.Identity) ([]string, error) {
+	return nil, nil
+}
+
 // Handle implements idp.IdentityProvider.Handle.
 func (idp *openidConnectIdentityProvider) Handle(ctx context.Context, w http.ResponseWriter, req *http.Request) {
 	switch req.URL.Path {

@@ -90,4 +90,8 @@ type IdentityProvider interface {
 	// handler local path, that is the part after URLPrefix above.
 	// The given request will have had ParseForm called.
 	Handle(ctx context.Context, w http.ResponseWriter, req *http.Request)
+
+	// GetGroups retrieves additional group information that is
+	// stored in the identity provider for the given identity.
+	GetGroups(ctx context.Context, id *store.Identity) (groups []string, err error)
 }

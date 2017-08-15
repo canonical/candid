@@ -51,3 +51,4 @@ gopkg.in/retry.v1	git	c09f6b86ba4d5d2cf5bdf0665364aec9fd4815db	2016-10-25T18:14:
 gopkg.in/square/go-jose.v2	git	296c7f1463ec9b712176dc804dea0173d06dc728	2016-11-17T00:42:38Z
 gopkg.in/tomb.v2	git	14b3d72120e8d10ea6e6b7f87f7175734b1faab8	2014-06-26T14:46:23Z
 gopkg.in/yaml.v2	git	a83829b6f1293c91addabc89d0571c246397bbf4	2016-03-01T20:40:22Z
+launchpad.net/lpad	bzr	gustavo@niemeyer.net-20131113112110-fqow8xpml1pxyutb	65

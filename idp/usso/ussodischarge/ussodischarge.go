@@ -166,6 +166,11 @@ func (idp *identityProvider) URL(waitID string) string {
 	return idputil.URL(idp.initParams.URLPrefix, "/login", waitID)
 }
 
+//  GetGroups implements idp.IdentityProvider.GetGroups.
+func (*identityProvider) GetGroups(context.Context, *store.Identity) ([]string, error) {
+	return nil, nil
+}
+
 // Handle handles the Ubuntu SSO Macaroon login process.
 func (idp *identityProvider) Handle(ctx context.Context, w http.ResponseWriter, req *http.Request) {
 	if err := idp.handle(ctx, w, req); err != nil {
