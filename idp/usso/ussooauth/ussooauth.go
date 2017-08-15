@@ -73,6 +73,13 @@ func (idp *identityProvider) URL(waitID string) string {
 	return idputil.URL(idp.initParams.URLPrefix, "/oauth", waitID)
 }
 
+//  GetGroups implements idp.IdentityProvider.GetGroups.
+func (*identityProvider) GetGroups(context.Context, *store.Identity) ([]string, error) {
+	// This method should never be called as this IDP supports
+	// identities in the "usso" namespace.
+	return nil, nil
+}
+
 // Handle handles the Ubuntu SSO OAuth login process.
 func (idp *identityProvider) Handle(ctx context.Context, w http.ResponseWriter, req *http.Request) {
 	id, err := verifyOAuthSignature(idp.initParams.URLPrefix+req.URL.Path, req)

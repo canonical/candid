@@ -11,6 +11,7 @@ import (
 
 	"github.com/CanonicalLtd/blues-identity/config"
 	"github.com/CanonicalLtd/blues-identity/idp"
+	"github.com/CanonicalLtd/blues-identity/store"
 )
 
 // IdentityProvider is the instance of the agent identity provider.
@@ -61,5 +62,10 @@ func (*identityProvider) URL(string) string {
 }
 
 // Handle handles the agent login process.
-func (a *identityProvider) Handle(context.Context, http.ResponseWriter, *http.Request) {
+func (*identityProvider) Handle(context.Context, http.ResponseWriter, *http.Request) {
+}
+
+//  GetGroups implements idp.IdentityProvider.GetGroups.
+func (*identityProvider) GetGroups(context.Context, *store.Identity) ([]string, error) {
+	return nil, nil
 }

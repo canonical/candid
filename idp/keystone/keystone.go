@@ -120,6 +120,13 @@ func (idp *identityProvider) URL(waitID string) string {
 	return idputil.URL(idp.initParams.URLPrefix, "/login", waitID)
 }
 
+//  GetGroups implements idp.IdentityProvider.GetGroups.
+func (*identityProvider) GetGroups(context.Context, *store.Identity) ([]string, error) {
+	// TODO(mhilton) store the token in the identity ProviderInfo and
+	// retrieve groups on demand rather than on login.
+	return nil, nil
+}
+
 // Handle implements idp.IdentityProvider.Handle.
 func (idp *identityProvider) Handle(ctx context.Context, w http.ResponseWriter, req *http.Request) {
 	if req.Form.Get("username") != "" {

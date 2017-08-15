@@ -9,11 +9,16 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
+
+	"launchpad.net/lpad"
 
 	"github.com/juju/httprequest"
 	"github.com/juju/idmclient/params"
 	"github.com/juju/loggo"
 	"github.com/juju/names"
+	"github.com/juju/utils/cache"
+	"github.com/prometheus/client_golang/prometheus"
 	openid "github.com/yohcop/openid-go"
 	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
@@ -37,6 +42,13 @@ func init() {
 var IdentityProvider idp.IdentityProvider = &identityProvider{
 	nonceStore:     openid.NewSimpleNonceStore(),
 	discoveryCache: openid.NewSimpleDiscoveryCache(),
+	groupCache:     cache.New(10 * time.Minute),
+	groupMonitor: prometheus.NewSummary(prometheus.SummaryOpts{
+		Namespace: "blues_identity",
+		Subsystem: "launchpad",
+		Name:      "get_launchpad_groups",
+		Help:      "The duration of launchpad login, /people, and super_teams_collection_link requests.",
+	}),
 }
 
 const (
@@ -56,6 +68,8 @@ type identityProvider struct {
 	nonceStore     openid.NonceStore
 	discoveryCache *openid.SimpleDiscoveryCache
 	initParams     idp.InitParams
+	groupCache     *cache.Cache
+	groupMonitor   prometheus.Summary
 }
 
 // Name gives the name of the identity provider (usso).
@@ -229,4 +243,54 @@ func userFromCallback(r *callbackRequest) (*store.Identity, error) {
 		Name:       r.Fullname,
 		Groups:     groups,
 	}, nil
+}
+
+// GetGroups implements idp.IdentityProvider.GetGroups by fetching group
+// information from launchpad.
+func (idp *identityProvider) GetGroups(_ context.Context, id *store.Identity) ([]string, error) {
+	_, ussoID := id.ProviderID.Split()
+	groups, err := idp.groupCache.Get(ussoID, func() (interface{}, error) {
+		t := time.Now()
+		groups, err := idp.getLaunchpadGroupsNoCache(ussoID)
+		idp.groupMonitor.Observe(float64(time.Since(t)) / float64(time.Microsecond))
+		return groups, err
+	})
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
+	return groups.([]string), nil
+}
+
+// getLaunchpadGroups tries to fetch the list of teams the user
+// belongs to in launchpad. Only public teams are supported.
+func (idp *identityProvider) getLaunchpadGroupsNoCache(ussoID string) ([]string, error) {
+	root, err := lpad.Login(lpad.Production, &lpad.OAuth{Consumer: "idm", Anonymous: true})
+	if err != nil {
+		return nil, errgo.Notef(err, "cannot connect to launchpad")
+	}
+	user, err := idp.getLaunchpadPersonByOpenID(root, ussoID)
+	if err != nil {
+		return nil, errgo.Notef(err, "cannot find user %s", ussoID)
+	}
+	teams, err := user.Link("super_teams_collection_link").Get(nil)
+	if err != nil {
+		return nil, errgo.Notef(err, "cannot get team list for launchpad user %q", user.Name())
+	}
+	groups := make([]string, 0, teams.TotalSize())
+	teams.For(func(team *lpad.Value) error {
+		groups = append(groups, team.StringField("name"))
+		return nil
+	})
+	return groups, nil
+}
+
+func (idp *identityProvider) getLaunchpadPersonByOpenID(root *lpad.Root, ussoID string) (*lpad.Person, error) {
+	launchpadID := "https://login.launchpad.net/+id/" + strings.TrimPrefix(ussoID, "https://login.ubuntu.com/+id/")
+	v, err := root.Location("/people").Get(lpad.Params{"ws.op": "getByOpenIDIdentifier", "identifier": launchpadID})
+	// TODO if err == lpad.ErrNotFound, return a not found error
+	// so that we won't round-trip to launchpad for users that don't exist there.
+	if err != nil {
+		return nil, errgo.Notef(err, "cannot find user %s", ussoID)
+	}
+	return &lpad.Person{v}, nil
 }

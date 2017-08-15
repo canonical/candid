@@ -17,6 +17,8 @@ import (
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
 	macaroon "gopkg.in/macaroon.v2-unstable"
 
+	"github.com/CanonicalLtd/blues-identity/idp"
+	"github.com/CanonicalLtd/blues-identity/idp/test"
 	"github.com/CanonicalLtd/blues-identity/internal/auth"
 	"github.com/CanonicalLtd/blues-identity/mgostore"
 	"github.com/CanonicalLtd/blues-identity/store"
@@ -24,14 +26,15 @@ import (
 
 type authSuite struct {
 	testing.IsolatedMgoSuite
-	db            *mgostore.Database
-	store         store.Store
-	oven          *bakery.Oven
-	authorizer    *auth.Authorizer
-	context       context.Context
-	close         func()
-	adminAgentKey *bakery.KeyPair
-	groupGetters  map[string]auth.GroupGetter
+	db                  *mgostore.Database
+	store               store.Store
+	oven                *bakery.Oven
+	authorizer          *auth.Authorizer
+	context             context.Context
+	close               func()
+	adminAgentKey       *bakery.KeyPair
+	providerGroups      []string
+	providerGroupsError error
 }
 
 var _ = gc.Suite(&authSuite{})
@@ -56,19 +59,27 @@ func (s *authSuite) SetUpTest(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 	s.store = s.db.Store()
 	s.context, s.close = s.store.Context(context.Background())
-	s.groupGetters = make(map[string]auth.GroupGetter)
 	s.authorizer = auth.New(auth.Params{
 		AdminUsername:   "admin",
 		AdminPassword:   "password",
 		Location:        identityLocation,
 		MacaroonOpStore: s.oven,
 		Store:           s.store,
-		GroupGetters:    s.groupGetters,
+		IdentityProviders: []idp.IdentityProvider{
+			test.NewIdentityProvider(test.Params{
+				Name:      "test",
+				GetGroups: s.getGroups,
+			}),
+		},
 	})
 	s.adminAgentKey, err = bakery.GenerateKey()
 	c.Assert(err, gc.Equals, nil)
 	err = s.authorizer.SetAdminPublicKey(s.context, &s.adminAgentKey.Public)
 	c.Assert(err, gc.Equals, nil)
+}
+
+func (s *authSuite) getGroups(*store.Identity) ([]string, error) {
+	return s.providerGroups, s.providerGroupsError
 }
 
 func (s *authSuite) TearDownTest(c *gc.C) {
@@ -351,10 +362,8 @@ var identityAllowTests = []struct {
 func (s *authSuite) TestIdentityAllow(c *gc.C) {
 	for i, test := range identityAllowTests {
 		c.Logf("test %d: %v", i, test.about)
-		s.groupGetters["test"] = testGroupGetter{
-			groups: append(test.groups, test.externalGroups...),
-			error:  test.externalGroupsError,
-		}
+		s.providerGroups = test.externalGroups
+		s.providerGroupsError = test.externalGroupsError
 		id := s.createIdentity(c, "testuser", nil, test.groups...)
 		ok, err := id.Allow(s.context, test.acl)
 		if test.expectError != "" {

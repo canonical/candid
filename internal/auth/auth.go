@@ -4,6 +4,7 @@ package auth
 
 import (
 	"bytes"
+	"sort"
 	"strings"
 
 	"github.com/juju/idmclient/params"
@@ -15,6 +16,7 @@ import (
 	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
 	macaroon "gopkg.in/macaroon.v2-unstable"
 
+	"github.com/CanonicalLtd/blues-identity/idp"
 	"github.com/CanonicalLtd/blues-identity/store"
 )
 
@@ -60,12 +62,12 @@ var AdminACL = []string{AdminUsername}
 
 // An Authorizer is used to authorize operations in the identity server.
 type Authorizer struct {
-	adminUsername string
-	adminPassword string
-	location      string
-	checker       *bakery.Checker
-	store         store.Store
-	groupGetters  map[string]GroupGetter
+	adminUsername  string
+	adminPassword  string
+	location       string
+	checker        *bakery.Checker
+	store          store.Store
+	groupResolvers map[string]groupResolver
 }
 
 // Params specifify the configuration parameters for a new Authroizer.
@@ -90,10 +92,10 @@ type Params struct {
 	// Store is the identity store.
 	Store store.Store
 
-	// GroupGetters are used to update the stored list of groups for
-	// an identity. The map key is the provider name in the
-	// identity's provider id.
-	GroupGetters map[string]GroupGetter
+	// IdentityProviders contains the set of identity providers that
+	// are configured for the service. The authenticatore uses these
+	// to get group information for authenticated users.
+	IdentityProviders []idp.IdentityProvider
 }
 
 // New creates a new Authorizer for authorizing identity server
@@ -104,8 +106,13 @@ func New(params Params) *Authorizer {
 		adminPassword: params.AdminPassword,
 		location:      params.Location,
 		store:         params.Store,
-		groupGetters:  params.GroupGetters,
 	}
+	resolvers := make(map[string]groupResolver)
+	for _, idp := range params.IdentityProviders {
+		idp := idp
+		resolvers[idp.Name()] = idpGroupResolver{idp}
+	}
+	a.groupResolvers = resolvers
 	a.checker = bakery.NewChecker(bakery.CheckerParams{
 		Checker: newChecker(a),
 		Authorizer: bakery.ACLAuthorizer{
@@ -225,8 +232,7 @@ func (a *Authorizer) Identity(ctx context.Context, username string) (*Identity, 
 		id: store.Identity{
 			Username: username,
 		},
-		store:        a.store,
-		groupGetters: a.groupGetters,
+		a: a,
 	}
 	if err := id.lookup(ctx); err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
@@ -302,8 +308,7 @@ func (c identityClient) IdentityFromContext(ctx context.Context) (_ident bakery.
 				id: store.Identity{
 					Username: AdminUsername,
 				},
-				store:        c.a.store,
-				groupGetters: c.a.groupGetters,
+				a: c.a,
 			}, nil, nil
 		}
 		return nil, nil, errgo.WithCausef(nil, params.ErrUnauthorized, "invalid credentials")
@@ -344,17 +349,16 @@ func (c identityClient) DeclaredIdentity(ctx context.Context, declared map[strin
 		id: store.Identity{
 			Username: username,
 		},
-		store:        c.a.store,
-		groupGetters: c.a.groupGetters,
+		a: c.a,
 	}, nil
 }
 
 // An Identity is the implementation of bakery.Identity used in the
 // identity server.
 type Identity struct {
-	id           store.Identity
-	store        store.Store
-	groupGetters map[string]GroupGetter
+	id             store.Identity
+	a              *Authorizer
+	resolvedGroups []string
 }
 
 // Id implements bakery.Identity.Id.
@@ -393,19 +397,26 @@ func (id *Identity) Allow(ctx context.Context, acl []string) (bool, error) {
 	return false, nil
 }
 
-// Groups returns all the groups associated with the user.
-// TODO (mhilton) document group getting.
+// Groups returns all the groups associated with the user. The groups
+// include those stored in the identity server's database along with any
+// retrieved by the relevent identity provider's GetGroups method. Once
+// the set of groups has been determined it is cached in the Identity.
 func (id *Identity) Groups(ctx context.Context) ([]string, error) {
+	if id.resolvedGroups != nil {
+		return id.resolvedGroups, nil
+	}
 	if err := id.lookup(ctx); err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
 	groups := id.id.Groups
 	provider, _ := id.id.ProviderID.Split()
-	if gg := id.groupGetters[provider]; gg != nil {
+	if gr := id.a.groupResolvers[provider]; gr != nil {
 		var err error
-		groups, err = gg.GetGroups(ctx, &id.id)
+		groups, err = gr.resolveGroups(ctx, &id.id)
 		if err != nil {
-			logger.Warningf("error getting groups: %s", err)
+			logger.Warningf("error resolving groups: %s", err)
+		} else {
+			id.resolvedGroups = groups
 		}
 	}
 	return groups, nil
@@ -415,7 +426,7 @@ func (id *Identity) lookup(ctx context.Context) error {
 	if id.id.ID != "" {
 		return nil
 	}
-	if err := id.store.Identity(ctx, &id.id); err != nil {
+	if err := id.a.store.Identity(ctx, &id.id); err != nil {
 		if errgo.Cause(err) == store.ErrNotFound {
 			return errgo.WithCausef(err, params.ErrNotFound, "")
 		}
@@ -462,12 +473,47 @@ func splitEntity(entity string) (string, string) {
 	return entity, ""
 }
 
-// A GroupGetter is used to update the groups associated with an
+// A groupResolver is used to update the groups associated with an
 // identity.
-type GroupGetter interface {
-	// GetGroups returns the group information for the given
+type groupResolver interface {
+	// resolveGroups returns the group information for the given
 	// identity. If a non-nil error is returned it will be logged,
-	// but the list of groups will still be taken as the set of
-	// groups to be associated with the identity.
-	GetGroups(context.Context, *store.Identity) ([]string, error)
+	// but the returned list of groups will still be taken as the set
+	// of groups to be associated with the identity.
+	resolveGroups(context.Context, *store.Identity) ([]string, error)
+}
+
+type idpGroupResolver struct {
+	idp idp.IdentityProvider
+}
+
+// resolveGroups implements groupResolver by getting the groups from the
+// idp and adding them to the set stored in the identity server.
+func (r idpGroupResolver) resolveGroups(ctx context.Context, id *store.Identity) ([]string, error) {
+	groups, err := r.idp.GetGroups(ctx, id)
+	if err != nil {
+		// if we couldn't get the groups just return the ones stored in the database.
+		return id.Groups, errgo.Mask(err)
+	}
+	return uniqueStrings(append(groups, id.Groups...)), nil
+}
+
+// uniqueStrings removes all duplicates from the supplied
+// string slice, updating the slice in place.
+// The values will be in lexicographic order.
+func uniqueStrings(ss []string) []string {
+	if len(ss) < 2 {
+		return ss
+	}
+	sort.Strings(ss)
+	prev := ss[0]
+	out := ss[:1]
+	for _, s := range ss[1:] {
+		if s == prev {
+			continue
+		}
+		out = append(out, s)
+		prev = s
+	}
+	return out
 }

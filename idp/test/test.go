@@ -41,6 +41,10 @@ type Params struct {
 	// Domain contains the domain that will be used with the identity
 	// provider.
 	Domain string
+
+	// GetGroups contains function that if set will be called by
+	// GetGroups to obtain the groups to return.
+	GetGroups func(*store.Identity) ([]string, error)
 }
 
 // NewIdentityProvider creates an idp.IdentityProvider that can be used
@@ -87,13 +91,13 @@ func (idp *identityProvider) URL(waitID string) string {
 	return idputil.URL(idp.initParams.URLPrefix, "/test-login", waitID)
 }
 
-type testInteractiveLoginResponse struct {
-	URL string `json:"url"`
-}
-
-type testLoginRequest struct {
-	httprequest.Route `httprequest:"POST"`
-	User              *params.User `httprequest:",body"`
+//  GetGroups implements idp.IdentityProvider.GetGroups.
+func (idp *identityProvider) GetGroups(_ context.Context, id *store.Identity) ([]string, error) {
+	f := idp.params.GetGroups
+	if f == nil {
+		return nil, nil
+	}
+	return f(id)
 }
 
 // Handle handles the login process.
@@ -104,6 +108,10 @@ func (idp *identityProvider) Handle(ctx context.Context, w http.ResponseWriter, 
 	} else if id != nil {
 		idp.initParams.LoginCompleter.Success(ctx, w, req, idputil.WaitID(req), id)
 	}
+}
+
+type testInteractiveLoginResponse struct {
+	URL string `json:"url"`
 }
 
 func (idp *identityProvider) handle(ctx context.Context, w http.ResponseWriter, req *http.Request) (*store.Identity, error) {
@@ -118,6 +126,11 @@ func (idp *identityProvider) handle(ctx context.Context, w http.ResponseWriter, 
 		return nil, errgo.WithCausef(nil, params.ErrMethodNotAllowed, "%s not allowed", req.Method)
 	}
 	return nil, nil
+}
+
+type testLoginRequest struct {
+	httprequest.Route `httprequest:"POST"`
+	User              *params.User `httprequest:",body"`
 }
 
 func (idp *identityProvider) handlePost(ctx context.Context, w http.ResponseWriter, req *http.Request) (*store.Identity, error) {
