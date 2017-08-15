@@ -1,7 +1,7 @@
 // Copyright 2017 Canonical Ltd.
 
-// Package azure is an identity provider that authenticates with azure.
-package azure
+// Package google is an identity provider that authenticates with google.
+package google
 
 import (
 	"gopkg.in/errgo.v1"
@@ -14,10 +14,10 @@ import (
 )
 
 func init() {
-	config.RegisterIDP("azure", func(unmarshal func(interface{}) error) (idp.IdentityProvider, error) {
+	config.RegisterIDP("google", func(unmarshal func(interface{}) error) (idp.IdentityProvider, error) {
 		var p Params
 		if err := unmarshal(&p); err != nil {
-			return nil, errgo.Notef(err, "cannot unmarshal azure parameters")
+			return nil, errgo.Notef(err, "cannot unmarshal google parameters")
 		}
 		if p.ClientID == "" {
 			return nil, errgo.Newf("client-id not specified")
@@ -31,23 +31,24 @@ func init() {
 
 type Params struct {
 	// ClientID contains the Application Id for the application
-	// registered at https://apps.dev.microsoft.com.
+	// registered at
+	// https://console.developers.google.com/apis/credentials.
 	ClientID string `yaml:"client-id"`
 
 	// ClientSecret contains a password type Application Secret for
 	// the application as generated on
-	// https://apps.dev.microsoft.com.
+	// https://console.developers.google.com/apis/credentials.
 	ClientSecret string `yaml:"client-secret"`
 }
 
-// NewIdentityProvider creates an azure identity provider with the
+// NewIdentityProvider creates a google identity provider with the
 // configuration defined by p.
 func NewIdentityProvider(p Params) idp.IdentityProvider {
 	return openid.NewOpenIDConnectIdentityProvider(openid.OpenIDConnectParams{
-		Name:         "azure",
-		Issuer:       "https://login.live.com",
-		Domain:       "azure",
-		Scopes:       []string{oidc.ScopeOpenID, "profile"},
+		Name:         "google",
+		Issuer:       "https://accounts.google.com",
+		Domain:       "google",
+		Scopes:       []string{oidc.ScopeOpenID, "email"},
 		ClientID:     p.ClientID,
 		ClientSecret: p.ClientSecret,
 	})
