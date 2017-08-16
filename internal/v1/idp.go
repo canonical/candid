@@ -33,6 +33,7 @@ func (h *Handler) initIDPs(ctx context.Context) error {
 			URLPrefix:      h.serviceURL("/v1/idp/" + ip.Name()),
 			LoginCompleter: loginCompleter{h},
 			Template:       h.template,
+			Key:            h.oven.Key(),
 		}); err != nil {
 			return errgo.Mask(err)
 		}

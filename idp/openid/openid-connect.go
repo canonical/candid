@@ -16,33 +16,59 @@ import (
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/names.v2"
 
+	"github.com/CanonicalLtd/blues-identity/config"
 	"github.com/CanonicalLtd/blues-identity/idp"
 	"github.com/CanonicalLtd/blues-identity/idp/idputil"
 	"github.com/CanonicalLtd/blues-identity/idp/idputil/secret"
 	"github.com/CanonicalLtd/blues-identity/store"
 )
 
+func init() {
+	config.RegisterIDP("openid-connect", func(unmarshal func(interface{}) error) (idp.IdentityProvider, error) {
+		var p OpenIDConnectParams
+		if err := unmarshal(&p); err != nil {
+			return nil, errgo.Notef(err, "cannot unmarshal openid-connect parameters")
+		}
+		if p.Name == "" {
+			return nil, errgo.Newf("name not specified")
+		}
+		if p.Issuer == "" {
+			return nil, errgo.Newf("issuer not specified")
+		}
+		if p.ClientID == "" {
+			return nil, errgo.Newf("client-id not specified")
+		}
+		if p.ClientSecret == "" {
+			return nil, errgo.Newf("client-secret not specified")
+		}
+		return NewOpenIDConnectIdentityProvider(p), nil
+	})
+}
+
 type OpenIDConnectParams struct {
 	// Name is the name that will be given to the identity provider.
-	Name string
+	Name string `yaml:"name"`
 
 	// Description is the description that will be used with the
 	// identity provider. If this is not set then Name will be used.
-	Description string
+	Description string `yaml:"description"`
 
 	// Domain is the domain with which all identities created by this
 	// identity provider will be tagged (not including the @ separator).
-	Domain string
+	Domain string `yaml:"domain"`
 
 	// Issuer is the OpenID connect issuer for the identity provider.
 	// Discovery will be performed for this issuer.
-	Issuer string
+	Issuer string `yaml:"issuer"`
+
+	// Scopes contains the OAuth scopes to request.
+	Scopes []string `yaml:"scopes"`
 
 	// ClientID is the ID of the client as registered with the issuer.
-	ClientID string
+	ClientID string `yaml:"client-id"`
 
 	// ClientSecret is a client specific secret agreed with the issuer.
-	ClientSecret string
+	ClientSecret string `yaml:"client-secret"`
 }
 
 // NewOpenIDConnectIdentityProvider creates a new identity provider using
@@ -50,6 +76,9 @@ type OpenIDConnectParams struct {
 func NewOpenIDConnectIdentityProvider(params OpenIDConnectParams) idp.IdentityProvider {
 	if params.Description == "" {
 		params.Description = params.Name
+	}
+	if len(params.Scopes) == 0 {
+		params.Scopes = []string{oidc.ScopeOpenID}
 	}
 	return &openidConnectIdentityProvider{
 		params: params,
@@ -98,7 +127,7 @@ func (idp *openidConnectIdentityProvider) Init(ctx context.Context, params idp.I
 		ClientSecret: idp.params.ClientSecret,
 		Endpoint:     idp.provider.Endpoint(),
 		RedirectURL:  idp.initParams.URLPrefix + "/callback",
-		Scopes:       []string{oidc.ScopeOpenID, "profile"},
+		Scopes:       idp.params.Scopes,
 	}
 	idp.codec = secret.NewCodec(idp.initParams.Key)
 	return nil
@@ -170,11 +199,13 @@ func (idp *openidConnectIdentityProvider) callback(ctx context.Context, w http.R
 	user := store.Identity{
 		ProviderID: store.MakeProviderIdentity(idp.Name(), fmt.Sprintf("%s:%s", id.Issuer, id.Subject)),
 	}
-	if err := idp.initParams.Store.Identity(ctx, &user); err == nil {
+	err = idp.initParams.Store.Identity(ctx, &user)
+	if err == nil {
 		idp.deleteSession(ctx, w)
 		idp.initParams.LoginCompleter.Success(ctx, w, req, waitid, &user)
 		return "", nil
 	}
+
 	if errgo.Cause(err) != store.ErrNotFound {
 		return waitid, errgo.Mask(err)
 	}
