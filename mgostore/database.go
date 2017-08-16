@@ -26,11 +26,9 @@ type Database struct {
 // given Database's underlying session will be copied. The Database must
 // be closed when finished with.
 func NewDatabase(db *mgo.Database) (*Database, error) {
-	// TODO(mhilton) these indexes are interfering with the rest of the
-	// system, re-enable when fully switched.
-	//	if err := ensureIdentityIndexes(db); err != nil {
-	//		return nil, err
-	//	}
+	if err := ensureIdentityIndexes(db); err != nil {
+		return nil, err
+	}
 	if err := ensureMeetingIndexes(db); err != nil {
 		return nil, err
 	}
@@ -84,11 +82,6 @@ func (d *Database) c(ctx context.Context, name string) *mgo.Collection {
 // Store returns a new store.Store implementation using this database for
 // persistent storage.
 func (d *Database) Store() store.Store {
-	// TODO(mhilton) this is only necessary temporarily until all
-	// modules use the new store.
-	if err := ensureIdentityIndexes(d.db); err != nil {
-		panic(err)
-	}
 	return &identityStore{d}
 }
 
@@ -105,6 +98,12 @@ func (d *Database) BakeryRootKeyStore(policy mgorootkeystore.Policy) bakery.Root
 		db:     d,
 		policy: policy,
 	}
+}
+
+// IDPDataStore returns a new store.IDPDataStore implementation using
+// this database for persistent storage.
+func (d *Database) IDPDataStore() store.IDPDataStore {
+	return &idpDataStore{d}
 }
 
 // DebugStatusCheckerFuncs returns a set of debugstatus.CheckerFuncs that
