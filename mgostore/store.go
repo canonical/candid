@@ -209,11 +209,11 @@ func identityUpdate(identity *store.Identity, update store.Update) updateDocumen
 	return doc
 }
 
-func encodePublicKeys(pks []bakery.PublicKey) []string {
-	data := make([]string, len(pks))
+func encodePublicKeys(pks []bakery.PublicKey) [][]byte {
+	data := make([][]byte, len(pks))
 	for i, pk := range pks {
 		b, _ := pk.MarshalBinary()
-		data[i] = string(b)
+		data[i] = b
 	}
 	return data
 }
