@@ -5,13 +5,15 @@ package v1_test
 import (
 	gc "gopkg.in/check.v1"
 
+	"github.com/CanonicalLtd/blues-identity/internal/discharger"
 	"github.com/CanonicalLtd/blues-identity/internal/identity"
 	"github.com/CanonicalLtd/blues-identity/internal/idmtest"
 	"github.com/CanonicalLtd/blues-identity/internal/v1"
 )
 
 var versions = map[string]identity.NewAPIHandlerFunc{
-	"v1": v1.NewAPIHandler,
+	"discharger": discharger.NewAPIHandler,
+	"v1":         v1.NewAPIHandler,
 }
 
 type apiSuite struct {

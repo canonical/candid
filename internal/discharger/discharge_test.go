@@ -1,6 +1,6 @@
 // Copyright 2014 Canonical Ltd.
 
-package v1_test
+package discharger_test
 
 import (
 	"bytes"
@@ -29,8 +29,8 @@ import (
 	"github.com/CanonicalLtd/blues-identity/idp"
 	"github.com/CanonicalLtd/blues-identity/idp/test"
 	"github.com/CanonicalLtd/blues-identity/internal/auth"
+	"github.com/CanonicalLtd/blues-identity/internal/discharger"
 	"github.com/CanonicalLtd/blues-identity/internal/idmtest"
-	"github.com/CanonicalLtd/blues-identity/internal/v1"
 	"github.com/CanonicalLtd/blues-identity/store"
 )
 
@@ -94,7 +94,7 @@ func (s *dischargeSuite) TestWaitReturnsDischargeToken(c *gc.C) {
 			continue
 		}
 		dischargeCount++
-		var wresp v1.WaitResponse
+		var wresp discharger.WaitResponse
 		err := json.Unmarshal(resp.body, &wresp)
 		c.Assert(err, gc.IsNil)
 		c.Assert(wresp.DischargeToken, gc.HasLen, 1)

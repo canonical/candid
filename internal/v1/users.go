@@ -29,9 +29,9 @@ var blacklistUsernames = map[params.Username]bool{
 	auth.AdminUsername: true,
 }
 
-// QueryUsers serves the /u endpoint. See http://tinyurl.com/lu3mmr9 for
-// details.
-func (h *apiHandler) QueryUsers(p httprequest.Params, r *params.QueryUsersRequest) ([]string, error) {
+// QueryUsers filters the user database for users that match the given
+// request. If no filters are requested all usernames will be returned.
+func (h *handler) QueryUsers(p httprequest.Params, r *params.QueryUsersRequest) ([]string, error) {
 	var identity store.Identity
 	var filter store.Filter
 	if r.ExternalID != "" {
@@ -61,7 +61,7 @@ func (h *apiHandler) QueryUsers(p httprequest.Params, r *params.QueryUsersReques
 
 	// TODO(mhilton) make sure this endpoint can be queried as a
 	// subset once there are more users.
-	identities, err := h.h.store.FindIdentities(p.Context, &identity, filter, []store.Sort{{Field: store.Username}}, 0, 0)
+	identities, err := h.params.Store.FindIdentities(p.Context, &identity, filter, []store.Sort{{Field: store.Username}}, 0, 0)
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}
@@ -72,13 +72,12 @@ func (h *apiHandler) QueryUsers(p httprequest.Params, r *params.QueryUsersReques
 	return usernames, nil
 }
 
-// User serves the /u/$username endpoint. See http://tinyurl.com/lrdjwmw
-// for details.
-func (h *apiHandler) User(p httprequest.Params, r *params.UserRequest) (*params.User, error) {
+// User returns the user information for the request user.
+func (h *handler) User(p httprequest.Params, r *params.UserRequest) (*params.User, error) {
 	id := store.Identity{
 		Username: string(r.Username),
 	}
-	err := h.h.store.Identity(p.Context, &id)
+	err := h.params.Store.Identity(p.Context, &id)
 	if err != nil {
 		return nil, translateStoreError(err)
 	}
@@ -90,7 +89,7 @@ func (h *apiHandler) User(p httprequest.Params, r *params.UserRequest) (*params.
 // request will be ignored. See SetUserGroups, ModifyUserGroups,
 // SetSSHKeys and DeleteSSHKeys if you wish to manipulate these for a
 // user.
-func (h *apiHandler) SetUser(p httprequest.Params, u *params.SetUserRequest) error {
+func (h *handler) SetUser(p httprequest.Params, u *params.SetUserRequest) error {
 	if err := validateUsername(u); err != nil {
 		return errgo.WithCausef(err, params.ErrForbidden, "")
 	}
@@ -131,7 +130,7 @@ func (h *apiHandler) SetUser(p httprequest.Params, u *params.SetUserRequest) err
 		update[store.ExtraInfo] = store.Push
 		identity.ExtraInfo["sshkeys"] = u.User.SSHKeys
 	}
-	return translateStoreError(h.h.store.UpdateIdentity(p.Context, &identity, update))
+	return translateStoreError(h.params.Store.UpdateIdentity(p.Context, &identity, update))
 }
 
 func validateUsername(u *params.SetUserRequest) error {
@@ -152,8 +151,8 @@ func publicKeys(pks []*bakery.PublicKey) []bakery.PublicKey {
 	return pks2
 }
 
-// Calculate the gravatar hash based on the following specification :
-// https://en.gravatar.com/site/implement/hash
+// gravatarHash calculates the gravatar hash based on the following
+// specification : https://en.gravatar.com/site/implement/hash
 func gravatarHash(s string) string {
 	if s == "" {
 		return ""
@@ -163,9 +162,8 @@ func gravatarHash(s string) string {
 	return fmt.Sprintf("%x", hasher.Sum(nil))
 }
 
-// WhoAmI returns authentication information on the client that is
-// making the call.
-func (h *apiHandler) WhoAmI(p httprequest.Params, arg *params.WhoAmIRequest) (params.WhoAmIResponse, error) {
+// WhoAmI returns details of the authenticated user.
+func (h *handler) WhoAmI(p httprequest.Params, arg *params.WhoAmIRequest) (params.WhoAmIResponse, error) {
 	id := identityFromContext(p.Context)
 	if id == nil || id.Id() == "" {
 		// Should never happen, as the endpoint should require authentication.
@@ -176,10 +174,10 @@ func (h *apiHandler) WhoAmI(p httprequest.Params, arg *params.WhoAmIRequest) (pa
 	}, nil
 }
 
-// UserGroups serves the GET /u/$username/groups endpoint, and returns
-// the list of groups associated with the user.
-func (h *apiHandler) UserGroups(p httprequest.Params, r *params.UserGroupsRequest) ([]string, error) {
-	id, err := h.h.auth.Identity(p.Context, string(r.Username))
+// UserGroups returns the list of groups associated with the requested
+// user.
+func (h *handler) UserGroups(p httprequest.Params, r *params.UserGroupsRequest) ([]string, error) {
+	id, err := h.params.Authorizer.Identity(p.Context, string(r.Username))
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
@@ -193,30 +191,28 @@ func (h *apiHandler) UserGroups(p httprequest.Params, r *params.UserGroupsReques
 	return groups, nil
 }
 
-// UserIDPGroups serves the /u/$username/idpgroups endpoint, and returns
-// the list of groups associated with the user. This endpoint should no longer be used
-// and is maintained for backwards compatibility purposes only.
-func (h *apiHandler) UserIDPGroups(p httprequest.Params, r *params.UserIDPGroupsRequest) ([]string, error) {
+// UserIDPGroups returns the list of groups associated with the requested
+// user. This is deprected and UserGroups should be used in preference.
+func (h *handler) UserIDPGroups(p httprequest.Params, r *params.UserIDPGroupsRequest) ([]string, error) {
 	return h.UserGroups(p, &params.UserGroupsRequest{
 		Username: r.Username,
 	})
 }
 
-// SetUserGroups serves the PUT /u/$username/groups endpoint, and sets the
-// list of groups associated with the user.
-func (h *apiHandler) SetUserGroups(p httprequest.Params, r *params.SetUserGroupsRequest) error {
+// SetUserGroups updates the groups stored for the given user to the
+// given value.
+func (h *handler) SetUserGroups(p httprequest.Params, r *params.SetUserGroupsRequest) error {
 	identity := store.Identity{
 		Username: string(r.Username),
 		Groups:   r.Groups.Groups,
 	}
-	return translateStoreError(h.h.store.UpdateIdentity(p.Context, &identity, store.Update{store.Groups: store.Set}))
+	return translateStoreError(h.params.Store.UpdateIdentity(p.Context, &identity, store.Update{store.Groups: store.Set}))
 }
 
-// ModifyUserGroups serves the POST /u/$username/groups endpoint, and
-// updates the list of groups associated with the user. Groups can be
-// either added or removed in a single query. It is an error to try and
-// both add and remove groups at the same time.
-func (h *apiHandler) ModifyUserGroups(p httprequest.Params, r *params.ModifyUserGroupsRequest) error {
+// ModifyUserGroups updates the groups stored for the given user. Groups
+// can be either added or removed in a single query. It is an error to
+// try and both add and remove groups at the same time.
+func (h *handler) ModifyUserGroups(p httprequest.Params, r *params.ModifyUserGroupsRequest) error {
 	identity := store.Identity{
 		Username: string(r.Username),
 	}
@@ -231,16 +227,15 @@ func (h *apiHandler) ModifyUserGroups(p httprequest.Params, r *params.ModifyUser
 		identity.Groups = r.Groups.Remove
 		update[store.Groups] = store.Pull
 	}
-	return translateStoreError(h.h.store.UpdateIdentity(p.Context, &identity, update))
+	return translateStoreError(h.params.Store.UpdateIdentity(p.Context, &identity, update))
 }
 
-// GetSSHKeys serves the /u/$username/sshkeys endpoint, and returns
-// the list of ssh keys associated with the user.
-func (h *apiHandler) GetSSHKeys(p httprequest.Params, r *params.SSHKeysRequest) (params.SSHKeysResponse, error) {
+// GetSSHKeys returns any SSH keys stored for the given user.
+func (h *handler) GetSSHKeys(p httprequest.Params, r *params.SSHKeysRequest) (params.SSHKeysResponse, error) {
 	id := store.Identity{
 		Username: string(r.Username),
 	}
-	if err := h.h.store.Identity(p.Context, &id); err != nil {
+	if err := h.params.Store.Identity(p.Context, &id); err != nil {
 		return params.SSHKeysResponse{}, translateStoreError(err)
 	}
 	return params.SSHKeysResponse{
@@ -248,10 +243,10 @@ func (h *apiHandler) GetSSHKeys(p httprequest.Params, r *params.SSHKeysRequest) 
 	}, nil
 }
 
-// PutSSHKeys serves the /u/$username/sshkeys put endpoint, and set ssh keys to
-// the list of ssh keys associated with the user. If the add parameter is set to
-// true then it will only add to the current list of ssh keys
-func (h *apiHandler) PutSSHKeys(p httprequest.Params, r *params.PutSSHKeysRequest) error {
+// PutSSHKeys updates the set of SSH keys stored for the given user. If
+// the add parameter is set to true then keys that are already stored
+// will be added to, otherwise they will be replaced.
+func (h *handler) PutSSHKeys(p httprequest.Params, r *params.PutSSHKeysRequest) error {
 	id := store.Identity{
 		Username: string(r.Username),
 		ExtraInfo: map[string][]string{
@@ -261,12 +256,13 @@ func (h *apiHandler) PutSSHKeys(p httprequest.Params, r *params.PutSSHKeysReques
 	update := store.Update{
 		store.ExtraInfo: store.Push,
 	}
-	return translateStoreError(h.h.store.UpdateIdentity(p.Context, &id, update))
+	return translateStoreError(h.params.Store.UpdateIdentity(p.Context, &id, update))
 }
 
-// DeleteSSHKeys serves the /u/$username/sshkeys delete endpoint, and remove
-// ssh keys from the list of ssh keys associated with the user.
-func (h *apiHandler) DeleteSSHKeys(p httprequest.Params, r *params.DeleteSSHKeysRequest) error {
+// DeleteSSHKeys removes all of the ssh keys specified from the keys
+// stored for the given user. It is not an error to attempt to remove a
+// key that is not associated with the user.
+func (h *handler) DeleteSSHKeys(p httprequest.Params, r *params.DeleteSSHKeysRequest) error {
 	id := store.Identity{
 		Username: string(r.Username),
 		ExtraInfo: map[string][]string{
@@ -276,17 +272,17 @@ func (h *apiHandler) DeleteSSHKeys(p httprequest.Params, r *params.DeleteSSHKeys
 	update := store.Update{
 		store.ExtraInfo: store.Pull,
 	}
-	return translateStoreError(h.h.store.UpdateIdentity(p.Context, &id, update))
+	return translateStoreError(h.params.Store.UpdateIdentity(p.Context, &id, update))
 }
 
-// UserToken serves a token, in the form of a macaroon, identifying
+// UserToken returns a token, in the form of a macaroon, identifying
 // the user. This token can only be generated by an administrator.
-func (h *apiHandler) UserToken(p httprequest.Params, r *params.UserTokenRequest) (*bakery.Macaroon, error) {
-	id, err := h.h.auth.Identity(p.Context, string(r.Username))
+func (h *handler) UserToken(p httprequest.Params, r *params.UserTokenRequest) (*bakery.Macaroon, error) {
+	id, err := h.params.Authorizer.Identity(p.Context, string(r.Username))
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
-	m, err := h.h.oven.NewMacaroon(
+	m, err := h.params.Oven.NewMacaroon(
 		p.Context,
 		httpbakery.RequestVersion(p.Request),
 		time.Now().Add(24*time.Hour),
@@ -301,8 +297,10 @@ func (h *apiHandler) UserToken(p httprequest.Params, r *params.UserTokenRequest)
 	return m, nil
 }
 
-func (h *apiHandler) VerifyToken(p httprequest.Params, r *params.VerifyTokenRequest) (map[string]string, error) {
-	authInfo, err := h.h.auth.Auth(p.Context, []macaroon.Slice{r.Macaroons}, bakery.LoginOp)
+// VerifyToken verifies that the given token is a macaroon generated by
+// this service and returns any declared values.
+func (h *handler) VerifyToken(p httprequest.Params, r *params.VerifyTokenRequest) (map[string]string, error) {
+	authInfo, err := h.params.Authorizer.Auth(p.Context, []macaroon.Slice{r.Macaroons}, bakery.LoginOp)
 	if err != nil {
 		// TODO only return ErrForbidden when the error is because of bad macaroons.
 		return nil, errgo.WithCausef(err, params.ErrForbidden, `verification failure`)
@@ -312,13 +310,12 @@ func (h *apiHandler) VerifyToken(p httprequest.Params, r *params.VerifyTokenRequ
 	}, nil
 }
 
-// UserExtraInfo serves the /v1/u/:username/extra-info endpoint, see
-// http://tinyurl.com/mxo24yy for details.
-func (h *apiHandler) UserExtraInfo(p httprequest.Params, r *params.UserExtraInfoRequest) (map[string]interface{}, error) {
+// UserExtraInfo returns any stored extra-info for the given user.
+func (h *handler) UserExtraInfo(p httprequest.Params, r *params.UserExtraInfoRequest) (map[string]interface{}, error) {
 	id := store.Identity{
 		Username: string(r.Username),
 	}
-	if err := h.h.store.Identity(p.Context, &id); err != nil {
+	if err := h.params.Store.Identity(p.Context, &id); err != nil {
 		return nil, translateStoreError(err)
 	}
 	res := make(map[string]interface{}, len(id.ExtraInfo))
@@ -332,9 +329,10 @@ func (h *apiHandler) UserExtraInfo(p httprequest.Params, r *params.UserExtraInfo
 	return res, nil
 }
 
-// SetUserExtraInfo serves the /v1/u/:username/extra-info endpoint, see
-// http://tinyurl.com/mqpynlw for details.
-func (h *apiHandler) SetUserExtraInfo(p httprequest.Params, r *params.SetUserExtraInfoRequest) error {
+// SetUserExtraInfo updates extra-info for the given user. For each
+// specified extra-info field the stored values will be updated to be the
+// specified value. All other values will remain unchanged.
+func (h *handler) SetUserExtraInfo(p httprequest.Params, r *params.SetUserExtraInfoRequest) error {
 	id := store.Identity{
 		Username:  string(r.Username),
 		ExtraInfo: make(map[string][]string, len(r.ExtraInfo)),
@@ -350,16 +348,16 @@ func (h *apiHandler) SetUserExtraInfo(p httprequest.Params, r *params.SetUserExt
 		}
 		id.ExtraInfo[k] = []string{string(buf)}
 	}
-	return translateStoreError(h.h.store.UpdateIdentity(p.Context, &id, store.Update{store.ExtraInfo: store.Set}))
+	return translateStoreError(h.params.Store.UpdateIdentity(p.Context, &id, store.Update{store.ExtraInfo: store.Set}))
 }
 
-// UserExtraInfoItem serves the /u/:username/extra-info/:item
-// endpoint, see http://tinyurl.com/mjuu7dt for details.
-func (h *apiHandler) UserExtraInfoItem(p httprequest.Params, r *params.UserExtraInfoItemRequest) (interface{}, error) {
+// UserExtraInfo returns any stored extra-info item with the given key
+// for the given user.
+func (h *handler) UserExtraInfoItem(p httprequest.Params, r *params.UserExtraInfoItemRequest) (interface{}, error) {
 	id := store.Identity{
 		Username: string(r.Username),
 	}
-	if err := h.h.store.Identity(p.Context, &id); err != nil {
+	if err := h.params.Store.Identity(p.Context, &id); err != nil {
 		return nil, translateStoreError(err)
 	}
 	if len(id.ExtraInfo[r.Item]) != 1 {
@@ -374,9 +372,9 @@ func (h *apiHandler) UserExtraInfoItem(p httprequest.Params, r *params.UserExtra
 	return v, nil
 }
 
-// SetUserExtraInfoItem serves the /u/:username/extra-info/:item
-// endpoint, see http://tinyurl.com/l5dc4r4 for details.
-func (h *apiHandler) SetUserExtraInfoItem(p httprequest.Params, r *params.SetUserExtraInfoItemRequest) error {
+// SetUserExtraInfoItem updates the stored extra-info item with the given
+// key for the given user.
+func (h *handler) SetUserExtraInfoItem(p httprequest.Params, r *params.SetUserExtraInfoItemRequest) error {
 	id := store.Identity{
 		Username: string(r.Username),
 	}
@@ -389,7 +387,7 @@ func (h *apiHandler) SetUserExtraInfoItem(p httprequest.Params, r *params.SetUse
 		panic(err)
 	}
 	id.ExtraInfo = map[string][]string{r.Item: {string(buf)}}
-	return translateStoreError(h.h.store.UpdateIdentity(p.Context, &id, store.Update{store.ExtraInfo: store.Set}))
+	return translateStoreError(h.params.Store.UpdateIdentity(p.Context, &id, store.Update{store.ExtraInfo: store.Set}))
 }
 
 func checkExtraInfoKey(key string) error {
@@ -399,7 +397,7 @@ func checkExtraInfoKey(key string) error {
 	return nil
 }
 
-func (h *apiHandler) userFromIdentity(ctx context.Context, id *store.Identity) (*params.User, error) {
+func (h *handler) userFromIdentity(ctx context.Context, id *store.Identity) (*params.User, error) {
 	var publicKeys []*bakery.PublicKey
 	if len(id.PublicKeys) > 0 {
 		publicKeys = make([]*bakery.PublicKey, len(id.PublicKeys))
@@ -408,7 +406,7 @@ func (h *apiHandler) userFromIdentity(ctx context.Context, id *store.Identity) (
 			publicKeys[i] = &pk
 		}
 	}
-	authID, err := h.h.auth.Identity(ctx, id.Username)
+	authID, err := h.params.Authorizer.Identity(ctx, id.Username)
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}
@@ -466,4 +464,36 @@ func translateStoreError(err error) error {
 	err1 := errgo.WithCausef(err, cause, "").(*errgo.Err)
 	err1.SetLocation(1)
 	return err1
+}
+
+const (
+	// dischargeTokenDuration is the length of time for which a
+	// discharge token is valid.
+	dischargeTokenDuration = 6 * time.Hour
+)
+
+// DischargeTokenForUser allows an administrator to create a discharge
+// token for the specified user.
+func (h *handler) DischargeTokenForUser(p httprequest.Params, req *params.DischargeTokenForUserRequest) (params.DischargeTokenForUserResponse, error) {
+	err := h.params.Store.Identity(p.Context, &store.Identity{
+		Username: string(req.Username),
+	})
+	if err != nil {
+		return params.DischargeTokenForUserResponse{}, errgo.NoteMask(err, "cannot get identity", errgo.Is(params.ErrNotFound))
+	}
+	m, err := h.params.Oven.NewMacaroon(
+		p.Context,
+		httpbakery.RequestVersion(p.Request),
+		time.Now().Add(dischargeTokenDuration),
+		[]checkers.Caveat{
+			idmclient.UserDeclaration(string(req.Username)),
+		},
+		bakery.LoginOp,
+	)
+	if err != nil {
+		return params.DischargeTokenForUserResponse{}, errgo.NoteMask(err, "cannot create discharge token", errgo.Any)
+	}
+	return params.DischargeTokenForUserResponse{
+		DischargeToken: m,
+	}, nil
 }

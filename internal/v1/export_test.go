@@ -3,9 +3,5 @@
 package v1
 
 var (
-	GravatarHash  = gravatarHash
-	NewIDPHandler = (*Handler).newIDPHandler
+	GravatarHash = gravatarHash
 )
-
-type WaitResponse waitResponse
-type DischargeTokenForUserResponse dischargeTokenForUserResponse

@@ -1,6 +1,6 @@
 // Copyright 2015 Canonical Ltd.
 
-package v1_test
+package discharger_test
 
 import (
 	"encoding/json"
@@ -49,7 +49,7 @@ func (s *loginSuite) TestInteractiveLogin(c *gc.C) {
 			IDPGroups:  []string{"test1", "test2"},
 		},
 	}
-	u, err := url.Parse(s.URL + "/v1/idp/test/login")
+	u, err := url.Parse(s.URL + "/login/test/login")
 	c.Assert(err, gc.Equals, nil)
 	err = visitor.VisitWebPage(testContext, client, map[string]*url.URL{httpbakery.UserInteractionMethod: u})
 	c.Assert(err, gc.Equals, nil)
@@ -74,7 +74,7 @@ func (s *loginSuite) TestNonInteractiveLogin(c *gc.C) {
 			IDPGroups:  []string{"test1", "test2"},
 		},
 	}
-	u, err := url.Parse(s.URL + "/v1/idp/test/login")
+	u, err := url.Parse(s.URL + "/login/test/login")
 	c.Assert(err, gc.Equals, nil)
 	err = visitor.VisitWebPage(testContext, client, map[string]*url.URL{"test": u})
 	c.Assert(err, gc.Equals, nil)
@@ -93,29 +93,29 @@ func (s *loginSuite) TestLoginFailure(c *gc.C) {
 	visitor := test.Visitor{
 		User: &params.User{},
 	}
-	u, err := url.Parse(s.URL + "/v1/idp/test/login")
+	u, err := url.Parse(s.URL + "/login/test/test-login")
 	c.Assert(err, gc.Equals, nil)
 	err = visitor.VisitWebPage(testContext, client, map[string]*url.URL{httpbakery.UserInteractionMethod: u})
-	c.Assert(err, gc.ErrorMatches, `Post .*/v1/idp/test/test-login: identity not specified`)
+	c.Assert(err, gc.ErrorMatches, `Post .*/login/test/test-login: identity not specified`)
 	c.Assert(jar.cookies, gc.HasLen, 0)
 }
 
 func (s *loginSuite) TestInteractiveIdentityProviderSelection(c *gc.C) {
-	resp := s.getNoRedirect(c, "/v1/login")
+	resp := s.getNoRedirect(c, "/login")
 	defer resp.Body.Close()
 	c.Assert(resp.StatusCode, gc.Equals, http.StatusFound)
-	c.Assert(resp.Header.Get("Location"), gc.Equals, s.URL+"/v1/idp/test/test-login")
+	c.Assert(resp.Header.Get("Location"), gc.Equals, s.URL+"/login/test/test-login")
 }
 
 func (s *loginSuite) TestInteractiveIdentityProviderSelectionWithDomain(c *gc.C) {
-	resp := s.getNoRedirect(c, "/v1/login?domain=test2")
+	resp := s.getNoRedirect(c, "/login?domain=test2")
 	defer resp.Body.Close()
 	c.Assert(resp.StatusCode, gc.Equals, http.StatusFound)
-	c.Assert(resp.Header.Get("Location"), gc.Equals, s.URL+"/v1/idp/test2/test-login")
+	c.Assert(resp.Header.Get("Location"), gc.Equals, s.URL+"/login/test2/test-login")
 }
 
 func (s *loginSuite) TestLoginMethodsIncludesAgent(c *gc.C) {
-	req, err := http.NewRequest("GET", "/v1/login", nil)
+	req, err := http.NewRequest("GET", "/login", nil)
 	c.Assert(err, gc.Equals, nil)
 	req.Header.Set("Accept", "application/json")
 	resp := s.Do(c, req)
@@ -126,7 +126,7 @@ func (s *loginSuite) TestLoginMethodsIncludesAgent(c *gc.C) {
 	var lm params.LoginMethods
 	err = json.Unmarshal(buf, &lm)
 	c.Assert(err, gc.Equals, nil)
-	c.Assert(lm.Agent, gc.Equals, s.URL+"/v1/agent-login")
+	c.Assert(lm.Agent, gc.Equals, s.URL+"/login/agent")
 }
 
 func (s *loginSuite) getNoRedirect(c *gc.C, path string) *http.Response {
