@@ -5,7 +5,6 @@ package discharger
 import (
 	"fmt"
 	"net/http"
-	"net/url"
 	"strings"
 	"time"
 
@@ -51,14 +50,6 @@ func initIDPs(ctx context.Context, params identity.HandlerParams, lc *loginCompl
 }
 
 func newIDPHandler(params identity.HandlerParams, idp idp.IdentityProvider) httprouter.Handle {
-	pathPrefix := ""
-	u, err := url.Parse(params.Location)
-	if err != nil {
-		logger.Warningf("location %q does not parse as a URL: %s", params.Location, err)
-		// if the location doesn't parse as a URL just assume the path has no prefix.
-	} else if u.Path != "/" {
-		pathPrefix = u.Path
-	}
 	return func(w http.ResponseWriter, req *http.Request, p httprouter.Params) {
 		t := trace.New("identity.internal.v1.idp", idp.Name())
 		defer t.Finish()
@@ -67,7 +58,7 @@ func newIDPHandler(params identity.HandlerParams, idp idp.IdentityProvider) http
 		defer close()
 		ctx, close = params.MeetingStore.Context(ctx)
 		defer close()
-		req.URL.Path = strings.TrimPrefix(req.URL.Path, pathPrefix+"/login/"+idp.Name())
+		req.URL.Path = strings.TrimPrefix(req.URL.Path, "/login/"+idp.Name())
 		req.ParseForm()
 		idp.Handle(ctx, w, req)
 	}
