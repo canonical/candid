@@ -130,6 +130,7 @@ func serve(confPath string) error {
 		},
 		identity.V1,
 		identity.Debug,
+		identity.Discharger,
 	)
 	if err != nil {
 		return errgo.Notef(err, "cannot create new server at %q", conf.APIAddr)
