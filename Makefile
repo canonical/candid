@@ -42,6 +42,8 @@ build: version/init.go
 check: version/init.go
 	go test $(PROJECT)/...
 
+release: identity-$(GIT_VERSION).tar.xz
+
 install: version/init.go
 	go install $(INSTALL_FLAGS) -v $(PROJECT)/...
 
@@ -60,6 +62,9 @@ check:
 	$(error Cannot $@; $(CURDIR) is not on GOPATH)
 
 install:
+	$(error Cannot $@; $(CURDIR) is not on GOPATH)
+
+release:
 	$(error Cannot $@; $(CURDIR) is not on GOPATH)
 
 clean:
@@ -97,6 +102,17 @@ snap:
 	$(MAKE) -C snap/idm
 	$(MAKE) -C snap/user-admin
 
+# Build a release tarball
+identity-$(GIT_VERSION).tar.xz: version/init.go
+	mkdir -p identity-$(GIT_VERSION)/bin
+	GOBIN=$(CURDIR)/identity-$(GIT_VERSION)/bin go install $(INSTALL_FLAGS) -v $(PROJECT)/...
+	mv identity-$(GIT_VERSION)/bin/idserver identity-$(GIT_VERSION)/bin/identity
+	cp -r $(CURDIR)/templates identity-$(GIT_VERSION)
+	cp -r $(CURDIR)/static identity-$(GIT_VERSION)
+	tar cv identity-$(GIT_VERSION) | xz > $@
+	-rm -r identity-$(GIT_VERSION)
+
+
 # Install packages required to develop the identity service and run tests.
 APT_BASED := $(shell command -v apt-get >/dev/null; echo $$?)
 sysdeps:
@@ -120,6 +136,7 @@ help:
 	@echo 'make - Build the package.'
 	@echo 'make check - Run tests.'
 	@echo 'make install - Install the package.'
+	@echo 'make release - Build a binary tarball of the package.'
 	@echo 'make server - Start the identity server.'
 	@echo 'make clean - Remove object files from package source directories.'
 	@echo 'make sysdeps - Install the development environment system packages.'
@@ -128,6 +145,6 @@ help:
 	@echo 'make format - Format the source files.'
 	@echo 'make simplify - Format and simplify the source files.'
 
-.PHONY: build check install clean format server simplify snap sysdeps help FORCE
+.PHONY: build check install clean format release server simplify snap sysdeps help FORCE
 
 FORCE:
