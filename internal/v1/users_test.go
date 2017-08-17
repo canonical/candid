@@ -132,8 +132,8 @@ var setUserTests = []struct {
 }, {
 	about: "create agent",
 	user: params.User{
-		Username: "agent@jbloggs2",
-		Owner:    "jbloggs2",
+		Username: "agent@jbloggs3",
+		Owner:    "jbloggs3",
 		IDPGroups: []string{
 			"test1",
 		},
@@ -142,8 +142,8 @@ var setUserTests = []struct {
 		},
 	},
 	expectUser: params.User{
-		Username: "agent@jbloggs2",
-		Owner:    "jbloggs2",
+		Username: "agent@jbloggs3",
+		Owner:    "jbloggs3",
 		IDPGroups: []string{
 			"test1",
 		},
@@ -154,8 +154,8 @@ var setUserTests = []struct {
 }, {
 	about: "update agent",
 	user: params.User{
-		Username: "agent2@jbloggs2",
-		Owner:    "jbloggs2",
+		Username: "agent2@jbloggs3",
+		Owner:    "jbloggs3",
 		IDPGroups: []string{
 			"test3",
 		},
@@ -164,8 +164,8 @@ var setUserTests = []struct {
 		},
 	},
 	expectUser: params.User{
-		Username: "agent2@jbloggs2",
-		Owner:    "jbloggs2",
+		Username: "agent2@jbloggs3",
+		Owner:    "jbloggs3",
 		IDPGroups: []string{
 			"test3",
 		},
@@ -179,7 +179,6 @@ func (s *usersSuite) TestSetUser(c *gc.C) {
 	err := s.adminClient.SetUser(s.Ctx, &params.SetUserRequest{
 		Username: "jbloggs2",
 		User: params.User{
-			Username:   "jbloggs2",
 			ExternalID: "test:http://example.com/jbloggs2",
 			FullName:   "Joe Bloggs II",
 			Email:      "jbloggs2@example.com",
@@ -191,10 +190,19 @@ func (s *usersSuite) TestSetUser(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 
 	err = s.adminClient.SetUser(s.Ctx, &params.SetUserRequest{
+		Username: "jbloggs3",
+		User: params.User{
+			ExternalID: "test:http://example.com/jbloggs3",
+			FullName:   "Joe Bloggs III",
+			Email:      "jbloggs3@example.com",
+		},
+	})
+	c.Assert(err, gc.Equals, nil)
+
+	err = s.adminClient.SetUser(s.Ctx, &params.SetUserRequest{
 		Username: "agent2@jbloggs2",
 		User: params.User{
-			Username: "jbloggs2",
-			Owner:    "jbloggs2",
+			Owner: "jbloggs2",
 			IDPGroups: []string{
 				"test1",
 			},
@@ -265,6 +273,13 @@ var setUserErrorTests = []struct {
 		Owner:    "bob",
 	},
 	expectError: `Put .*/v1/u/agent: bob cannot create user "agent" \(suffix must be "@bob"\)`,
+}, {
+	about: "agent owner doesn't exist",
+	user: params.User{
+		Username: "agent@alice",
+		Owner:    "alice",
+	},
+	expectError: `Put .*/v1/u/agent@alice: owner must exist`,
 }}
 
 func (s *usersSuite) TestSetUserErrors(c *gc.C) {

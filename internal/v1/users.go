@@ -110,9 +110,18 @@ func (h *handler) SetUser(p httprequest.Params, u *params.SetUserRequest) error 
 		if u.ExternalID != "" {
 			return errgo.WithCausef(nil, params.ErrBadRequest, `both owner and external_id specified`)
 		}
+		owner := store.Identity{
+			Username: string(u.Owner),
+		}
+		if err := h.params.Store.Identity(p.Context, &owner); err != nil {
+			if errgo.Cause(err) == store.ErrNotFound {
+				return errgo.WithCausef(nil, params.ErrForbidden, `owner must exist`)
+			}
+			return errgo.Mask(err)
+		}
 		identity.ProviderID = store.MakeProviderIdentity("idm", identity.Username)
 		identity.ProviderInfo = map[string][]string{
-			"owner": []string{string(u.Owner)},
+			"owner": []string{string(owner.ProviderID), owner.Username},
 		}
 		update[store.ProviderInfo] = store.Push
 		update[store.Groups] = store.Set
@@ -418,11 +427,20 @@ func (h *handler) userFromIdentity(ctx context.Context, id *store.Identity) (*pa
 		// Ensure that a null list of groups is never sent.
 		groups = []string{}
 	}
-	externalID := string(id.ProviderID)
 	var owner params.Username
-	if len(id.ProviderInfo["owner"]) > 0 {
-		owner = params.Username(id.ProviderInfo["owner"][0])
-		externalID = ""
+	var externalID string
+	if p, _ := id.ProviderID.Split(); p == "idm" {
+		// TODO(mhilton) try and avoid having provider specific
+		// behaviour here.
+
+		// The "owner" provider info will contain the owner's
+		// provider id in the first position and their username
+		// in the second.
+		if len(id.ProviderInfo["owner"]) > 1 {
+			owner = params.Username(id.ProviderInfo["owner"][1])
+		}
+	} else {
+		externalID = string(id.ProviderID)
 	}
 	var sshKeys []string
 	if len(id.ExtraInfo["sshkeys"]) > 0 {
