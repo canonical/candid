@@ -12,12 +12,12 @@ import (
 	"github.com/CanonicalLtd/blues-identity/store"
 )
 
-// an idpDataStore implements store.IDPDataStore.
-type idpDataStore struct {
+// an providerDataStore implements store.ProviderDataStore.
+type providerDataStore struct {
 	db *Database
 }
 
-func (s *idpDataStore) KeyValueStore(ctx context.Context, idp string) (store.KeyValueStore, error) {
+func (s *providerDataStore) KeyValueStore(ctx context.Context, idp string) (store.KeyValueStore, error) {
 	collection := "kv-idp-" + idp
 	coll := s.db.c(ctx, collection)
 	defer coll.Database.Session.Close()
@@ -44,8 +44,8 @@ func (s *keyValueStore) Context(ctx context.Context) (context.Context, func()) {
 }
 
 type kvDoc struct {
-	Key    string     `bson:"_id,omitempty"`
-	Value  []byte     `bson:",omitempty"`
+	Key    string    `bson:"_id,omitempty"`
+	Value  []byte    `bson:",omitempty"`
 	Expire time.Time `bson:",omitempty"`
 }
 
@@ -72,7 +72,7 @@ func (s *keyValueStore) Set(ctx context.Context, key string, value []byte, expir
 	defer coll.Database.Session.Close()
 
 	_, err := coll.UpsertId(key, kvDoc{
-		Key: key,
+		Key:    key,
 		Value:  value,
 		Expire: expire,
 	})

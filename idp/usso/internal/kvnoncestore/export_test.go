@@ -1,7 +1,5 @@
 // Copyright 2015 Canonical Ltd.
 
-package mgononcestore
+package kvnoncestore
 
 var Accept = (*Store).accept
-
-type NonceDoc nonceDoc

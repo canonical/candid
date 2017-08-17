@@ -17,7 +17,7 @@ import (
 type kvSuite struct {
 	testing.IsolatedMgoSuite
 	db       *mgostore.Database
-	idpStore store.IDPDataStore
+	idpStore store.ProviderDataStore
 }
 
 var _ = gc.Suite(&kvSuite{})
@@ -27,7 +27,7 @@ func (s *kvSuite) SetUpTest(c *gc.C) {
 	var err error
 	s.db, err = mgostore.NewDatabase(s.Session.DB("idm-test"))
 	c.Assert(err, gc.Equals, nil)
-	s.idpStore = s.db.IDPDataStore()
+	s.idpStore = s.db.ProviderDataStore()
 }
 
 func (s *kvSuite) TearDownTest(c *gc.C) {

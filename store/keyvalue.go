@@ -44,9 +44,10 @@ type KeyValueStore interface {
 	Add(ctx context.Context, key string, value []byte, expire time.Time) error
 }
 
-// An IDPDataStore is a data store that supports identity provider
-// specific KeyValueStores.
-type IDPDataStore interface {
+// An ProviderDataStore is a data store that supports identity provider
+// specific KeyValueStores. These stores can be used by identity
+// providers to store data that is not directly related to an identity.
+type ProviderDataStore interface {
 	// KeyValueStore gets a KeyValueStore for use by the given
 	// identity provider.
 	KeyValueStore(ctx context.Context, idp string) (KeyValueStore, error)

@@ -100,10 +100,10 @@ func (d *Database) BakeryRootKeyStore(policy mgorootkeystore.Policy) bakery.Root
 	}
 }
 
-// IDPDataStore returns a new store.IDPDataStore implementation using
+// ProviderDataStore returns a new store.IDPDataStore implementation using
 // this database for persistent storage.
-func (d *Database) IDPDataStore() store.IDPDataStore {
-	return &idpDataStore{d}
+func (d *Database) ProviderDataStore() store.ProviderDataStore {
+	return &providerDataStore{d}
 }
 
 // DebugStatusCheckerFuncs returns a set of debugstatus.CheckerFuncs that
