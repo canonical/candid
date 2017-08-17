@@ -32,8 +32,13 @@ const (
 
 func initIDPs(ctx context.Context, params identity.HandlerParams, lc *loginCompleter) error {
 	for _, ip := range params.IdentityProviders {
+		kvStore, err := params.ProviderDataStore.KeyValueStore(ctx, ip.Name())
+		if err != nil {
+			return errgo.Mask(err)
+		}
 		if err := ip.Init(ctx, idp.InitParams{
 			Store:          params.Store,
+			KeyValueStore:  kvStore,
 			URLPrefix:      params.Location + "/login/" + ip.Name(),
 			LoginCompleter: lc,
 			Template:       params.Template,

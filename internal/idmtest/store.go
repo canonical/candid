@@ -24,6 +24,7 @@ type StoreSuite struct {
 	// The following stores will be initialised after calling SetUpTest
 
 	Store              store.Store
+	ProviderDataStore  store.ProviderDataStore
 	MeetingStore       meeting.Store
 	BakeryRootKeyStore bakery.RootKeyStore
 
@@ -47,6 +48,7 @@ func (s *StoreSuite) SetUpTest(c *gc.C) {
 	s.db, err = mgostore.NewDatabase(s.mgoSuite.Session.DB("idmtest"))
 	c.Assert(err, gc.Equals, nil)
 	s.Store = s.db.Store()
+	s.ProviderDataStore = s.db.ProviderDataStore()
 	s.MeetingStore = s.db.MeetingStore()
 	s.BakeryRootKeyStore = s.db.BakeryRootKeyStore(mgorootkeystore.Policy{ExpiryDuration: time.Minute})
 }
@@ -67,6 +69,7 @@ type StoreServerSuite struct {
 func (s *StoreServerSuite) SetUpTest(c *gc.C) {
 	s.StoreSuite.SetUpTest(c)
 	s.Params.Store = s.Store
+	s.Params.ProviderDataStore = s.ProviderDataStore
 	s.Params.MeetingStore = s.MeetingStore
 	s.Params.RootKeyStore = s.BakeryRootKeyStore
 	s.ServerSuite.SetUpTest(c)

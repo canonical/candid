@@ -65,8 +65,11 @@ func (s *Suite) InitParams(c *gc.C, prefix string) idp.InitParams {
 	s.loginCompleter = &loginCompleter{
 		c: c,
 	}
+	kv, err := s.ProviderDataStore.KeyValueStore(s.Ctx, "idptest")
+	c.Assert(err, gc.Equals, nil)
 	return idp.InitParams{
 		Store:          s.Store,
+		KeyValueStore:  kv,
 		Oven:           s.Oven,
 		Key:            s.Oven.Key(),
 		URLPrefix:      prefix,

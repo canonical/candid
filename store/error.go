@@ -34,23 +34,31 @@ func NotFoundError(id string, providerID ProviderIdentity, username string) erro
 	case username != "":
 		msg = fmt.Sprintf("user %s not found", username)
 	}
-	return errgo.WithCausef(nil, ErrNotFound, msg)
+	err := errgo.WithCausef(nil, ErrNotFound, msg)
+	err.(*errgo.Err).SetLocation(1)
+	return err
 }
 
 // DuplicateUsernameError creates a new error with a cause of
 // ErrDuplicateUsername and an appropriate message.
 func DuplicateUsernameError(username string) error {
-	return errgo.WithCausef(nil, ErrDuplicateUsername, "username %s already in use", username)
+	err := errgo.WithCausef(nil, ErrDuplicateUsername, "username %s already in use", username)
+	err.(*errgo.Err).SetLocation(1)
+	return err
 }
 
 // KeyNotFoundError creates a new error with a cause of ErrNotFound and
 // an appropriate message.
 func KeyNotFoundError(key string) error {
-	return errgo.WithCausef(nil, ErrNotFound, "key %s not found", key)
+	err := errgo.WithCausef(nil, ErrNotFound, "key %s not found", key)
+	err.(*errgo.Err).SetLocation(1)
+	return err
 }
 
 // DuplicateKeyError creates a new error with a cause of ErrDuplicateKey
 // and an appropriate message.
 func DuplicateKeyError(key string) error {
-	return errgo.WithCausef(nil, ErrDuplicateKey, "key %s already exists", key)
+	err := errgo.WithCausef(nil, ErrDuplicateKey, "key %s already exists", key)
+	err.(*errgo.Err).SetLocation(1)
+	return err
 }

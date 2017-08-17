@@ -1,6 +1,6 @@
 // Copyright 2014 Canonical Ltd.
 
-package mgononcestore_test
+package kvnoncestore_test
 
 import (
 	"testing"

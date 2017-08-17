@@ -148,6 +148,11 @@ type ServerParams struct {
 	// rendezvous information.
 	MeetingStore meeting.Store
 
+	// ProviderDataStore holds the storeage that can be used by
+	// identity providers to store data that is not associated with
+	// an individual identity.
+	ProviderDataStore store.ProviderDataStore
+
 	// RootKeyStore holds the root key store that will be used to
 	// store macaroon root keys within the identity server.
 	RootKeyStore bakery.RootKeyStore

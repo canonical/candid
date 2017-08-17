@@ -31,6 +31,10 @@ type InitParams struct {
 	// server.
 	Store store.Store
 
+	// KeyValueStore contains a store that the provider may use to
+	// store additional data that is not related to identities.
+	KeyValueStore store.KeyValueStore
+
 	// Oven contains an oven that may be used in the identity
 	// provider to mint new macaroons.
 	Oven *bakery.Oven

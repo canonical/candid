@@ -77,7 +77,7 @@ func (d identityDocument) PublicKeys() []bakery.PublicKey {
 	for _, data := range d.PublicKeys_ {
 		// Filter out any keys that cannot be unmarshaled; there
 		// shouldn't be any anyway.
-		if err := pks[i].UnmarshalBinary([]byte(data)); err != nil {
+		if err := pks[i].UnmarshalBinary(data); err != nil {
 			logger.Warningf("cannot unmarshal public key: %s", err)
 			continue
 		}

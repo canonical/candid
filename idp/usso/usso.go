@@ -26,6 +26,7 @@ import (
 	"github.com/CanonicalLtd/blues-identity/config"
 	"github.com/CanonicalLtd/blues-identity/idp"
 	"github.com/CanonicalLtd/blues-identity/idp/idputil"
+	"github.com/CanonicalLtd/blues-identity/idp/usso/internal/kvnoncestore"
 	"github.com/CanonicalLtd/blues-identity/store"
 )
 
@@ -40,7 +41,6 @@ func init() {
 // IdentityProvider is an idp.IdentityProvider that provides
 // authentication via Ubuntu SSO.
 var IdentityProvider idp.IdentityProvider = &identityProvider{
-	nonceStore:     openid.NewSimpleNonceStore(),
 	discoveryCache: openid.NewSimpleDiscoveryCache(),
 	groupCache:     cache.New(10 * time.Minute),
 	groupMonitor: prometheus.NewSummary(prometheus.SummaryOpts{
@@ -63,8 +63,6 @@ const openIdRequestedTeams = "blues-development,charm-beta"
 
 // USSOIdentityProvider allows login using Ubuntu SSO credentials.
 type identityProvider struct {
-	// TODO (mhilton) provide a new mechanism for this.
-	// noncePool      *mgononcestore.Pool
 	nonceStore     openid.NonceStore
 	discoveryCache *openid.SimpleDiscoveryCache
 	initParams     idp.InitParams
@@ -95,6 +93,7 @@ func (*identityProvider) Interactive() bool {
 // Init initialises this identity provider
 func (idp *identityProvider) Init(_ context.Context, params idp.InitParams) error {
 	idp.initParams = params
+	idp.nonceStore = kvnoncestore.New(params.KeyValueStore, time.Minute)
 	return nil
 }
 
