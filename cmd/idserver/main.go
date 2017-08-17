@@ -108,8 +108,9 @@ func serve(confPath string) error {
 
 	srv, err := identity.NewServer(
 		identity.ServerParams{
-			Store:        database.Store(),
-			MeetingStore: database.MeetingStore(),
+			Store:             database.Store(),
+			ProviderDataStore: database.ProviderDataStore(),
+			MeetingStore:      database.MeetingStore(),
 			RootKeyStore: database.BakeryRootKeyStore(mgorootkeystore.Policy{
 				ExpiryDuration: 365 * 24 * time.Hour,
 			}),
