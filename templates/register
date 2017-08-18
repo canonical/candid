@@ -38,8 +38,8 @@ with this program.  If not, see <http://www.gnu.org/licenses/>.
     <meta name="viewport" content="width=device-width,initial-scale=1.0 maximum-scale=1.0, user-scalable=no">
     <meta name="description" content="">
     <meta name="author" content="Juju team">
-    <link rel="shortcut icon" href="../../../static/favicon.ico">
-    <link rel="stylesheet" href="../../../static/css/style.css">
+    <link rel="shortcut icon" href="../../static/favicon.ico">
+    <link rel="stylesheet" href="../../static/css/style.css">
 
     <!--[if lt IE 9]>
     <script src="http://html5shim.googlecode.com/svn/trunk/html5.js"></script>
