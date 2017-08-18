@@ -65,11 +65,12 @@ func New(sp ServerParams, versions map[string]NewAPIHandlerFunc) (*Server, error
 		Location:           "identity",
 	})
 	auth := auth.New(auth.Params{
-		AdminUsername:   sp.AuthUsername,
-		AdminPassword:   sp.AuthPassword,
-		Location:        sp.Location,
-		MacaroonOpStore: oven,
-		Store:           sp.Store,
+		AdminUsername:     sp.AuthUsername,
+		AdminPassword:     sp.AuthPassword,
+		Location:          sp.Location,
+		MacaroonOpStore:   oven,
+		Store:             sp.Store,
+		IdentityProviders: sp.IdentityProviders,
 	})
 	if err := auth.SetAdminPublicKey(context.Background(), sp.AdminAgentPublicKey); err != nil {
 		return nil, errgo.Mask(err)
