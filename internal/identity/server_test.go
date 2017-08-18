@@ -3,6 +3,7 @@
 package identity_test
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -18,8 +19,14 @@ import (
 	"github.com/julienschmidt/httprouter"
 	gc "gopkg.in/check.v1"
 
+	"github.com/CanonicalLtd/blues-identity/idp"
+	"github.com/CanonicalLtd/blues-identity/idp/test"
+	"github.com/CanonicalLtd/blues-identity/internal/debug"
+	"github.com/CanonicalLtd/blues-identity/internal/discharger"
 	"github.com/CanonicalLtd/blues-identity/internal/identity"
 	"github.com/CanonicalLtd/blues-identity/internal/idmtest"
+	"github.com/CanonicalLtd/blues-identity/internal/v1"
+	"github.com/CanonicalLtd/blues-identity/store"
 )
 
 type serverSuite struct {
@@ -242,4 +249,51 @@ func assertDoesNotServeVersion(c *gc.C, h http.Handler, vers string) {
 		URL:     "/" + vers + "/some/path",
 	})
 	c.Assert(rec.Code, gc.Equals, http.StatusNotFound)
+}
+
+type fullServerSuite struct {
+	idmtest.StoreServerSuite
+}
+
+var _ = gc.Suite(&fullServerSuite{})
+
+func (s *fullServerSuite) SetUpTest(c *gc.C) {
+	s.Params.IdentityProviders = []idp.IdentityProvider{
+		test.NewIdentityProvider(test.Params{
+			Name: "test",
+			GetGroups: func(*store.Identity) ([]string, error) {
+				return []string{"g1", "g2", "g3"}, nil
+			},
+		}),
+	}
+	s.Versions = map[string]identity.NewAPIHandlerFunc{
+		"debug":      debug.NewAPIHandler,
+		"discharger": discharger.NewAPIHandler,
+		"v1":         v1.NewAPIHandler,
+	}
+	s.StoreServerSuite.SetUpTest(c)
+}
+
+func (s *fullServerSuite) TestUserGroups(c *gc.C) {
+	ctx := context.Background()
+	err := s.Store.UpdateIdentity(
+		ctx,
+		&store.Identity{
+			ProviderID: store.MakeProviderIdentity("test", "bob"),
+			Username:   "bob",
+			Groups:     []string{"g4"},
+		},
+		store.Update{
+			store.Username: store.Set,
+			store.Groups:   store.Set,
+		},
+	)
+	c.Assert(err, gc.Equals, nil)
+
+	client := s.AdminIdentityClient(c)
+	groups, err := client.UserGroups(ctx, &params.UserGroupsRequest{
+		Username: "bob",
+	})
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(groups, jc.DeepEquals, []string{"g1", "g2", "g3", "g4"})
 }
