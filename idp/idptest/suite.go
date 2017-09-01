@@ -6,7 +6,6 @@ import (
 	"html/template"
 	"net/http"
 
-	jc "github.com/juju/testing/checkers"
 	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
@@ -107,9 +106,7 @@ func (s *Suite) AssertUser(c *gc.C, id *store.Identity) {
 	}
 	err := s.Store.Identity(s.Ctx, &id1)
 	c.Assert(err, gc.Equals, nil)
-	c.Assert(id1.ID, gc.Not(gc.Equals), "")
-	id1.ID = ""
-	c.Assert(&id1, jc.DeepEquals, id)
+	idmtest.AssertEqualIdentity(c, &id1, id)
 }
 
 type loginCompleter struct {

@@ -3,15 +3,14 @@
 package idmtest
 
 import (
-	"time"
-
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/juju/testing"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
-	"gopkg.in/macaroon-bakery.v2-unstable/bakery/mgorootkeystore"
 
 	"github.com/CanonicalLtd/blues-identity/meeting"
-	"github.com/CanonicalLtd/blues-identity/mgostore"
+	"github.com/CanonicalLtd/blues-identity/memstore"
 	"github.com/CanonicalLtd/blues-identity/store"
 )
 
@@ -19,7 +18,6 @@ import (
 // meeting.MeetingStore and bakery.RootKeyStore for use with tests.
 type StoreSuite struct {
 	testing.IsolationSuite
-	mgoSuite testing.MgoSuite
 
 	// The following stores will be initialised after calling SetUpTest
 
@@ -27,35 +25,25 @@ type StoreSuite struct {
 	ProviderDataStore  store.ProviderDataStore
 	MeetingStore       meeting.Store
 	BakeryRootKeyStore bakery.RootKeyStore
-
-	db *mgostore.Database
 }
 
 func (s *StoreSuite) SetUpSuite(c *gc.C) {
 	s.IsolationSuite.SetUpSuite(c)
-	s.mgoSuite.SetUpSuite(c)
 }
 
 func (s *StoreSuite) TearDownSuite(c *gc.C) {
-	s.mgoSuite.TearDownSuite(c)
 	s.IsolationSuite.TearDownSuite(c)
 }
 
 func (s *StoreSuite) SetUpTest(c *gc.C) {
 	s.IsolationSuite.SetUpTest(c)
-	s.mgoSuite.SetUpTest(c)
-	var err error
-	s.db, err = mgostore.NewDatabase(s.mgoSuite.Session.DB("idmtest"))
-	c.Assert(err, gc.Equals, nil)
-	s.Store = s.db.Store()
-	s.ProviderDataStore = s.db.ProviderDataStore()
-	s.MeetingStore = s.db.MeetingStore()
-	s.BakeryRootKeyStore = s.db.BakeryRootKeyStore(mgorootkeystore.Policy{ExpiryDuration: time.Minute})
+	s.Store = memstore.NewStore()
+	s.ProviderDataStore = memstore.NewProviderDataStore()
+	s.MeetingStore = memstore.NewMeetingStore()
+	s.BakeryRootKeyStore = bakery.NewMemRootKeyStore()
 }
 
 func (s *StoreSuite) TearDownTest(c *gc.C) {
-	s.db.Close()
-	s.mgoSuite.TearDownTest(c)
 	s.IsolationSuite.TearDownTest(c)
 }
 
@@ -78,4 +66,21 @@ func (s *StoreServerSuite) SetUpTest(c *gc.C) {
 func (s *StoreServerSuite) TearDownTest(c *gc.C) {
 	s.ServerSuite.TearDownTest(c)
 	s.StoreSuite.TearDownTest(c)
+}
+
+// AssertEqualIdentity asserts that the two provided identites are
+// semantically equivilent.
+func AssertEqualIdentity(c *gc.C, obtained, expected *store.Identity) {
+	if expected.ID == "" {
+		obtained.ID = ""
+	}
+	opts := []cmp.Option{
+		cmpopts.EquateEmpty(),
+		cmpopts.SortSlices(func(s, t string) bool { return s < t }),
+		cmpopts.SortSlices(func(x, y bakery.PublicKey) bool { return string(x.Key[:]) < string(y.Key[:]) }),
+	}
+	msg := cmp.Diff(obtained, expected, opts...)
+	if msg != "" {
+		c.Fatalf("identities do not match: %s", msg)
+	}
 }
