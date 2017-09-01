@@ -6,16 +6,15 @@ package testing
 
 import (
 	"fmt"
-	"reflect"
 	"time"
 
-	"github.com/google/go-cmp/cmp"
 	jc "github.com/juju/testing/checkers"
 	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
 	errgo "gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
 
+	"github.com/CanonicalLtd/blues-identity/internal/idmtest"
 	"github.com/CanonicalLtd/blues-identity/store"
 )
 
@@ -41,68 +40,6 @@ func (s *StoreSuite) SetUpTest(c *gc.C) {
 
 func (s *StoreSuite) TearDownTest(c *gc.C) {
 	s.close()
-}
-
-func assertEqual(c *gc.C, obtained, expected *store.Identity) {
-	if expected.ID == "" {
-		obtained.ID = ""
-	}
-	opts := []cmp.Option{
-		cmp.Comparer(cmpStringSet),
-		cmp.Comparer(cmpPublicKeySet),
-		cmp.Comparer(cmpInfoMap),
-	}
-	msg := cmp.Diff(obtained, expected, opts...)
-	if msg != "" {
-		c.Fatalf("identities do not match: %s", msg)
-	}
-}
-
-func cmpStringSet(s1, s2 []string) bool {
-	sm1 := make(map[string]bool)
-	for _, s := range s1 {
-		sm1[s] = true
-	}
-
-	sm2 := make(map[string]bool)
-	for _, s := range s2 {
-		sm2[s] = true
-	}
-
-	return reflect.DeepEqual(sm1, sm2)
-}
-
-func cmpPublicKeySet(s1, s2 []bakery.PublicKey) bool {
-	sm1 := make(map[bakery.PublicKey]bool)
-	for _, pk := range s1 {
-		sm1[pk] = true
-	}
-
-	sm2 := make(map[bakery.PublicKey]bool)
-	for _, pk := range s2 {
-		sm2[pk] = true
-	}
-
-	return reflect.DeepEqual(sm1, sm2)
-}
-
-func cmpInfoMap(m1, m2 map[string][]string) bool {
-	if len(m1) != len(m2) {
-		return false
-	}
-	if len(m1) == 0 {
-		return true
-	}
-	for k, s1 := range m1 {
-		s2, ok := m2[k]
-		if !ok {
-			return false
-		}
-		if !cmpStringSet(s1, s2) {
-			return false
-		}
-	}
-	return true
 }
 
 var updateIdentityTests = []struct {
@@ -628,7 +565,7 @@ func (s *StoreSuite) TestUpdateIdentity(c *gc.C) {
 		}
 		err = s.Store.Identity(s.ctx, &obtained)
 		c.Assert(err, gc.Equals, nil)
-		assertEqual(c, &obtained, test.expectIdentity)
+		idmtest.AssertEqualIdentity(c, &obtained, test.expectIdentity)
 	}
 }
 
@@ -1198,7 +1135,7 @@ func (s *StoreSuite) TestFindIdentities(c *gc.C) {
 		c.Assert(err, gc.Equals, nil)
 		c.Assert(len(identities), gc.Equals, len(test.expect))
 		for i, identity := range identities {
-			assertEqual(c, &identity, &testIdentities[test.expect[i]])
+			idmtest.AssertEqualIdentity(c, &identity, &testIdentities[test.expect[i]])
 		}
 	}
 }

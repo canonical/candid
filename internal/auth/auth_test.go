@@ -8,7 +8,6 @@ import (
 
 	"github.com/juju/idmclient"
 	"github.com/juju/idmclient/params"
-	"github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"
 	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
@@ -20,14 +19,12 @@ import (
 	"github.com/CanonicalLtd/blues-identity/idp"
 	"github.com/CanonicalLtd/blues-identity/idp/test"
 	"github.com/CanonicalLtd/blues-identity/internal/auth"
-	"github.com/CanonicalLtd/blues-identity/mgostore"
+	"github.com/CanonicalLtd/blues-identity/internal/idmtest"
 	"github.com/CanonicalLtd/blues-identity/store"
 )
 
 type authSuite struct {
-	testing.IsolatedMgoSuite
-	db                  *mgostore.Database
-	store               store.Store
+	idmtest.StoreSuite
 	oven                *bakery.Oven
 	authorizer          *auth.Authorizer
 	context             context.Context
@@ -42,7 +39,7 @@ var _ = gc.Suite(&authSuite{})
 const identityLocation = "https://identity.test/id"
 
 func (s *authSuite) SetUpTest(c *gc.C) {
-	s.IsolatedMgoSuite.SetUpTest(c)
+	s.StoreSuite.SetUpTest(c)
 	key, err := bakery.GenerateKey()
 	c.Assert(err, gc.Equals, nil)
 	locator := bakery.NewThirdPartyStore()
@@ -55,16 +52,13 @@ func (s *authSuite) SetUpTest(c *gc.C) {
 		Locator:  locator,
 		Location: "identity",
 	})
-	s.db, err = mgostore.NewDatabase(s.Session.DB("identity-test"))
-	c.Assert(err, gc.Equals, nil)
-	s.store = s.db.Store()
-	s.context, s.close = s.store.Context(context.Background())
+	s.context, s.close = s.Store.Context(context.Background())
 	s.authorizer = auth.New(auth.Params{
 		AdminUsername:   "admin",
 		AdminPassword:   "password",
 		Location:        identityLocation,
 		MacaroonOpStore: s.oven,
-		Store:           s.store,
+		Store:           s.Store,
 		IdentityProviders: []idp.IdentityProvider{
 			test.NewIdentityProvider(test.Params{
 				Name:      "test",
@@ -84,8 +78,7 @@ func (s *authSuite) getGroups(*store.Identity) ([]string, error) {
 
 func (s *authSuite) TearDownTest(c *gc.C) {
 	s.close()
-	s.db.Close()
-	s.IsolatedMgoSuite.TearDownTest(c)
+	s.StoreSuite.TearDownTest(c)
 }
 
 func (s *authSuite) createIdentity(c *gc.C, username string, pk *bakery.PublicKey, groups ...string) *auth.Identity {
@@ -93,7 +86,7 @@ func (s *authSuite) createIdentity(c *gc.C, username string, pk *bakery.PublicKe
 	if pk != nil {
 		pks = append(pks, *pk)
 	}
-	err := s.store.UpdateIdentity(s.context, &store.Identity{
+	err := s.Store.UpdateIdentity(s.context, &store.Identity{
 		ProviderID: store.MakeProviderIdentity("test", username),
 		Username:   username,
 		Groups:     groups,
@@ -172,7 +165,7 @@ func (s *authSuite) TestUserHasPublicKeyCaveat(c *gc.C) {
 func (s *authSuite) TestUserHasPublicKeyChecker(c *gc.C) {
 	key, err := bakery.GenerateKey()
 	c.Assert(err, gc.IsNil)
-	ctx, close := s.store.Context(context.Background())
+	ctx, close := s.Store.Context(context.Background())
 	defer close()
 	s.createIdentity(c, "test-user", &key.Public)
 

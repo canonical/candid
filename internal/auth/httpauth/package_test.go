@@ -5,9 +5,9 @@ package httpauth_test
 import (
 	"testing"
 
-	jujutesting "github.com/juju/testing"
+	gc "gopkg.in/check.v1"
 )
 
 func TestPackage(t *testing.T) {
-	jujutesting.MgoTestPackage(t, nil)
+	gc.TestingT(t)
 }
