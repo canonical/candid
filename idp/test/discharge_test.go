@@ -5,7 +5,6 @@ package test_test
 import (
 	"github.com/juju/idmclient/params"
 	gc "gopkg.in/check.v1"
-	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
 
 	"github.com/CanonicalLtd/blues-identity/idp"
 	"github.com/CanonicalLtd/blues-identity/idp/test"
@@ -14,7 +13,7 @@ import (
 
 type dischargeSuite struct {
 	idmtest.DischargeSuite
-	visitor test.Visitor
+	interactor test.Interactor
 }
 
 var _ = gc.Suite(&dischargeSuite{})
@@ -26,7 +25,7 @@ func (s *dischargeSuite) SetUpTest(c *gc.C) {
 		}),
 	}
 	s.DischargeSuite.SetUpTest(c)
-	s.visitor = test.Visitor{
+	s.interactor = test.Interactor{
 		User: &params.User{
 			Username:   "test",
 			ExternalID: "https://example.com/+id/test",
@@ -35,9 +34,10 @@ func (s *dischargeSuite) SetUpTest(c *gc.C) {
 }
 
 func (s *dischargeSuite) TestInteractiveDischarge(c *gc.C) {
-	s.AssertDischarge(c, s.visitor)
+	s.AssertDischarge(c, s.interactor)
 }
 
 func (s *dischargeSuite) TestNonInteractiveDischarge(c *gc.C) {
-	s.AssertDischarge(c, httpbakery.NewMultiVisitor(s.visitor))
+	// TODO (mhilton) work out how to differentiate these.
+	s.AssertDischarge(c, s.interactor)
 }

@@ -12,9 +12,13 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"strings"
 
+	"github.com/juju/httprequest"
+	"github.com/juju/idmclient/ussologin"
 	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
+	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
 
 	"github.com/CanonicalLtd/blues-identity/config"
 	"github.com/CanonicalLtd/blues-identity/idp"
@@ -69,8 +73,13 @@ func (idp *identityProvider) Init(_ context.Context, params idp.InitParams) erro
 }
 
 // URL gets the login URL to use this identity provider.
-func (idp *identityProvider) URL(waitID string) string {
-	return idputil.URL(idp.initParams.URLPrefix, "/oauth", waitID)
+func (idp *identityProvider) URL(dischargeID string) string {
+	return idputil.URL(idp.initParams.URLPrefix, "/login", dischargeID)
+}
+
+// SetInteraction sets the interaction information for
+func (idp *identityProvider) SetInteraction(ierr *httpbakery.Error, dischargeID string) {
+	ussologin.SetInteraction(ierr, idputil.URL(idp.initParams.URLPrefix, "/interact", dischargeID))
 }
 
 //  GetGroups implements idp.IdentityProvider.GetGroups.
@@ -84,17 +93,29 @@ func (*identityProvider) GetGroups(context.Context, *store.Identity) ([]string, 
 func (idp *identityProvider) Handle(ctx context.Context, w http.ResponseWriter, req *http.Request) {
 	id, err := verifyOAuthSignature(idp.initParams.URLPrefix+req.URL.Path, req)
 	if err != nil {
-		idp.initParams.LoginCompleter.Failure(ctx, w, req, idputil.WaitID(req), err)
+		idp.initParams.VisitCompleter.Failure(ctx, w, req, idputil.DischargeID(req), err)
 		return
 	}
 	identity := store.Identity{
 		ProviderID: store.MakeProviderIdentity("usso", id),
 	}
 	if err := idp.initParams.Store.Identity(ctx, &identity); err != nil {
-		idp.initParams.LoginCompleter.Failure(ctx, w, req, idputil.WaitID(req), errgo.Notef(err, "cannot get user details for %q", id))
+		idp.initParams.VisitCompleter.Failure(ctx, w, req, idputil.DischargeID(req), errgo.Notef(err, "cannot get user details for %q", id))
 		return
 	}
-	idp.initParams.LoginCompleter.Success(ctx, w, req, idputil.WaitID(req), &identity)
+	if strings.TrimPrefix(req.URL.Path, idp.initParams.URLPrefix) == "/interact" {
+		token, err := idp.initParams.DischargeTokenCreator.DischargeToken(ctx, idputil.DischargeID(req), &identity)
+		if err != nil {
+			code, body := httpbakery.ErrorToResponse(ctx, err)
+			httprequest.WriteJSON(w, code, body)
+			return
+		}
+		httprequest.WriteJSON(w, http.StatusOK, ussologin.LoginResponse{
+			DischargeToken: token,
+		})
+	} else {
+		idp.initParams.VisitCompleter.Success(ctx, w, req, idputil.DischargeID(req), &identity)
+	}
 }
 
 var consumerKeyRegexp = regexp.MustCompile(`oauth_consumer_key="([^"]*)"`)

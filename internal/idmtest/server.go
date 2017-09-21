@@ -136,14 +136,14 @@ func (s *ServerSuite) ThirdPartyInfo(ctx context.Context, loc string) (bakery.Th
 // Client creates a new httpbakery.Client which uses the given visitor as
 // its WebPageVisitor. If no Visitor is specified then NoVisit will be
 // used.
-func (s *ServerSuite) Client(v httpbakery.Visitor) *httpbakery.Client {
-	if v == nil {
-		v = NoVisit{}
+func (s *ServerSuite) Client(i httpbakery.Interactor) *httpbakery.Client {
+	cl := &httpbakery.Client{
+		Client: httpbakery.NewHTTPClient(),
 	}
-	return &httpbakery.Client{
-		Client:         httpbakery.NewHTTPClient(),
-		WebPageVisitor: v,
+	if i != nil {
+		cl.AddInteractor(i)
 	}
+	return cl
 }
 
 // AdminClient creates a new httpbakery.Client that is configured to log
@@ -153,7 +153,13 @@ func (s *ServerSuite) AdminClient() *httpbakery.Client {
 		Client: httpbakery.NewHTTPClient(),
 		Key:    s.adminAgentKey,
 	}
-	agent.SetUpAuth(client, s.URL, auth.AdminUsername)
+	agent.SetUpAuth(client, &agent.AuthInfo{
+		Key: s.adminAgentKey,
+		Agents: []agent.Agent{{
+			URL:      s.URL,
+			Username: auth.AdminUsername,
+		}},
+	})
 	return client
 }
 

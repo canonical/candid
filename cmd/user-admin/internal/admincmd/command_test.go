@@ -12,7 +12,6 @@ import (
 	"github.com/juju/httprequest"
 	"github.com/juju/idmclient/params"
 	"github.com/juju/testing"
-	"github.com/julienschmidt/httprouter"
 	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
 	errgo "gopkg.in/errgo.v1"
@@ -105,13 +104,8 @@ func newServer(c *gc.C, handler *handler) *server {
 		adminKey:        adminKey,
 		handler:         handler,
 	}
-	srv.AgentDischarger.SetPublicKey("admin@idm", &adminKey.Public)
-	router := httprouter.New()
 	reqsrv := httprequest.Server{
 		ErrorMapper: httpbakery.ErrorToResponse,
-	}
-	for _, h := range reqsrv.Handlers(srv.newHandler) {
-		router.Handle(h.Method, h.Path, h.Handle)
 	}
 	bakeryKey, err := bakery.GenerateKey()
 	c.Assert(err, gc.Equals, nil)
@@ -120,23 +114,20 @@ func newServer(c *gc.C, handler *handler) *server {
 		Locator:        srv,
 		IdentityClient: IdentityClient(srv.Location()),
 	})
-	srv.AgentDischarger.InteractiveDischarger.Mux.Handle("/v1/", router)
+	srv.AgentDischarger.Discharger.AddHTTPHandlers(reqsrv.Handlers(srv.newHandler))
 	return srv
 }
 
 // adminAgent returns an agent Visitor holding
 // details of the admin agent.
-func (srv *server) adminAgent() *agent.Visitor {
-	var v agent.Visitor
-	err := v.AddAgent(agent.Agent{
-		URL:      srv.Location() + "/visit",
-		Username: "admin@idm",
-		Key:      srv.adminKey,
-	})
-	if err != nil {
-		panic(err)
+func (srv *server) adminAgent() *agent.AuthInfo {
+	return &agent.AuthInfo{
+		Key: srv.adminKey,
+		Agents: []agent.Agent{{
+			URL:      srv.Location(),
+			Username: "admin@idm",
+		}},
 	}
-	return &v
 }
 
 func (srv *server) newHandler(p httprequest.Params) (*handler, context.Context, error) {

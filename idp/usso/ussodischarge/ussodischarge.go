@@ -162,8 +162,12 @@ func (idp *identityProvider) Init(_ context.Context, params idp.InitParams) erro
 }
 
 // URL gets the login URL to use this identity provider.
-func (idp *identityProvider) URL(waitID string) string {
-	return idputil.URL(idp.initParams.URLPrefix, "/login", waitID)
+func (idp *identityProvider) URL(dischargeID string) string {
+	return idputil.URL(idp.initParams.URLPrefix, "/login", dischargeID)
+}
+
+func (idp *identityProvider) SetInteraction(ierr *httpbakery.Error, dischargeID string) {
+	ussodischarge.SetInteraction(ierr, idputil.URL(idp.initParams.URLPrefix, "/interact", dischargeID))
 }
 
 //  GetGroups implements idp.IdentityProvider.GetGroups.
@@ -173,12 +177,22 @@ func (*identityProvider) GetGroups(context.Context, *store.Identity) ([]string, 
 
 // Handle handles the Ubuntu SSO Macaroon login process.
 func (idp *identityProvider) Handle(ctx context.Context, w http.ResponseWriter, req *http.Request) {
-	if err := idp.handle(ctx, w, req); err != nil {
-		idp.initParams.LoginCompleter.Failure(ctx, w, req, idputil.WaitID(req), err)
+	switch strings.TrimPrefix(req.URL.Path, idp.initParams.URLPrefix) {
+	case "/login":
+		if err := idp.handleLogin(ctx, w, req); err != nil {
+			idp.initParams.VisitCompleter.Failure(ctx, w, req, idputil.DischargeID(req), err)
+		}
+	case "/interact":
+		if err := idp.handleInteract(ctx, w, req); err != nil {
+			idp.initParams.VisitCompleter.Failure(ctx, w, req, idputil.DischargeID(req), err)
+		}
+	default:
+		idp.initParams.VisitCompleter.Failure(ctx, w, req, idputil.DischargeID(req), errgo.WithCausef(nil, params.ErrNotFound, "path %q not found", req.URL.Path))
 	}
+
 }
 
-func (idp identityProvider) handle(ctx context.Context, w http.ResponseWriter, req *http.Request) error {
+func (idp identityProvider) handleLogin(ctx context.Context, w http.ResponseWriter, req *http.Request) error {
 	switch req.Method {
 	case "GET":
 		m, err := idp.ussoMacaroon(ctx)
@@ -205,7 +219,47 @@ func (idp identityProvider) handle(ctx context.Context, w http.ResponseWriter, r
 		if err != nil {
 			return err
 		}
-		idp.initParams.LoginCompleter.Success(ctx, w, req, idputil.WaitID(req), user)
+		idp.initParams.VisitCompleter.Success(ctx, w, req, idputil.DischargeID(req), user)
+	default:
+		return errgo.WithCausef(nil, params.ErrBadRequest, "unexpected method %q", req.Method)
+	}
+	return nil
+}
+
+func (idp identityProvider) handleInteract(ctx context.Context, w http.ResponseWriter, req *http.Request) error {
+	switch req.Method {
+	case "GET":
+		m, err := idp.ussoMacaroon(ctx)
+		if err != nil {
+			return err
+		}
+		httprequest.WriteJSON(w, http.StatusOK, ussodischarge.MacaroonResponse{
+			Macaroon: m,
+		})
+	case "POST":
+		user, err := idp.verifyUSSOMacaroon(ctx, req)
+		if err != nil {
+			return err
+		}
+		err = idp.initParams.Store.UpdateIdentity(
+			ctx,
+			user,
+			store.Update{
+				store.Username: store.Set,
+				store.Name:     store.Set,
+				store.Email:    store.Set,
+			},
+		)
+		if err != nil {
+			return err
+		}
+		token, err := idp.initParams.DischargeTokenCreator.DischargeToken(ctx, idputil.DischargeID(req), user)
+		if err != nil {
+			return err
+		}
+		httprequest.WriteJSON(w, http.StatusOK, ussodischarge.LoginResponse{
+			DischargeToken: token,
+		})
 	default:
 		return errgo.WithCausef(nil, params.ErrBadRequest, "unexpected method %q", req.Method)
 	}

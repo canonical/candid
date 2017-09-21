@@ -9,20 +9,29 @@ import (
 
 	"golang.org/x/net/context"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
+	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
 
 	"github.com/CanonicalLtd/blues-identity/store"
 )
 
-// A LoginCompleter is used by the identity providers to finish login
-// attempts.
-type LoginCompleter interface {
+// A DischargeTokenCreator is used by the identity providers to create a
+// new httpbakery.DischargeToken for authenticated identity.
+type DischargeTokenCreator interface {
+	// DischargeToken creates a new httpbakery.DischargeToken for the
+	// given identity.
+	DischargeToken(ctx context.Context, dischargeID string, id *store.Identity) (*httpbakery.DischargeToken, error)
+}
+
+// A VisitCompleter is used by the identity providers to finish login
+// visit attempts.
+type VisitCompleter interface {
 	// Success is used by an identity provider to indicate that a
 	// successful login has been completed for the given identity.
-	Success(ctx context.Context, w http.ResponseWriter, req *http.Request, waitid string, id *store.Identity)
+	Success(ctx context.Context, w http.ResponseWriter, req *http.Request, dischargeID string, id *store.Identity)
 
 	// Failure is used by an identity provider to indicate that a
 	// login attempt has failed with the specified error.
-	Failure(ctx context.Context, w http.ResponseWriter, req *http.Request, waitid string, err error)
+	Failure(ctx context.Context, w http.ResponseWriter, req *http.Request, dischargeID string, err error)
 }
 
 // InitParams are passed to the identity provider to initialise it.
@@ -47,9 +56,13 @@ type InitParams struct {
 	// will contain only the part after this prefix.
 	URLPrefix string
 
-	// LoginCompleter is the LoginCompleter that the identity
-	// provider should use to complete login requests.
-	LoginCompleter LoginCompleter
+	// DischargeTokener is the DischargeTokener that the identity
+	// provider should use to create discharge tokens.
+	DischargeTokenCreator DischargeTokenCreator
+
+	// VisitCompleter is the LoginCompleter that the identity
+	// provider should use to complete visit requests.
+	VisitCompleter VisitCompleter
 
 	// Template contains the templates loaded in the identity server.
 	Template *template.Template
@@ -87,7 +100,11 @@ type IdentityProvider interface {
 	// then the user will be automatically redirected to the URL.
 	// Otherwise the URL is returned in the response to a
 	// request for login methods.
-	URL(waitid string) string
+	URL(dischargeID string) string
+
+	// SetInteraction adds interaction information for this identity
+	// provider to the given interaction required error.
+	SetInteraction(ierr *httpbakery.Error, dischargeID string)
 
 	// Handle handles any requests sent to the identity provider's
 	// endpoints. The URL.Path in the request will contain only the

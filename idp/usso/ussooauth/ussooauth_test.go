@@ -76,7 +76,7 @@ func (s *ussooauthSuite) TestInteractive(c *gc.C) {
 
 func (s *ussooauthSuite) TestURL(c *gc.C) {
 	t := s.idp.URL("1")
-	c.Assert(t, gc.Equals, "https://idp.test/oauth?waitid=1")
+	c.Assert(t, gc.Equals, "https://idp.test/login?id=1")
 }
 
 func (s *ussooauthSuite) TestHandleSuccess(c *gc.C) {
@@ -111,7 +111,7 @@ func (s *ussooauthSuite) TestHandleSuccess(c *gc.C) {
 		},
 		SignatureMethod: oauth.HMACSHA1,
 	}
-	req, err := http.NewRequest("GET", "http://example.com/oauth?waitid=2", nil)
+	req, err := http.NewRequest("GET", "http://example.com/oauth?id=2", nil)
 	c.Assert(err, gc.Equals, nil)
 	err = oc.SetAuthorizationHeader(
 		req.Header,
@@ -161,7 +161,7 @@ func (s *ussooauthSuite) TestHandleVerifyFail(c *gc.C) {
 		},
 		SignatureMethod: oauth.HMACSHA1,
 	}
-	req, err := http.NewRequest("GET", "http://example.com/oauth?waitid=2", nil)
+	req, err := http.NewRequest("GET", "http://example.com/oauth?id=2", nil)
 	c.Assert(err, gc.Equals, nil)
 	err = oc.SetAuthorizationHeader(
 		req.Header,

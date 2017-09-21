@@ -57,11 +57,9 @@ func main() {
 	if err != nil {
 		log.Fatalf("cannot login: %s", err)
 	}
-	client.WebPageVisitor = httpbakery.NewMultiVisitor(
-		ussodischarge.NewVisitor(func(*httpbakery.Client, string) (macaroon.Slice, error) {
-			return lms, nil
-		}),
-	)
+	client.AddInteractor(ussodischarge.NewInteractor(func(*httpbakery.Client, string) (macaroon.Slice, error) {
+		return lms, nil
+	}))
 	ms, err := client.DischargeAll(ctx, m)
 	if err != nil {
 		log.Fatalf("cannot discharge macaroon: %s", err)

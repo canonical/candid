@@ -8,6 +8,7 @@ import (
 
 	"golang.org/x/net/context"
 	errgo "gopkg.in/errgo.v1"
+	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
 
 	"github.com/CanonicalLtd/blues-identity/config"
 	"github.com/CanonicalLtd/blues-identity/idp"
@@ -59,6 +60,11 @@ func (*identityProvider) Init(context.Context, idp.InitParams) error {
 // URL gets the login URL to use this identity provider.
 func (*identityProvider) URL(string) string {
 	return ""
+}
+
+// SetInteraction implements idp.IdentityProvider.SetInteraction by doing
+// nothing.
+func (*identityProvider) SetInteraction(ierr *httpbakery.Error, dischargeID string) {
 }
 
 // Handle handles the agent login process.

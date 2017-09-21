@@ -7,7 +7,7 @@ package test
 
 import (
 	"net/http"
-	"net/url"
+	"strings"
 
 	"github.com/juju/httprequest"
 	"github.com/juju/idmclient/params"
@@ -87,8 +87,15 @@ func (idp *identityProvider) Init(ctx context.Context, params idp.InitParams) er
 }
 
 // URL gets the login URL to use this identity provider.
-func (idp *identityProvider) URL(waitID string) string {
-	return idputil.URL(idp.initParams.URLPrefix, "/test-login", waitID)
+func (idp *identityProvider) URL(dischargeID string) string {
+	return idputil.URL(idp.initParams.URLPrefix, "/login", dischargeID)
+}
+
+// SetInteraction sets the interaction information for this identity provider.
+func (idp *identityProvider) SetInteraction(ierr *httpbakery.Error, dischargeID string) {
+	ierr.SetInteraction(authType, authInfo{
+		URL: idputil.URL(idp.initParams.URLPrefix, "/interact", dischargeID),
+	})
 }
 
 //  GetGroups implements idp.IdentityProvider.GetGroups.
@@ -104,9 +111,9 @@ func (idp *identityProvider) GetGroups(_ context.Context, id *store.Identity) ([
 func (idp *identityProvider) Handle(ctx context.Context, w http.ResponseWriter, req *http.Request) {
 	id, err := idp.handle(ctx, w, req)
 	if err != nil {
-		idp.initParams.LoginCompleter.Failure(ctx, w, req, idputil.WaitID(req), err)
+		idp.initParams.VisitCompleter.Failure(ctx, w, req, idputil.DischargeID(req), err)
 	} else if id != nil {
-		idp.initParams.LoginCompleter.Success(ctx, w, req, idputil.WaitID(req), id)
+		idp.initParams.VisitCompleter.Success(ctx, w, req, idputil.DischargeID(req), id)
 	}
 }
 
@@ -118,7 +125,7 @@ func (idp *identityProvider) handle(ctx context.Context, w http.ResponseWriter, 
 	switch req.Method {
 	case "GET":
 		httprequest.WriteJSON(w, http.StatusOK, testInteractiveLoginResponse{
-			URL: idp.URL(idputil.WaitID(req)),
+			URL: idp.URL(idputil.DischargeID(req)),
 		})
 	case "POST":
 		return idp.handlePost(ctx, w, req)
@@ -126,11 +133,6 @@ func (idp *identityProvider) handle(ctx context.Context, w http.ResponseWriter, 
 		return nil, errgo.WithCausef(nil, params.ErrMethodNotAllowed, "%s not allowed", req.Method)
 	}
 	return nil, nil
-}
-
-type testLoginRequest struct {
-	httprequest.Route `httprequest:"POST"`
-	User              *params.User `httprequest:",body"`
 }
 
 func (idp *identityProvider) handlePost(ctx context.Context, w http.ResponseWriter, req *http.Request) (*store.Identity, error) {
@@ -153,7 +155,21 @@ func (idp *identityProvider) handlePost(ctx context.Context, w http.ResponseWrit
 		}
 		return nil, errgo.Mask(err)
 	}
-	return &id, nil
+	switch strings.TrimPrefix(req.URL.Path, idp.initParams.URLPrefix) {
+	default:
+		return nil, errgo.WithCausef(nil, params.ErrNotFound, "path %q not found", req.URL.Path)
+	case "/interact":
+		dt, err := idp.initParams.DischargeTokenCreator.DischargeToken(ctx, idputil.DischargeID(req), &id)
+		if err != nil {
+			return nil, errgo.Mask(err)
+		}
+		httprequest.WriteJSON(w, http.StatusOK, testTokenResponse{
+			DischargeToken: dt,
+		})
+		return nil, nil
+	case "/login":
+		return &id, nil
+	}
 }
 
 func (idp *identityProvider) updateUser(ctx context.Context, u *params.User) error {
@@ -180,59 +196,6 @@ func (idp *identityProvider) updateUser(ctx context.Context, u *params.User) err
 		if errgo.Cause(err) == store.ErrDuplicateUsername {
 			return errgo.WithCausef(err, params.ErrAlreadyExists, "")
 		}
-		return errgo.Mask(err)
-	}
-	return nil
-}
-
-var _ httpbakery.Visitor = Visitor{}
-
-type Visitor struct {
-	// User contains the user to log in as. User may be fully defined
-	// in which case the user is added to the database or can be a
-	// Username or ExternalID. If the latter two cases the database
-	// will be checked for a matching user.
-	User *params.User
-}
-
-func (v Visitor) VisitWebPage(ctx context.Context, client *httpbakery.Client, urls map[string]*url.URL) error {
-	cl := &httprequest.Client{
-		Doer: client,
-	}
-	if u, ok := urls["test"]; ok {
-		return v.nonInteractive(ctx, cl, u)
-	}
-	return v.interactive(ctx, cl, urls[httpbakery.UserInteractionMethod])
-}
-
-// Interactive is a web page visit function that performs an interactive
-// login.
-func (v Visitor) interactive(ctx context.Context, client *httprequest.Client, u *url.URL) error {
-	var resp testInteractiveLoginResponse
-	if err := client.Get(ctx, u.String(), &resp); err != nil {
-		return errgo.Mask(err)
-	}
-	if err := v.doLogin(ctx, client, resp.URL); err != nil {
-		return errgo.Mask(err)
-	}
-	return nil
-}
-
-// NonInteractive is a web page visit function that performs an
-// non-interactive login.
-func (v Visitor) nonInteractive(ctx context.Context, client *httprequest.Client, u *url.URL) error {
-	if err := v.doLogin(ctx, client, u.String()); err != nil {
-		return errgo.Mask(err)
-	}
-	return nil
-}
-
-// doLogin performs the common part of the login.
-func (v Visitor) doLogin(ctx context.Context, client *httprequest.Client, url string) error {
-	req := &testLoginRequest{
-		User: v.User,
-	}
-	if err := client.CallURL(ctx, url, req, nil); err != nil {
 		return errgo.Mask(err)
 	}
 	return nil

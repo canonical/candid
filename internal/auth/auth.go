@@ -3,7 +3,6 @@
 package auth
 
 import (
-	"bytes"
 	"sort"
 	"strings"
 
@@ -13,7 +12,6 @@ import (
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
-	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
 	macaroon "gopkg.in/macaroon.v2-unstable"
 
 	"github.com/CanonicalLtd/blues-identity/idp"
@@ -33,19 +31,12 @@ const (
 	kindUser   = "u"
 )
 
-// Namespace contains the checkers.Namespace supported by the identity
-// service.
-var Namespace = checkers.NewNamespace(map[string]string{
-	checkers.StdNamespace:        "",
-	httpbakery.CheckersNamespace: "http",
-	checkersNamespace:            "",
-})
-
 // The following constants define possible operation actions.
 const (
 	ActionRead               = "read"
 	ActionVerify             = "verify"
 	ActionDischargeFor       = "dischargeFor"
+	ActionDischarge          = "discharge"
 	ActionCreateAgent        = "createAgent"
 	ActionReadAdmin          = "readAdmin"
 	ActionWriteAdmin         = "writeAdmin"
@@ -114,10 +105,9 @@ func New(params Params) *Authorizer {
 	}
 	a.groupResolvers = resolvers
 	a.checker = bakery.NewChecker(bakery.CheckerParams{
-		Checker: newChecker(a),
+		Checker: NewChecker(a),
 		Authorizer: bakery.ACLAuthorizer{
-			AllowPublic: true,
-			GetACL: func(ctx context.Context, op bakery.Op) ([]string, error) {
+			GetACL: func(ctx context.Context, op bakery.Op) ([]string, bool, error) {
 				return a.aclForOp(ctx, op)
 			},
 		},
@@ -127,58 +117,67 @@ func New(params Params) *Authorizer {
 	return a
 }
 
-func (a *Authorizer) aclForOp(ctx context.Context, op bakery.Op) ([]string, error) {
+func (a *Authorizer) aclForOp(ctx context.Context, op bakery.Op) (acl []string, public bool, _ error) {
 	kind, name := splitEntity(op.Entity)
 	switch kind {
 	case kindGlobal:
 		if name != "" {
-			return nil, nil
+			return nil, false, nil
 		}
 		switch op.Action {
 		case ActionRead:
 			// Only admins are allowed to read global information.
-			return AdminACL, nil
+			return AdminACL, true, nil
 		case ActionDischargeFor:
 			// Only admins are allowed to discharge for other users.
-			return AdminACL, nil
+			return AdminACL, true, nil
 		case ActionVerify:
 			// Everyone is allowed to verify a macaroon.
-			return []string{bakery.Everyone}, nil
+			return []string{bakery.Everyone}, true, nil
 		case ActionLogin:
 			// Everyone is allowed to log in.
-			return []string{bakery.Everyone}, nil
+			return []string{bakery.Everyone}, true, nil
+		case ActionDischarge:
+			// Everyone is allowed to discharge, but they must authenticate themselves
+			// first.
+			return []string{bakery.Everyone}, false, nil
 		}
 	case kindUser:
 		if name == "" {
-			return nil, nil
+			return nil, false, nil
 		}
 		username := name
 		acl := make([]string, 0, len(AdminACL)+2)
 		acl = append(acl, AdminACL...)
 		switch op.Action {
 		case ActionRead:
-			return append(acl, username), nil
+			return append(acl, username), false, nil
 		case ActionCreateAgent:
-			return append(acl, "+create-agent@"+username), nil
+			return append(acl, "+create-agent@"+username), false, nil
 		case ActionReadAdmin:
-			return acl, nil
+			return acl, false, nil
 		case ActionWriteAdmin:
-			return acl, nil
+			return acl, false, nil
 		case ActionReadGroups:
 			// Administrators, users with GroupList permissions and the user
 			// themselves can list their groups.
-			return append(acl, username, GroupListGroup), nil
+			return append(acl, username, GroupListGroup), false, nil
 		case ActionWriteGroups:
 			// Only administrators can set a user's groups.
-			return acl, nil
+			return acl, false, nil
 		case ActionReadSSHKeys:
-			return append(acl, username, SSHKeyGetterGroup), nil
+			return append(acl, username, SSHKeyGetterGroup), false, nil
 		case ActionWriteSSHKeys:
-			return append(acl, username), nil
+			return append(acl, username), false, nil
+		}
+	case "groups":
+		switch op.Action {
+		case ActionDischarge:
+			return strings.Fields(name), true, nil
 		}
 	}
 	logger.Infof("no ACL found for op %#v", op)
-	return nil, nil
+	return nil, false, nil
 }
 
 // SetAdminPublicKey configures the public key on the admin user. This is
@@ -221,7 +220,7 @@ func (a *Authorizer) Auth(ctx context.Context, mss []macaroon.Slice, ops ...bake
 }
 
 func isDischargeRequiredError(err error) bool {
-	_, ok := err.(*bakery.DischargeRequiredError)
+	_, ok := errgo.Cause(err).(*bakery.DischargeRequiredError)
 	return ok
 }
 
@@ -240,53 +239,6 @@ func (a *Authorizer) Identity(ctx context.Context, username string) (*Identity, 
 	return id, nil
 }
 
-// UserHasPublicKeyCaveat creates a first-party caveat that ensures that
-// the given user is associated with the given public key.
-func UserHasPublicKeyCaveat(user params.Username, pk *bakery.PublicKey) checkers.Caveat {
-	return checkers.Caveat{
-		Namespace: checkersNamespace,
-		Condition: checkers.Condition(userHasPublicKeyCondition, string(user)+" "+pk.String()),
-	}
-}
-
-const checkersNamespace = "jujucharms.com/identity"
-const userHasPublicKeyCondition = "user-has-public-key"
-
-func newChecker(a *Authorizer) *checkers.Checker {
-	checker := httpbakery.NewChecker()
-	checker.Namespace().Register(checkersNamespace, "")
-	checker.Register(userHasPublicKeyCondition, checkersNamespace, a.checkUserHasPublicKey)
-	return checker
-}
-
-// checkUserHasPublicKey checks the "user-has-public-key" caveat.
-func (a *Authorizer) checkUserHasPublicKey(ctx context.Context, cond, arg string) error {
-	parts := strings.Fields(arg)
-	if len(parts) != 2 {
-		return errgo.New("caveat badly formatted")
-	}
-	var publicKey bakery.PublicKey
-	if err := publicKey.UnmarshalText([]byte(parts[1])); err != nil {
-		return errgo.Notef(err, "invalid public key %q", parts[1])
-	}
-	identity := store.Identity{
-		Username: parts[0],
-	}
-	if err := a.store.Identity(ctx, &identity); err != nil {
-		if errgo.Cause(err) != store.ErrNotFound {
-			return errgo.Mask(err)
-		}
-		return errgo.Newf("public key not valid for user")
-	}
-	for _, pk := range identity.PublicKeys {
-		if !bytes.Equal(pk.Key[:], publicKey.Key[:]) {
-			continue
-		}
-		return nil
-	}
-	return errgo.Newf("public key not valid for user")
-}
-
 // An identityClient is an implementation of bakery.IdentityClient that
 // uses the identity server's data store to get identity information.
 type identityClient struct {
@@ -301,6 +253,16 @@ func (c identityClient) IdentityFromContext(ctx context.Context) (_ident bakery.
 	defer func() {
 		logger.Debugf("} -> ident %#v", _ident)
 	}()
+	if username := usernameFromContext(ctx); username != "" {
+		if err := CheckUserDomain(ctx, username); err != nil {
+			return nil, nil, errgo.Mask(err)
+		}
+		id, err := c.a.Identity(ctx, username)
+		if err != nil {
+			return nil, nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
+		}
+		return id, nil, nil
+	}
 	if username, password, ok := userCredentialsFromContext(ctx); ok {
 		if username == c.a.adminUsername && password == c.a.adminPassword {
 			logger.Debugf("admin login success as %q", AdminUsername)
@@ -449,6 +411,18 @@ func trivialAllow(username string, acl []string) (allow, isTrivial bool) {
 		}
 	}
 	return false, false
+}
+
+// DomainDischargeOp creates an operation that is discharging the
+// specified domain.
+func DomainDischargeOp(domain string) bakery.Op {
+	return op("domain-"+domain, "discharge")
+}
+
+// GroupsDischargeOp creates an operation that is discharging as a user
+// in one of the specified groups.
+func GroupsDischargeOp(groups []string) bakery.Op {
+	return op("groups-"+strings.Join(groups, " "), "discharge")
 }
 
 func UserOp(u params.Username, action string) bakery.Op {

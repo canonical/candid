@@ -46,16 +46,20 @@ func RequestParams(ctx context.Context, w http.ResponseWriter, req *http.Request
 }
 
 // WaitID gets the wait ID from the given request using the standard form value.
-func WaitID(req *http.Request) string {
-	return req.Form.Get("waitid")
+func DischargeID(req *http.Request) string {
+	return req.Form.Get("id")
 }
 
 // URL creates a URL addressed to the given path within the IDP handler
-// and adds the given waitid (when specified).
-func URL(prefix, path, waitid string) string {
+// and adds the given dischargeID (when specified).
+func URL(prefix, path, dischargeID string) string {
 	callback := prefix + path
-	if waitid != "" {
-		callback += "?waitid=" + waitid
+	v := make(url.Values)
+	if dischargeID != "" {
+		v.Set("id", dischargeID)
+	}
+	if len(v) > 0 {
+		callback += "?" + v.Encode()
 	}
 	return callback
 }

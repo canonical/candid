@@ -63,7 +63,7 @@ func (a *Authorizer) Auth(ctx context.Context, req *http.Request, ops ...bakery.
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}
-	err = httpbakery.NewDischargeRequiredErrorForRequest(m, mpath, derr, req)
+	err = httpbakery.NewDischargeRequiredError(m, mpath, derr, req)
 	err.(*httpbakery.Error).Info.CookieNameSuffix = "idm"
 	return nil, err
 }

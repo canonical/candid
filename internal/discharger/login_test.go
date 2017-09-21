@@ -40,7 +40,7 @@ func (s *loginSuite) SetUpTest(c *gc.C) {
 func (s *loginSuite) TestInteractiveLogin(c *gc.C) {
 	jar := &testCookieJar{}
 	client := httpbakery.NewClient()
-	visitor := test.Visitor{
+	visitor := test.Interactor{
 		User: &params.User{
 			Username:   "test",
 			ExternalID: "test:test",
@@ -51,7 +51,7 @@ func (s *loginSuite) TestInteractiveLogin(c *gc.C) {
 	}
 	u, err := url.Parse(s.URL + "/login/test/login")
 	c.Assert(err, gc.Equals, nil)
-	err = visitor.VisitWebPage(testContext, client, map[string]*url.URL{httpbakery.UserInteractionMethod: u})
+	err = visitor.LegacyInteract(testContext, client, "", u)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(jar.cookies, gc.HasLen, 0)
 	id := store.Identity{
@@ -59,13 +59,13 @@ func (s *loginSuite) TestInteractiveLogin(c *gc.C) {
 	}
 	err = s.Params.Store.Identity(testContext, &id)
 	c.Assert(err, gc.Equals, nil)
-	c.Assert(id.LastLogin.After(time.Now().Add(-1*time.Second)), gc.Equals, true)
+	c.Assert(id.LastLogin.After(time.Now().Add(-1*time.Second)), gc.Equals, true, gc.Commentf("%#v", id))
 }
 
 func (s *loginSuite) TestNonInteractiveLogin(c *gc.C) {
 	jar := &testCookieJar{}
 	client := httpbakery.NewClient()
-	visitor := test.Visitor{
+	visitor := test.Interactor{
 		User: &params.User{
 			Username:   "test",
 			ExternalID: "test:test",
@@ -74,9 +74,11 @@ func (s *loginSuite) TestNonInteractiveLogin(c *gc.C) {
 			IDPGroups:  []string{"test1", "test2"},
 		},
 	}
-	u, err := url.Parse(s.URL + "/login/test/login")
+	req, err := http.NewRequest("GET", "/", nil)
 	c.Assert(err, gc.Equals, nil)
-	err = visitor.VisitWebPage(testContext, client, map[string]*url.URL{"test": u})
+	ierr := httpbakery.NewInteractionRequiredError(nil, req)
+	ierr.SetInteraction("test", map[string]string{"url": s.URL + "/login/test/interact"})
+	_, err = visitor.Interact(testContext, client, "", ierr)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(jar.cookies, gc.HasLen, 0)
 	id := store.Identity{
@@ -90,13 +92,13 @@ func (s *loginSuite) TestNonInteractiveLogin(c *gc.C) {
 func (s *loginSuite) TestLoginFailure(c *gc.C) {
 	jar := &testCookieJar{}
 	client := httpbakery.NewClient()
-	visitor := test.Visitor{
+	visitor := test.Interactor{
 		User: &params.User{},
 	}
-	u, err := url.Parse(s.URL + "/login/test/test-login")
+	u, err := url.Parse(s.URL + "/login/test/login")
 	c.Assert(err, gc.Equals, nil)
-	err = visitor.VisitWebPage(testContext, client, map[string]*url.URL{httpbakery.UserInteractionMethod: u})
-	c.Assert(err, gc.ErrorMatches, `Post .*/login/test/test-login: identity not specified`)
+	err = visitor.LegacyInteract(testContext, client, "", u)
+	c.Assert(err, gc.ErrorMatches, `Post .*/login/test/login: identity not specified`)
 	c.Assert(jar.cookies, gc.HasLen, 0)
 }
 
@@ -104,14 +106,14 @@ func (s *loginSuite) TestInteractiveIdentityProviderSelection(c *gc.C) {
 	resp := s.getNoRedirect(c, "/login")
 	defer resp.Body.Close()
 	c.Assert(resp.StatusCode, gc.Equals, http.StatusFound)
-	c.Assert(resp.Header.Get("Location"), gc.Equals, s.URL+"/login/test/test-login")
+	c.Assert(resp.Header.Get("Location"), gc.Equals, s.URL+"/login/test/login")
 }
 
 func (s *loginSuite) TestInteractiveIdentityProviderSelectionWithDomain(c *gc.C) {
 	resp := s.getNoRedirect(c, "/login?domain=test2")
 	defer resp.Body.Close()
 	c.Assert(resp.StatusCode, gc.Equals, http.StatusFound)
-	c.Assert(resp.Header.Get("Location"), gc.Equals, s.URL+"/login/test2/test-login")
+	c.Assert(resp.Header.Get("Location"), gc.Equals, s.URL+"/login/test2/login")
 }
 
 func (s *loginSuite) TestLoginMethodsIncludesAgent(c *gc.C) {

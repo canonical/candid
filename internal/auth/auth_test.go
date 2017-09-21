@@ -200,22 +200,27 @@ func (s *authSuite) TestUserHasPublicKeyChecker(c *gc.C) {
 }
 
 var aclForOpTests = []struct {
-	op     bakery.Op
-	expect []string
+	op           bakery.Op
+	expect       []string
+	expectPublic bool
 }{{
 	op: op("other", "read"),
 }, {
-	op:     auth.GlobalOp("read"),
-	expect: auth.AdminACL,
+	op:           auth.GlobalOp("read"),
+	expect:       auth.AdminACL,
+	expectPublic: true,
 }, {
-	op:     auth.GlobalOp("verify"),
-	expect: []string{bakery.Everyone},
+	op:           auth.GlobalOp("verify"),
+	expect:       []string{bakery.Everyone},
+	expectPublic: true,
 }, {
-	op:     auth.GlobalOp("dischargeFor"),
-	expect: auth.AdminACL,
+	op:           auth.GlobalOp("dischargeFor"),
+	expect:       auth.AdminACL,
+	expectPublic: true,
 }, {
-	op:     auth.GlobalOp("login"),
-	expect: []string{bakery.Everyone},
+	op:           auth.GlobalOp("login"),
+	expect:       []string{bakery.Everyone},
+	expectPublic: true,
 }, {
 	op: op("global-foo", "login"),
 }, {
@@ -254,10 +259,11 @@ func (s *authSuite) TestACLForOp(c *gc.C) {
 	for i, test := range aclForOpTests {
 		c.Logf("test %d: %v", i, test.op)
 		sort.Strings(test.expect)
-		acl, err := auth.AuthorizerACLForOp(s.authorizer, context.Background(), test.op)
+		acl, public, err := auth.AuthorizerACLForOp(s.authorizer, context.Background(), test.op)
 		c.Assert(err, gc.IsNil)
 		sort.Strings(acl)
 		c.Assert(acl, gc.DeepEquals, test.expect)
+		c.Assert(public, gc.Equals, test.expectPublic)
 	}
 }
 

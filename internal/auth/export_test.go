@@ -3,7 +3,6 @@
 package auth
 
 var (
-	NewChecker         = newChecker
 	AuthorizerACLForOp = (*Authorizer).aclForOp
 )
 

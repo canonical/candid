@@ -73,7 +73,7 @@ func (s *testSuite) TestURL(c *gc.C) {
 	err := s.idp.Init(ctx, s.InitParams(c, "https://idp.test"))
 	c.Assert(err, gc.Equals, nil)
 	u := s.idp.URL("1")
-	c.Assert(u, gc.Equals, "https://idp.test/test-login?waitid=1")
+	c.Assert(u, gc.Equals, "https://idp.test/login?id=1")
 }
 
 func (s *testSuite) TestHandleGet(c *gc.C) {
@@ -87,7 +87,7 @@ func (s *testSuite) TestHandleGet(c *gc.C) {
 	s.AssertLoginNotComplete(c)
 	httptesting.AssertJSONResponse(c, rr, http.StatusOK,
 		test.TestInteractiveLoginResponse{
-			URL: "https://idp.test/test-login",
+			URL: "https://idp.test/login",
 		},
 	)
 }
@@ -196,7 +196,7 @@ func testLogin(u *params.User) *http.Request {
 	if err != nil {
 		panic(err)
 	}
-	req, err := http.NewRequest("POST", "/test-login", bytes.NewReader(body))
+	req, err := http.NewRequest("POST", "/login", bytes.NewReader(body))
 	if err != nil {
 		panic(err)
 	}

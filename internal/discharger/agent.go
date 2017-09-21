@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/juju/httprequest"
+	"github.com/juju/idmclient"
 	"github.com/juju/idmclient/params"
 	"github.com/juju/utils"
 	"golang.org/x/net/context"
@@ -17,6 +18,7 @@ import (
 	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery/agent"
 
 	"github.com/CanonicalLtd/blues-identity/internal/auth"
+	"github.com/CanonicalLtd/blues-identity/store"
 )
 
 const (
@@ -30,16 +32,28 @@ const (
 	agentLoginMacaroonDuration = 10 * time.Second
 )
 
-// agentLoginCookieRequest is the expected request to the agent-login
-// endpoint, when specifying the agent as a cookie.
-type agentLoginCookieRequest struct {
+// agentLoginRequest is the expected GET request to the agent-login
+// endpoint.
+type agentLoginRequest struct {
 	httprequest.Route `httprequest:"GET /login/agent"`
-	WaitID            string `httprequest:"waitid,form"`
+	Version           int    `httprequest:"v,form"`
+	DischargeID       string `httprequest:"did,form"`
 }
 
-// AgentLoginCookie is the endpoint used when performing an agent login
-// using the agent-login cookie protocol.
-func (h *handler) AgentLoginCookie(p httprequest.Params, alr *agentLoginCookieRequest) (*params.AgentLoginResponse, error) {
+type agentMacaroonResponse struct {
+	Macaroon *bakery.Macaroon `json:"macaroon"`
+}
+
+// AgentLogin is the endpoint used when performing an agent login
+// using the agent-login cookie based protocols.
+func (h *handler) AgentLogin(p httprequest.Params, req *agentLoginRequest) (interface{}, error) {
+	switch req.Version {
+	default:
+		return nil, errgo.WithCausef(nil, params.ErrBadRequest, "unsupported protocol version %d", req.Version)
+	case 1:
+		return h.agentLoginV1(p.Context, req.DischargeID, p.Request)
+	case 0:
+	}
 	user, key, err := agent.LoginCookie(p.Request)
 	if err != nil {
 		if errgo.Cause(err) == agent.ErrNoAgentLoginCookie {
@@ -47,26 +61,45 @@ func (h *handler) AgentLoginCookie(p httprequest.Params, alr *agentLoginCookieRe
 		}
 		return nil, errgo.Mask(err)
 	}
-	resp, err := h.agentLogin(p.Context, p.Request, alr.WaitID, user, key)
+	resp, err := h.agentLogin(p.Context, p.Request, req.DischargeID, user, key)
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Any)
 	}
 	return resp, nil
+}
 
+func (h *handler) agentLoginV1(ctx context.Context, dischargeID string, req *http.Request) (*agentMacaroonResponse, error) {
+	username := req.Form.Get("username")
+	if username == "" {
+		return nil, errgo.WithCausef(nil, params.ErrBadRequest, "username not specified")
+	}
+	pk := req.Form.Get("public-key")
+	if pk == "" {
+		return nil, errgo.WithCausef(nil, params.ErrBadRequest, "public-key not specified")
+	}
+	var key bakery.PublicKey
+	if err := key.Key.UnmarshalText([]byte(pk)); err != nil {
+		return nil, errgo.WithCausef(err, params.ErrBadRequest, "invalid public-key")
+	}
+	m, err := h.agentMacaroon(ctx, httpbakery.RequestVersion(req), bakery.LoginOp, username, &key, dischargeID)
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
+	return &agentMacaroonResponse{Macaroon: m}, nil
 }
 
 // agentLoginPostRequest is the expected request to the agent-login
 // endpoint when using the POST protocol.
 type agentLoginPostRequest struct {
 	httprequest.Route `httprequest:"POST /login/agent"`
-	WaitID            string            `httprequest:"waitid,form"`
+	DischargeID       string            `httprequest:"did,form"`
 	AgentLogin        params.AgentLogin `httprequest:",body"`
 }
 
 // AgentLoginPost is the endpoint used when performing an agent login
 // using the POST protocol.
-func (h *handler) AgentLoginPost(p httprequest.Params, alr *agentLoginPostRequest) (*params.AgentLoginResponse, error) {
-	resp, err := h.agentLogin(p.Context, p.Request, alr.WaitID, string(alr.AgentLogin.Username), alr.AgentLogin.PublicKey)
+func (h *handler) AgentLoginPost(p httprequest.Params, alr *agentLoginPostRequest) (*agent.LegacyAgentResponse, error) {
+	resp, err := h.agentLogin(p.Context, p.Request, alr.DischargeID, string(alr.AgentLogin.Username), alr.AgentLogin.PublicKey)
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Any)
 	}
@@ -74,19 +107,23 @@ func (h *handler) AgentLoginPost(p httprequest.Params, alr *agentLoginPostReques
 }
 
 // agentLogin handles the common parts of the agent login protocols.
-func (h *handler) agentLogin(ctx context.Context, req *http.Request, waitID string, user string, key *bakery.PublicKey) (*params.AgentLoginResponse, error) {
-	loginOp := bakery.Op{
-		Entity: "agent-" + string(user),
-		Action: "login",
-	}
+func (h *handler) agentLogin(ctx context.Context, req *http.Request, dischargeID string, user string, key *bakery.PublicKey) (*agent.LegacyAgentResponse, error) {
+	loginOp := loginOp(user)
 	vers := httpbakery.RequestVersion(req)
 	ctx = httpbakery.ContextWithRequest(ctx, req)
+	ctx = auth.ContextWithDischargeID(ctx, dischargeID)
 	_, err := h.params.Authorizer.Auth(ctx, httpbakery.RequestMacaroons(req), loginOp)
 	if err == nil {
-		if err := h.params.loginCompleter.complete(ctx, waitID, vers, user, time.Now().Add(agentMacaroonDuration)); err != nil {
+		dt, err := h.params.dischargeTokenCreator.DischargeToken(ctx, dischargeID, &store.Identity{
+			Username: user,
+		})
+		if err != nil {
 			return nil, errgo.Mask(err)
 		}
-		return &params.AgentLoginResponse{
+		h.params.place.Done(ctx, dischargeID, &loginInfo{
+			DischargeToken: dt,
+		})
+		return &agent.LegacyAgentResponse{
 			AgentLogin: true,
 		}, nil
 	}
@@ -97,7 +134,7 @@ func (h *handler) agentLogin(ctx context.Context, req *http.Request, waitID stri
 	// part of the discharge process so we can't do that here.
 	// Instead, mint a very short term macaroon containing
 	// the local third party caveat that will allow access if discharged.
-	m, err := h.agentMacaroon(ctx, vers, loginOp, user, key)
+	m, err := h.agentMacaroon(ctx, vers, loginOp, user, key, dischargeID)
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot create macaroon")
 	}
@@ -105,21 +142,23 @@ func (h *handler) agentLogin(ctx context.Context, req *http.Request, waitID stri
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}
-	err = httpbakery.NewDischargeRequiredErrorForRequest(m, path, nil, req)
+	err = httpbakery.NewDischargeRequiredError(m, path, nil, req)
 	err.(*httpbakery.Error).Info.CookieNameSuffix = "agent-login"
 	return nil, err
 }
 
 // agentMacaroon creates a new macaroon containing a local third-party
 // caveat addressed to the specified agent.
-func (h *handler) agentMacaroon(ctx context.Context, vers bakery.Version, op bakery.Op, user string, key *bakery.PublicKey) (*bakery.Macaroon, error) {
+func (h *handler) agentMacaroon(ctx context.Context, vers bakery.Version, op bakery.Op, user string, key *bakery.PublicKey, dischargeID string) (*bakery.Macaroon, error) {
 	m, err := h.params.Oven.NewMacaroon(
 		ctx,
 		vers,
 		time.Now().Add(agentLoginMacaroonDuration),
 		[]checkers.Caveat{
+			idmclient.UserDeclaration(user),
 			bakery.LocalThirdPartyCaveat(key, vers),
 			auth.UserHasPublicKeyCaveat(params.Username(user), key),
+			auth.DischargeIDCaveat(dischargeID),
 		},
 		op,
 	)
@@ -128,10 +167,17 @@ func (h *handler) agentMacaroon(ctx context.Context, vers bakery.Version, op bak
 
 // agentURL generates an approptiate URL for use with agent login
 // protocols.
-func (h *handler) agentURL(waitID string) string {
+func (h *handler) agentURL(dischargeID string) string {
 	url := h.params.Location + "/login/agent"
-	if waitID != "" {
-		url += "?waitid=" + waitID
+	if dischargeID != "" {
+		url += "?did=" + dischargeID
 	}
 	return url
+}
+
+func loginOp(user string) bakery.Op {
+	return bakery.Op{
+		Entity: "agent-" + user,
+		Action: "login",
+	}
 }

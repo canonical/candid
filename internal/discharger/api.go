@@ -18,17 +18,21 @@ import (
 	"github.com/CanonicalLtd/blues-identity/internal/monitoring"
 )
 
-var logger = loggo.GetLogger("identity.internal.dishcarger")
+var logger = loggo.GetLogger("identity.internal.discharger")
 
 // NewAPIHandler is an identity.NewAPIHandlerFunc.
 func NewAPIHandler(params identity.HandlerParams) ([]httprequest.Handler, error) {
 	reqAuth := httpauth.New(params.Oven, params.Authorizer)
 	place := &place{params.MeetingPlace}
-	lc := &loginCompleter{
+	dt := &dischargeTokenCreator{
 		params: params,
-		place:  place,
 	}
-	if err := initIDPs(context.Background(), params, lc); err != nil {
+	vc := &visitCompleter{
+		params:                params,
+		dischargeTokenCreator: dt,
+		place: place,
+	}
+	if err := initIDPs(context.Background(), params, dt, vc); err != nil {
 		return nil, errgo.Mask(err)
 	}
 	checker := &thirdPartyCaveatChecker{
@@ -37,11 +41,12 @@ func NewAPIHandler(params identity.HandlerParams) ([]httprequest.Handler, error)
 		reqAuth: reqAuth,
 	}
 	handlers := identity.ReqServer.Handlers(new(handlerParams{
-		HandlerParams:  params,
-		checker:        checker,
-		loginCompleter: lc,
-		place:          place,
-		reqAuth:        reqAuth,
+		HandlerParams:         params,
+		checker:               checker,
+		dischargeTokenCreator: dt,
+		visitCompleter:        vc,
+		place:                 place,
+		reqAuth:               reqAuth,
 	}))
 	d := httpbakery.NewDischarger(httpbakery.DischargerParams{
 		Checker:         checker,
@@ -64,10 +69,11 @@ func NewAPIHandler(params identity.HandlerParams) ([]httprequest.Handler, error)
 
 type handlerParams struct {
 	identity.HandlerParams
-	checker        *thirdPartyCaveatChecker
-	loginCompleter *loginCompleter
-	place          *place
-	reqAuth        *httpauth.Authorizer
+	checker               *thirdPartyCaveatChecker
+	dischargeTokenCreator *dischargeTokenCreator
+	visitCompleter        *visitCompleter
+	place                 *place
+	reqAuth               *httpauth.Authorizer
 }
 
 // new returns a function that creates new instances of the discharger API handler for a request.

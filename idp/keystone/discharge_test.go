@@ -9,6 +9,7 @@ import (
 	"regexp"
 
 	"github.com/juju/httprequest"
+	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
 	envschemaform "gopkg.in/juju/environschema.v1/form"
@@ -16,7 +17,6 @@ import (
 	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery/form"
 
 	"github.com/CanonicalLtd/blues-identity/idp"
-	"github.com/CanonicalLtd/blues-identity/idp/idputil"
 	"github.com/CanonicalLtd/blues-identity/idp/keystone"
 	"github.com/CanonicalLtd/blues-identity/idp/keystone/internal/mockkeystone"
 	"github.com/CanonicalLtd/blues-identity/internal/idmtest"
@@ -72,7 +72,9 @@ func (s *dischargeSuite) SetUpTest(c *gc.C) {
 }
 
 func (s *dischargeSuite) TestInteractiveDischarge(c *gc.C) {
-	s.AssertDischarge(c, idmtest.VisitorFunc(s.visitInteractive))
+	s.AssertDischarge(c, httpbakery.WebBrowserInteractor{
+		OpenWebBrowser: s.visitInteractive,
+	})
 }
 
 var urlRegexp = regexp.MustCompile(`[Aa][Cc][Tt][Ii][Oo][Nn]="(.*)"`)
@@ -106,14 +108,12 @@ func (s *dischargeSuite) visitInteractive(u *url.URL) error {
 }
 
 func (s *dischargeSuite) TestFormDischarge(c *gc.C) {
-	s.AssertDischarge(c, httpbakery.NewMultiVisitor(
-		form.Visitor{
-			Filler: keystoneFormFiller{
-				username: "testuser",
-				password: "testpass",
-			},
+	s.AssertDischarge(c, form.Interactor{
+		Filler: keystoneFormFiller{
+			username: "testuser",
+			password: "testpass",
 		},
-	))
+	})
 }
 
 type keystoneFormFiller struct {
@@ -134,7 +134,7 @@ func (h keystoneFormFiller) Fill(f envschemaform.Form) (map[string]interface{}, 
 }
 
 func (s *dischargeSuite) TestTokenDischarge(c *gc.C) {
-	s.AssertDischarge(c, idmtest.VisitorFunc(s.visitToken))
+	s.AssertDischarge(c, &tokenInteractor{})
 }
 
 type tokenLoginRequest struct {
@@ -142,19 +142,29 @@ type tokenLoginRequest struct {
 	Token             keystone.Token `httprequest:",body"`
 }
 
-func (s *dischargeSuite) visitToken(u *url.URL) error {
-	client := &httprequest.Client{}
-	var lm map[string]string
-	if err := idputil.GetLoginMethods(s.Ctx, client, u, &lm); err != nil {
-		return errgo.Mask(err)
+type TokenInteractionInfo struct {
+	URL string `json:"url"`
+}
+
+type tokenInteractor struct{}
+
+func (i *tokenInteractor) Kind() string {
+	return "token"
+}
+
+func (i *tokenInteractor) Interact(ctx context.Context, client *httpbakery.Client, location string, ierr *httpbakery.Error) (*httpbakery.DischargeToken, error) {
+	var info keystone.TokenInteractionInfo
+	if err := ierr.InteractionMethod("token", &info); err != nil {
+		return nil, errgo.Mask(err, errgo.Is(httpbakery.ErrInteractionMethodNotFound))
 	}
-	if lm["token"] == "" {
-		return errgo.Newf("token login not supported")
-	}
-	var req tokenLoginRequest
+	var req keystone.TokenLoginRequest
 	req.Token.Login.ID = "789"
-	if err := client.CallURL(s.Ctx, lm["token"], &req, nil); err != nil {
-		return errgo.Mask(err)
+	var resp keystone.TokenLoginResponse
+	cl := &httprequest.Client{
+		Doer: client,
 	}
-	return nil
+	if err := cl.CallURL(ctx, info.URL, &req, &resp); err != nil {
+		return nil, errgo.Mask(err)
+	}
+	return resp.DischargeToken, nil
 }

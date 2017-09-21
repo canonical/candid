@@ -38,7 +38,7 @@ var putAgentUsageTests = []struct {
 }, {
 	about:       "invalid public key",
 	args:        []string{"-k", "xxx", "bob"},
-	expectError: `invalid value "xxx" for flag -k: cannot decode base64 key: .*`,
+	expectError: `invalid value "xxx" for flag -k: wrong length for key, got 2 want 32`,
 }}
 
 func (s *putAgentSuite) TestUsage(c *gc.C) {
@@ -59,15 +59,15 @@ func (s *putAgentSuite) TestPutAgentWithGeneratedKeyAndNoAgentsFile(c *gc.C) {
 	out := CheckSuccess(c, runf, "put-agent", "-a", "admin.agent", "bob@someone")
 	c.Assert(calledReq, gc.NotNil)
 	// The output should be valid input to an agent.Visitor unmarshal.
-	var v agent.Visitor
+	var v agent.AuthInfo
 	err := json.Unmarshal([]byte(out), &v)
 	c.Assert(err, gc.Equals, nil)
 
 	// Check that the public key looks right.
-	agents := v.Agents()
+	agents := v.Agents
 	c.Assert(agents, gc.HasLen, 1)
 	c.Assert(calledReq.PublicKeys, gc.HasLen, 1)
-	c.Assert(&agents[0].Key.Public, gc.DeepEquals, calledReq.PublicKeys[0])
+	c.Assert(&v.Key.Public, gc.DeepEquals, calledReq.PublicKeys[0])
 	c.Assert(agents[0].URL, gc.Matches, "https://.*")
 	c.Assert(agents[0].Username, gc.Equals, "bob@someone")
 
@@ -96,10 +96,10 @@ func (s *putAgentSuite) TestPutAgentWithNonExistentAgentsFile(c *gc.C) {
 	v, err := admincmd.ReadAgentFile(agentFile)
 	c.Assert(err, gc.Equals, nil)
 
-	agents := v.Agents()
+	agents := v.Agents
 	c.Assert(agents, gc.HasLen, 1)
 	c.Assert(calledReq.PublicKeys, gc.HasLen, 1)
-	c.Assert(&agents[0].Key.Public, gc.DeepEquals, calledReq.PublicKeys[0])
+	c.Assert(&v.Key.Public, gc.DeepEquals, calledReq.PublicKeys[0])
 	c.Assert(agents[0].URL, gc.Matches, "https://.*")
 	c.Assert(agents[0].Username, gc.Equals, "bob@someone")
 
@@ -115,10 +115,10 @@ func (s *putAgentSuite) TestPutAgentWithNonExistentAgentsFile(c *gc.C) {
 func (s *putAgentSuite) TestPutAgentWithNFlag(c *gc.C) {
 	// With the -n flag, it doesn't contact the idm server at all.
 	out := CheckSuccess(c, s.Run, "put-agent", "-n", "admin@idm")
-	var v agent.Visitor
+	var v agent.AuthInfo
 	err := json.Unmarshal([]byte(out), &v)
 	c.Assert(err, gc.Equals, nil)
-	agents := v.Agents()
+	agents := v.Agents
 	c.Assert(agents, gc.HasLen, 1)
 	c.Assert(agents[0].Username, gc.Equals, "admin@idm")
 	c.Assert(agents[0].URL, gc.Equals, idmclient.Production)
@@ -140,12 +140,12 @@ func (s *putAgentSuite) TestInferOwner(c *gc.C) {
 	out := CheckSuccess(c, runf, "put-agent", "-a", "admin.agent", "myagent")
 	c.Assert(calledReq, gc.NotNil)
 
-	var v agent.Visitor
+	var v agent.AuthInfo
 	err := json.Unmarshal([]byte(out), &v)
 	c.Assert(err, gc.Equals, nil)
 
 	// Check that the public key looks right.
-	agents := v.Agents()
+	agents := v.Agents
 	c.Assert(agents, gc.HasLen, 1)
 	c.Assert(calledReq.PublicKeys, gc.HasLen, 1)
 	c.Assert(agents[0].Username, gc.Equals, "myagent@nemo")

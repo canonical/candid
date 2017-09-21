@@ -4,8 +4,10 @@ package admincmd_test
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/juju/httprequest"
+	"github.com/juju/idmclient"
 	"golang.org/x/net/context"
 	errgo "gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
@@ -13,6 +15,7 @@ import (
 	"gopkg.in/macaroon-bakery.v2-unstable/bakerytest"
 	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
 	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery/agent"
+	macaroon "gopkg.in/macaroon.v2-unstable"
 )
 
 var agentBakeryKey bakery.KeyPair
@@ -26,10 +29,10 @@ func init() {
 	}
 }
 
-// AgentDischarger is a bakerytest.InteractiveDischarger that implements
+// AgentDischarger is a bakerytest.Discharger that implements
 // visit by providing the agent login flow.
 type AgentDischarger struct {
-	*bakerytest.InteractiveDischarger
+	*bakerytest.Discharger
 	bakery *bakery.Bakery
 	agents map[string]*bakery.PublicKey
 }
@@ -37,94 +40,82 @@ type AgentDischarger struct {
 // NewAgentDischarger creates an AgentDischarger.
 func NewAgentDischarger() *AgentDischarger {
 	d := &AgentDischarger{
+		Discharger: bakerytest.NewDischarger(nil),
 		bakery: bakery.New(bakery.BakeryParams{
 			Key:            &agentBakeryKey,
 			IdentityClient: agentLoginIdentityClient{},
+			Authorizer:     bakery.OpenAuthorizer,
 		}),
 		agents: make(map[string]*bakery.PublicKey),
 	}
-	d.InteractiveDischarger = bakerytest.NewInteractiveDischarger(nil, http.HandlerFunc(d.visit))
+	srv := &httprequest.Server{
+		ErrorMapper: httpbakery.ErrorToResponse,
+	}
+	d.Discharger.Checker = httpbakery.ThirdPartyCaveatCheckerFunc(d.CheckThirdPartyCaveat)
+	d.Discharger.AddHTTPHandlers([]httprequest.Handler{srv.Handle(d.visit)})
 	return d
 }
 
-// SetPublicKey sets the given agent's public key.
-func (d *AgentDischarger) SetPublicKey(username string, k *bakery.PublicKey) {
-	if k == nil {
-		panic("nil key")
-	}
-	d.agents[username] = k
+// agentMacaroonRequest represents a request to get the
+// agent macaroon that, when discharged, becomes
+// the discharge token to complete the discharge.
+type agentMacaroonRequest struct {
+	httprequest.Route `httprequest:"GET /login/agent"`
+	Username          string            `httprequest:"username,form"`
+	PublicKey         *bakery.PublicKey `httprequest:"public-key,form"`
+}
+
+type agentMacaroonResponse struct {
+	Macaroon *bakery.Macaroon `json:"macaroon"`
 }
 
 // visit implements http.Handler. It performs the agent login interaction flow.
-func (d *AgentDischarger) visit(w http.ResponseWriter, req *http.Request) {
-	if req.Header.Get("Accept") == "application/json" {
-		httprequest.WriteJSON(w, http.StatusOK, map[string]string{"agent": req.RequestURI})
-		return
-	}
-	ctx := context.Background()
-	if err := d.visit1(ctx, w, req); err != nil {
-		d.FinishInteraction(ctx, w, req, nil, err)
-		status, body := httpbakery.ErrorToResponse(ctx, err)
-		httprequest.WriteJSON(w, status, body)
-	}
-}
-
-func (d *AgentDischarger) visit1(ctx context.Context, w http.ResponseWriter, req *http.Request) error {
-	user, key, err := agent.LoginCookie(req)
+func (d *AgentDischarger) visit(p httprequest.Params, req *agentMacaroonRequest) (*agentMacaroonResponse, error) {
+	m, err := d.bakery.Oven.NewMacaroon(
+		p.Context,
+		httpbakery.RequestVersion(p.Request),
+		time.Now().Add(time.Minute),
+		[]checkers.Caveat{
+			idmclient.UserDeclaration(req.Username),
+			bakery.LocalThirdPartyCaveat(req.PublicKey, httpbakery.RequestVersion(p.Request)),
+		},
+		bakery.LoginOp,
+	)
 	if err != nil {
-		return errgo.Notef(err, "invalid agent cookie")
+		return nil, errgo.Mask(err)
 	}
-	if key1, ok := d.agents[user]; !ok || *key != *key1 {
-		return errgo.Newf("unrecognized agent credentials for %q", user)
+	return &agentMacaroonResponse{
+		Macaroon: m,
+	}, nil
+}
+
+func (d *AgentDischarger) CheckThirdPartyCaveat(ctx context.Context, req *http.Request, info *bakery.ThirdPartyCaveatInfo, token *httpbakery.DischargeToken) ([]checkers.Caveat, error) {
+	if token == nil || token.Kind != "agent" {
+		ierr := httpbakery.NewInteractionRequiredError(nil, req)
+		agent.SetInteraction(ierr, "/login/agent")
+		return nil, ierr
 	}
-	version := httpbakery.RequestVersion(req)
-	ctx = context.WithValue(ctx, usernameKey, user)
-	ctx = context.WithValue(ctx, publicKeyKey, key)
-	ctx = context.WithValue(ctx, versionKey, version)
-	ai, authErr := d.bakery.Checker.Auth(httpbakery.RequestMacaroons(req)...).Allow(ctx, bakery.LoginOp)
-	if authErr == nil {
-		d.FinishInteraction(ctx, w, req, []checkers.Caveat{checkers.DeclaredCaveat("username", ai.Identity.Id())}, nil)
-		httprequest.WriteJSON(w, http.StatusOK, agentResponse{
-			AgentLogin: true,
-		})
-		return nil
+	var ms macaroon.Slice
+	if err := ms.UnmarshalBinary(token.Value); err != nil {
+		return nil, errgo.Mask(err)
 	}
-	derr, ok := errgo.Cause(authErr).(*bakery.DischargeRequiredError)
-	if !ok {
-		return errgo.Mask(authErr, errgo.Is(httpbakery.ErrBadRequest))
-	}
-	m, err := d.bakery.Oven.NewMacaroon(ctx, version, ages, derr.Caveats, derr.Ops...)
+	ai, err := d.bakery.Checker.Auth(ms).Allow(ctx, bakery.LoginOp)
 	if err != nil {
-		return errgo.Notef(err, "cannot create macaroon")
+		return nil, errgo.Mask(err)
 	}
-	httpbakery.WriteDischargeRequiredErrorForRequest(w, m, "", authErr, req)
-	return nil
+	return []checkers.Caveat{
+		idmclient.UserDeclaration(ai.Identity.Id()),
+	}, nil
 }
-
-// agentResponse contains the response to an agent login attempt.
-type agentResponse struct {
-	AgentLogin bool `json:"agent_login"`
-}
-
-type agentLoginContextKey int
-
-const (
-	usernameKey agentLoginContextKey = iota
-	publicKeyKey
-	versionKey
-)
 
 type agentLoginIdentityClient struct{}
 
 func (c agentLoginIdentityClient) IdentityFromContext(ctx context.Context) (bakery.Identity, []checkers.Caveat, error) {
-	return nil, []checkers.Caveat{
-		checkers.DeclaredCaveat("agent-username", ctx.Value(usernameKey).(string)),
-		bakery.LocalThirdPartyCaveat(ctx.Value(publicKeyKey).(*bakery.PublicKey), ctx.Value(versionKey).(bakery.Version)),
-	}, nil
+	return nil, nil, nil
 }
 
 func (c agentLoginIdentityClient) DeclaredIdentity(ctx context.Context, declared map[string]string) (bakery.Identity, error) {
-	username, ok := declared["agent-username"]
+	username, ok := declared["username"]
 	if !ok {
 		return nil, errgo.Newf("no declared user")
 	}

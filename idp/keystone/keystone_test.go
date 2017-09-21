@@ -79,11 +79,11 @@ func (s *keystoneSuite) TestKeystoneIdentityProviderUseNameForDescription(c *gc.
 
 func (s *keystoneSuite) TestKeystoneIdentityProviderURL(c *gc.C) {
 	u := s.idp.URL("1")
-	c.Assert(u, gc.Equals, "https://idp.test/login?waitid=1")
+	c.Assert(u, gc.Equals, "https://idp.test/login?id=1")
 }
 
 func (s *keystoneSuite) TestKeystoneIdentityProviderHandleGet(c *gc.C) {
-	req, err := http.NewRequest("GET", "/login?waitid=1", nil)
+	req, err := http.NewRequest("GET", "/login?id=1", nil)
 	c.Assert(err, gc.IsNil)
 	req.ParseForm()
 	rr := httptest.NewRecorder()
@@ -95,7 +95,7 @@ func (s *keystoneSuite) TestKeystoneIdentityProviderHandleGet(c *gc.C) {
 <html>
 	<head><title>OpenStack Login</title></head>
 	<body>
-		<form method="POST" action="https://idp.test/login?waitid=1">
+		<form method="POST" action="https://idp.test/login?id=1">
 			<p><label>Username: <input type="text" name="username"></label></p>
 			<p><label>Password: <input type="password" name="password"></label></p>
 			<p><input type="submit"></p>
@@ -106,7 +106,7 @@ func (s *keystoneSuite) TestKeystoneIdentityProviderHandleGet(c *gc.C) {
 }
 
 func (s *keystoneSuite) TestKeystoneIdentityProviderHandlePost(c *gc.C) {
-	req, err := http.NewRequest("POST", "/login?waitid=1",
+	req, err := http.NewRequest("POST", "/login?did=1",
 		strings.NewReader(
 			url.Values{
 				"username": {"testuser"},
@@ -128,7 +128,7 @@ func (s *keystoneSuite) TestKeystoneIdentityProviderHandlePost(c *gc.C) {
 }
 
 func (s *keystoneSuite) TestKeystoneIdentityProviderHandlePostBadPassword(c *gc.C) {
-	req, err := http.NewRequest("POST", "/login?waitid=1",
+	req, err := http.NewRequest("POST", "/login?did=1",
 		strings.NewReader(
 			url.Values{
 				"username": {"testuser"},
@@ -145,7 +145,7 @@ func (s *keystoneSuite) TestKeystoneIdentityProviderHandlePostBadPassword(c *gc.
 }
 
 func (s *keystoneSuite) TestKeystoneIdentityProviderHandlePostNoTenants(c *gc.C) {
-	req, err := http.NewRequest("POST", "/login?waitid=1",
+	req, err := http.NewRequest("POST", "/login?did=1",
 		strings.NewReader(
 			url.Values{
 				"username": {"testuser2"},
@@ -173,7 +173,7 @@ func (s *keystoneSuite) TestKeystoneIdentityProviderHandleExistingUser(c *gc.C) 
 		},
 	)
 	c.Assert(err, gc.Equals, nil)
-	req, err := http.NewRequest("POST", "/login?waitid=1",
+	req, err := http.NewRequest("POST", "/login?did=1",
 		strings.NewReader(
 			url.Values{
 				"username": {"testuser"},

@@ -3,12 +3,14 @@
 package discharger
 
 import (
+	"crypto/sha256"
+	"encoding"
+	"fmt"
 	"net/http"
 	"net/url"
 	"strings"
 	"time"
 
-	"github.com/juju/httprequest"
 	"github.com/juju/idmclient"
 	"github.com/juju/idmclient/params"
 	"golang.org/x/net/context"
@@ -18,6 +20,7 @@ import (
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
 	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
+	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery/agent"
 	"gopkg.in/macaroon.v2-unstable"
 
 	"github.com/CanonicalLtd/blues-identity/internal/auth"
@@ -26,43 +29,53 @@ import (
 	"github.com/CanonicalLtd/blues-identity/store"
 )
 
-const (
-	// dischargeTokenDuration is the length of time for which a
-	// discharge token is valid.
-	dischargeTokenDuration = 6 * time.Hour
-)
-
 // thirdPartyCaveatChecker implements an
 // httpbakery.ThirdPartyCaveatChecker for the identity service.
 type thirdPartyCaveatChecker struct {
 	params  identity.HandlerParams
 	reqAuth *httpauth.Authorizer
+	checker *bakery.Checker
 	place   *place
 }
 
 // CheckThirdPartyCaveat implements httpbakery.ThirdPartyCaveatChecker.
 // It acquires a handler before checking the caveat, so that we have a
 // database connection for the purpose.
-func (c *thirdPartyCaveatChecker) CheckThirdPartyCaveat(ctx context.Context, req *http.Request, ci *bakery.ThirdPartyCaveatInfo) ([]checkers.Caveat, error) {
+func (c *thirdPartyCaveatChecker) CheckThirdPartyCaveat(ctx context.Context, ci *bakery.ThirdPartyCaveatInfo, req *http.Request, token *httpbakery.DischargeToken) ([]checkers.Caveat, error) {
 	t := trace.New(req.URL.Path, "")
 	defer t.Finish()
-	return c.checkThirdPartyCaveat(trace.NewContext(ctx, t), req, ci)
+	return c.checkThirdPartyCaveat(trace.NewContext(ctx, t), ci, req, token)
 }
 
 // checkThirdPartyCaveat checks the given caveat. This function is called
 // by the httpbakery discharge logic. See httpbakery.DischargeHandler
 // for futher details.
-func (c *thirdPartyCaveatChecker) checkThirdPartyCaveat(ctx context.Context, req *http.Request, ci *bakery.ThirdPartyCaveatInfo) ([]checkers.Caveat, error) {
-	cond, args, err := checkers.ParseCaveat(string(ci.Condition))
-	if err != nil {
-		return nil, errgo.WithCausef(err, params.ErrBadRequest, "cannot parse caveat %q", ci.Condition)
+func (c *thirdPartyCaveatChecker) checkThirdPartyCaveat(ctx context.Context, ci *bakery.ThirdPartyCaveatInfo, req *http.Request, token *httpbakery.DischargeToken) ([]checkers.Caveat, error) {
+	dischargeID := dischargeID(ci)
+	ctx = auth.ContextWithDischargeID(ctx, dischargeID)
+	interactionRequiredParams := interactionRequiredParams{
+		req: req,
+		info: &dischargeRequestInfo{
+			Caveat:    ci.Caveat,
+			CaveatId:  ci.Id,
+			Condition: string(ci.Condition),
+			Origin:    req.Header.Get("Origin"),
+		},
+		dischargeID: dischargeID,
 	}
+
 	domain := ""
 	if c, err := req.Cookie("domain"); err == nil && names.IsValidUserDomain(c.Value) {
 		domain = c.Value
 	}
+	cond, args, err := checkers.ParseCaveat(string(ci.Condition))
+	if err != nil {
+		return nil, errgo.WithCausef(err, params.ErrBadRequest, "cannot parse caveat %q", ci.Condition)
+	}
+	var op bakery.Op
 	switch cond {
 	case "is-authenticated-user":
+		op = auth.GlobalOp("discharge")
 		if len(args) == 0 {
 			break
 		}
@@ -75,63 +88,65 @@ func (c *thirdPartyCaveatChecker) checkThirdPartyCaveat(ctx context.Context, req
 		domain = args[1:]
 		ctx = auth.ContextWithRequiredDomain(ctx, domain)
 	case "is-member-of":
+		op = auth.GroupsDischargeOp(strings.Fields(args))
 	default:
 		return nil, checkers.ErrCaveatNotRecognized
 	}
+	interactionRequiredParams.domain = domain
+	// TODO add discharge id to context
 
-	var identity *auth.Identity
-	var invalidUserf func(err error) error
+	var mss []macaroon.Slice
 	if user := req.Form.Get("discharge-for-user"); user != "" {
-		_, err := c.reqAuth.Auth(ctx, req, auth.GlobalOp(auth.ActionDischargeFor))
+		_, err = c.reqAuth.Auth(ctx, req, auth.GlobalOp(auth.ActionDischargeFor))
 		if err != nil {
 			return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized), isDischargeRequiredError)
 		}
-		invalidUserf = func(err error) error {
-			return errgo.WithCausef(err, params.ErrBadRequest, "invalid username %q", user)
-		}
-		identity, err = c.params.Authorizer.Identity(ctx, user)
+		ctx = auth.ContextWithUsername(ctx, user)
+	} else if token != nil {
+		mss, err = c.macaroonsFromDischargeToken(ctx, token)
 		if err != nil {
-			return nil, invalidUserf(err)
-		}
-		if err := auth.CheckUserDomain(ctx, user); err != nil {
-			return nil, invalidUserf(err)
+			return nil, errgo.Mask(err)
 		}
 	} else {
-		invalidUserf = func(err error) error {
-			return c.needLoginError(ctx, req, domain, &dischargeRequestInfo{
-				Caveat:    ci.Caveat,
-				CaveatId:  ci.Id,
-				Condition: string(ci.Condition),
-				Origin:    req.Header.Get("Origin"),
-			}, err)
-		}
-		userInfo, err := c.reqAuth.Auth(ctx, req, bakery.LoginOp)
-		if err != nil {
-			return nil, invalidUserf(err)
-		}
-		identity = userInfo.Identity.(*auth.Identity)
+		mss = httpbakery.RequestMacaroons(req)
 	}
-	logger.Infof("authorization for %#v succeeded", identity)
 
-	var cavs []checkers.Caveat
-	switch cond {
-	case "is-authenticated-user":
-		cavs = []checkers.Caveat{
-			idmclient.UserDeclaration(identity.Id()),
-			checkers.TimeBeforeCaveat(time.Now().Add(24 * time.Hour)),
-		}
-	case "is-member-of":
-		ok, err := identity.Allow(ctx, strings.Fields(args))
-		if err != nil {
-			return nil, errgo.Notef(err, "cannot check group membership")
-		}
-		if !ok {
-			return nil, invalidUserf(errgo.Newf("user is not a member of required groups"))
-		}
-		// TODO should this be time-limited?
+	authInfo, err := c.params.Authorizer.Auth(ctx, mss, op)
+	if _, ok := errgo.Cause(err).(*bakery.DischargeRequiredError); ok {
+		return nil, c.interactionRequiredError(ctx, interactionRequiredParams, err)
 	}
-	c.updateDischargeTime(ctx, identity.Id())
-	return cavs, nil
+	if err != nil {
+		// TODO return appropriate error code when permission denied.
+		return nil, errgo.Mask(err)
+	}
+	logger.Debugf("authorization for %#v succeeded", authInfo.Identity)
+	c.updateDischargeTime(ctx, authInfo.Identity.Id())
+	if cond == "is-member-of" {
+		return nil, nil
+	}
+	return []checkers.Caveat{
+		idmclient.UserDeclaration(authInfo.Identity.Id()),
+		checkers.TimeBeforeCaveat(time.Now().Add(24 * time.Hour)),
+	}, nil
+}
+
+func (c *thirdPartyCaveatChecker) macaroonsFromDischargeToken(ctx context.Context, token *httpbakery.DischargeToken) ([]macaroon.Slice, error) {
+	var ms macaroon.Slice
+	var v encoding.BinaryUnmarshaler
+	switch token.Kind {
+	default:
+		return nil, errgo.WithCausef(nil, params.ErrBadRequest, "invalid token")
+	case "agent":
+		v = &ms
+	case "macaroon":
+		var m macaroon.Macaroon
+		ms = macaroon.Slice{&m}
+		v = &m
+	}
+	if err := v.UnmarshalBinary(token.Value); err != nil {
+		return nil, errgo.WithCausef(err, params.ErrBadRequest, "invalid token")
+	}
+	return []macaroon.Slice{ms}, nil
 }
 
 func (c *thirdPartyCaveatChecker) updateDischargeTime(ctx context.Context, username string) {
@@ -149,113 +164,48 @@ func (c *thirdPartyCaveatChecker) updateDischargeTime(ctx context.Context, usern
 	}
 }
 
-// needLoginError returns an error suitable for returning
-// from a discharge request that can only be satisfied
-// if the user logs in.
-func (c *thirdPartyCaveatChecker) needLoginError(ctx context.Context, req *http.Request, domain string, info *dischargeRequestInfo, why error) error {
+type interactionRequiredParams struct {
+	req         *http.Request
+	info        *dischargeRequestInfo
+	dischargeID string
+	domain      string
+}
+
+// interactionRequiredError returns an error suitable for returning from
+// a discharge request that can only be satisfied if the user logs in.
+func (c *thirdPartyCaveatChecker) interactionRequiredError(ctx context.Context, p interactionRequiredParams, why error) error {
 	// TODO(rog) If the user is already logged in (username != ""),
 	// we should perhaps just return an error here.
-	waitId, err := c.place.NewRendezvous(ctx, info)
-	if err != nil {
+	if err := c.place.NewRendezvous(ctx, p.dischargeID, p.info); err != nil {
 		return errgo.Notef(err, "cannot make rendezvous")
 	}
-	visitURL := c.params.Location + "/login?waitid=" + waitId
-	if domain != "" {
-		visitURL += "&domain=" + url.QueryEscape(domain)
+	ierr := httpbakery.NewInteractionRequiredError(why, p.req)
+	agent.SetInteraction(ierr, c.params.Location+"/login/agent?v=1&did="+p.dischargeID)
+	for _, idp := range c.params.IdentityProviders {
+		if p.domain != "" && idp.Domain() != p.domain {
+			// The client has specified a domain and the idp is not in that domain,
+			// so omit it.
+			continue
+		}
+		idp.SetInteraction(ierr, p.dischargeID)
 	}
-	waitURL := c.params.Location + "/wait?waitid=" + waitId
-	return httpbakery.NewInteractionRequiredError(visitURL, waitURL, why, req)
-}
-
-// waitRequest is the request sent to the server to wait for logins to
-// complete. Discharging caveats will normally be handled by the bakery
-// it would be unusual to use this type directly in client software.
-type waitRequest struct {
-	httprequest.Route `httprequest:"GET /wait"`
-	WaitID            string `httprequest:"waitid,form"`
-}
-
-// waitResponse holds the response from the wait endpoint. Discharging
-// caveats will normally be handled by the bakery it would be unusual to
-// use this type directly in client software.
-type waitResponse struct {
-	// Macaroon holds the acquired discharge macaroon.
-	Macaroon *bakery.Macaroon
-
-	// DischargeToken holds a macaroon that can be attached as
-	// authorization for future discharge requests. This will also
-	// be returned as a cookie.
-	DischargeToken macaroon.Slice
-}
-
-// serveWait serves an HTTP endpoint that waits until a macaroon
-// has been discharged, and returns the discharge macaroon.
-func (h *handler) Wait(p httprequest.Params, w *waitRequest) (*waitResponse, error) {
-	if w.WaitID == "" {
-		return nil, errgo.WithCausef(nil, params.ErrBadRequest, "wait id parameter not found")
+	visitURL := c.params.Location + "/login?did=" + p.dischargeID
+	if p.domain != "" {
+		visitURL += "&domain=" + url.QueryEscape(p.domain)
 	}
-	// TODO don't wait forever here.
-	reqInfo, login, err := h.params.place.Wait(p.Context, w.WaitID)
-	if err != nil {
-		return nil, errgo.Notef(err, "cannot wait")
-	}
-	if login.Error != nil {
-		return nil, errgo.NoteMask(login.Error, "login failed", errgo.Any)
-	}
-	// TODO we shouldn't need to manually resolve this caveat - the
-	// reqInfo macaroon should contain a bakery.Macaroon not a macaroon slice.
-	originCaveat := auth.Namespace.ResolveCaveat(httpbakery.ClientOriginCaveat(reqInfo.Origin))
-	// Ensure the identity macaroon can only be used from the same
-	// origin as the original discharge request.
-	err = login.IdentityMacaroon[0].AddFirstPartyCaveat(originCaveat.Condition)
-	if err != nil {
-		return nil, errgo.Notef(err, "cannot add origin caveat to identity macaroon")
-	}
-	// We've now got the newly minted identity macaroon. Now
-	// we want to check the third party caveat against the
-	// identity that the user has logged in as, so add the
-	// macaroon to the request and then go through the
-	// same discharge checking that they would have gone
-	// through even if they had gone through the web
-	// login process.
-	cookie, err := httpbakery.NewCookie(auth.Namespace, login.IdentityMacaroon)
-	if err != nil {
-		return nil, errgo.Notef(err, "cannot make cookie")
-	}
-	cookie.Name = "macaroon-identity"
-	p.Request.AddCookie(cookie)
-	m, err := bakery.Discharge(p.Context, bakery.DischargeParams{
-		Id:     reqInfo.CaveatId,
-		Caveat: reqInfo.Caveat,
-		Key:    h.params.Key,
-		Checker: bakery.ThirdPartyCaveatCheckerFunc(func(ctx context.Context, ci *bakery.ThirdPartyCaveatInfo) ([]checkers.Caveat, error) {
-			return h.params.checker.checkThirdPartyCaveat(ctx, p.Request, ci)
-		}),
-	})
-	if err != nil {
-		return nil, errgo.NoteMask(err, "cannot discharge", errgo.Any)
-	}
-
-	// Return the identity macaroon as a cookie in the wait
-	// response. Note that this is a security hole that means that
-	// any web site can obtain the capability to do arbitrary things
-	// as the logged in user. For the command line, though, we do
-	// want to return the cookie.
-	//
-	// TODO distinguish between the two cases by looking at the
-	// X-Requested-With header, return the identity cookie only when
-	// it's not present (i.e. when /wait is not called from an AJAX
-	// request).
-	cookie.Path = "/"
-	http.SetCookie(p.Response, cookie)
-
-	return &waitResponse{
-		Macaroon:       m,
-		DischargeToken: login.IdentityMacaroon,
-	}, nil
+	waitURL := c.params.Location + "/wait?did=" + p.dischargeID
+	waitTokenURL := c.params.Location + "/wait-token?did=" + p.dischargeID
+	httpbakery.SetWebBrowserInteraction(ierr, visitURL, waitTokenURL)
+	httpbakery.SetLegacyInteraction(ierr, visitURL, waitURL)
+	return ierr
 }
 
 func isDischargeRequiredError(err error) bool {
 	cause, ok := errgo.Cause(err).(*httpbakery.Error)
 	return ok && cause.Code == httpbakery.ErrDischargeRequired
+}
+
+func dischargeID(ci *bakery.ThirdPartyCaveatInfo) string {
+	sum := sha256.Sum256(ci.Caveat)
+	return fmt.Sprintf("%x", sum[:8])
 }

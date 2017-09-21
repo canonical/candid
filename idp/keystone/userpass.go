@@ -4,6 +4,7 @@ package keystone
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/juju/httprequest"
 	"github.com/juju/idmclient/params"
@@ -12,6 +13,7 @@ import (
 	"gopkg.in/errgo.v1"
 	gooseidentity "gopkg.in/goose.v1/identity"
 	"gopkg.in/juju/environschema.v1"
+	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
 	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery/form"
 
 	"github.com/CanonicalLtd/blues-identity/config"
@@ -45,6 +47,13 @@ func (*userpassIdentityProvider) Interactive() bool {
 	return false
 }
 
+// SetInteraction implements idp.IdentityProvider.SetInteraction.
+func (idp *userpassIdentityProvider) SetInteraction(ierr *httpbakery.Error, dischargeID string) {
+	ierr.SetInteraction(form.InteractionMethod, form.InteractionInfo{
+		URL: idputil.URL(idp.initParams.URLPrefix, "/interact", dischargeID),
+	})
+}
+
 // Handle implements idp.IdentityProvider.Handle.
 func (idp *userpassIdentityProvider) Handle(ctx context.Context, w http.ResponseWriter, req *http.Request) {
 	if req.Method != "POST" {
@@ -53,21 +62,37 @@ func (idp *userpassIdentityProvider) Handle(ctx context.Context, w http.Response
 	}
 	var lr form.LoginRequest
 	if err := httprequest.Unmarshal(idputil.RequestParams(ctx, w, req), &lr); err != nil {
-		idp.initParams.LoginCompleter.Failure(ctx, w, req, idputil.WaitID(req), errgo.WithCausef(err, params.ErrBadRequest, "cannot unmarshal login request"))
+		idp.initParams.VisitCompleter.Failure(ctx, w, req, idputil.DischargeID(req), errgo.WithCausef(err, params.ErrBadRequest, "cannot unmarshal login request"))
 		return
 	}
-	form, err := keystoneFieldsChecker.Coerce(lr.Body.Form, nil)
+	frm, err := keystoneFieldsChecker.Coerce(lr.Body.Form, nil)
 	if err != nil {
-		idp.initParams.LoginCompleter.Failure(ctx, w, req, idputil.WaitID(req), errgo.Notef(err, "cannot validate form"))
+		idp.initParams.VisitCompleter.Failure(ctx, w, req, idputil.DischargeID(req), errgo.Notef(err, "cannot validate form"))
 		return
 	}
-	m := form.(map[string]interface{})
-	idp.doLogin(ctx, w, req, keystone.Auth{
+	m := frm.(map[string]interface{})
+	user, err := idp.doLogin(ctx, keystone.Auth{
 		PasswordCredentials: &keystone.PasswordCredentials{
 			Username: m["username"].(string),
 			Password: m["password"].(string),
 		},
 	})
+	if err != nil {
+		idp.initParams.VisitCompleter.Failure(ctx, w, req, idputil.DischargeID(req), errgo.Notef(err, "cannot validate form"))
+		return
+	}
+	if strings.TrimPrefix(req.URL.Path, idp.initParams.URLPrefix) == "/interact" {
+		dt, err := idp.initParams.DischargeTokenCreator.DischargeToken(ctx, idputil.DischargeID(req), user)
+		if err != nil {
+			idp.initParams.VisitCompleter.Failure(ctx, w, req, idputil.DischargeID(req), err)
+			return
+		}
+		httprequest.WriteJSON(w, http.StatusOK, form.LoginResponse{
+			Token: dt,
+		})
+	} else {
+		idp.initParams.VisitCompleter.Success(ctx, w, req, idputil.DischargeID(req), user)
+	}
 }
 
 var keystoneSchemaResponse = form.SchemaResponse{
