@@ -28,10 +28,7 @@ import (
 )
 
 func (h *Handler) initIDPs() error {
-	st, err := h.storePool.Get()
-	if err != nil {
-		return errgo.Mask(err)
-	}
+	st := h.storePool.Get()
 	defer h.storePool.Put(st)
 	for _, idp := range h.idps {
 		ctx := &idpHandler{
@@ -52,20 +49,10 @@ func (h *Handler) newIDPHandler(idp idp.IdentityProvider) httprouter.Handle {
 		ctx := context.TODO()
 		t := trace.New("identity.internal.v1.idp", idp.Name())
 		req.ParseForm()
-		st, err := h.storePool.Get()
-		if err != nil {
-			// TODO(mhilton) consider logging inside the pool.
-			t.LazyPrintf("cannot get store: %s", err)
-			if errgo.Cause(err) != params.ErrServiceUnavailable {
-				t.SetError()
-			}
-			t.Finish()
-			identity.ReqServer.WriteError(ctx, w, errgo.NoteMask(err, "cannot get store", errgo.Any))
-			return
-		}
+		st := h.storePool.Get()
 		defer func() {
-			h.storePool.Put(st)
 			t.LazyPrintf("store released")
+			h.storePool.Put(st)
 			t.Finish()
 		}()
 		ctx = store.ContextWithStore(ctx, st)

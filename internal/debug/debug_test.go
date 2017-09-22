@@ -45,7 +45,7 @@ func (s *apiSuite) SetUpTest(c *gc.C) {
 
 	key, err := bakery.GenerateKey()
 	c.Assert(err, gc.IsNil)
-	s.srv, s.pool = newServer(c, s.Session.Copy(), key, s.teams)
+	s.srv, s.pool = newServer(c, s.Session, key, s.teams)
 	s.keyPair = key
 	s.server = httptest.NewServer(s.srv)
 	s.PatchValue(&http.DefaultTransport, httptesting.URLRewritingTransport{
@@ -114,7 +114,6 @@ func (s *debugSuite) TestServeDebugStatus(c *gc.C) {
 		"mongo_connected":   "MongoDB is connected",
 		"mongo_collections": "MongoDB collections",
 		"meeting_count":     "count of meeting collection",
-		"store_pool_status": "Status of store limit pool (mgo)",
 		"nonce_count":       "count of usso nonces collection",
 	}
 	expectValues := map[string]string{

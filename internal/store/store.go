@@ -19,8 +19,8 @@ import (
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 
-	"github.com/CanonicalLtd/blues-identity/internal/limitpool"
 	"github.com/CanonicalLtd/blues-identity/internal/mempool"
+	"github.com/CanonicalLtd/blues-identity/internal/mgosession"
 	"github.com/CanonicalLtd/blues-identity/internal/mongodoc"
 	"github.com/CanonicalLtd/blues-identity/meeting"
 	"github.com/CanonicalLtd/blues-identity/meeting/mgomeeting"
@@ -52,10 +52,6 @@ type StoreParams struct {
 	// sessions.
 	MaxMgoSessions int
 
-	// RequestTimeout holds the time to wait for a request to be able
-	// to start.
-	RequestTimeout time.Duration
-
 	// PrivateAddr should hold a dialable address that will be used
 	// for communication between identity servers. Note that this
 	// should not contain a port.
@@ -70,52 +66,9 @@ type ExternalGroupGetter interface {
 	GetGroups(externalId string) ([]string, error)
 }
 
-// newMonitoredSessionPool returns a wrapper around a limitpool.Pool that
-// records how many unused items are currently in the pool in the
-// given gauge.
-func newMonitoredSessionPool(count prometheus.Gauge, limit int, new func() limitpool.Item) *monitoredSessionPool {
-	monitoredNew := func() limitpool.Item {
-		count.Inc()
-		return new()
-	}
-	return &monitoredSessionPool{
-		pool:  limitpool.NewPool(limit, monitoredNew),
-		count: count,
-	}
-}
-
-type monitoredSessionPool struct {
-	pool  *limitpool.Pool
-	count prometheus.Gauge
-}
-
-func (p *monitoredSessionPool) Get(t time.Duration) (limitpool.Item, error) {
-	i, err := p.pool.Get(t)
-	if err == nil {
-		p.count.Dec()
-	}
-	return i, err
-}
-
-func (p *monitoredSessionPool) GetNoLimit() limitpool.Item {
-	i := p.pool.GetNoLimit()
-	p.count.Dec()
-	return i
-}
-
-func (p *monitoredSessionPool) Put(i limitpool.Item) {
-	p.pool.Put(i)
-	p.count.Inc()
-}
-
-func (p *monitoredSessionPool) Close() {
-	p.count.Set(0)
-	p.pool.Close()
-}
-
 // Pool provides a pool of *Store objects.
 type Pool struct {
-	sessionPool *monitoredSessionPool
+	sessionPool *mgosession.Pool
 	storePool   mempool.Pool
 
 	// meetingServer holds the server used to create
@@ -132,8 +85,9 @@ type Pool struct {
 
 // NewPool creates a new Pool. The pool will be sized at sp.MaxMgoSessions.
 func NewPool(db *mgo.Database, sp StoreParams) (*Pool, error) {
+	db1 := *db
 	p := &Pool{
-		db:     db,
+		db:     &db1,
 		params: sp,
 	}
 	if sp.PrivateAddr == "" {
@@ -148,7 +102,10 @@ func NewPool(db *mgo.Database, sp StoreParams) (*Pool, error) {
 	})
 	prometheus.MustRegisterOrGet(sessionGauge)
 
-	p.sessionPool = newMonitoredSessionPool(sessionGauge, sp.MaxMgoSessions, p.newSession)
+	p.sessionPool = mgosession.NewPool(p.db.Session, sp.MaxMgoSessions)
+	// The only sessions used should be taken from the mgosession
+	// pool, so make sure of that.
+	p.db.Session = nil
 	p.storePool.New = func() interface{} {
 		logger.Infof("in storePool.New")
 		return p.newStore()
@@ -191,7 +148,7 @@ func NewPool(db *mgo.Database, sp StoreParams) (*Pool, error) {
 		},
 		Location: "identity",
 	}
-	s := p.GetNoLimit()
+	s := p.Get()
 	defer p.Put(s)
 	if err := s.ensureIndexes(); err != nil {
 		return nil, errgo.Notef(err, "cannot ensure indexes")
@@ -214,7 +171,7 @@ func NewPool(db *mgo.Database, sp StoreParams) (*Pool, error) {
 
 // newMeetingStore returns a new meeting.Store.
 func (p *Pool) newMeetingStore() meeting.Store {
-	session := p.getSessionNoLimit()
+	session := p.sessionPool.Session()
 	db := StoreDatabase{p.db.With(session)}
 	return &poolMeetingStore{
 		pool:    p,
@@ -223,73 +180,19 @@ func (p *Pool) newMeetingStore() meeting.Store {
 	}
 }
 
-func (p *Pool) newSession() limitpool.Item {
-	return p.db.Session.Copy()
-}
-
 // Get retrieves a Store object from the pool if there is one available.
-// If none are available it waits for the time specified as the
-// RequestTimeout in the ServiceParameters for one to become available.
-// If a *Store does not become available in that time it returns an error
-// with a cause of params.ErrServiceUnavailable.
-func (p *Pool) Get() (*Store, error) {
-	session, err := p.getSession()
-	if err != nil {
-		return nil, errgo.Mask(err, errgo.Is(params.ErrServiceUnavailable))
-	}
-	// Now associate the store we've just acquired with
-	// the session we've also acquired.
+func (p *Pool) Get() *Store {
 	store := p.storePool.Get().(*Store)
-	store.setSession(session)
-	return store, nil
-}
-
-// getSessionNoLimit returns a session from the session limit-pool
-// without deferring to the limit.
-// The session must be returned to the pool with putSession
-// after use.
-func (p *Pool) getSessionNoLimit() *mgo.Session {
-	return p.sessionPool.GetNoLimit().(*mgo.Session)
-}
-
-// getSesson returns a session from the session limit-pool.
-// The session must be returned to the pool with putSession
-// after use.
-func (p *Pool) getSession() (*mgo.Session, error) {
-	v, err := p.sessionPool.Get(p.params.RequestTimeout)
-	if err == limitpool.ErrLimitExceeded {
-		return nil, errgo.WithCausef(err, params.ErrServiceUnavailable, "too many mongo sessions in use")
-	}
-	if err != nil {
-		// This should be impossible.
-		return nil, errgo.Notef(err, "cannot get Session")
-	}
-	return v.(*mgo.Session), nil
-}
-
-func (p *Pool) putSession(session *mgo.Session) {
-	session.Refresh()
-	p.sessionPool.Put(session)
-}
-
-// GetNoLimit immediately retrieves a Store from the pool. If there is no
-// Store available one will be created, even if that overflows the limit.
-func (p *Pool) GetNoLimit() *Store {
-	store := p.storePool.Get().(*Store)
-	store.setSession(p.getSessionNoLimit())
+	store.setSession(p.sessionPool.Session())
 	return store
 }
 
 // Put places a Store back into the pool. Put will automatically close
 // the Store if it cannot go back into the pool.
 func (p *Pool) Put(s *Store) {
-	p.putSession(s.DB.Session)
+	s.DB.Close()
+	s.DB.Session = nil
 	p.storePool.Put(s)
-}
-
-// Stats returns information about the current pool statistics.
-func (p *Pool) Stats() limitpool.Stats {
-	return p.sessionPool.pool.Stats()
 }
 
 // Close clears out the pool closing the contained stores and prevents
@@ -300,7 +203,6 @@ func (p *Pool) Close() {
 	// pool.
 	p.meetingServer.Close()
 	p.sessionPool.Close()
-	p.db.Session.Close()
 	if p.monitor != nil {
 		prometheus.Unregister(p.monitor)
 	}
@@ -603,11 +505,6 @@ func (s *Store) UpdateIdentity(username params.Username, update bson.D) error {
 	return nil
 }
 
-// Close returns the store to the pool
-func (s *Store) Close() {
-	s.DB.Close()
-}
-
 // StoreDatabase wraps an mgo.DB ands adds a few convenience methods.
 type StoreDatabase struct {
 	*mgo.Database
@@ -666,7 +563,7 @@ type poolMeetingStore struct {
 }
 
 func (s *poolMeetingStore) Close() {
-	s.pool.putSession(s.session)
+	s.session.Close()
 }
 
 // uniqueStrings removes all duplicates from the supplied
@@ -726,7 +623,7 @@ func (cm *collectionMonitor) Describe(c chan<- *prometheus.Desc) {
 
 // Collect implements the prometheus.Collector interface.
 func (cm *collectionMonitor) Collect(c chan<- prometheus.Metric) {
-	store := cm.pool.GetNoLimit()
+	store := cm.pool.Get()
 	defer cm.pool.Put(store)
 	for _, entry := range cm.entries {
 		cnt, err := store.DB.C(entry.collection).Count()

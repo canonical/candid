@@ -20,8 +20,9 @@ var _ = gc.Suite(&idpsSuite{})
 func (s *idpsSuite) SetUpTest(c *gc.C) {
 	s.IsolatedMgoSuite.SetUpTest(c)
 	var err error
-	s.pool, err = store.NewPool(s.Session.Copy().DB("idps-tests"), store.StoreParams{
-		PrivateAddr: "localhost",
+	s.pool, err = store.NewPool(s.Session.DB("idps-tests"), store.StoreParams{
+		PrivateAddr:    "localhost",
+		MaxMgoSessions: 1,
 	})
 	c.Assert(err, gc.IsNil)
 }
@@ -32,7 +33,7 @@ func (s *idpsSuite) TearDownTest(c *gc.C) {
 }
 
 func (s *idpsSuite) TestIdentityProvider(c *gc.C) {
-	st := s.pool.GetNoLimit()
+	st := s.pool.Get()
 	defer s.pool.Put(st)
 	// Add an identity to the identity_providers collection using mgo directly.
 	err := st.DB.IdentityProviders().Insert(mongodoc.IdentityProvider{
@@ -51,7 +52,7 @@ func (s *idpsSuite) TestIdentityProvider(c *gc.C) {
 }
 
 func (s *idpsSuite) TestIdentityProviderNotFound(c *gc.C) {
-	st := s.pool.GetNoLimit()
+	st := s.pool.Get()
 	defer s.pool.Put(st)
 
 	// Retrieve the identity provider using the store object.
@@ -60,7 +61,7 @@ func (s *idpsSuite) TestIdentityProviderNotFound(c *gc.C) {
 }
 
 func (s *idpsSuite) TestSetIdentityProvider(c *gc.C) {
-	st := s.pool.GetNoLimit()
+	st := s.pool.Get()
 	defer s.pool.Put(st)
 
 	// Set an identity provider using the store object
@@ -80,7 +81,7 @@ func (s *idpsSuite) TestSetIdentityProvider(c *gc.C) {
 }
 
 func (s *idpsSuite) TestUpdateIdentityProvider(c *gc.C) {
-	st := s.pool.GetNoLimit()
+	st := s.pool.Get()
 	defer s.pool.Put(st)
 
 	// Set an identity provider using the store object
@@ -108,7 +109,7 @@ func (s *idpsSuite) TestUpdateIdentityProvider(c *gc.C) {
 }
 
 func (s *idpsSuite) TestListIdentityProviders(c *gc.C) {
-	st := s.pool.GetNoLimit()
+	st := s.pool.Get()
 	defer s.pool.Put(st)
 
 	idps, err := st.IdentityProviderNames()
