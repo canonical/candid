@@ -60,7 +60,7 @@ func (s *apiSuite) SetUpTest(c *gc.C) {
 	key, err := bakery.GenerateKey()
 	c.Assert(err, gc.IsNil)
 	s.template = template.New("")
-	s.srv, s.pool = newServer(c, s.Session.Copy(), key, s.template, s.idps)
+	s.srv, s.pool = newServer(c, s.Session, key, s.template, s.idps)
 	s.keyPair = key
 	s.server = httptest.NewServer(s.srv)
 	s.PatchValue(&http.DefaultTransport, httptesting.URLRewritingTransport{
@@ -113,7 +113,7 @@ func newServer(c *gc.C, session *mgo.Session, key *bakery.KeyPair, t *template.T
 }
 
 func (s *apiSuite) assertMacaroon(c *gc.C, ms macaroon.Slice, expectUser string) {
-	store := s.pool.GetNoLimit()
+	store := s.pool.Get()
 	defer s.pool.Put(store)
 	authInfo, err := store.Bakery.Checker.Auth(ms).Allow(context.TODO(), bakery.LoginOp)
 	c.Assert(err, gc.IsNil)
@@ -122,7 +122,7 @@ func (s *apiSuite) assertMacaroon(c *gc.C, ms macaroon.Slice, expectUser string)
 }
 
 func (s *apiSuite) createUser(c *gc.C, user *params.User) {
-	store := s.pool.GetNoLimit()
+	store := s.pool.Get()
 	defer s.pool.Put(store)
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Handler: s.srv,
@@ -146,7 +146,7 @@ func (s *apiSuite) createUser(c *gc.C, user *params.User) {
 }
 
 func (s *apiSuite) createIdentity(c *gc.C, doc *mongodoc.Identity) {
-	store := s.pool.GetNoLimit()
+	store := s.pool.Get()
 	defer s.pool.Put(store)
 	if doc.Owner != "" {
 		err := store.UpsertAgent(doc)

@@ -11,7 +11,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/juju/idmclient/params"
 	"github.com/juju/testing"
@@ -36,7 +35,7 @@ var _ = gc.Suite(&storeSuite{})
 func (s *storeSuite) SetUpTest(c *gc.C) {
 	s.IsolatedMgoSuite.SetUpTest(c)
 	var err error
-	s.pool, err = store.NewPool(s.Session.Copy().DB("store-tests"), store.StoreParams{
+	s.pool, err = store.NewPool(s.Session.DB("store-tests"), store.StoreParams{
 		MaxMgoSessions: 10,
 		PrivateAddr:    "localhost",
 	})
@@ -64,7 +63,7 @@ func (s *storeSuite) TestNew(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 
 	// Set up a new store.
-	store := s.pool.GetNoLimit()
+	store := s.pool.Get()
 	defer s.pool.Put(store)
 
 	// Retrieve the identity using the store object.
@@ -167,7 +166,7 @@ var upsertUserTests = []struct {
 }}
 
 func (s *storeSuite) TestUpsertUser(c *gc.C) {
-	store := s.pool.GetNoLimit()
+	store := s.pool.Get()
 	defer s.pool.Put(store)
 
 	// Add existing interactive user.
@@ -284,7 +283,7 @@ var upsertAgentTests = []struct {
 }}
 
 func (s *storeSuite) TestUpsertAgent(c *gc.C) {
-	store := s.pool.GetNoLimit()
+	store := s.pool.Get()
 	defer s.pool.Put(store)
 
 	// Add existing agent user
@@ -314,7 +313,7 @@ func (s *storeSuite) TestUpsertAgent(c *gc.C) {
 }
 
 func (s *storeSuite) TestUpsertUserEmptyUserInformation(c *gc.C) {
-	store := s.pool.GetNoLimit()
+	store := s.pool.Get()
 	defer s.pool.Put(store)
 	id := &mongodoc.Identity{
 		Username:   "test",
@@ -338,7 +337,7 @@ func (s *storeSuite) TestUpsertUserEmptyUserInformation(c *gc.C) {
 }
 
 func (s *storeSuite) TestUpsertUserDedupeGroups(c *gc.C) {
-	store := s.pool.GetNoLimit()
+	store := s.pool.Get()
 	defer s.pool.Put(store)
 
 	// Add interactive user.
@@ -422,7 +421,7 @@ var setGroupsTests = []struct {
 }}
 
 func (s *storeSuite) TestSetGroups(c *gc.C) {
-	store := s.pool.GetNoLimit()
+	store := s.pool.Get()
 	defer s.pool.Put(store)
 
 	// Add existing interactive user.
@@ -506,7 +505,7 @@ var addGroupsTests = []struct {
 }}
 
 func (s *storeSuite) TestAddGroups(c *gc.C) {
-	store := s.pool.GetNoLimit()
+	store := s.pool.Get()
 	defer s.pool.Put(store)
 
 	for i, test := range addGroupsTests {
@@ -582,7 +581,7 @@ var removeGroupsTests = []struct {
 }}
 
 func (s *storeSuite) TestRemoveGroups(c *gc.C) {
-	store := s.pool.GetNoLimit()
+	store := s.pool.Get()
 	defer s.pool.Put(store)
 
 	for i, test := range removeGroupsTests {
@@ -647,7 +646,7 @@ var updatePublicKeysIdentityTests = []struct {
 }}
 
 func (s *storeSuite) TestUpdatePublicKeys(c *gc.C) {
-	store := s.pool.GetNoLimit()
+	store := s.pool.Get()
 	defer s.pool.Put(store)
 
 	// Add existing agent user
@@ -679,7 +678,7 @@ func (s *storeSuite) TestUpdatePublicKeys(c *gc.C) {
 }
 
 func (s *storeSuite) TestSetGroupsDedupeGroups(c *gc.C) {
-	store := s.pool.GetNoLimit()
+	store := s.pool.Get()
 	defer s.pool.Put(store)
 
 	// Add interactive user.
@@ -715,7 +714,7 @@ func (s *storeSuite) TestSetGroupsDedupeGroups(c *gc.C) {
 }
 
 func (s *storeSuite) TestCollections(c *gc.C) {
-	store := s.pool.GetNoLimit()
+	store := s.pool.Get()
 	defer s.pool.Put(store)
 	colls := store.DB.Collections()
 	names, err := store.DB.CollectionNames()
@@ -757,7 +756,7 @@ func (s *storeSuite) TestCollections(c *gc.C) {
 }
 
 func (s *storeSuite) TestGetIdentity(c *gc.C) {
-	store := s.pool.GetNoLimit()
+	store := s.pool.Get()
 	defer s.pool.Put(store)
 
 	// Add an identity to the store.
@@ -788,7 +787,7 @@ func (s *storeSuite) TestGetIdentity(c *gc.C) {
 }
 
 func (s *storeSuite) TestUpdateIdentity(c *gc.C) {
-	store := s.pool.GetNoLimit()
+	store := s.pool.Get()
 	defer s.pool.Put(store)
 
 	// Add an identity to the store.
@@ -821,7 +820,7 @@ func (s *storeSuite) TestUpdateIdentity(c *gc.C) {
 }
 
 func (s *storeSuite) TestUpdateGroupsDoesntEraseSSHKeys(c *gc.C) {
-	store := s.pool.GetNoLimit()
+	store := s.pool.Get()
 	defer s.pool.Put(store)
 
 	// Add an identity to the store.
@@ -873,69 +872,8 @@ func (s *storeSuite) TestGetLaunchpadGroups(c *gc.C) {
 	c.Assert(groups, jc.DeepEquals, []string{"test1", "test2"})
 }
 
-func (s *storeSuite) TestGetStoreFromPool(c *gc.C) {
-	p, err := store.NewPool(s.Session.Copy().DB("store-launchpad-tests"),
-		store.StoreParams{
-			MaxMgoSessions: 2,
-			PrivateAddr:    "localhost",
-		},
-	)
-	c.Assert(err, gc.IsNil)
-	defer p.Close()
-	s1, err := p.Get()
-	c.Assert(err, gc.IsNil)
-	s2, err := p.Get()
-	c.Assert(err, gc.IsNil)
-	defer p.Put(s2)
-	p.Put(s1)
-	s3, err := p.Get()
-	c.Assert(err, gc.IsNil)
-	defer p.Put(s3)
-	c.Assert(s3.DB.Database.Session, gc.Equals, s1.DB.Database.Session)
-}
-
-func (s *storeSuite) TestGetStoreFromPoolLimit(c *gc.C) {
-	p, err := store.NewPool(s.Session.Copy().DB("store-launchpad-tests"),
-		store.StoreParams{
-			MaxMgoSessions: 1,
-			RequestTimeout: 100 * time.Millisecond,
-			PrivateAddr:    "localhost",
-		},
-	)
-	c.Assert(err, gc.IsNil)
-	defer p.Close()
-	s1, err := p.Get()
-	c.Assert(err, gc.IsNil)
-	defer p.Put(s1)
-	_, err = p.Get()
-	c.Assert(err, gc.ErrorMatches, "too many mongo sessions in use: pool limit exceeded")
-}
-
-func (s *storeSuite) TestGetStoreFromPoolPutBeforeTimeout(c *gc.C) {
-	p, err := store.NewPool(s.Session.Copy().DB("store-launchpad-tests"),
-		store.StoreParams{
-			MaxMgoSessions: 1,
-			RequestTimeout: time.Second,
-			PrivateAddr:    "localhost",
-		},
-	)
-	c.Assert(err, gc.IsNil)
-	defer p.Close()
-	s1, err := p.Get()
-	c.Assert(err, gc.IsNil)
-	s1Session := s1.DB.Session
-	go func() {
-		time.Sleep(500 * time.Millisecond)
-		p.Put(s1)
-	}()
-	s2, err := p.Get()
-	c.Assert(err, gc.IsNil)
-	defer p.Put(s2)
-	c.Assert(s2.DB.Session, gc.Equals, s1Session)
-}
-
 func (s *storeSuite) TestCollectionCountsMonitor(c *gc.C) {
-	store := s.pool.GetNoLimit()
+	store := s.pool.Get()
 	defer s.pool.Put(store)
 	// Add existing interactive user.
 	err := store.UpsertUser(&mongodoc.Identity{

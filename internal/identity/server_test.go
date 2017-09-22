@@ -69,6 +69,7 @@ func (s *serverSuite) TestNewServerWithVersions(c *gc.C) {
 		"version1": serveVersion("version1"),
 	})
 	c.Assert(err, gc.IsNil)
+	defer h.Close()
 	assertServesVersion(c, h, "version1")
 	assertDoesNotServeVersion(c, h, "version2")
 	assertDoesNotServeVersion(c, h, "version3")
@@ -80,6 +81,7 @@ func (s *serverSuite) TestNewServerWithVersions(c *gc.C) {
 		"version2": serveVersion("version2"),
 	})
 	c.Assert(err, gc.IsNil)
+	defer h.Close()
 	assertServesVersion(c, h, "version1")
 	assertServesVersion(c, h, "version2")
 	assertDoesNotServeVersion(c, h, "version3")
@@ -92,6 +94,7 @@ func (s *serverSuite) TestNewServerWithVersions(c *gc.C) {
 		"version3": serveVersion("version3"),
 	})
 	c.Assert(err, gc.IsNil)
+	defer h.Close()
 	assertServesVersion(c, h, "version1")
 	assertServesVersion(c, h, "version2")
 	assertServesVersion(c, h, "version3")
@@ -114,6 +117,7 @@ func (s *serverSuite) TestServerHasAccessControlAllowHeaders(c *gc.C) {
 		PrivateAddr: "localhost",
 	}, impl)
 	c.Assert(err, gc.IsNil)
+	defer h.Close()
 	rec := httptesting.DoRequest(c, httptesting.DoRequestParams{
 		Handler: h,
 		URL:     "/a",
@@ -159,6 +163,7 @@ func (s *serverSuite) TestServerPanicRecovery(c *gc.C) {
 		PrivateAddr: "localhost",
 	}, impl)
 	c.Assert(err, gc.IsNil)
+	defer h.Close()
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Handler:      h,
 		URL:          "/a",
@@ -199,6 +204,7 @@ func (s *serverSuite) TestServerStaticFiles(c *gc.C) {
 		"version1": serveVersion("version1"),
 	})
 	c.Assert(err, gc.IsNil)
+	defer h.Close()
 
 	f, err := os.Create(filepath.Join(path, "file"))
 	c.Assert(err, gc.IsNil)

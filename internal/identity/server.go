@@ -48,7 +48,6 @@ func New(db *mgo.Database, sp ServerParams, versions map[string]NewAPIHandlerFun
 		Location:            sp.Location,
 		ExternalGroupGetter: groupGetter,
 		MaxMgoSessions:      sp.MaxMgoSessions,
-		RequestTimeout:      sp.RequestTimeout,
 		PrivateAddr:         sp.PrivateAddr,
 		AdminAgentPublicKey: sp.AdminAgentPublicKey,
 	})

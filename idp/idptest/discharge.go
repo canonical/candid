@@ -88,7 +88,7 @@ func (s *DischargeSuite) SetUpTest(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 	s.adminAgentKey, err = bakery.GenerateKey()
 	c.Assert(err, gc.IsNil)
-	db := s.Session.Copy().DB("idptest")
+	db := s.Session.DB("idptest")
 	s.srv, err = identity.NewServer(db, identity.ServerParams{
 		AuthUsername:        authUsername,
 		AuthPassword:        authPassword,

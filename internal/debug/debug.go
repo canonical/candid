@@ -3,16 +3,13 @@
 package debug
 
 import (
-	"fmt"
 	"net/http"
 	"strconv"
 
 	"github.com/juju/httprequest"
-	"github.com/juju/idmclient/params"
 	"github.com/juju/loggo"
 	"github.com/juju/utils/debugstatus"
 	"golang.org/x/net/context"
-	"gopkg.in/errgo.v1"
 
 	"github.com/CanonicalLtd/blues-identity/internal/identity"
 	"github.com/CanonicalLtd/blues-identity/internal/store"
@@ -85,11 +82,7 @@ type handler struct {
 // DebugStatus overrides Handler.DebugStatus to first get a store from
 // the pool.
 func (h *handler) DebugStatus(r *debugstatus.DebugStatusRequest) (map[string]debugstatus.CheckResult, error) {
-	var err error
-	h.store, err = h.h.pool.Get()
-	if err != nil {
-		return nil, errgo.Mask(err, errgo.Is(params.ErrServiceUnavailable))
-	}
+	h.store = h.h.pool.Get()
 	return h.check(), nil
 }
 
@@ -100,7 +93,6 @@ func (h *handler) check() map[string]debugstatus.CheckResult {
 		debugstatus.Connection(h.store.DB.Session),
 		debugstatus.MongoCollections(h.store.DB),
 		h.meetingStatus(),
-		h.storePoolStatus(),
 	}
 	if h.h.nonceDB != "" {
 		checks = append(checks, h.noncesStatus("nonces"))
@@ -119,20 +111,6 @@ func (h *handler) meetingStatus() debugstatus.CheckerFunc {
 			result.Passed = false
 		}
 		return "meeting_count", result
-	}
-}
-
-func (h *handler) storePoolStatus() debugstatus.CheckerFunc {
-	return func() (key string, result debugstatus.CheckResult) {
-		result.Name = "Status of store limit pool (mgo)"
-		result.Passed = true
-		result.Value = "disabled"
-		if h.h != nil && h.h.pool != nil {
-			info := h.h.pool.Stats()
-			result.Value = fmt.Sprintf("free: %d; limit: %d; size: %d", info.Free, info.Limit, info.Size)
-			result.Passed = info.Size-info.Free < info.Limit
-		}
-		return "store_pool_status", result
 	}
 }
 

@@ -109,17 +109,7 @@ func (h *Handler) getAuthorizedHandler(p httprequest.Params, traceFamily string,
 func (h *Handler) getHandler(p httprequest.Params, traceFamily string) (*handler, context.Context, error) {
 	ctx := p.Context
 	t := trace.New(traceFamily, p.PathPattern)
-	st, err := h.storePool.Get()
-	if err != nil {
-		// TODO(mhilton) consider logging inside the pool.
-		t.LazyPrintf("cannot get store: %s", err)
-		if errgo.Cause(err) != params.ErrServiceUnavailable {
-			t.SetError()
-		}
-		t.Finish()
-		return nil, nil, errgo.NoteMask(err, "cannot get store", errgo.Any)
-	}
-	t.LazyPrintf("store acquired")
+	st := h.storePool.Get()
 	handler := h.handlerPool.Get().(*handler)
 	handler.store = st
 	handler.place = &place{st.Place}

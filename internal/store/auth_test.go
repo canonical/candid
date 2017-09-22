@@ -36,7 +36,7 @@ func (s *authSuite) SetUpTest(c *gc.C) {
 	s.IsolatedMgoSuite.SetUpTest(c)
 	var err error
 	s.pool, err = store.NewPool(
-		s.Session.Copy().DB("idm-test"),
+		s.Session.DB("idm-test"),
 		store.StoreParams{
 			AuthUsername: "test-admin",
 			AuthPassword: "open sesame",
@@ -53,7 +53,7 @@ func (s *authSuite) TearDownTest(c *gc.C) {
 }
 
 func (s *authSuite) createIdentity(c *gc.C, doc *mongodoc.Identity) {
-	store := s.pool.GetNoLimit()
+	store := s.pool.Get()
 	defer s.pool.Put(store)
 	if doc.ExternalID != "" {
 		err := store.UpsertUser(doc)
@@ -113,7 +113,7 @@ func (s *authSuite) TestAuthorizeWithAdminCredentials(c *gc.C) {
 	}}
 	for i, test := range tests {
 		c.Logf("test %d. %s", i, test.about)
-		st := s.pool.GetNoLimit()
+		st := s.pool.Get()
 		defer s.pool.Put(st)
 		req, _ := http.NewRequest("GET", "/", nil)
 		for attr, val := range test.header {
@@ -153,7 +153,7 @@ func (s *authSuite) TestUserHasPublicKeyChecker(c *gc.C) {
 
 	checker := store.NewChecker()
 
-	st := s.pool.GetNoLimit()
+	st := s.pool.Get()
 	defer s.pool.Put(st)
 	ctx := store.ContextWithStore(context.Background(), st)
 	checkCaveat := func(cav checkers.Caveat) error {
@@ -240,7 +240,7 @@ var aclForOpTests = []struct {
 }}
 
 func (s *authSuite) TestACLForOp(c *gc.C) {
-	st := s.pool.GetNoLimit()
+	st := s.pool.Get()
 	defer s.pool.Put(st)
 	for i, test := range aclForOpTests {
 		c.Logf("test %d: %v", i, test.op)
@@ -253,7 +253,7 @@ func (s *authSuite) TestACLForOp(c *gc.C) {
 }
 
 func (s *authSuite) TestAdminUserGroups(c *gc.C) {
-	st := s.pool.GetNoLimit()
+	st := s.pool.Get()
 	defer s.pool.Put(st)
 
 	req, _ := http.NewRequest("GET", "/", nil)
@@ -264,7 +264,7 @@ func (s *authSuite) TestAdminUserGroups(c *gc.C) {
 }
 
 func (s *authSuite) TestNonExistentUserGroups(c *gc.C) {
-	st := s.pool.GetNoLimit()
+	st := s.pool.Get()
 	defer s.pool.Put(st)
 
 	req, _ := http.NewRequest("GET", "/", nil)
@@ -291,7 +291,7 @@ func (s *authSuite) TestNonExistentUserGroups(c *gc.C) {
 }
 
 func (s *authSuite) TestExistingUserGroups(c *gc.C) {
-	st := s.pool.GetNoLimit()
+	st := s.pool.Get()
 	defer s.pool.Put(st)
 	// good identity
 	s.createIdentity(c, &mongodoc.Identity{
@@ -399,7 +399,7 @@ func (s *authSuite) TestIdentityAllow(c *gc.C) {
 	var externalGroupsError error
 
 	pool, err := store.NewPool(
-		s.Session.Copy().DB("store-launchpad-tests"),
+		s.Session.DB("store-launchpad-tests"),
 		store.StoreParams{
 			ExternalGroupGetter: externalGroupGetterFunc(func(id string) ([]string, error) {
 				c.Check(id, gc.Equals, "testuser-external-id")
@@ -410,7 +410,7 @@ func (s *authSuite) TestIdentityAllow(c *gc.C) {
 	)
 	c.Assert(err, gc.IsNil)
 	defer pool.Close()
-	st := pool.GetNoLimit()
+	st := pool.Get()
 	defer pool.Put(st)
 	// Add an identity to the store.
 	err = st.UpsertUser(&mongodoc.Identity{
@@ -447,7 +447,7 @@ func (s *authSuite) TestIdentityAllow(c *gc.C) {
 
 func (s *authSuite) TestIdentityGroups(c *gc.C) {
 	pool, err := store.NewPool(
-		s.Session.Copy().DB("store-launchpad-tests"),
+		s.Session.DB("store-launchpad-tests"),
 		store.StoreParams{
 			ExternalGroupGetter: externalGroupGetterFunc(func(id string) ([]string, error) {
 				return []string{"extgroup1", "extgroup2", "group1"}, nil
@@ -457,7 +457,7 @@ func (s *authSuite) TestIdentityGroups(c *gc.C) {
 	)
 	c.Assert(err, gc.IsNil)
 	defer pool.Close()
-	st := pool.GetNoLimit()
+	st := pool.Get()
 	defer pool.Put(st)
 	err = st.UpsertUser(&mongodoc.Identity{
 		Username:   "testuser",
@@ -479,7 +479,7 @@ func (s *authSuite) TestIdentityGroups(c *gc.C) {
 
 func (s *authSuite) TestIdentityGroupsForAgent(c *gc.C) {
 	pool, err := store.NewPool(
-		s.Session.Copy().DB("store-launchpad-tests"),
+		s.Session.DB("store-launchpad-tests"),
 		store.StoreParams{
 			ExternalGroupGetter: externalGroupGetterFunc(func(id string) ([]string, error) {
 				if id != "testuser-external-id" {
@@ -492,7 +492,7 @@ func (s *authSuite) TestIdentityGroupsForAgent(c *gc.C) {
 	)
 	c.Assert(err, gc.IsNil)
 	defer pool.Close()
-	st := pool.GetNoLimit()
+	st := pool.Get()
 	defer pool.Put(st)
 	err = st.UpsertUser(&mongodoc.Identity{
 		Username:   "testuser",
@@ -530,7 +530,7 @@ func (f externalGroupGetterFunc) GetGroups(id string) ([]string, error) {
 }
 
 func (s *authSuite) TestAuthorizeMacaroonRequired(c *gc.C) {
-	store := s.pool.GetNoLimit()
+	store := s.pool.Get()
 	defer s.pool.Put(store)
 	req, err := http.NewRequest("GET", "http://example.com/v1/test", nil)
 	c.Assert(err, gc.IsNil)

@@ -31,7 +31,7 @@ func (s *idpSuite) SetUpTest(c *gc.C) {
 	s.IsolatedMgoSuite.SetUpTest(c)
 	key, err := bakery.GenerateKey()
 	c.Assert(err, gc.IsNil)
-	s.hnd, s.pool = s.newHandler(c, s.Session.Copy(), key)
+	s.hnd, s.pool = s.newHandler(c, s.Session, key)
 }
 
 func (s *idpSuite) TearDownTest(c *gc.C) {

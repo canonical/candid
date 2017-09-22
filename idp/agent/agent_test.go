@@ -43,15 +43,15 @@ func (s *agentSuite) SetUpTest(c *gc.C) {
 	s.IsolatedMgoSuite.SetUpTest(c)
 	s.idp = agent.IdentityProvider
 	var err error
-	s.pool, err = store.NewPool(s.Session.Copy().DB("testing"), store.StoreParams{
+	s.pool, err = store.NewPool(s.Session.DB("testing"), store.StoreParams{
 		PrivateAddr: "localhost",
 	})
 	c.Assert(err, gc.IsNil)
-	s.store = s.pool.GetNoLimit()
+	s.store = s.pool.Get()
 }
 
 func (s *agentSuite) TearDownTest(c *gc.C) {
-	s.store.Close()
+	s.pool.Put(s.store)
 	s.pool.Close()
 	s.IsolatedMgoSuite.TearDownTest(c)
 }

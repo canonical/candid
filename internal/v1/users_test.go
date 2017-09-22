@@ -764,7 +764,7 @@ func (s *usersSuite) TestCreateUserWritesToDatabase(c *gc.C) {
 		Password:     adminPassword,
 		ExpectStatus: http.StatusOK,
 	})
-	store := s.pool.GetNoLimit()
+	store := s.pool.Get()
 	defer s.pool.Put(store)
 	var doc mongodoc.Identity
 	err := store.DB.Identities().Find(bson.D{{"username", "jbloggs"}}).One(&doc)
@@ -777,7 +777,7 @@ func (s *usersSuite) TestCreateUserWritesToDatabase(c *gc.C) {
 }
 
 func (s *usersSuite) TestQueryUsers(c *gc.C) {
-	st := s.pool.GetNoLimit()
+	st := s.pool.Get()
 	defer s.pool.Put(st)
 	s.createUser(c, &params.User{
 		Username:   "jbloggs2",
@@ -1344,7 +1344,7 @@ func (s *usersSuite) TestUserIDPGroups(c *gc.C) {
 }
 
 func (s *usersSuite) TestUserGroups(c *gc.C) {
-	st := s.pool.GetNoLimit()
+	st := s.pool.Get()
 	defer s.pool.Put(st)
 	s.createUser(c, &params.User{
 		Username:   "test",
@@ -1467,7 +1467,7 @@ func (s *usersSuite) TestUserGroups(c *gc.C) {
 }
 
 func (s *usersSuite) TestWhoAmIWithAuthenticatedUser(c *gc.C) {
-	st := s.pool.GetNoLimit()
+	st := s.pool.Get()
 	defer s.pool.Put(st)
 	s.createUser(c, &params.User{
 		Username:   "bob",
@@ -1486,7 +1486,7 @@ func (s *usersSuite) TestWhoAmIWithAuthenticatedUser(c *gc.C) {
 }
 
 func (s *usersSuite) TestWhoAmIWithNoUser(c *gc.C) {
-	st := s.pool.GetNoLimit()
+	st := s.pool.Get()
 	defer s.pool.Put(st)
 	rec := httptesting.DoRequest(c, httptesting.DoRequestParams{
 		Handler: s.srv,
@@ -1550,7 +1550,7 @@ var setUserGroupsTests = []struct {
 }}
 
 func (s *usersSuite) TestSetUserGroups(c *gc.C) {
-	store := s.pool.GetNoLimit()
+	store := s.pool.Get()
 	defer s.pool.Put(store)
 	for i, test := range setUserGroupsTests {
 		c.Logf("test %d. %s", i, test.about)
@@ -1671,7 +1671,7 @@ var modifyUserGroupsTests = []struct {
 }}
 
 func (s *usersSuite) TestModifyUserGroups(c *gc.C) {
-	store := s.pool.GetNoLimit()
+	store := s.pool.Get()
 	defer s.pool.Put(store)
 	for i, test := range modifyUserGroupsTests {
 		c.Logf("test %d. %s", i, test.about)
@@ -1870,7 +1870,7 @@ var extraInfoTests = []struct {
 }}
 
 func (s *usersSuite) TestExtraInfo(c *gc.C) {
-	store := s.pool.GetNoLimit()
+	store := s.pool.Get()
 	defer s.pool.Put(store)
 	s.createUser(c, &params.User{
 		Username:   "jbloggs",
@@ -1927,7 +1927,7 @@ func (s *usersSuite) TestExtraInfo(c *gc.C) {
 }
 
 func (s *usersSuite) TestMultipleEndpointAccess(c *gc.C) {
-	store := s.pool.GetNoLimit()
+	store := s.pool.Get()
 	defer s.pool.Put(store)
 	s.createIdentity(c, &mongodoc.Identity{
 		Username:   "test",
