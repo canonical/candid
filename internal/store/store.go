@@ -52,6 +52,10 @@ type StoreParams struct {
 	// sessions.
 	MaxMgoSessions int
 
+	// WaitTimeout holds the maximum amount of
+	// time an interactive discharge wait request should wait for.
+	WaitTimeout time.Duration
+
 	// PrivateAddr should hold a dialable address that will be used
 	// for communication between identity servers. Note that this
 	// should not contain a port.
@@ -111,7 +115,12 @@ func NewPool(db *mgo.Database, sp StoreParams) (*Pool, error) {
 		return p.newStore()
 	}
 	var err error
-	p.meetingServer, err = meeting.NewServer(p.newMeetingStore, newMeetingMetrics(), p.params.PrivateAddr)
+	p.meetingServer, err = meeting.NewServer(meeting.Params{
+		GetStore:    p.newMeetingStore,
+		Metrics:     newMeetingMetrics(),
+		ListenAddr:  p.params.PrivateAddr,
+		WaitTimeout: sp.WaitTimeout,
+	})
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}

@@ -30,7 +30,7 @@ type Config struct {
 	Location            string             `yaml:"location"`
 	AccessLog           string             `yaml:"access-log"`
 	MaxMgoSessions      int                `yaml:"max-mgo-sessions"`
-	RequestTimeout      DurationString     `yaml:"request-timeout"`
+	WaitTimeout         DurationString     `yaml:"wait-timeout"`
 	IdentityProviders   []IdentityProvider `yaml:"identity-providers"`
 	PrivateAddr         string             `yaml:"private-addr"`
 	DebugTeams          []string           `yaml:"debug-teams"`
