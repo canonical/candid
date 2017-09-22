@@ -31,12 +31,16 @@ var (
 	// rendezvous.
 	pollInterval = 30 * time.Second
 
-	// expiryDuration holds the length of time that we keep
+	// defaultExpiryDuration holds the length of time that we keep
 	// a rendezvous around before deleting it. This needs to
 	// be long enough that the user can do all the web page
 	// interaction that they need to before the rendezvous is
 	// completed.
-	expiryDuration = time.Hour
+	defaultExpiryDuration = time.Hour
+
+	// defaultWaitTimeout holds the default maximum
+	// length of time that a wait request can block for.
+	defaultWaitTimeout = time.Minute
 
 	// reallyOldExpiryDuration holds the length of time after
 	// which we'll delete rendezvous regardless of server.
@@ -78,12 +82,14 @@ type Store interface {
 
 // Server represents a rendezvous server.
 type Server struct {
-	tomb      tomb.Tomb
-	getStore  func() Store
-	localAddr string
-	listener  net.Listener
-	handler   *handler
-	metrics   Metrics
+	tomb           tomb.Tomb
+	getStore       func() Store
+	localAddr      string
+	listener       net.Listener
+	handler        *handler
+	metrics        Metrics
+	waitTimeout    time.Duration
+	expiryDuration time.Duration
 
 	mu    sync.Mutex
 	items map[string]*item
@@ -102,34 +108,76 @@ type Place struct {
 	srv   *Server
 }
 
+// Metrics represents a way to report metrics information
+// about the meeting service. It must be callable
+// concurrently.
 type Metrics interface {
+	// RequestCompleted is called every time an HTTP
+	// request has completed with the time the request started.
 	RequestCompleted(startTime time.Time)
+
+	// RequestsExpired is called when some requests
+	// have been garbage collected with the number
+	// of GC'd requests.
 	RequestsExpired(count int)
 }
 
-// NewServer returns a new rendezvous server that listens on the given
-// address. When a store is required by a server request,
-// it will be acquired by calling getStore and closed after the
-// request has finished.
-//
-// Note that listenAddr must also be sufficient for other
-// servers to use to contact this one.
-func NewServer(getStore func() Store, m Metrics, listenAddr string) (*Server, error) {
-	return newServer(getStore, m, listenAddr, true)
+// Params holds parameters for the NewServer function.
+type Params struct {
+	// GetStore is used to acquire store instances.
+	// When a store is required by a server request,
+	// it will be acquired by calling getStore and closed after the
+	// request has finished.
+	GetStore func() Store
+
+	// Metrics holds an object that's used to report server metrics.
+	// If it's nil, no metrics will be reported.
+	Metrics Metrics
+
+	// ListenAddr holds the host name to listen on. This
+	// should not have a port number.
+	// Note that listenAddr must also be sufficient for other
+	// servers to use to contact this one.
+	ListenAddr string
+
+	// DisableGC holds whether the garbage collector is disabled.
+	DisableGC bool
+
+	// WaitTimeout holds the maximum time to that
+	// wait requests will wait. If it is zero, a default
+	// duration will be used.
+	WaitTimeout time.Duration
+
+	// ExpiryDuration holds the maximum amount of time
+	// a rendezvous will be kept around for. If it is zero, a default
+	// duration will be used.
+	ExpiryDuration time.Duration
 }
 
-func newServer(getStore func() Store, m Metrics, listenAddr string, runGC bool) (*Server, error) {
-	listener, err := net.Listen("tcp", net.JoinHostPort(listenAddr, "0"))
+// NewServer returns a new rendezvous server using the given
+// parameters.
+func NewServer(p Params) (*Server, error) {
+	listener, err := net.Listen("tcp", net.JoinHostPort(p.ListenAddr, "0"))
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot start listener")
 	}
-
+	if p.Metrics == nil {
+		p.Metrics = noMetrics{}
+	}
+	if p.WaitTimeout == 0 {
+		p.WaitTimeout = defaultWaitTimeout
+	}
+	if p.ExpiryDuration == 0 {
+		p.ExpiryDuration = defaultExpiryDuration
+	}
 	srv := &Server{
-		getStore:  getStore,
-		listener:  listener,
-		localAddr: listener.Addr().String(),
-		items:     make(map[string]*item),
-		metrics:   m,
+		getStore:       p.GetStore,
+		listener:       listener,
+		localAddr:      listener.Addr().String(),
+		items:          make(map[string]*item),
+		metrics:        p.Metrics,
+		waitTimeout:    p.WaitTimeout,
+		expiryDuration: p.ExpiryDuration,
 	}
 	srv.handler = &handler{
 		srv: srv,
@@ -138,7 +186,7 @@ func newServer(getStore func() Store, m Metrics, listenAddr string, runGC bool) 
 	for _, h := range reqServer.Handlers(srv.newHandler) {
 		router.Handle(h.Method, h.Path, h.Handle)
 	}
-	if runGC {
+	if !p.DisableGC {
 		srv.tomb.Go(srv.gc)
 	}
 	srv.tomb.Go(func() error {
@@ -189,7 +237,7 @@ func (srv *Server) runGC(dying bool, now time.Time) error {
 		// find all entries.
 		expiryTime = now.Add(time.Millisecond)
 	} else {
-		expiryTime = now.Add(-expiryDuration)
+		expiryTime = now.Add(-srv.expiryDuration)
 	}
 	ids, err := store.RemoveOld(srv.localAddr, expiryTime)
 	if len(ids) > 0 {
@@ -234,11 +282,11 @@ func (srv *Server) localWait(id string, getStore func() Store) (data0, data1 []b
 		return nil, nil, errgo.Newf("rendezvous %q not found", id)
 	}
 	// Wait for the channel to be closed by Done.
-	expired := false
+	timeout := false
 	select {
 	case <-item.c:
-	case <-Clock.After(expiryDuration):
-		expired = true
+	case <-Clock.After(srv.waitTimeout):
+		timeout = true
 	}
 	// Note that we get the Store *after* waiting, so we
 	// don't tie up resources while waiting.
@@ -254,8 +302,8 @@ func (srv *Server) localWait(id string, getStore func() Store) (data0, data1 []b
 	if !t.IsZero() {
 		srv.metrics.RequestCompleted(t)
 	}
-	if expired {
-		return nil, nil, errgo.Newf("rendezvous has expired after %v", expiryDuration)
+	if timeout {
+		return nil, nil, errgo.Newf("rendezvous timed out after %v", srv.waitTimeout)
 	}
 	return item.data0, item.data1, nil
 }
@@ -393,3 +441,10 @@ type storeNopCloser struct {
 
 func (storeNopCloser) Close() {
 }
+
+// noMetrics implements Metrics by doing nothing.
+type noMetrics struct{}
+
+func (noMetrics) RequestCompleted(startTime time.Time) {}
+
+func (noMetrics) RequestsExpired(count int) {}

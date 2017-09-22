@@ -109,7 +109,7 @@ func serve(confPath string) error {
 			Location:            conf.Location,
 			Launchpad:           lpad.Production,
 			MaxMgoSessions:      conf.MaxMgoSessions,
-			RequestTimeout:      conf.RequestTimeout.Duration,
+			WaitTimeout:         conf.WaitTimeout.Duration,
 			IdentityProviders:   idps,
 			PrivateAddr:         conf.PrivateAddr,
 			DebugTeams:          conf.DebugTeams,

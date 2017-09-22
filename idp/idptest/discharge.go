@@ -96,7 +96,7 @@ func (s *DischargeSuite) SetUpTest(c *gc.C) {
 		Launchpad:           "https://0.1.2.3/",
 		Location:            DischargeLocation,
 		MaxMgoSessions:      100,
-		RequestTimeout:      time.Second,
+		WaitTimeout:         time.Second,
 		PrivateAddr:         "localhost",
 		IdentityProviders:   s.IDPs,
 		AdminAgentPublicKey: &s.adminAgentKey.Public,

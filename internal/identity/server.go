@@ -50,6 +50,7 @@ func New(db *mgo.Database, sp ServerParams, versions map[string]NewAPIHandlerFun
 		MaxMgoSessions:      sp.MaxMgoSessions,
 		PrivateAddr:         sp.PrivateAddr,
 		AdminAgentPublicKey: sp.AdminAgentPublicKey,
+		WaitTimeout:         sp.WaitTimeout,
 	})
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot make store")
@@ -135,9 +136,9 @@ type ServerParams struct {
 	// sessions.
 	MaxMgoSessions int
 
-	// RequestTimeout holds the time to wait for a request to be able
-	// to start.
-	RequestTimeout time.Duration
+	// WaitTimeout holds the time after which an interactive discharge wait
+	// request will timeout.
+	WaitTimeout time.Duration
 
 	// PrivateAddr should hold a dialable address that will be used
 	// for communication between identity servers. Note that this

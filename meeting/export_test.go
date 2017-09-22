@@ -10,11 +10,6 @@ func ItemCount(srv *Server) int {
 }
 
 var (
-	ExpiryDuration          = &expiryDuration
 	ReallyOldExpiryDuration = &reallyOldExpiryDuration
 	RunGC                   = (*Server).runGC
 )
-
-func NewServerNoGC(getStore func() Store, m Metrics, listenAddr string) (*Server, error) {
-	return newServer(getStore, m, listenAddr, false)
-}
