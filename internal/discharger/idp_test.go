@@ -55,7 +55,11 @@ func (s *idpSuite) SetUpTest(c *gc.C) {
 		Location: "idmtest",
 	})
 	var err error
-	s.meetingPlace, err = meeting.NewPlace(s.MeetingStore, monitoring.NewMeetingMetrics(), "localhost")
+	s.meetingPlace, err = meeting.NewPlace(meeting.Params{
+		Store:      s.MeetingStore,
+		Metrics:    monitoring.NewMeetingMetrics(),
+		ListenAddr: "localhost",
+	})
 	c.Assert(err, gc.Equals, nil)
 
 	s.vc = discharger.NewVisitCompleter(identity.HandlerParams{

@@ -39,7 +39,7 @@ public-key: CIdWcEUN+0OZnKW9KwruRQnQDY/qqzVdD30CijwiWCk=
 admin-agent-public-key: dUnC8p9p3nygtE2h92a47Ooq0rXg0fVSm3YBWou5/UQ=
 location: http://foo.com:1234
 max-mgo-sessions: 10
-request-timeout: 500ms
+wait-timeout: 1m
 identity-providers:
  - type: usso
  - type: keystone
@@ -143,7 +143,7 @@ func (s *configSuite) TestRead(c *gc.C) {
 		AdminAgentPublicKey: &adminPubKey,
 		Location:            "http://foo.com:1234",
 		MaxMgoSessions:      10,
-		RequestTimeout:      config.DurationString{Duration: 500 * time.Millisecond},
+		WaitTimeout:         config.DurationString{Duration: time.Minute},
 		IdentityProviders: []config.IdentityProvider{{
 			IdentityProvider: IdentityProvider{
 				Params: map[string]string{

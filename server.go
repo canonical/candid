@@ -6,6 +6,7 @@ import (
 	"html/template"
 	"net/http"
 	"sort"
+	"time"
 
 	"github.com/juju/utils/debugstatus"
 	"gopkg.in/errgo.v1"
@@ -102,6 +103,10 @@ type ServerParams struct {
 	// DebugStatusCheckerFuncs contains functions that will be
 	// executed as part of a /debug/status check.
 	DebugStatusCheckerFuncs []debugstatus.CheckerFunc
+
+	// WaitTimeout holds the time after which an interactive discharge wait
+	// request will timeout.
+	WaitTimeout time.Duration
 }
 
 // NewServer returns a new handler that handles identity service requests and
