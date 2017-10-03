@@ -103,3 +103,12 @@ func RegistrationForm(ctx context.Context, w http.ResponseWriter, params Registr
 	}
 	return nil
 }
+
+// NameWithDomain builds a name out of name and domain. If domain is
+// empty then name is returned unchanged.
+func NameWithDomain(name, domain string) string {
+	if domain == "" {
+		return name
+	}
+	return name + "@" + domain
+}

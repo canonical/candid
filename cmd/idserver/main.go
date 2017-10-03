@@ -26,6 +26,7 @@ import (
 	_ "github.com/CanonicalLtd/blues-identity/idp/azure"
 	_ "github.com/CanonicalLtd/blues-identity/idp/google"
 	_ "github.com/CanonicalLtd/blues-identity/idp/keystone"
+	_ "github.com/CanonicalLtd/blues-identity/idp/ldap"
 	"github.com/CanonicalLtd/blues-identity/idp/usso"
 	_ "github.com/CanonicalLtd/blues-identity/idp/usso/ussodischarge"
 	"github.com/CanonicalLtd/blues-identity/idp/usso/ussooauth"
