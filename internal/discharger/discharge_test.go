@@ -6,7 +6,6 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -28,8 +27,6 @@ import (
 
 	"github.com/CanonicalLtd/blues-identity/idp"
 	"github.com/CanonicalLtd/blues-identity/idp/test"
-	"github.com/CanonicalLtd/blues-identity/internal/auth"
-	"github.com/CanonicalLtd/blues-identity/internal/discharger"
 	"github.com/CanonicalLtd/blues-identity/internal/idmtest"
 	"github.com/CanonicalLtd/blues-identity/store"
 )
@@ -46,61 +43,27 @@ var _ = gc.Suite(&dischargeSuite{})
 
 func (s *dischargeSuite) SetUpTest(c *gc.C) {
 	s.Params.IdentityProviders = []idp.IdentityProvider{
-		test.NewIdentityProvider(test.Params{Name: "test"}),
+		test.NewIdentityProvider(test.Params{Name: "test", Domain: "test-domain"}),
 	}
 	s.DischargeSuite.SetUpTest(c)
 }
 
 func (s *dischargeSuite) TestInteractiveDischarge(c *gc.C) {
-	s.AssertDischarge(c, interactiveVisitor)
+	s.AssertDischarge(c, webBrowserInteractor)
 }
 
 func (s *dischargeSuite) TestNonInteractiveDischarge(c *gc.C) {
-	s.AssertDischarge(c, nonInteractiveVisitor)
+	s.AssertDischarge(c, interactor)
 }
 
 func (s *dischargeSuite) TestDischargeWhenLoggedIn(c *gc.C) {
-	client := s.Client(interactiveVisitor)
+	client := s.Client(webBrowserInteractor)
 	ms, err := s.Discharge(c, "is-authenticated-user", client)
 	c.Assert(err, gc.Equals, nil)
 	s.AssertMacaroon(c, ms, bakery.LoginOp, "test-interactive")
-	client.WebPageVisitor = noVisit
 	ms, err = s.Discharge(c, "is-authenticated-user", client)
 	c.Assert(err, gc.Equals, nil)
 	s.AssertMacaroon(c, ms, bakery.LoginOp, "test-interactive")
-}
-
-func (s *dischargeSuite) TestWaitReturnsDischargeToken(c *gc.C) {
-	client := s.Client(interactiveVisitor)
-	transport := &responseBodyRecordingTransport{
-		c:         c,
-		transport: client.Transport,
-	}
-	client.Transport = transport
-	_, err := s.Discharge(c, "is-authenticated-user", client)
-	c.Assert(err, gc.Equals, nil)
-
-	u, _ := url.Parse(s.URL)
-	mss := cookiesToMacaroons(client.Jar.Cookies(u))
-	c.Assert(mss, gc.HasLen, 1)
-	c.Assert(mss[0], gc.HasLen, 1)
-
-	dischargeCount := 0
-	// Check that the responses to /discharge also included discharge tokens
-	// the same as the cookie.
-	for _, resp := range transport.responses {
-		if !strings.HasSuffix(resp.url.Path, "/wait") {
-			c.Logf("ignoring %v (path %s)", resp.url, resp.url.Path)
-			continue
-		}
-		dischargeCount++
-		var wresp discharger.WaitResponse
-		err := json.Unmarshal(resp.body, &wresp)
-		c.Assert(err, gc.IsNil)
-		c.Assert(wresp.DischargeToken, gc.HasLen, 1)
-		c.Assert(wresp.DischargeToken[0].Signature(), gc.DeepEquals, mss[0][0].Signature())
-	}
-	c.Assert(dischargeCount, gc.Not(gc.Equals), 0)
 }
 
 func (s *dischargeSuite) TestVisitURLWithDomainCookie(c *gc.C) {
@@ -111,13 +74,16 @@ func (s *dischargeSuite) TestVisitURLWithDomainCookie(c *gc.C) {
 		Name:  "domain",
 		Value: "test2",
 	}})
-	visitor := &valueSavingVisitor{
-		visitor: interactiveVisitor,
+
+	openWebBrowser := &valueSavingOpenWebBrowser{
+		openWebBrowser: interactor.OpenWebBrowser,
 	}
-	client.WebPageVisitor = visitor
+	client.AddInteractor(httpbakery.WebBrowserInteractor{
+		OpenWebBrowser: openWebBrowser.OpenWebBrowser,
+	})
 	_, err = s.Discharge(c, "is-authenticated-user", client)
 	c.Assert(err, gc.Equals, nil)
-	c.Assert(visitor.url.Query().Get("domain"), gc.Equals, "test2")
+	c.Assert(openWebBrowser.url.Query().Get("domain"), gc.Equals, "test2")
 }
 
 func (s *dischargeSuite) TestVisitURLWithInvalidDomainCookie(c *gc.C) {
@@ -128,13 +94,15 @@ func (s *dischargeSuite) TestVisitURLWithInvalidDomainCookie(c *gc.C) {
 		Name:  "domain",
 		Value: "test2-",
 	}})
-	visitor := &valueSavingVisitor{
-		visitor: interactiveVisitor,
+	openWebBrowser := &valueSavingOpenWebBrowser{
+		openWebBrowser: interactor.OpenWebBrowser,
 	}
-	client.WebPageVisitor = visitor
+	client.AddInteractor(httpbakery.WebBrowserInteractor{
+		OpenWebBrowser: openWebBrowser.OpenWebBrowser,
+	})
 	_, err = s.Discharge(c, "is-authenticated-user", client)
 	c.Assert(err, gc.Equals, nil)
-	c.Assert(visitor.url.Query().Get("domain"), gc.Equals, "")
+	c.Assert(openWebBrowser.url.Query().Get("domain"), gc.Equals, "")
 }
 
 func (s *dischargeSuite) TestVisitURLWithEscapedDomainCookie(c *gc.C) {
@@ -145,23 +113,15 @@ func (s *dischargeSuite) TestVisitURLWithEscapedDomainCookie(c *gc.C) {
 		Name:  "domain",
 		Value: "test+2",
 	}})
-	visitor := &valueSavingVisitor{
-		visitor: interactiveVisitor,
+	openWebBrowser := &valueSavingOpenWebBrowser{
+		openWebBrowser: interactor.OpenWebBrowser,
 	}
-	client.WebPageVisitor = visitor
+	client.AddInteractor(httpbakery.WebBrowserInteractor{
+		OpenWebBrowser: openWebBrowser.OpenWebBrowser,
+	})
 	_, err = s.Discharge(c, "is-authenticated-user", client)
 	c.Assert(err, gc.Equals, nil)
-	c.Assert(visitor.url.Query().Get("domain"), gc.Equals, "test+2")
-}
-
-type valueSavingVisitor struct {
-	url     *url.URL
-	visitor httpbakery.Visitor
-}
-
-func (v *valueSavingVisitor) VisitWebPage(ctx context.Context, client *httpbakery.Client, methodURLs map[string]*url.URL) error {
-	v.url = methodURLs[httpbakery.UserInteractionMethod]
-	return v.visitor.VisitWebPage(ctx, client, methodURLs)
+	c.Assert(openWebBrowser.url.Query().Get("domain"), gc.Equals, "test+2")
 }
 
 // cookiesToMacaroons returns a slice of any macaroons found
@@ -234,10 +194,20 @@ func (t *responseBodyRecordingTransport) RoundTrip(req *http.Request) (*http.Res
 }
 
 func (s *dischargeSuite) TestDischargeFromDifferentOriginWhenLoggedIn(c *gc.C) {
-	client := s.Client(interactiveVisitor)
+	c.Skip("cookies not yet supported")
+	var disabled bool
+	openWebBrowser := func(u *url.URL) error {
+		if disabled {
+			return errgo.New("visit required but not allowed")
+		}
+		return interactor.OpenWebBrowser(u)
+	}
+	client := s.Client(httpbakery.WebBrowserInteractor{
+		OpenWebBrowser: openWebBrowser,
+	})
 	_, err := s.Discharge(c, "is-authenticated-user", client)
 	c.Assert(err, gc.Equals, nil)
-	client.WebPageVisitor = noVisit
+	disabled = true
 	_, err = s.Discharge(c, "is-authenticated-user", client)
 	c.Assert(err, gc.Equals, nil)
 
@@ -269,14 +239,6 @@ func (t originTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	return transport.RoundTrip(&req1)
 }
 
-var noVisit = noVisitor{}
-
-type noVisitor struct{}
-
-func (noVisitor) VisitWebPage(context.Context, *httpbakery.Client, map[string]*url.URL) error {
-	return errors.New("unexpected call to visit")
-}
-
 var dischargeForUserTests = []struct {
 	about            string
 	condition        string
@@ -294,17 +256,6 @@ var dischargeForUserTests = []struct {
 	dischargeForUser: "jbloggs",
 	expectUser:       "jbloggs",
 }, {
-	about:     "no discharge user",
-	condition: "is-authenticated-user",
-	username:  idmtest.AdminUsername,
-	password:  idmtest.AdminPassword,
-	// Without the discharge-for-user query parameter, the administrator
-	// is just discharging for themselves.
-	// Note that even though we've used "admin" as the basic-auth
-	// user name, the identity server treats it the same
-	// as if it had agent authenticated as the admin agent.
-	expectUser: auth.AdminUsername,
-}, {
 	about:            "no authentication",
 	condition:        "is-authenticated-user",
 	dischargeForUser: "jbloggs",
@@ -315,7 +266,7 @@ var dischargeForUserTests = []struct {
 	username:         idmtest.AdminUsername,
 	password:         idmtest.AdminPassword,
 	dischargeForUser: "jbloggs2",
-	expectErr:        `cannot get discharge from ".*": Post .*/discharge: cannot discharge: invalid username "jbloggs2": user jbloggs2 not found`,
+	expectErr:        `cannot get discharge from ".*": Post .*/discharge: cannot discharge: could not determine identity: user jbloggs2 not found`,
 }, {
 	about:            "unsupported condition",
 	condition:        "is-authenticated-group",
@@ -343,7 +294,7 @@ var dischargeForUserTests = []struct {
 	username:         idmtest.AdminUsername,
 	password:         idmtest.AdminPassword,
 	dischargeForUser: "jbloggs@test",
-	expectErr:        `cannot get discharge from ".*": Post .*/discharge: cannot discharge: invalid username "jbloggs@test": "jbloggs@test" not in required domain "test2"`,
+	expectErr:        `cannot get discharge from ".*": Post .*/discharge: cannot discharge: could not determine identity: "jbloggs@test" not in required domain "test2"`,
 }, {
 	about:            "is-authenticated-user with invalid domain",
 	condition:        "is-authenticated-user @test-",
@@ -366,8 +317,7 @@ func (s *dischargeSuite) TestDischargeForUser(c *gc.C) {
 
 	for i, test := range dischargeForUserTests {
 		c.Logf("test %d. %s", i, test.about)
-		client := s.Client(nil)
-		client.DischargeAcquirer = &testDischargeAcquirer{
+		da := &testDischargeAcquirer{
 			client: &httprequest.Client{
 				BaseURL: s.URL,
 			},
@@ -375,7 +325,11 @@ func (s *dischargeSuite) TestDischargeForUser(c *gc.C) {
 			password:         test.password,
 			dischargeForUser: test.dischargeForUser,
 		}
-		ms, err := s.Discharge(c, test.condition, client)
+		ms, err := bakery.DischargeAll(
+			s.Ctx,
+			s.NewMacaroon(c, test.condition, bakery.LoginOp),
+			da.AcquireDischarge,
+		)
 		if test.expectErr != "" {
 			c.Assert(err, gc.ErrorMatches, test.expectErr)
 			continue
@@ -449,18 +403,18 @@ var dischargeMemberOfTests = []struct {
 }, {
 	about:       "test membership in single group - no match",
 	condition:   "is-member-of test1",
-	expectError: `cannot get discharge from ".*": failed to acquire macaroon after waiting: third party refused discharge: user is not a member of required groups`,
+	expectError: `cannot get discharge from ".*": Post http.*: permission denied`,
 }, {
 	about:     "test membership in a set of groups - one group matches",
 	condition: "is-member-of test2 test4",
 }, {
 	about:       "test membership in a set of groups fail - no match",
 	condition:   "is-member-of test1 test3",
-	expectError: `cannot get discharge from ".*": failed to acquire macaroon after waiting: third party refused discharge: user is not a member of required groups`,
+	expectError: `cannot get discharge from ".*": Post http.*: permission denied`,
 }}
 
 func (s *dischargeSuite) TestDischargeMemberOf(c *gc.C) {
-	client := s.Client(test.Visitor{
+	client := s.Client(test.Interactor{
 		User: &params.User{
 			Username:   "test-user",
 			ExternalID: "http://example.com/test-user",
@@ -489,7 +443,7 @@ func (s *dischargeSuite) TestDischargeMemberOf(c *gc.C) {
 func (s *dischargeSuite) TestDischargeXMemberOfX(c *gc.C) {
 	// if the user is X member of no group, we must still
 	// discharge is-member-of X.
-	client := s.Client(test.Visitor{
+	client := s.Client(test.Interactor{
 		User: &params.User{
 			Username:   "test-user",
 			ExternalID: "http://example.com/test-user",
@@ -593,8 +547,10 @@ func (s *dischargeSuite) TestPublicKey(c *gc.C) {
 	})
 }
 
+// TODO(mhilton): Work out how to deal with identity cookies later.
 func (s *dischargeSuite) TestIdentityCookieParameters(c *gc.C) {
-	client := s.Client(interactiveVisitor)
+	c.Skip("cookies not yet supported")
+	client := s.Client(webBrowserInteractor)
 	jar := new(testCookieJar)
 	client.Client.Jar = jar
 	ms, err := s.Discharge(c, "is-authenticated-user", client)
@@ -642,7 +598,7 @@ func (j *testCookieJar) Cookies(u *url.URL) []*http.Cookie {
 }
 
 func (s *dischargeSuite) TestLastDischargeTimeUpdates(c *gc.C) {
-	s.AssertDischarge(c, interactiveVisitor)
+	s.AssertDischarge(c, webBrowserInteractor)
 	id1 := store.Identity{
 		ProviderID: "test:test-interactive",
 	}
@@ -654,7 +610,7 @@ func (s *dischargeSuite) TestLastDischargeTimeUpdates(c *gc.C) {
 	// database is necessarily different.
 	time.Sleep(time.Millisecond)
 
-	s.AssertDischarge(c, interactiveVisitor)
+	s.AssertDischarge(c, webBrowserInteractor)
 	id2 := store.Identity{
 		ProviderID: "test:test-interactive",
 	}
@@ -698,14 +654,16 @@ func (s *dischargeSuite) TestDomainInInteractionURLs(c *gc.C) {
 		if tst.expectDomain != "" {
 			username = "user@" + tst.expectDomain
 		}
-		client := s.Client(&valueSavingVisitor{
-			visitor: &test.Visitor{
-				User: &params.User{
-					Username:   params.Username(username),
-					ExternalID: tst.expectDomain + ":user",
-				},
+		interactor := &test.Interactor{
+			User: &params.User{
+				Username:   params.Username(username),
+				ExternalID: tst.expectDomain + ":user",
 			},
+		}
+		client := s.Client(httpbakery.WebBrowserInteractor{
+			OpenWebBrowser: interactor.OpenWebBrowser,
 		})
+		interactor.Doer = client
 		for k, v := range tst.cookies {
 			u, err := url.Parse(s.URL)
 			c.Assert(err, gc.IsNil)
@@ -722,24 +680,24 @@ func (s *dischargeSuite) TestDomainInInteractionURLs(c *gc.C) {
 
 func (s *dischargeSuite) TestDischargeWithDomainWithExistingNonDomainAuth(c *gc.C) {
 	// First log in successfully without a domain.
-	s.AssertDischarge(c, &test.Visitor{
-		&params.User{
+	s.AssertDischarge(c, &test.Interactor{
+		User: &params.User{
 			Username:   "bob",
 			ExternalID: "bobexternal",
 		},
 	})
 	// Then try with a caveat that requires a domain.
-	ms, err := s.Discharge(c, "is-authenticated-user @somewhere", s.Client(&test.Visitor{
-		&params.User{
-			Username:   "alice@somewhere",
+	ms, err := s.Discharge(c, "is-authenticated-user @test-domain", s.Client(&test.Interactor{
+		User: &params.User{
+			Username:   "alice@test-domain",
 			ExternalID: "aliceexternal",
 		},
 	}))
 	c.Assert(err, gc.Equals, nil)
-	s.AssertMacaroon(c, ms, bakery.LoginOp, "alice@somewhere")
+	s.AssertMacaroon(c, ms, bakery.LoginOp, "alice@test-domain")
 }
 
-var interactiveVisitor = &test.Visitor{
+var interactor = &test.Interactor{
 	User: &params.User{
 		Username:   "test-interactive",
 		ExternalID: "test:test-interactive",
@@ -749,12 +707,16 @@ var interactiveVisitor = &test.Visitor{
 	},
 }
 
-var nonInteractiveVisitor = &test.Visitor{
-	User: &params.User{
-		Username:   "test-non-interactive",
-		ExternalID: "test:test-non-interactive",
-		FullName:   "Non-interactive Test User",
-		Email:      "test-non-interactive@example.com",
-		IDPGroups:  []string{"test1", "test2"},
-	},
+var webBrowserInteractor = httpbakery.WebBrowserInteractor{
+	OpenWebBrowser: interactor.OpenWebBrowser,
+}
+
+type valueSavingOpenWebBrowser struct {
+	url            *url.URL
+	openWebBrowser func(u *url.URL) error
+}
+
+func (v *valueSavingOpenWebBrowser) OpenWebBrowser(u *url.URL) error {
+	v.url = u
+	return v.openWebBrowser(u)
 }

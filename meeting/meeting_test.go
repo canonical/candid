@@ -3,6 +3,8 @@
 package meeting_test
 
 import (
+	"crypto/rand"
+	"fmt"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -55,8 +57,9 @@ func (s *suite) TestRendezvousWaitBeforeDone(c *gc.C) {
 
 	ctx := context.Background()
 
-	id, err := m.NewRendezvous(ctx, []byte("first data"))
+	id, err := newId()
 	c.Assert(err, gc.IsNil)
+	err = m.NewRendezvous(ctx, id, []byte("first data"))
 	c.Assert(id, gc.Not(gc.Equals), "")
 
 	waitDone := make(chan struct{})
@@ -97,7 +100,9 @@ func (s *suite) TestRendezvousDoneBeforeWait(c *gc.C) {
 
 	ctx := context.Background()
 
-	id, err := m.NewRendezvous(ctx, []byte("first data"))
+	id, err := newId()
+	c.Assert(err, gc.IsNil)
+	err = m.NewRendezvous(ctx, id, []byte("first data"))
 	c.Assert(err, gc.IsNil)
 	c.Assert(id, gc.Not(gc.Equals), "")
 
@@ -140,7 +145,9 @@ func (s *suite) TestRendezvousDifferentPlaces(c *gc.C) {
 	ctx := context.Background()
 
 	// Create the rendezvous in m1.
-	id, err := m1.NewRendezvous(ctx, []byte("first data"))
+	id, err := newId()
+	c.Assert(err, gc.IsNil)
+	err = m1.NewRendezvous(ctx, id, []byte("first data"))
 	c.Assert(err, gc.IsNil)
 	c.Assert(id, gc.Not(gc.Equals), "")
 
@@ -184,11 +191,11 @@ func (s *suite) TestEntriesRemovedOnClose(c *gc.C) {
 	ctx := context.Background()
 
 	for i := 0; i < 3; i++ {
-		_, err := m1.NewRendezvous(ctx, []byte("something"))
+		err := m1.NewRendezvous(ctx, fmt.Sprintf("1%04x", i), []byte("something"))
 		c.Assert(err, gc.IsNil)
 	}
 	for i := 0; i < 5; i++ {
-		_, err := m2.NewRendezvous(ctx, []byte("something"))
+		err := m2.NewRendezvous(ctx, fmt.Sprintf("2%04x", i), []byte("something"))
 		c.Assert(err, gc.IsNil)
 	}
 	m1.Close()
@@ -218,12 +225,16 @@ func (s *suite) TestRunGCNotDying(c *gc.C) {
 		*meeting.ExpiryDuration + 2*time.Millisecond,
 		*meeting.ExpiryDuration / 2,
 	} {
-		id, err := m1.NewRendezvous(ctx, []byte("something"))
+		id, err := newId()
+		c.Assert(err, gc.IsNil)
+		err = m1.NewRendezvous(ctx, id, []byte("something"))
 		c.Assert(err, gc.IsNil)
 		ids1 = append(ids1, id)
 		store.setCreationTime(id, now.Add(-d))
 
-		id, err = m2.NewRendezvous(ctx, []byte("something"))
+		id, err = newId()
+		c.Assert(err, gc.IsNil)
+		err = m2.NewRendezvous(ctx, id, []byte("something"))
 		c.Assert(err, gc.IsNil)
 		ids2 = append(ids2, id)
 		store.setCreationTime(id, now.Add(-d))
@@ -269,7 +280,9 @@ func (s *suite) TestPartialRemoveOldFailure(c *gc.C) {
 		*meeting.ExpiryDuration + 2*time.Millisecond,
 		*meeting.ExpiryDuration / 2,
 	} {
-		id, err := m.NewRendezvous(ctx, []byte("something"))
+		id, err := newId()
+		c.Assert(err, gc.IsNil)
+		err = m.NewRendezvous(ctx, id, []byte("something"))
 		c.Assert(err, gc.IsNil)
 		store.setCreationTime(id, now.Add(-d))
 	}
@@ -309,9 +322,10 @@ func (*suite) TestPutFailure(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 	defer m.Close()
 	ctx := context.Background()
-	id, err := m.NewRendezvous(ctx, []byte("x"))
+	id, err := newId()
+	c.Assert(err, gc.IsNil)
+	err = m.NewRendezvous(ctx, id, []byte("x"))
 	c.Assert(err, gc.ErrorMatches, "cannot create entry for rendezvous: put error")
-	c.Assert(id, gc.Equals, "")
 	c.Assert(meeting.ItemCount(m), gc.Equals, 0)
 }
 
@@ -321,8 +335,9 @@ func (s *suite) TestWaitTimeout(c *gc.C) {
 	m, err := meeting.NewPlaceNoGC(store, nilMetrics{}, "localhost")
 	c.Assert(err, gc.IsNil)
 	ctx := context.Background()
-
-	id, err := m.NewRendezvous(ctx, nil)
+	id, err := newId()
+	c.Assert(err, gc.IsNil)
+	err = m.NewRendezvous(ctx, id, nil)
 	c.Assert(err, gc.IsNil)
 	_, _, err = m.Wait(ctx, id)
 	c.Logf("err: %#v", err)
@@ -339,7 +354,9 @@ func (s *suite) TestRequestCompletedCalled(c *gc.C) {
 
 	ctx := context.Background()
 
-	id, err := m.NewRendezvous(ctx, nil)
+	id, err := newId()
+	c.Assert(err, gc.IsNil)
+	err = m.NewRendezvous(ctx, id, nil)
 	c.Assert(err, gc.IsNil)
 	c.Assert(id, gc.Not(gc.Equals), "")
 
@@ -376,7 +393,7 @@ func (s *suite) TestRequestsExpiredCalled(c *gc.C) {
 	ctx := context.Background()
 
 	for i := 0; i < 3; i++ {
-		_, err := m.NewRendezvous(ctx, nil)
+		err := m.NewRendezvous(ctx, fmt.Sprintf("%04x", i), nil)
 		c.Assert(err, gc.IsNil)
 	}
 	m.Close()
@@ -504,4 +521,12 @@ func (s *fakeStore) RemoveOld(_ context.Context, addr string, olderThan time.Tim
 		}
 	}
 	return ids, nil
+}
+
+func newId() (string, error) {
+	var id [16]byte
+	if _, err := rand.Read(id[:]); err != nil {
+		return "", errgo.Notef(err, "cannot read random id")
+	}
+	return fmt.Sprintf("%x", id[:]), nil
 }

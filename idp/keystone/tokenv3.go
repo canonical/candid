@@ -4,6 +4,7 @@ package keystone
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/juju/httprequest"
 	"github.com/juju/idmclient/params"
@@ -43,12 +44,12 @@ func (*v3tokenIdentityProvider) Interactive() bool {
 
 // Handle implements idp.IdentityProvider.Handle.
 func (idp *v3tokenIdentityProvider) Handle(ctx context.Context, w http.ResponseWriter, req *http.Request) {
-	var lr tokenLoginRequest
+	var lr TokenLoginRequest
 	if err := httprequest.Unmarshal(idputil.RequestParams(ctx, w, req), &lr); err != nil {
-		idp.initParams.LoginCompleter.Failure(ctx, w, req, idputil.WaitID(req), errgo.WithCausef(err, params.ErrBadRequest, "cannot unmarshal login request"))
+		idp.initParams.VisitCompleter.Failure(ctx, w, req, idputil.DischargeID(req), errgo.WithCausef(err, params.ErrBadRequest, "cannot unmarshal login request"))
 		return
 	}
-	idp.doLoginV3(ctx, w, req, keystone.AuthV3{
+	user, err := idp.doLoginV3(ctx, keystone.AuthV3{
 		Identity: keystone.Identity{
 			Methods: []string{"token"},
 			Token: &keystone.IdentityToken{
@@ -56,4 +57,20 @@ func (idp *v3tokenIdentityProvider) Handle(ctx context.Context, w http.ResponseW
 			},
 		},
 	})
+	if err != nil {
+		idp.initParams.VisitCompleter.Failure(ctx, w, req, idputil.DischargeID(req), err)
+		return
+	}
+	if strings.TrimPrefix(req.URL.Path, idp.initParams.URLPrefix) == "/interact" {
+		dt, err := idp.initParams.DischargeTokenCreator.DischargeToken(ctx, idputil.DischargeID(req), user)
+		if err != nil {
+			idp.initParams.VisitCompleter.Failure(ctx, w, req, idputil.DischargeID(req), err)
+			return
+		}
+		httprequest.WriteJSON(w, http.StatusOK, TokenLoginResponse{
+			DischargeToken: dt,
+		})
+	} else {
+		idp.initParams.VisitCompleter.Success(ctx, w, req, idputil.DischargeID(req), user)
+	}
 }

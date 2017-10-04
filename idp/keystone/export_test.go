@@ -3,5 +3,3 @@
 package keystone
 
 var KeystoneSchemaResponse = keystoneSchemaResponse
-
-type Token token

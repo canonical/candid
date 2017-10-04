@@ -10,11 +10,11 @@ import (
 var NewIDPHandler = newIDPHandler
 
 type LoginInfo loginInfo
-type WaitResponse waitResponse
 
-func NewLoginCompleter(params identity.HandlerParams) idp.LoginCompleter {
-	return &loginCompleter{
-		params: params,
-		place:  &place{params.MeetingPlace},
+func NewVisitCompleter(params identity.HandlerParams) idp.VisitCompleter {
+	return &visitCompleter{
+		params:                params,
+		dischargeTokenCreator: &dischargeTokenCreator{params: params},
+		place: &place{params.MeetingPlace},
 	}
 }

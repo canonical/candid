@@ -22,6 +22,7 @@ import (
 	openid "github.com/yohcop/openid-go"
 	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
+	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
 
 	"github.com/CanonicalLtd/blues-identity/config"
 	"github.com/CanonicalLtd/blues-identity/idp"
@@ -98,8 +99,12 @@ func (idp *identityProvider) Init(_ context.Context, params idp.InitParams) erro
 }
 
 // URL gets the login URL to use this identity provider.
-func (idp *identityProvider) URL(waitID string) string {
-	return idputil.URL(idp.initParams.URLPrefix, "/login", waitID)
+func (idp *identityProvider) URL(dischargeID string) string {
+	return idputil.URL(idp.initParams.URLPrefix, "/login", dischargeID)
+}
+
+// SetInteraction sets the interaction information for
+func (idp *identityProvider) SetInteraction(ierr *httpbakery.Error, dischargeID string) {
 }
 
 // Handle handles the Ubuntu SSO login process.
@@ -108,11 +113,11 @@ func (idp *identityProvider) Handle(ctx context.Context, w http.ResponseWriter, 
 	switch req.URL.Path {
 	case "/callback":
 		if err := idp.callback(ctx, w, req); err != nil {
-			idp.initParams.LoginCompleter.Failure(ctx, w, req, idputil.WaitID(req), err)
+			idp.initParams.VisitCompleter.Failure(ctx, w, req, idputil.DischargeID(req), err)
 		}
 	default:
 		if err := idp.login(ctx, w, req); err != nil {
-			idp.initParams.LoginCompleter.Failure(ctx, w, req, idputil.WaitID(req), err)
+			idp.initParams.VisitCompleter.Failure(ctx, w, req, idputil.DischargeID(req), err)
 		}
 	}
 }
@@ -120,8 +125,8 @@ func (idp *identityProvider) Handle(ctx context.Context, w http.ResponseWriter, 
 func (idp *identityProvider) login(ctx context.Context, w http.ResponseWriter, req *http.Request) error {
 	realm := idp.initParams.URLPrefix + "/callback"
 	callback := realm
-	if waitid := idputil.WaitID(req); waitid != "" {
-		callback += "?waitid=" + waitid
+	if dischargeID := idputil.DischargeID(req); dischargeID != "" {
+		callback += "?id=" + dischargeID
 	}
 	u, err := openid.RedirectURL(ussoURL, callback, realm)
 	if err != nil {
@@ -190,7 +195,7 @@ func (idp *identityProvider) callback(ctx context.Context, w http.ResponseWriter
 		}
 		serr := idp.initParams.Store.Identity(ctx, &identity)
 		if serr == nil {
-			idp.initParams.LoginCompleter.Success(ctx, w, req, idputil.WaitID(req), &identity)
+			idp.initParams.VisitCompleter.Success(ctx, w, req, idputil.DischargeID(req), &identity)
 			return nil
 		}
 		if errgo.Cause(serr) != store.ErrNotFound {
@@ -207,7 +212,7 @@ func (idp *identityProvider) callback(ctx context.Context, w http.ResponseWriter
 	}); err != nil {
 		return errgo.Mask(err)
 	}
-	idp.initParams.LoginCompleter.Success(ctx, w, req, idputil.WaitID(req), user)
+	idp.initParams.VisitCompleter.Success(ctx, w, req, idputil.DischargeID(req), user)
 	return nil
 }
 

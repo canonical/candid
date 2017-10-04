@@ -15,6 +15,7 @@ import (
 	"golang.org/x/oauth2"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/names.v2"
+	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
 
 	"github.com/CanonicalLtd/blues-identity/config"
 	"github.com/CanonicalLtd/blues-identity/idp"
@@ -134,8 +135,12 @@ func (idp *openidConnectIdentityProvider) Init(ctx context.Context, params idp.I
 }
 
 // URL implements idp.IdentityProvider.URL.
-func (idp *openidConnectIdentityProvider) URL(waitID string) string {
-	return idputil.URL(idp.initParams.URLPrefix, "/login", waitID)
+func (idp *openidConnectIdentityProvider) URL(dischargeID string) string {
+	return idputil.URL(idp.initParams.URLPrefix, "/login", dischargeID)
+}
+
+// SetInteraction implements idp.IdentityProvider.SetInteraction.
+func (idp *openidConnectIdentityProvider) SetInteraction(ierr *httpbakery.Error, dischargeID string) {
 }
 
 //  GetGroups implements idp.IdentityProvider.GetGroups.
@@ -147,54 +152,54 @@ func (*openidConnectIdentityProvider) GetGroups(context.Context, *store.Identity
 func (idp *openidConnectIdentityProvider) Handle(ctx context.Context, w http.ResponseWriter, req *http.Request) {
 	switch req.URL.Path {
 	case "/callback":
-		if waitid, err := idp.callback(ctx, w, req); err != nil {
-			idp.initParams.LoginCompleter.Failure(ctx, w, req, waitid, err)
+		if dischargeID, err := idp.callback(ctx, w, req); err != nil {
+			idp.initParams.VisitCompleter.Failure(ctx, w, req, dischargeID, err)
 		}
 	case "/register":
-		if waitid, err := idp.register(ctx, w, req); err != nil {
-			idp.initParams.LoginCompleter.Failure(ctx, w, req, waitid, err)
+		if dischargeID, err := idp.register(ctx, w, req); err != nil {
+			idp.initParams.VisitCompleter.Failure(ctx, w, req, dischargeID, err)
 		}
 	default:
 		if err := idp.login(ctx, w, req); err != nil {
-			idp.initParams.LoginCompleter.Failure(ctx, w, req, idputil.WaitID(req), err)
+			idp.initParams.VisitCompleter.Failure(ctx, w, req, idputil.DischargeID(req), err)
 		}
 	}
 }
 
 func (idp *openidConnectIdentityProvider) login(ctx context.Context, w http.ResponseWriter, req *http.Request) error {
-	waitid := idputil.WaitID(req)
-	err := idp.newSession(ctx, w, waitid)
+	dischargeID := idputil.DischargeID(req)
+	err := idp.newSession(ctx, w, dischargeID)
 	if err != nil {
 		return errgo.Mask(err)
 	}
-	url := idp.config.AuthCodeURL(waitid)
+	url := idp.config.AuthCodeURL(dischargeID)
 	http.Redirect(w, req, url, http.StatusFound)
 	return nil
 }
 
 func (idp *openidConnectIdentityProvider) callback(ctx context.Context, w http.ResponseWriter, req *http.Request) (string, error) {
-	waitid, err := idp.getSession(ctx, req)
+	dischargeID, err := idp.getSession(ctx, req)
 	if err != nil {
-		return waitid, errgo.WithCausef(err, params.ErrBadRequest, "")
+		return dischargeID, errgo.WithCausef(err, params.ErrBadRequest, "")
 	}
-	if waitid != req.Form.Get("state") {
-		return waitid, errgo.WithCausef(nil, params.ErrBadRequest, "invalid session")
+	if dischargeID != req.Form.Get("state") {
+		return dischargeID, errgo.WithCausef(nil, params.ErrBadRequest, "invalid session")
 	}
 	tok, err := idp.config.Exchange(ctx, req.Form.Get("code"))
 	if err != nil {
-		return waitid, errgo.Mask(err)
+		return dischargeID, errgo.Mask(err)
 	}
 	idtok := tok.Extra("id_token")
 	if idtok == nil {
-		return waitid, errgo.Newf("no id_token in OpenID response")
+		return dischargeID, errgo.Newf("no id_token in OpenID response")
 	}
 	idtoks, ok := idtok.(string)
 	if !ok {
-		return waitid, errgo.Newf("invalid id_token in OpenID response")
+		return dischargeID, errgo.Newf("invalid id_token in OpenID response")
 	}
 	id, err := idp.provider.Verifier(&oidc.Config{ClientID: idp.config.ClientID}).Verify(ctx, idtoks)
 	if err != nil {
-		return waitid, errgo.Mask(err)
+		return dischargeID, errgo.Mask(err)
 	}
 	user := store.Identity{
 		ProviderID: store.MakeProviderIdentity(idp.Name(), fmt.Sprintf("%s:%s", id.Issuer, id.Subject)),
@@ -202,26 +207,26 @@ func (idp *openidConnectIdentityProvider) callback(ctx context.Context, w http.R
 	err = idp.initParams.Store.Identity(ctx, &user)
 	if err == nil {
 		idp.deleteSession(ctx, w)
-		idp.initParams.LoginCompleter.Success(ctx, w, req, waitid, &user)
+		idp.initParams.VisitCompleter.Success(ctx, w, req, dischargeID, &user)
 		return "", nil
 	}
 
 	if errgo.Cause(err) != store.ErrNotFound {
-		return waitid, errgo.Mask(err)
+		return dischargeID, errgo.Mask(err)
 	}
 	var claims claims
 	if err := id.Claims(&claims); err != nil {
-		return waitid, errgo.Mask(err)
+		return dischargeID, errgo.Mask(err)
 	}
 	state, err := idp.codec.Encode(registrationState{
-		WaitID:     waitid,
+		WaitID:     dischargeID,
 		ProviderID: user.ProviderID,
 	})
 	preferredUsername := ""
 	if names.IsValidUserName(claims.PreferredUsername) {
 		preferredUsername = claims.PreferredUsername
 	}
-	return waitid, errgo.Mask(idputil.RegistrationForm(ctx, w, idputil.RegistrationParams{
+	return dischargeID, errgo.Mask(idputil.RegistrationForm(ctx, w, idputil.RegistrationParams{
 		State:    state,
 		Username: preferredUsername,
 		Domain:   idp.params.Domain,
@@ -231,16 +236,16 @@ func (idp *openidConnectIdentityProvider) callback(ctx context.Context, w http.R
 }
 
 func (idp *openidConnectIdentityProvider) register(ctx context.Context, w http.ResponseWriter, req *http.Request) (string, error) {
-	waitid, err := idp.getSession(ctx, req)
+	dischargeID, err := idp.getSession(ctx, req)
 	if err != nil {
-		return waitid, errgo.WithCausef(err, params.ErrBadRequest, "")
+		return dischargeID, errgo.WithCausef(err, params.ErrBadRequest, "")
 	}
 	var state registrationState
 	if err := idp.codec.Decode(req.Form.Get("state"), &state); err != nil {
-		return waitid, errgo.WithCausef(err, params.ErrBadRequest, "invalid registration state")
+		return dischargeID, errgo.WithCausef(err, params.ErrBadRequest, "invalid registration state")
 	}
-	if state.WaitID != waitid {
-		return waitid, errgo.WithCausef(err, params.ErrBadRequest, "invalid registration state")
+	if state.WaitID != dischargeID {
+		return dischargeID, errgo.WithCausef(err, params.ErrBadRequest, "invalid registration state")
 	}
 	u := &store.Identity{
 		ProviderID: state.ProviderID,
@@ -250,13 +255,13 @@ func (idp *openidConnectIdentityProvider) register(ctx context.Context, w http.R
 	err = idp.registerUser(ctx, req.Form.Get("username"), u)
 	if err == nil {
 		idp.deleteSession(ctx, w)
-		idp.initParams.LoginCompleter.Success(ctx, w, req, waitid, u)
-		return waitid, nil
+		idp.initParams.VisitCompleter.Success(ctx, w, req, dischargeID, u)
+		return dischargeID, nil
 	}
 	if errgo.Cause(err) != errInvalidUser {
-		return waitid, errgo.Mask(err)
+		return dischargeID, errgo.Mask(err)
 	}
-	return waitid, errgo.Mask(idputil.RegistrationForm(ctx, w, idputil.RegistrationParams{
+	return dischargeID, errgo.Mask(idputil.RegistrationForm(ctx, w, idputil.RegistrationParams{
 		State:    req.Form.Get("state"),
 		Error:    err.Error(),
 		Username: req.Form.Get("username"),
@@ -292,9 +297,9 @@ func (idp *openidConnectIdentityProvider) registerUser(ctx context.Context, user
 
 // newSession stores the state data for this login session in an
 // encrypted session cookie.
-func (idp *openidConnectIdentityProvider) newSession(ctx context.Context, w http.ResponseWriter, waitid string) error {
+func (idp *openidConnectIdentityProvider) newSession(ctx context.Context, w http.ResponseWriter, dischargeID string) error {
 	sessionCookie := sessionCookie{
-		WaitID:  waitid,
+		WaitID:  dischargeID,
 		Expires: time.Now().Add(15 * time.Minute),
 	}
 	value, err := idp.codec.Encode(sessionCookie)
@@ -309,7 +314,7 @@ func (idp *openidConnectIdentityProvider) newSession(ctx context.Context, w http
 }
 
 // getSession retrieves and validats the current session cookie for the
-// login session and returns the associated waitid.
+// login session and returns the associated dischargeID.
 func (idp *openidConnectIdentityProvider) getSession(ctx context.Context, req *http.Request) (string, error) {
 	c, err := req.Cookie(idp.sessionCookieName())
 	if err == http.ErrNoCookie {

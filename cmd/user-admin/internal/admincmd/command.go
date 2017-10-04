@@ -84,6 +84,7 @@ func (c *idmCommand) Client(ctxt *cmd.Context) (*idmclient.Client, error) {
 		return c.client, nil
 	}
 	bClient := httpbakery.NewClient()
+	bClient.AddInteractor(httpbakery.WebBrowserInteractor{})
 	var err error
 	bClient.Client.Jar, err = cookiejar.New(&cookiejar.Options{
 		PublicSuffixList: publicsuffix.List,
@@ -97,9 +98,7 @@ func (c *idmCommand) Client(ctxt *cmd.Context) (*idmclient.Client, error) {
 		if err != nil {
 			return nil, errgo.Notef(err, "cannot load agent information")
 		}
-		bClient.WebPageVisitor = httpbakery.NewMultiVisitor(v, httpbakery.WebBrowserVisitor)
-	} else {
-		bClient.WebPageVisitor = httpbakery.WebBrowserVisitor
+		agent.SetUpAuth(bClient, v)
 	}
 
 	client, err := idmclient.New(idmclient.NewParams{
@@ -226,19 +225,19 @@ func (v publicKeyValue) Get() interface{} {
 	return *v.key
 }
 
-func readAgentFile(f string) (*agent.Visitor, error) {
+func readAgentFile(f string) (*agent.AuthInfo, error) {
 	data, err := ioutil.ReadFile(f)
 	if err != nil {
 		return nil, errgo.Mask(err, os.IsNotExist)
 	}
-	var v agent.Visitor
+	var v agent.AuthInfo
 	if err := json.Unmarshal(data, &v); err != nil {
 		return nil, errgo.Notef(err, "cannot parse agent data from %q", f)
 	}
 	return &v, nil
 }
 
-func writeAgentFile(f string, v *agent.Visitor) error {
+func writeAgentFile(f string, v *agent.AuthInfo) error {
 	data, err := json.MarshalIndent(v, "", "\t")
 	if err != nil {
 		return errgo.Mask(err)

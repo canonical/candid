@@ -36,7 +36,7 @@ type idpSuite struct {
 	template     *template.Template
 	meetingPlace *meeting.Place
 
-	lc idp.LoginCompleter
+	vc idp.VisitCompleter
 }
 
 var _ = gc.Suite(&idpSuite{})
@@ -58,7 +58,7 @@ func (s *idpSuite) SetUpTest(c *gc.C) {
 	s.meetingPlace, err = meeting.NewPlace(s.MeetingStore, monitoring.NewMeetingMetrics(), "localhost")
 	c.Assert(err, gc.Equals, nil)
 
-	s.lc = discharger.NewLoginCompleter(identity.HandlerParams{
+	s.vc = discharger.NewVisitCompleter(identity.HandlerParams{
 		ServerParams: identity.ServerParams{
 			Store:        s.Store,
 			MeetingStore: s.MeetingStore,
@@ -77,7 +77,7 @@ func (s *idpSuite) TearDownTest(c *gc.C) {
 
 func (s *idpSuite) TestLoginFailure(c *gc.C) {
 	rr := httptest.NewRecorder()
-	s.lc.Failure(context.Background(), rr, nil, "", errgo.WithCausef(nil, params.ErrForbidden, "test error"))
+	s.vc.Failure(context.Background(), rr, nil, "", errgo.WithCausef(nil, params.ErrForbidden, "test error"))
 	c.Assert(rr.Code, gc.Equals, http.StatusForbidden)
 	var perr params.Error
 	err := json.Unmarshal(rr.Body.Bytes(), &perr)
@@ -89,11 +89,12 @@ func (s *idpSuite) TestLoginFailure(c *gc.C) {
 }
 
 func (s *idpSuite) TestLoginFailureWithWait(c *gc.C) {
-	waitid, err := s.meetingPlace.NewRendezvous(context.Background(), []byte("test"))
+	id := "test"
+	err := s.meetingPlace.NewRendezvous(context.Background(), id, []byte("test"))
 	c.Assert(err, gc.Equals, nil)
 
 	rr := httptest.NewRecorder()
-	s.lc.Failure(context.Background(), rr, nil, waitid, errgo.WithCausef(nil, params.ErrForbidden, "test error"))
+	s.vc.Failure(context.Background(), rr, nil, id, errgo.WithCausef(nil, params.ErrForbidden, "test error"))
 	c.Assert(rr.Code, gc.Equals, http.StatusForbidden)
 	var perr params.Error
 	err = json.Unmarshal(rr.Body.Bytes(), &perr)
@@ -105,13 +106,13 @@ func (s *idpSuite) TestLoginFailureWithWait(c *gc.C) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
-	d1, d2, err := s.meetingPlace.Wait(ctx, waitid)
+	d1, d2, err := s.meetingPlace.Wait(ctx, id)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(string(d1), gc.Equals, "test")
 	var li discharger.LoginInfo
 	err = json.Unmarshal(d2, &li)
 	c.Assert(err, gc.Equals, nil)
-	c.Assert(li.IdentityMacaroon, gc.IsNil)
+	c.Assert(li.DischargeToken, gc.IsNil)
 	c.Assert(li.Error, jc.DeepEquals, &httpbakery.Error{
 		Message: "test error",
 	})
@@ -121,7 +122,7 @@ func (s *idpSuite) TestLoginSuccess(c *gc.C) {
 	req, err := http.NewRequest("GET", "", nil)
 	c.Assert(err, gc.Equals, nil)
 	rr := httptest.NewRecorder()
-	s.lc.Success(context.Background(), rr, req, "", &store.Identity{
+	s.vc.Success(context.Background(), rr, req, "", &store.Identity{
 		Username: "test-user",
 	})
 	c.Assert(rr.Code, gc.Equals, http.StatusOK)
@@ -135,7 +136,7 @@ func (s *idpSuite) TestLoginSuccessWithTemplate(c *gc.C) {
 	req, err := http.NewRequest("GET", "", nil)
 	c.Assert(err, gc.Equals, nil)
 	rr := httptest.NewRecorder()
-	s.lc.Success(context.Background(), rr, req, "", &store.Identity{
+	s.vc.Success(context.Background(), rr, req, "", &store.Identity{
 		Username: "test-user",
 	})
 	c.Assert(rr.Code, gc.Equals, http.StatusOK)

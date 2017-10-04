@@ -16,7 +16,7 @@ import (
 type loginRequest struct {
 	httprequest.Route `httprequest:"GET /login"`
 	Domain            string `httprequest:"domain,form"`
-	WaitID            string `httprequest:"waitid,form"`
+	DischargeID       string `httprequest:"did,form"`
 }
 
 // login handles the GET /v1/login endpoint that is used to log in to IdM.
@@ -25,9 +25,9 @@ func (h *handler) Login(p httprequest.Params, lr *loginRequest) error {
 	// it's really complicated http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.1
 	// perhaps use http://godoc.org/bitbucket.org/ww/goautoneg for this.
 	if p.Request.Header.Get("Accept") == "application/json" {
-		methods := map[string]string{"agent": h.agentURL(lr.WaitID)}
+		methods := map[string]string{"agent": h.agentURL(lr.DischargeID)}
 		for _, idp := range h.params.IdentityProviders {
-			methods[idp.Name()] = idp.URL(lr.WaitID)
+			methods[idp.Name()] = idp.URL(lr.DischargeID)
 		}
 		err := httprequest.WriteJSON(p.Response, http.StatusOK, methods)
 		if err != nil {
@@ -39,8 +39,8 @@ func (h *handler) Login(p httprequest.Params, lr *loginRequest) error {
 	// Check for an agent-login cookie, and use it if set.
 	_, _, err := agent.LoginCookie(p.Request)
 	if errgo.Cause(err) != agent.ErrNoAgentLoginCookie {
-		resp, err := h.AgentLoginCookie(p, &agentLoginCookieRequest{
-			WaitID: lr.WaitID,
+		resp, err := h.AgentLogin(p, &agentLoginRequest{
+			DischargeID: lr.DischargeID,
 		})
 		if err != nil {
 			return errgo.Mask(err, errgo.Any)
@@ -58,9 +58,9 @@ func (h *handler) Login(p httprequest.Params, lr *loginRequest) error {
 			continue
 		}
 		// Select the first interactive identity provider even if
-		// it does not match the domain.If no subsequent match is
-		// found for the domain then this identity provider will
-		// be used.
+		// it does not match the domain. If no subsequent match
+		// is found for the domain then this identity provider
+		// will be used.
 		if selected == nil {
 			selected = idp
 		}
@@ -75,7 +75,7 @@ func (h *handler) Login(p httprequest.Params, lr *loginRequest) error {
 	if selected == nil {
 		return errgo.Newf("no interactive login methods found")
 	}
-	url := selected.URL(lr.WaitID)
+	url := selected.URL(lr.DischargeID)
 	http.Redirect(p.Response, p.Request, url, http.StatusFound)
 	return nil
 }

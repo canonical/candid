@@ -61,7 +61,7 @@ func (s *userpassSuite) TestKeystoneUserpassIdentityProviderInteractive(c *gc.C)
 }
 
 func (s *userpassSuite) TestKeystoneUserpassIdentityProviderHandle(c *gc.C) {
-	req, err := http.NewRequest("GET", "https://idp.test/login?waitid=1", nil)
+	req, err := http.NewRequest("GET", "https://idp.test/login?did=1", nil)
 	c.Assert(err, gc.Equals, nil)
 	rr := httptest.NewRecorder()
 	s.idp.Handle(s.Ctx, rr, req)
@@ -78,7 +78,7 @@ func (s *userpassSuite) TestKeystoneUserpassIdentityProviderHandleResponse(c *gc
 		Form: login,
 	})
 	c.Assert(err, gc.IsNil)
-	req, err := http.NewRequest("POST", "/login?waitid=1", bytes.NewReader(body))
+	req, err := http.NewRequest("POST", "/login?did=1", bytes.NewReader(body))
 	c.Assert(err, gc.IsNil)
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
@@ -92,7 +92,7 @@ func (s *userpassSuite) TestKeystoneUserpassIdentityProviderHandleResponse(c *gc
 }
 
 func (s *userpassSuite) TestKeystoneUserpassIdentityProviderHandleBadRequest(c *gc.C) {
-	req, err := http.NewRequest("POST", "/login?waitid=1", strings.NewReader("{"))
+	req, err := http.NewRequest("POST", "/login?did=1", strings.NewReader("{"))
 	c.Assert(err, gc.IsNil)
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
@@ -108,7 +108,7 @@ func (s *userpassSuite) TestKeystoneUserpassIdentityProviderHandleNoUsername(c *
 		Form: login,
 	})
 	c.Assert(err, gc.IsNil)
-	req, err := http.NewRequest("POST", "https://idp.test/login?waitid=1", bytes.NewReader(body))
+	req, err := http.NewRequest("POST", "https://idp.test/login?did=1", bytes.NewReader(body))
 	c.Assert(err, gc.IsNil)
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()

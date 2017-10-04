@@ -5,8 +5,6 @@
 package meeting
 
 import (
-	"crypto/rand"
-	"fmt"
 	"net"
 	"net/http"
 	"sync"
@@ -284,21 +282,9 @@ var reqServer = httprequest.Server{
 	},
 }
 
-func newId() (string, error) {
-	var id [16]byte
-	if _, err := rand.Read(id[:]); err != nil {
-		return "", errgo.Notef(err, "cannot read random id")
-	}
-	return fmt.Sprintf("%x", id[:]), nil
-}
-
 // NewRendezvous creates a new rendezvous holding
 // the given data. The rendezvous id is returned.
-func (p *Place) NewRendezvous(ctx context.Context, data []byte) (string, error) {
-	id, err := newId()
-	if err != nil {
-		return "", errgo.Mask(err)
-	}
+func (p *Place) NewRendezvous(ctx context.Context, id string, data []byte) error {
 	p.mu.Lock()
 	p.items[id] = &item{
 		c:     make(chan struct{}),
@@ -309,9 +295,9 @@ func (p *Place) NewRendezvous(ctx context.Context, data []byte) (string, error) 
 		p.mu.Lock()
 		defer p.mu.Unlock()
 		delete(p.items, id)
-		return "", errgo.Notef(err, "cannot create entry for rendezvous")
+		return errgo.Notef(err, "cannot create entry for rendezvous")
 	}
-	return id, nil
+	return nil
 }
 
 // Wait waits for the rendezvous with the given id

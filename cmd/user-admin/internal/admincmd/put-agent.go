@@ -96,16 +96,16 @@ func (c *putAgentCommand) Run(cmdctx *cmd.Context) error {
 		return errgo.Mask(err)
 	}
 	var key *bakery.KeyPair
-	var agents *agent.Visitor
+	var agents *agent.AuthInfo
 	if c.agentFile != "" {
 		agents, err = readAgentFile(c.agentFile)
 		if err != nil {
 			if !os.IsNotExist(errgo.Cause(err)) {
 				return errgo.Mask(err)
 			}
-			agents = new(agent.Visitor)
+			agents = new(agent.AuthInfo)
 		} else {
-			key = agents.DefaultKey()
+			key = agents.Key
 		}
 	}
 	if key == nil && c.publicKey == nil {
@@ -129,20 +129,21 @@ func (c *putAgentCommand) Run(cmdctx *cmd.Context) error {
 		}
 	}
 	if agents != nil {
-		if err := agents.AddAgent(agent.Agent{
+		if agents.Key == nil {
+			agents.Key = key
+		}
+		agents.Agents = append(agents.Agents, agent.Agent{
 			URL:      client.Client.BaseURL,
 			Username: string(agentName),
-			Key:      key,
-		}); err != nil {
-			return errgo.Notef(err, "cannot add agent")
-		}
+		})
+
 		if err := writeAgentFile(c.agentFile, agents); err != nil {
 			return errgo.Mask(err)
 		}
 		fmt.Fprintf(cmdctx.Stdout, "updated agent %s for %s in %s\n", agentName, client.Client.BaseURL, c.agentFile)
 		return nil
 	}
-	agentsData := &agent.Agents{
+	agentsData := &agent.AuthInfo{
 		Agents: []agent.Agent{{
 			URL:      client.Client.BaseURL,
 			Username: string(agentName),

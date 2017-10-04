@@ -59,7 +59,7 @@ func (s *tokenV3Suite) TestKeystoneV3TokenIdentityProviderHandle(c *gc.C) {
 	tok.Login.ID = "789"
 	body, err := json.Marshal(tok)
 	c.Assert(err, gc.IsNil)
-	req, err := http.NewRequest("POST", "/login?waitid=1", bytes.NewReader(body))
+	req, err := http.NewRequest("POST", "/login?did=1", bytes.NewReader(body))
 	c.Assert(err, gc.IsNil)
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
@@ -77,7 +77,7 @@ func (s *tokenV3Suite) TestKeystoneV3TokenIdentityProviderHandleBadToken(c *gc.C
 	tok.Login.ID = "012"
 	body, err := json.Marshal(tok)
 	c.Assert(err, gc.IsNil)
-	req, err := http.NewRequest("POST", "https://idp.test/login?waitid=1", bytes.NewReader(body))
+	req, err := http.NewRequest("POST", "https://idp.test/login?did=1", bytes.NewReader(body))
 	c.Assert(err, gc.IsNil)
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
@@ -86,7 +86,7 @@ func (s *tokenV3Suite) TestKeystoneV3TokenIdentityProviderHandleBadToken(c *gc.C
 }
 
 func (s *tokenV3Suite) TestKeystoneV3TokenIdentityProviderHandleBadRequest(c *gc.C) {
-	req, err := http.NewRequest("POST", "https://idp.test/login?waitid=1", strings.NewReader("{"))
+	req, err := http.NewRequest("POST", "https://idp.test/login?did=1", strings.NewReader("{"))
 	c.Assert(err, gc.IsNil)
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()

@@ -814,7 +814,7 @@ func (s *usersSuite) TestWhoAmIWithNoUser(c *gc.C) {
 	})
 	c.Assert(err, gc.Equals, nil)
 	_, err = client.WhoAmI(s.Ctx, nil)
-	c.Assert(err, gc.ErrorMatches, `Get .*/v1/whoami: cannot get discharge from ".*": cannot start interactive session: visit not supported`)
+	c.Assert(err, gc.ErrorMatches, `Get .*/v1/whoami: cannot get discharge from ".*": cannot start interactive session: interaction required but not possible`)
 }
 
 func (s *usersSuite) TestExtraInfo(c *gc.C) {

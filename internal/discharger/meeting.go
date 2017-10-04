@@ -4,11 +4,10 @@ package discharger
 
 import (
 	"encoding/json"
-	"fmt"
 
 	"golang.org/x/net/context"
+	errgo "gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
-	"gopkg.in/macaroon.v2-unstable"
 
 	"github.com/CanonicalLtd/blues-identity/meeting"
 )
@@ -21,10 +20,10 @@ type dischargeRequestInfo struct {
 }
 
 type loginInfo struct {
-	// When a user logs in successfully, an identity
-	// macaroon is provided which grants them
-	// the right to perform operations as that user.
-	IdentityMacaroon macaroon.Slice
+	// When a user logs in successfully, a discharge token is
+	// provided which grants them the right to discharge macaroons as
+	// that user.
+	DischargeToken *httpbakery.DischargeToken
 
 	// When a login request fails, the error is filled out appropriately.
 	Error *httpbakery.Error
@@ -35,34 +34,34 @@ type place struct {
 	place *meeting.Place
 }
 
-func (p *place) NewRendezvous(ctx context.Context, info *dischargeRequestInfo) (string, error) {
+func (p *place) NewRendezvous(ctx context.Context, id string, info *dischargeRequestInfo) error {
 	reqData, err := json.Marshal(info)
 	if err != nil {
-		return "", fmt.Errorf("cannot marshal reqData: %v", err)
+		return errgo.Notef(err, "cannot marshal reqData")
 	}
-	return p.place.NewRendezvous(ctx, reqData)
+	return p.place.NewRendezvous(ctx, id, reqData)
 }
 
-func (p *place) Done(ctx context.Context, waitId string, info *loginInfo) error {
+func (p *place) Done(ctx context.Context, id string, info *loginInfo) error {
 	data, err := json.Marshal(info)
 	if err != nil {
-		return fmt.Errorf("cannot marshal loginData: %v", err)
+		return errgo.Notef(err, "cannot marshal loginData")
 	}
-	return p.place.Done(ctx, waitId, data)
+	return p.place.Done(ctx, id, data)
 }
 
-func (p *place) Wait(ctx context.Context, waitId string) (*dischargeRequestInfo, *loginInfo, error) {
-	reqData, loginData, err := p.place.Wait(ctx, waitId)
+func (p *place) Wait(ctx context.Context, id string) (*dischargeRequestInfo, *loginInfo, error) {
+	reqData, loginData, err := p.place.Wait(ctx, id)
 	if err != nil {
-		return nil, nil, fmt.Errorf("cannot wait: %v", err)
+		return nil, nil, errgo.Notef(err, "cannot wait")
 	}
 	var info dischargeRequestInfo
 	if err := json.Unmarshal(reqData, &info); err != nil {
-		return nil, nil, fmt.Errorf("cannot unmarshal reqData: %v", err)
+		return nil, nil, errgo.Notef(err, "cannot unmarshal reqData")
 	}
 	var login loginInfo
 	if err := json.Unmarshal(loginData, &login); err != nil {
-		return nil, nil, fmt.Errorf("cannot unmarshal loginData: %v", err)
+		return nil, nil, errgo.Notef(err, "cannot unmarshal loginData")
 	}
 	return &info, &login, nil
 }

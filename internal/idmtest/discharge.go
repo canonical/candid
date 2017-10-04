@@ -50,8 +50,8 @@ func (s *DischargeSuite) SetUpTest(c *gc.C) {
 
 // AssertDischarge checks that a macaroon can be discharged with
 // interaction using the specified visitor.
-func (s *DischargeSuite) AssertDischarge(c *gc.C, v httpbakery.Visitor) {
-	ms, err := s.Discharge(c, "is-authenticated-user", s.Client(v))
+func (s *DischargeSuite) AssertDischarge(c *gc.C, i httpbakery.Interactor) {
+	ms, err := s.Discharge(c, "is-authenticated-user", s.Client(i))
 	c.Assert(err, gc.Equals, nil)
 	_, err = s.Bakery.Checker.Auth(ms).Allow(context.Background(), bakery.LoginOp)
 	c.Assert(err, gc.Equals, nil)
@@ -95,10 +95,10 @@ func (s *DischargeSuite) AssertMacaroon(c *gc.C, ms macaroon.Slice, op bakery.Op
 	c.Assert(ui.Identity.Id(), gc.Equals, id)
 }
 
-// A VisitorFunc converts a function to a httpbakery.Visitor.
+// A VisitorFunc converts a function to a httpbakery.LegacyInteractor.
 type VisitorFunc func(*url.URL) error
 
 // VisitWebPage implements httpbakery.Visitor.VisitWebPage.
-func (f VisitorFunc) VisitWebPage(ctx context.Context, _ *httpbakery.Client, m map[string]*url.URL) error {
-	return f(m[httpbakery.UserInteractionMethod])
+func (f VisitorFunc) LegacyInteract(ctx context.Context, _ *httpbakery.Client, _ string, u *url.URL) error {
+	return f(u)
 }

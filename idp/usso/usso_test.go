@@ -80,7 +80,7 @@ func (s *ussoSuite) TestInteractive(c *gc.C) {
 }
 
 func (s *ussoSuite) TestURL(c *gc.C) {
-	c.Assert(s.idp.URL("1"), gc.Equals, "https://idp.test/login?waitid=1")
+	c.Assert(s.idp.URL("1"), gc.Equals, "https://idp.test/login?id=1")
 }
 
 func (s *ussoSuite) TestRedirect(c *gc.C) {
@@ -95,7 +95,7 @@ func (s *ussoSuite) TestRedirect(c *gc.C) {
 		"openid.identity":            []string{"http://specs.openid.net/auth/2.0/identifier_select"},
 		"openid.mode":                []string{"checkid_setup"},
 		"openid.realm":               []string{"https://idp.test/callback"},
-		"openid.return_to":           []string{"https://idp.test/callback?waitid=1"},
+		"openid.return_to":           []string{"https://idp.test/callback?id=1"},
 		"openid.ns.lp":               []string{"http://ns.launchpad.net/2007/openid-teams"},
 		"openid.lp.query_membership": []string{"blues-development,charm-beta"},
 		"openid.ns.sreg":             []string{"http://openid.net/extensions/sreg/1.1"},
@@ -249,8 +249,8 @@ func (s *ussoSuite) TestGetGroups(c *gc.C) {
 }
 
 // ussoURL gets a request addressed to the MockUSSO server with the given wait ID.
-func (s *ussoSuite) ussoURL(c *gc.C, ctx context.Context, waitid string) string {
-	rr := s.get(c, ctx, "/?waitid="+waitid)
+func (s *ussoSuite) ussoURL(c *gc.C, ctx context.Context, dischargeID string) string {
+	rr := s.get(c, ctx, "/?id="+dischargeID)
 	c.Assert(rr.Code, gc.Equals, http.StatusFound)
 	return rr.Header().Get("Location")
 }

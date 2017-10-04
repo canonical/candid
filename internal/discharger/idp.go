@@ -16,9 +16,9 @@ import (
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
 	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
-	macaroon "gopkg.in/macaroon.v2-unstable"
 
 	"github.com/CanonicalLtd/blues-identity/idp"
+	"github.com/CanonicalLtd/blues-identity/internal/auth"
 	"github.com/CanonicalLtd/blues-identity/internal/identity"
 	"github.com/CanonicalLtd/blues-identity/store"
 )
@@ -27,21 +27,26 @@ const (
 	// identityMacaroonDuration is the length of time for which an
 	// identity macaroon is valid.
 	identityMacaroonDuration = 28 * 24 * time.Hour
+
+	// dischargeTokenDuration is the length of time for which a
+	// discharge token is valid.
+	dischargeTokenDuration = 10 * time.Minute
 )
 
-func initIDPs(ctx context.Context, params identity.HandlerParams, lc *loginCompleter) error {
+func initIDPs(ctx context.Context, params identity.HandlerParams, dt *dischargeTokenCreator, vc *visitCompleter) error {
 	for _, ip := range params.IdentityProviders {
 		kvStore, err := params.ProviderDataStore.KeyValueStore(ctx, ip.Name())
 		if err != nil {
 			return errgo.Mask(err)
 		}
 		if err := ip.Init(ctx, idp.InitParams{
-			Store:          params.Store,
-			KeyValueStore:  kvStore,
-			URLPrefix:      params.Location + "/login/" + ip.Name(),
-			LoginCompleter: lc,
-			Template:       params.Template,
-			Key:            params.Key,
+			Store:                 params.Store,
+			KeyValueStore:         kvStore,
+			URLPrefix:             params.Location + "/login/" + ip.Name(),
+			DischargeTokenCreator: dt,
+			VisitCompleter:        vc,
+			Template:              params.Template,
+			Key:                   params.Key,
 		}); err != nil {
 			return errgo.Mask(err)
 		}
@@ -64,25 +69,64 @@ func newIDPHandler(params identity.HandlerParams, idp idp.IdentityProvider) http
 	}
 }
 
-// A loginCompleter is an implementation of idp.LoginCompleter.
-type loginCompleter struct {
+type dischargeTokenCreator struct {
 	params identity.HandlerParams
-	place  *place
 }
 
-// Success implements idp.LoginCompleter.Success.
-func (c *loginCompleter) Success(ctx context.Context, w http.ResponseWriter, req *http.Request, waitid string, id *store.Identity) {
-	logger.Infof("login success, username %q", id.Username)
-	err := c.complete(
+func (d *dischargeTokenCreator) DischargeToken(ctx context.Context, dischargeID string, id *store.Identity) (*httpbakery.DischargeToken, error) {
+	expire := time.Now().Add(dischargeTokenDuration)
+	cavs := []checkers.Caveat{
+		idmclient.UserDeclaration(id.Username),
+	}
+	if dischargeID != "" {
+		cavs = append(cavs, auth.DischargeIDCaveat(dischargeID))
+	}
+
+	m, err := d.params.Oven.NewMacaroon(
 		ctx,
-		waitid,
-		httpbakery.RequestVersion(req),
-		id.Username,
-		time.Now().Add(identityMacaroonDuration),
+		bakery.LatestVersion,
+		expire,
+		cavs,
+		bakery.LoginOp,
 	)
 	if err != nil {
-		c.Failure(ctx, w, req, waitid, errgo.Mask(err))
+		return nil, errgo.Mask(err)
+	}
+	v, err := m.M().MarshalBinary()
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
+	id.LastLogin = time.Now()
+	if err := d.params.Store.UpdateIdentity(ctx, id, store.Update{
+		store.LastLogin: store.Set,
+	}); err != nil {
+		logger.Errorf("cannot update last login time: %s", err)
+	}
+	return &httpbakery.DischargeToken{
+		Kind:  "macaroon",
+		Value: v,
+	}, nil
+}
+
+// A visitCompleter is an implementation of idp.VisitCompleter.
+type visitCompleter struct {
+	params                identity.HandlerParams
+	dischargeTokenCreator *dischargeTokenCreator
+	place                 *place
+}
+
+// Success implements idp.VisitCompleter.Success.
+func (c *visitCompleter) Success(ctx context.Context, w http.ResponseWriter, req *http.Request, dischargeID string, id *store.Identity) {
+	dt, err := c.dischargeTokenCreator.DischargeToken(ctx, dischargeID, id)
+	if err != nil {
+		c.Failure(ctx, w, req, dischargeID, errgo.Mask(err))
 		return
+	}
+	if dischargeID != "" {
+		if err := c.place.Done(ctx, dischargeID, &loginInfo{DischargeToken: dt}); err != nil {
+			c.Failure(ctx, w, req, dischargeID, errgo.Mask(err))
+			return
+		}
 	}
 	t := c.params.Template.Lookup("login")
 	if t == nil {
@@ -95,43 +139,11 @@ func (c *loginCompleter) Success(ctx context.Context, w http.ResponseWriter, req
 	}
 }
 
-// completeLogin finishes a login attempt. A new macaroon will be minted
-// with the given version, username and expiry and used to complete the
-// rendezvous specified by the given waitid.
-func (c *loginCompleter) complete(ctx context.Context, waitid string, v bakery.Version, username string, expiry time.Time) error {
-	m, err := c.params.Oven.NewMacaroon(
-		ctx,
-		v,
-		expiry,
-		[]checkers.Caveat{
-			idmclient.UserDeclaration(username),
-		},
-		bakery.LoginOp,
-	)
-	if err != nil {
-		return errgo.Notef(err, "cannot mint identity macaroon")
-	}
-	if waitid != "" {
-		if err := c.place.Done(ctx, waitid, &loginInfo{
-			IdentityMacaroon: macaroon.Slice{m.M()},
-		}); err != nil {
-			return errgo.Notef(err, "cannot complete rendezvous")
-		}
-	}
-	c.params.Store.UpdateIdentity(ctx, &store.Identity{
-		Username:  username,
-		LastLogin: time.Now(),
-	}, store.Update{
-		store.LastLogin: store.Set,
-	})
-	return nil
-}
-
-// Failure implements idp.LoginCompleter.Failure.
-func (c *loginCompleter) Failure(ctx context.Context, w http.ResponseWriter, req *http.Request, waitid string, err error) {
+// Failure implements idp.VisitCompleter.Failure.
+func (c *visitCompleter) Failure(ctx context.Context, w http.ResponseWriter, req *http.Request, dischargeID string, err error) {
 	_, bakeryErr := httpbakery.ErrorToResponse(ctx, err)
-	if waitid != "" {
-		c.place.Done(ctx, waitid, &loginInfo{
+	if dischargeID != "" {
+		c.place.Done(ctx, dischargeID, &loginInfo{
 			Error: bakeryErr.(*httpbakery.Error),
 		})
 	}

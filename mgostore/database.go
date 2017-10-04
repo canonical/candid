@@ -27,10 +27,10 @@ type Database struct {
 // be closed when finished with.
 func NewDatabase(db *mgo.Database) (*Database, error) {
 	if err := ensureIdentityIndexes(db); err != nil {
-		return nil, err
+		return nil, errgo.Mask(err)
 	}
 	if err := ensureMeetingIndexes(db); err != nil {
-		return nil, err
+		return nil, errgo.Mask(err)
 	}
 	rk := mgorootkeystore.NewRootKeys(1000) // TODO(mhilton) make this configurable?
 	if err := ensureBakeryIndexes(rk, db); err != nil {
