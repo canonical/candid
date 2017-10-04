@@ -6,8 +6,8 @@ import (
 	"time"
 )
 
-// Identity holds the in-database representation of a user in the identities
-// Mongo collection.
+// Identity holds the legacy in-database representation of a user in the
+// identities mongodb collection.
 type Identity struct {
 	// Username holds the unique name for the user of the system, which is
 	// associated to the URL accessed through jaas.io/u/username.

@@ -90,10 +90,10 @@ func migrateIdentity(doc *mongodoc.Identity) *store.Identity {
 	if doc.Owner != "" {
 		if doc.Owner == "admin@idm" {
 			id.ProviderInfo = map[string][]string{
-				"owner": []string{string(store.MakeProviderIdentity("idm", "admin@idm")), "admin@idm"},
+				"owner": {string(store.MakeProviderIdentity("idm", "admin@idm")), "admin@idm"},
 			}
 		} else {
-			log.Printf("unrecognised owner for %s (%s), not migrating", doc.Username, doc.Owner)
+			log.Printf("unrecognised owner for %s (%q), not migrating", doc.Username, doc.Owner)
 		}
 	}
 	if len(doc.SSHKeys) > 0 {
