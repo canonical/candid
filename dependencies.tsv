@@ -36,14 +36,16 @@ github.com/prometheus/procfs	git	abf152e5f3e97f2fafac028d2cc06c1feb87ffa5	2016-0
 github.com/rogpeppe/fastuuid	git	6724a57986aff9bff1a1770e9347036def7c89f6	2015-01-06T09:32:20Z
 github.com/yohcop/openid-go	git	f38c0087a377532505cb5b86418b1cc50d385f0d	2016-03-04T16:44:25Z
 golang.org/x/crypto	git	f6b343c37ca80bfa8ea539da67a0b621f84fab1d	2016-12-21T23:57:47Z
-golang.org/x/net	git	ea47fc708ee3e20177f3ca3716217c4ab75942cb	2015-08-29T23:03:18Z
+golang.org/x/net	git	0744d001aa8470aaa53df28d32e5ceeb8af9bd70	2017-09-22T01:12:44Z
 golang.org/x/oauth2	git	314dd2c0bf3ebd592ec0d20847d27e79d0dbe8dd	2016-12-19T19:29:54Z
 golang.org/x/sys	git	9bb9f0998d48b31547d975974935ae9b48c7a03c	2016-10-12T00:19:20Z
+gopkg.in/asn1-ber.v1	git	379148ca0225df7a432012b8df0355c2a2063ac0	2017-05-11T16:59:59Z
 gopkg.in/check.v1	git	4f90aeace3a26ad7021961c297b22c42160c7b25	2016-01-05T16:49:36Z
 gopkg.in/errgo.v1	git	442357a80af5c6bf9b6d51ae791a39c3421004f3	2016-12-22T12:58:16Z
 gopkg.in/goose.v1	git	8f055ce635d660f9b7827a1ff398c360715df261	2016-11-30T14:51:16Z
 gopkg.in/juju/environschema.v1	git	7359fc7857abe2b11b5b3e23811a9c64cb6b01e0	2015-11-04T11:58:10Z
 gopkg.in/juju/names.v2	git	0847c26d322a121e52614f969fb82eae2820c715	2016-11-02T13:43:03Z
+gopkg.in/ldap.v2	git	8168ee085ee43257585e50c6441aadf54ecb2c9f	2016-12-01T20:47:33Z
 gopkg.in/macaroon-bakery.v2-unstable	git	e71c68b3e66ea03eb865b90847ff2ddc2fa8c8a5	2017-09-21T12:27:21Z
 gopkg.in/macaroon.v2-unstable	git	cb99e7b7e91a03cef309d5983a8ed42fa8958016	2017-08-15T14:52:37Z
 gopkg.in/mgo.v2	git	f2b6f6c918c452ad107eec89615f074e3bd80e33	2016-08-18T01:52:18Z
