@@ -18,8 +18,9 @@ import (
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
+	"gopkg.in/macaroon-bakery.v2-unstable/bakery/identchecker"
 	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
-	macaroon "gopkg.in/macaroon.v2-unstable"
+	macaroon "gopkg.in/macaroon.v2"
 	yaml "gopkg.in/yaml.v2"
 
 	"github.com/CanonicalLtd/blues-identity/config"
@@ -122,8 +123,8 @@ func (s *ussoMacaroonSuite) TestHandleGetSuccess(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 	md.Bind(m.Signature())
 	ms := macaroon.Slice{m, md}
-	checker := bakery.NewChecker(bakery.CheckerParams{
-		MacaroonOpStore: s.Oven,
+	checker := identchecker.NewChecker(identchecker.CheckerParams{
+		MacaroonVerifier: s.Oven,
 	})
 	authInfo, err := checker.Auth(ms).Allow(s.Ctx, ussodischarge.USSOLoginOp)
 	c.Assert(err, gc.Equals, nil)
@@ -160,8 +161,8 @@ func (s *ussoMacaroonSuite) TestHandleGetV1Success(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 	md.Bind(m.Signature())
 	ms := macaroon.Slice{m, md}
-	checker := bakery.NewChecker(bakery.CheckerParams{
-		MacaroonOpStore: s.Oven,
+	checker := identchecker.NewChecker(identchecker.CheckerParams{
+		MacaroonVerifier: s.Oven,
 	})
 	authInfo, err := checker.Auth(ms).Allow(s.Ctx, ussodischarge.USSOLoginOp)
 	c.Assert(err, gc.Equals, nil)
@@ -236,7 +237,7 @@ var postTests = []struct {
 	lastAuth:     timeString(-time.Minute),
 	expires:      timeString(time.Hour),
 	extraCaveats: []string{`login.staging.ubuntu.com|account|{"username": "failuser"}`},
-	expectError:  `verification failed \(USSO caveat\): account specified multiple times`,
+	expectError:  `verification failed \(USSO caveat\): account specified inconsistently`,
 }, {
 	about: "unrecognised caveat",
 	account: &ussodischarge.AccountInfo{
@@ -284,29 +285,29 @@ func (s *ussoMacaroonSuite) TestHandlePost(c *gc.C) {
 		c.Logf("%d. %s", i, test.about)
 		err := s.idp.Init(s.Ctx, s.InitParams(c, "https://idp.test"))
 		c.Assert(err, gc.Equals, nil)
-		bm, err := s.Oven.NewMacaroon(s.Ctx, bakery.Version1, time.Now().Add(time.Minute), nil, ussodischarge.USSOLoginOp)
+		bm, err := s.Oven.NewMacaroon(s.Ctx, bakery.Version1, nil, ussodischarge.USSOLoginOp)
 		c.Assert(err, gc.Equals, nil)
 		m := bm.M()
 		if test.account != nil {
 			buf, err := json.Marshal(test.account)
 			c.Assert(err, gc.Equals, nil)
-			err = m.AddFirstPartyCaveat("login.staging.ubuntu.com|account|" + base64.StdEncoding.EncodeToString(buf))
+			err = m.AddFirstPartyCaveat([]byte("login.staging.ubuntu.com|account|" + base64.StdEncoding.EncodeToString(buf)))
 			c.Assert(err, gc.Equals, nil)
 		}
 		if test.validSince != "" {
-			err = m.AddFirstPartyCaveat("login.staging.ubuntu.com|valid_since|" + test.validSince)
+			err = m.AddFirstPartyCaveat([]byte("login.staging.ubuntu.com|valid_since|" + test.validSince))
 			c.Assert(err, gc.Equals, nil)
 		}
 		if test.lastAuth != "" {
-			err = m.AddFirstPartyCaveat("login.staging.ubuntu.com|last_auth|" + test.lastAuth)
+			err = m.AddFirstPartyCaveat([]byte("login.staging.ubuntu.com|last_auth|" + test.lastAuth))
 			c.Assert(err, gc.Equals, nil)
 		}
 		if test.expires != "" {
-			err = m.AddFirstPartyCaveat("login.staging.ubuntu.com|expires|" + test.expires)
+			err = m.AddFirstPartyCaveat([]byte("login.staging.ubuntu.com|expires|" + test.expires))
 			c.Assert(err, gc.Equals, nil)
 		}
 		for _, cav := range test.extraCaveats {
-			err = m.AddFirstPartyCaveat(cav)
+			err = m.AddFirstPartyCaveat([]byte(cav))
 			c.Assert(err, gc.Equals, nil)
 		}
 		body := udclient.Login{
@@ -332,7 +333,7 @@ func (s *ussoMacaroonSuite) TestHandlePost(c *gc.C) {
 func (s *ussoMacaroonSuite) TestHandlePostV1(c *gc.C) {
 	err := s.idp.Init(s.Ctx, s.InitParams(c, "https://idp.test"))
 	c.Assert(err, gc.Equals, nil)
-	bm, err := s.Oven.NewMacaroon(s.Ctx, bakery.Version1, time.Now().Add(time.Minute), nil, ussodischarge.USSOLoginOp)
+	bm, err := s.Oven.NewMacaroon(s.Ctx, bakery.Version1, nil, ussodischarge.USSOLoginOp)
 	c.Assert(err, gc.Equals, nil)
 	m := bm.M()
 	buf, err := json.Marshal(&ussodischarge.AccountInfo{
@@ -342,15 +343,15 @@ func (s *ussoMacaroonSuite) TestHandlePostV1(c *gc.C) {
 		DisplayName: "Test User",
 	})
 	c.Assert(err, gc.Equals, nil)
-	err = m.AddFirstPartyCaveat("login.staging.ubuntu.com|account|" + base64.StdEncoding.EncodeToString(buf))
+	err = m.AddFirstPartyCaveat([]byte("login.staging.ubuntu.com|account|" + base64.StdEncoding.EncodeToString(buf)))
 	c.Assert(err, gc.Equals, nil)
 
-	err = m.AddFirstPartyCaveat("login.staging.ubuntu.com|valid_since|" + timeString(-time.Hour))
+	err = m.AddFirstPartyCaveat([]byte("login.staging.ubuntu.com|valid_since|" + timeString(-time.Hour)))
 	c.Assert(err, gc.Equals, nil)
 
-	err = m.AddFirstPartyCaveat("login.staging.ubuntu.com|last_auth|" + timeString(-time.Minute))
+	err = m.AddFirstPartyCaveat([]byte("login.staging.ubuntu.com|last_auth|" + timeString(-time.Minute)))
 	c.Assert(err, gc.Equals, nil)
-	err = m.AddFirstPartyCaveat("login.staging.ubuntu.com|expires|" + timeString(time.Hour))
+	err = m.AddFirstPartyCaveat([]byte("login.staging.ubuntu.com|expires|" + timeString(time.Hour)))
 	c.Assert(err, gc.Equals, nil)
 	body := udclient.Login{
 		Macaroons: macaroon.Slice{m},

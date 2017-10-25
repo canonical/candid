@@ -12,8 +12,9 @@ import (
 	gc "gopkg.in/check.v1"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
+	"gopkg.in/macaroon-bakery.v2-unstable/bakery/identchecker"
 	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
-	macaroon "gopkg.in/macaroon.v2-unstable"
+	macaroon "gopkg.in/macaroon.v2"
 
 	"github.com/CanonicalLtd/blues-identity/internal/discharger"
 	"github.com/CanonicalLtd/blues-identity/internal/identity"
@@ -24,7 +25,7 @@ import (
 type DischargeSuite struct {
 	StoreServerSuite
 
-	Bakery *bakery.Bakery
+	Bakery *identchecker.Bakery
 
 	bakeryKey *bakery.KeyPair
 	db        *mgostore.Database
@@ -40,7 +41,7 @@ func (s *DischargeSuite) SetUpTest(c *gc.C) {
 	var err error
 	s.bakeryKey, err = bakery.GenerateKey()
 	c.Assert(err, gc.Equals, nil)
-	s.Bakery = bakery.New(bakery.BakeryParams{
+	s.Bakery = identchecker.NewBakery(identchecker.BakeryParams{
 		Locator:        s,
 		Key:            s.bakeryKey,
 		IdentityClient: s.AdminIdentityClient(c),
@@ -53,7 +54,7 @@ func (s *DischargeSuite) SetUpTest(c *gc.C) {
 func (s *DischargeSuite) AssertDischarge(c *gc.C, i httpbakery.Interactor) {
 	ms, err := s.Discharge(c, "is-authenticated-user", s.Client(i))
 	c.Assert(err, gc.Equals, nil)
-	_, err = s.Bakery.Checker.Auth(ms).Allow(context.Background(), bakery.LoginOp)
+	_, err = s.Bakery.Checker.Auth(ms).Allow(context.Background(), identchecker.LoginOp)
 	c.Assert(err, gc.Equals, nil)
 }
 
@@ -63,7 +64,7 @@ func (s *DischargeSuite) AssertDischarge(c *gc.C, i httpbakery.Interactor) {
 // newly minted macaroon will have a third-party caveat addressed to the
 // identity server with the given condition.
 func (s *DischargeSuite) Discharge(c *gc.C, condition string, client *httpbakery.Client) (macaroon.Slice, error) {
-	return client.DischargeAll(s.Ctx, s.NewMacaroon(c, condition, bakery.LoginOp))
+	return client.DischargeAll(s.Ctx, s.NewMacaroon(c, condition, identchecker.LoginOp))
 }
 
 // NewMacaroon creates a new macaroon with a third-party caveat addressed
@@ -72,11 +73,10 @@ func (s *DischargeSuite) NewMacaroon(c *gc.C, condition string, op bakery.Op) *b
 	m, err := s.Bakery.Oven.NewMacaroon(
 		context.Background(),
 		bakery.LatestVersion,
-		time.Now().Add(time.Minute),
 		[]checkers.Caveat{{
 			Location:  s.URL,
 			Condition: condition,
-		}},
+		}, checkers.TimeBeforeCaveat(time.Now().Add(time.Minute))},
 		op,
 	)
 	c.Assert(err, gc.Equals, nil)

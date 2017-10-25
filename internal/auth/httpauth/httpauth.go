@@ -7,10 +7,11 @@ import (
 	"time"
 
 	"github.com/juju/idmclient/params"
-	"github.com/juju/utils"
 	"golang.org/x/net/context"
 	errgo "gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
+	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
+	"gopkg.in/macaroon-bakery.v2-unstable/bakery/identchecker"
 	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
 
 	"github.com/CanonicalLtd/blues-identity/internal/auth"
@@ -36,7 +37,7 @@ func New(o *bakery.Oven, a *auth.Authorizer) *Authorizer {
 // perform the given operations. It may return an httpbakery error when
 // further checks are required, or params.ErrUnauthorized if the user is
 // authenticated but does not have the required authorization.
-func (a *Authorizer) Auth(ctx context.Context, req *http.Request, ops ...bakery.Op) (*bakery.AuthInfo, error) {
+func (a *Authorizer) Auth(ctx context.Context, req *http.Request, ops ...bakery.Op) (*identchecker.AuthInfo, error) {
 	ctx = httpbakery.ContextWithRequest(ctx, req)
 	if username, password, ok := req.BasicAuth(); ok {
 		ctx = auth.ContextWithUserCredentials(ctx, username, password)
@@ -49,21 +50,20 @@ func (a *Authorizer) Auth(ctx context.Context, req *http.Request, ops ...bakery.
 	if !ok {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
+	caveats := append(derr.Caveats, checkers.TimeBeforeCaveat(time.Now().Add(365*24*time.Hour)))
 	m, err := a.oven.NewMacaroon(
 		ctx,
 		httpbakery.RequestVersion(req),
-		time.Now().Add(365*24*time.Hour),
-		derr.Caveats,
+		caveats,
 		derr.Ops...,
 	)
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot create macaroon")
 	}
-	mpath, err := utils.RelativeURLPath(req.URL.Path, "/")
-	if err != nil {
-		return nil, errgo.Mask(err)
-	}
-	err = httpbakery.NewDischargeRequiredError(m, mpath, derr, req)
-	err.(*httpbakery.Error).Info.CookieNameSuffix = "idm"
-	return nil, err
+	return nil, httpbakery.NewDischargeRequiredError(httpbakery.DischargeRequiredErrorParams{
+		Macaroon:         m,
+		Request:          req,
+		OriginalError:    derr,
+		CookieNameSuffix: "idm",
+	})
 }

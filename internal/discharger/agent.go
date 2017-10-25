@@ -9,11 +9,11 @@ import (
 	"github.com/juju/httprequest"
 	"github.com/juju/idmclient"
 	"github.com/juju/idmclient/params"
-	"github.com/juju/utils"
 	"golang.org/x/net/context"
 	errgo "gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
+	"gopkg.in/macaroon-bakery.v2-unstable/bakery/identchecker"
 	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
 	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery/agent"
 
@@ -81,7 +81,7 @@ func (h *handler) agentLoginV1(ctx context.Context, dischargeID string, req *htt
 	if err := key.Key.UnmarshalText([]byte(pk)); err != nil {
 		return nil, errgo.WithCausef(err, params.ErrBadRequest, "invalid public-key")
 	}
-	m, err := h.agentMacaroon(ctx, httpbakery.RequestVersion(req), bakery.LoginOp, username, &key, dischargeID)
+	m, err := h.agentMacaroon(ctx, httpbakery.RequestVersion(req), identchecker.LoginOp, username, &key, dischargeID)
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}
@@ -138,13 +138,11 @@ func (h *handler) agentLogin(ctx context.Context, req *http.Request, dischargeID
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot create macaroon")
 	}
-	path, err := utils.RelativeURLPath(req.URL.Path, "/")
-	if err != nil {
-		return nil, errgo.Mask(err)
-	}
-	err = httpbakery.NewDischargeRequiredError(m, path, nil, req)
-	err.(*httpbakery.Error).Info.CookieNameSuffix = "agent-login"
-	return nil, err
+	return nil, httpbakery.NewDischargeRequiredError(httpbakery.DischargeRequiredErrorParams{
+		Macaroon:         m,
+		Request:          req,
+		CookieNameSuffix: "agent-login",
+	})
 }
 
 // agentMacaroon creates a new macaroon containing a local third-party
@@ -153,8 +151,8 @@ func (h *handler) agentMacaroon(ctx context.Context, vers bakery.Version, op bak
 	m, err := h.params.Oven.NewMacaroon(
 		ctx,
 		vers,
-		time.Now().Add(agentLoginMacaroonDuration),
 		[]checkers.Caveat{
+			checkers.TimeBeforeCaveat(time.Now().Add(agentLoginMacaroonDuration)),
 			idmclient.UserDeclaration(user),
 			bakery.LocalThirdPartyCaveat(key, vers),
 			auth.UserHasPublicKeyCaveat(params.Username(user), key),

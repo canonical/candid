@@ -21,7 +21,7 @@ import (
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
 	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
 	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery/agent"
-	"gopkg.in/macaroon.v2-unstable"
+	"gopkg.in/macaroon.v2"
 
 	"github.com/CanonicalLtd/blues-identity/internal/auth"
 	"github.com/CanonicalLtd/blues-identity/internal/auth/httpauth"

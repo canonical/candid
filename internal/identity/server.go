@@ -68,7 +68,7 @@ func New(sp ServerParams, versions map[string]NewAPIHandlerFunc) (*Server, error
 		AdminUsername:     sp.AuthUsername,
 		AdminPassword:     sp.AuthPassword,
 		Location:          sp.Location,
-		MacaroonOpStore:   oven,
+		MacaroonVerifier:  oven,
 		Store:             sp.Store,
 		IdentityProviders: sp.IdentityProviders,
 	})

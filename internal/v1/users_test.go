@@ -12,7 +12,7 @@ import (
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
-	macaroon "gopkg.in/macaroon.v2-unstable"
+	macaroon "gopkg.in/macaroon.v2"
 
 	"github.com/CanonicalLtd/blues-identity/internal/auth"
 	"github.com/CanonicalLtd/blues-identity/store"

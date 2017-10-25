@@ -5,6 +5,7 @@ package v1
 import (
 	"github.com/juju/idmclient/params"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
+	"gopkg.in/macaroon-bakery.v2-unstable/bakery/identchecker"
 
 	"github.com/CanonicalLtd/blues-identity/internal/auth"
 )
@@ -31,7 +32,7 @@ func opForRequest(r interface{}) bakery.Op {
 	case *params.UserIDPGroupsRequest:
 		return auth.UserOp(r.Username, auth.ActionReadGroups)
 	case *params.WhoAmIRequest:
-		return bakery.LoginOp
+		return identchecker.LoginOp
 	case *params.SSHKeysRequest:
 		return auth.UserOp(r.Username, auth.ActionReadSSHKeys)
 	case *params.PutSSHKeysRequest:

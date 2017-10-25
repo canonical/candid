@@ -85,7 +85,8 @@ func (s *Suite) InitParams(c *gc.C, prefix string) idp.InitParams {
 // successful login of the given user.
 func (s *Suite) AssertLoginSuccess(c *gc.C, username string) {
 	c.Assert(s.visitCompleter.called, gc.Equals, true)
-	c.Assert(s.visitCompleter.id, gc.Not(gc.IsNil))
+	c.Check(s.visitCompleter.err, gc.Equals, nil)
+	c.Assert(s.visitCompleter.id, gc.NotNil)
 	c.Assert(s.visitCompleter.id.Username, gc.Equals, username)
 }
 

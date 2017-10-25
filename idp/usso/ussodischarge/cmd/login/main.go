@@ -15,8 +15,9 @@ import (
 	errgo "gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
 	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
+	"gopkg.in/macaroon-bakery.v2-unstable/bakery/identchecker"
 	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
-	"gopkg.in/macaroon.v2-unstable"
+	"gopkg.in/macaroon.v2"
 )
 
 var (
@@ -39,15 +40,15 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	b := bakery.New(bakery.BakeryParams{
+	b := identchecker.NewBakery(identchecker.BakeryParams{
 		Location: "test",
 		Locator:  tpl,
 		Key:      key,
 	})
-	m, err := b.Oven.NewMacaroon(ctx, bakery.LatestVersion, time.Now().Add(time.Minute), []checkers.Caveat{{
+	m, err := b.Oven.NewMacaroon(ctx, bakery.LatestVersion, []checkers.Caveat{{
 		Condition: "is-authenticated-user",
 		Location:  *url,
-	}}, bakery.LoginOp)
+	}, checkers.TimeBeforeCaveat(time.Now().Add(time.Minute))}, identchecker.LoginOp)
 	if err != nil {
 		log.Fatalf("cannot make macaroon: %s", err)
 	}
@@ -64,7 +65,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("cannot discharge macaroon: %s", err)
 	}
-	authInfo, err := b.Checker.Auth(ms).Allow(ctx, bakery.LoginOp)
+	authInfo, err := b.Checker.Auth(ms).Allow(ctx, identchecker.LoginOp)
 	if err != nil {
 		log.Fatalf("invalid macaroon discharge: %s", err)
 	}
