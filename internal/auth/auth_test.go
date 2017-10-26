@@ -4,7 +4,6 @@ package auth_test
 
 import (
 	"sort"
-	"time"
 
 	"github.com/juju/idmclient"
 	"github.com/juju/idmclient/params"
@@ -12,9 +11,10 @@ import (
 	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
 	errgo "gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
-	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
-	macaroon "gopkg.in/macaroon.v2-unstable"
+	"gopkg.in/macaroon-bakery.v2/bakery"
+	"gopkg.in/macaroon-bakery.v2/bakery/checkers"
+	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
+	macaroon "gopkg.in/macaroon.v2"
 
 	"github.com/CanonicalLtd/blues-identity/idp"
 	"github.com/CanonicalLtd/blues-identity/idp/test"
@@ -54,11 +54,11 @@ func (s *authSuite) SetUpTest(c *gc.C) {
 	})
 	s.context, s.close = s.Store.Context(context.Background())
 	s.authorizer = auth.New(auth.Params{
-		AdminUsername:   "admin",
-		AdminPassword:   "password",
-		Location:        identityLocation,
-		MacaroonOpStore: s.oven,
-		Store:           s.Store,
+		AdminUsername:    "admin",
+		AdminPassword:    "password",
+		Location:         identityLocation,
+		MacaroonVerifier: s.oven,
+		Store:            s.Store,
 		IdentityProviders: []idp.IdentityProvider{
 			test.NewIdentityProvider(test.Params{
 				Name:      "test",
@@ -106,10 +106,10 @@ func (s authSuite) identityMacaroon(c *gc.C, username string) *bakery.Macaroon {
 	m, err := s.oven.NewMacaroon(
 		s.context,
 		bakery.LatestVersion,
-		time.Now().Add(time.Minute), []checkers.Caveat{
+		[]checkers.Caveat{
 			idmclient.UserDeclaration(username),
 		},
-		bakery.LoginOp,
+		identchecker.LoginOp,
 	)
 	c.Assert(err, gc.Equals, nil)
 	return m
@@ -142,7 +142,7 @@ func (s *authSuite) TestAuthorizeWithAdminCredentials(c *gc.C) {
 		if test.username != "" {
 			ctx = auth.ContextWithUserCredentials(ctx, test.username, test.password)
 		}
-		authInfo, err := s.authorizer.Auth(ctx, nil, bakery.LoginOp)
+		authInfo, err := s.authorizer.Auth(ctx, nil, identchecker.LoginOp)
 		if test.expectErrorMessage != "" {
 			c.Assert(err, gc.ErrorMatches, test.expectErrorMessage)
 			c.Assert(errgo.Cause(err), gc.Equals, params.ErrUnauthorized)
@@ -211,7 +211,7 @@ var aclForOpTests = []struct {
 	expectPublic: true,
 }, {
 	op:           auth.GlobalOp("verify"),
-	expect:       []string{bakery.Everyone},
+	expect:       []string{identchecker.Everyone},
 	expectPublic: true,
 }, {
 	op:           auth.GlobalOp("dischargeFor"),
@@ -219,7 +219,7 @@ var aclForOpTests = []struct {
 	expectPublic: true,
 }, {
 	op:           auth.GlobalOp("login"),
-	expect:       []string{bakery.Everyone},
+	expect:       []string{identchecker.Everyone},
 	expectPublic: true,
 }, {
 	op: op("global-foo", "login"),
@@ -269,14 +269,14 @@ func (s *authSuite) TestACLForOp(c *gc.C) {
 
 func (s *authSuite) TestAdminUserGroups(c *gc.C) {
 	ctx := auth.ContextWithUserCredentials(context.Background(), "admin", "password")
-	authInfo, err := s.authorizer.Auth(ctx, nil, bakery.LoginOp)
+	authInfo, err := s.authorizer.Auth(ctx, nil, identchecker.LoginOp)
 	c.Assert(err, gc.IsNil)
 	assertAuthorizedGroups(c, authInfo, []string{auth.AdminUsername})
 }
 
 func (s *authSuite) TestNonExistentUserGroups(c *gc.C) {
 	m := s.identityMacaroon(c, "noone")
-	authInfo, err := s.authorizer.Auth(s.context, []macaroon.Slice{{m.M()}}, bakery.LoginOp)
+	authInfo, err := s.authorizer.Auth(s.context, []macaroon.Slice{{m.M()}}, identchecker.LoginOp)
 	c.Assert(err, gc.Equals, nil)
 	ident := authInfo.Identity.(*auth.Identity)
 	groups, err := ident.Groups(s.context)
@@ -289,12 +289,12 @@ func (s *authSuite) TestExistingUserGroups(c *gc.C) {
 	// good identity
 	s.createIdentity(c, "test", nil, "test-group1", "test-group2")
 	m := s.identityMacaroon(c, "test")
-	authInfo, err := s.authorizer.Auth(s.context, []macaroon.Slice{{m.M()}}, bakery.LoginOp)
+	authInfo, err := s.authorizer.Auth(s.context, []macaroon.Slice{{m.M()}}, identchecker.LoginOp)
 	c.Assert(err, gc.Equals, nil)
 	assertAuthorizedGroups(c, authInfo, []string{"test-group1", "test-group2"})
 }
 
-func assertAuthorizedGroups(c *gc.C, authInfo *bakery.AuthInfo, expectGroups []string) {
+func assertAuthorizedGroups(c *gc.C, authInfo *identchecker.AuthInfo, expectGroups []string) {
 	c.Assert(authInfo.Identity, gc.NotNil)
 	ident := authInfo.Identity.(*auth.Identity)
 	groups, err := ident.Groups(context.Background())
@@ -376,12 +376,12 @@ func (s *authSuite) TestIdentityAllow(c *gc.C) {
 }
 
 func (s *authSuite) TestAuthorizeMacaroonRequired(c *gc.C) {
-	authInfo, err := s.authorizer.Auth(s.context, nil, bakery.LoginOp)
+	authInfo, err := s.authorizer.Auth(s.context, nil, identchecker.LoginOp)
 	c.Assert(err, gc.ErrorMatches, `macaroon discharge required: authentication required`)
 	c.Assert(authInfo, gc.IsNil)
 	c.Assert(errgo.Cause(err), gc.FitsTypeOf, (*bakery.DischargeRequiredError)(nil))
 	derr := errgo.Cause(err).(*bakery.DischargeRequiredError)
-	c.Assert(derr.Ops, jc.DeepEquals, []bakery.Op{bakery.LoginOp})
+	c.Assert(derr.Ops, jc.DeepEquals, []bakery.Op{identchecker.LoginOp})
 	c.Assert(derr.Caveats, jc.DeepEquals, []checkers.Caveat{{Condition: "need-declared username is-authenticated-user", Location: "https://identity.test/id"}})
 }
 

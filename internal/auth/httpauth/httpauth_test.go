@@ -9,8 +9,9 @@ import (
 	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
-	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
+	"gopkg.in/macaroon-bakery.v2/bakery"
+	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
+	"gopkg.in/macaroon-bakery.v2/httpbakery"
 
 	"github.com/CanonicalLtd/blues-identity/internal/auth"
 	"github.com/CanonicalLtd/blues-identity/internal/auth/httpauth"
@@ -43,11 +44,11 @@ func (s *authSuite) SetUpTest(c *gc.C) {
 		Location: "identity",
 	})
 	s.auth = auth.New(auth.Params{
-		AdminUsername:   "test-admin",
-		AdminPassword:   "open sesame",
-		Location:        identityLocation,
-		Store:           s.Store,
-		MacaroonOpStore: s.oven,
+		AdminUsername:    "test-admin",
+		AdminPassword:    "open sesame",
+		Location:         identityLocation,
+		Store:            s.Store,
+		MacaroonVerifier: s.oven,
 	})
 	s.authorizer = httpauth.New(s.oven, s.auth)
 }
@@ -85,7 +86,7 @@ func (s *authSuite) TestAuthorizeWithAdminCredentials(c *gc.C) {
 		for attr, val := range test.header {
 			req.Header[attr] = val
 		}
-		authInfo, err := s.authorizer.Auth(context.Background(), req, bakery.LoginOp)
+		authInfo, err := s.authorizer.Auth(context.Background(), req, identchecker.LoginOp)
 		if test.expectErrorMessage != "" {
 			c.Assert(err, gc.ErrorMatches, test.expectErrorMessage)
 			c.Assert(errgo.Cause(err), gc.Equals, params.ErrUnauthorized)
@@ -99,7 +100,7 @@ func (s *authSuite) TestAuthorizeWithAdminCredentials(c *gc.C) {
 func (s *authSuite) TestAuthorizeMacaroonRequired(c *gc.C) {
 	req, err := http.NewRequest("GET", "http://example.com/v1/test", nil)
 	c.Assert(err, gc.IsNil)
-	authInfo, err := s.authorizer.Auth(context.Background(), req, bakery.LoginOp)
+	authInfo, err := s.authorizer.Auth(context.Background(), req, identchecker.LoginOp)
 	c.Assert(err, gc.ErrorMatches, `macaroon discharge required: authentication required`)
 	c.Assert(authInfo, gc.IsNil)
 	c.Assert(errgo.Cause(err), gc.FitsTypeOf, (*httpbakery.Error)(nil))

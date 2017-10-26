@@ -6,7 +6,6 @@ import (
 	"bytes"
 	"net/http"
 	"path/filepath"
-	"time"
 
 	"github.com/juju/cmd"
 	"github.com/juju/httprequest"
@@ -15,9 +14,10 @@ import (
 	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
 	errgo "gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
-	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
-	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery/agent"
+	"gopkg.in/macaroon-bakery.v2/bakery"
+	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
+	"gopkg.in/macaroon-bakery.v2/httpbakery"
+	"gopkg.in/macaroon-bakery.v2/httpbakery/agent"
 
 	"github.com/CanonicalLtd/blues-identity/cmd/user-admin/internal/admincmd"
 )
@@ -91,7 +91,7 @@ func (s *commandSuite) RunServer(c *gc.C, handler *handler) func(args ...string)
 
 type server struct {
 	*AgentDischarger
-	bakery   *bakery.Bakery
+	bakery   *identchecker.Bakery
 	adminKey *bakery.KeyPair
 	handler  *handler
 }
@@ -109,7 +109,7 @@ func newServer(c *gc.C, handler *handler) *server {
 	}
 	bakeryKey, err := bakery.GenerateKey()
 	c.Assert(err, gc.Equals, nil)
-	srv.bakery = bakery.New(bakery.BakeryParams{
+	srv.bakery = identchecker.NewBakery(identchecker.BakeryParams{
 		Key:            bakeryKey,
 		Locator:        srv,
 		IdentityClient: IdentityClient(srv.Location()),
@@ -165,18 +165,20 @@ func (h *handler) WhoAmI(p *params.WhoAmIRequest) (*params.WhoAmIResponse, error
 	return h.whoAmI(p)
 }
 
-var ages = time.Now().Add(time.Hour)
-
 func (srv *server) checkLogin(ctx context.Context, req *http.Request) error {
-	_, authErr := srv.bakery.Checker.Auth(httpbakery.RequestMacaroons(req)...).Allow(context.TODO(), bakery.LoginOp)
+	_, authErr := srv.bakery.Checker.Auth(httpbakery.RequestMacaroons(req)...).Allow(context.TODO(), identchecker.LoginOp)
 	derr, ok := errgo.Cause(authErr).(*bakery.DischargeRequiredError)
 	if !ok {
 		return errgo.Mask(authErr)
 	}
 	version := httpbakery.RequestVersion(req)
-	m, err := srv.bakery.Oven.NewMacaroon(ctx, version, ages, derr.Caveats, derr.Ops...)
+	m, err := srv.bakery.Oven.NewMacaroon(ctx, version, derr.Caveats, derr.Ops...)
 	if err != nil {
 		return errgo.Notef(err, "cannot create macaroon")
 	}
-	return httpbakery.NewDischargeRequiredErrorWithVersion(m, "", authErr, version)
+	return httpbakery.NewDischargeRequiredError(httpbakery.DischargeRequiredErrorParams{
+		Macaroon:      m,
+		OriginalError: authErr,
+		Request:       req,
+	})
 }

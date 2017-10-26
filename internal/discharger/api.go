@@ -11,7 +11,7 @@ import (
 	"golang.org/x/net/context"
 	"golang.org/x/net/trace"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
+	"gopkg.in/macaroon-bakery.v2/httpbakery"
 
 	"github.com/CanonicalLtd/blues-identity/internal/auth/httpauth"
 	"github.com/CanonicalLtd/blues-identity/internal/identity"

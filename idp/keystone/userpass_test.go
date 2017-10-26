@@ -11,7 +11,7 @@ import (
 
 	"github.com/juju/testing/httptesting"
 	gc "gopkg.in/check.v1"
-	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery/form"
+	"gopkg.in/macaroon-bakery.v2/httpbakery/form"
 	"gopkg.in/yaml.v2"
 
 	"github.com/CanonicalLtd/blues-identity/config"

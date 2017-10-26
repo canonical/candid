@@ -16,7 +16,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
+	"gopkg.in/macaroon-bakery.v2/bakery"
 
 	"github.com/CanonicalLtd/blues-identity/idp"
 	"github.com/CanonicalLtd/blues-identity/internal/auth"
@@ -68,7 +68,7 @@ func New(sp ServerParams, versions map[string]NewAPIHandlerFunc) (*Server, error
 		AdminUsername:     sp.AuthUsername,
 		AdminPassword:     sp.AuthPassword,
 		Location:          sp.Location,
-		MacaroonOpStore:   oven,
+		MacaroonVerifier:  oven,
 		Store:             sp.Store,
 		IdentityProviders: sp.IdentityProviders,
 	})

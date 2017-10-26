@@ -59,7 +59,7 @@ func (s *apiSuite) SetUpTest(c *gc.C) {
 //	key, err := bakery.GenerateKey()
 //	c.Assert(err, gc.IsNil)
 //	rks := bakery.NewMemRootKeyStore()
-//	s.bakery = bakery.New(bakery.BakeryParams{
+//	s.bakery = identchecker.NewBakery(identchecker.BakeryParams{
 //		RootKeyStore:   rks,
 //		IdentityClient: testIdentityClient{},
 //		Key:            key,
@@ -113,7 +113,7 @@ func (s *apiSuite) SetUpTest(c *gc.C) {
 //}
 //
 //func (s *apiSuite) assertMacaroon(c *gc.C, ms macaroon.Slice, expectUser string) {
-//	authInfo, err := s.bakery.Checker.Auth(ms).Allow(context.TODO(), bakery.LoginOp)
+//	authInfo, err := s.bakery.Checker.Auth(ms).Allow(context.TODO(), identchecker.LoginOp)
 //	c.Assert(err, gc.IsNil)
 //	c.Assert(authInfo.Identity, gc.NotNil)
 //	c.Assert(authInfo.Identity.Id(), gc.Equals, expectUser)
@@ -176,13 +176,13 @@ func (s *apiSuite) SetUpTest(c *gc.C) {
 //
 //type testIdentityClient struct{}
 //
-//func (testIdentityClient) IdentityFromContext(context.Context) (bakery.Identity, []checkers.Caveat, error) {
+//func (testIdentityClient) IdentityFromContext(context.Context) (identchecker.Identity, []checkers.Caveat, error) {
 //	return nil, nil, nil
 //}
 //
-//func (testIdentityClient) DeclaredIdentity(_ context.Context, declared map[string]string) (bakery.Identity, error) {
+//func (testIdentityClient) DeclaredIdentity(_ context.Context, declared map[string]string) (identchecker.Identity, error) {
 //	if name, ok := declared["username"]; ok {
-//		return bakery.SimpleIdentity(name), nil
+//		return identchecker.SimpleIdentity(name), nil
 //	}
 //	return nil, errgo.New("no username declared")
 //}

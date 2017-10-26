@@ -14,9 +14,10 @@ import (
 	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
 	errgo "gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
-	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
-	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery/agent"
+	"gopkg.in/macaroon-bakery.v2/bakery"
+	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
+	"gopkg.in/macaroon-bakery.v2/httpbakery"
+	"gopkg.in/macaroon-bakery.v2/httpbakery/agent"
 
 	"github.com/CanonicalLtd/blues-identity/internal/auth"
 	"github.com/CanonicalLtd/blues-identity/internal/idmtest"
@@ -42,7 +43,7 @@ func (s *agentSuite) TestHTTPBakeryAgentDischarge(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 	ms, err := s.Discharge(c, "is-authenticated-user", client)
 	c.Assert(err, gc.Equals, nil)
-	_, err = s.Bakery.Checker.Auth(ms).Allow(context.Background(), bakery.LoginOp)
+	_, err = s.Bakery.Checker.Auth(ms).Allow(context.Background(), identchecker.LoginOp)
 	c.Assert(err, gc.Equals, nil)
 }
 
@@ -68,7 +69,7 @@ func (s *agentSuite) TestLegacyAgentDischarge(c *gc.C) {
 	})
 	ms, err := s.Discharge(c, "is-authenticated-user", client)
 	c.Assert(err, gc.Equals, nil)
-	_, err = s.Bakery.Checker.Auth(ms).Allow(context.Background(), bakery.LoginOp)
+	_, err = s.Bakery.Checker.Auth(ms).Allow(context.Background(), identchecker.LoginOp)
 	c.Assert(err, gc.Equals, nil)
 }
 
@@ -86,7 +87,7 @@ func (s *agentSuite) TestLegacyCookieAgentDischarge(c *gc.C) {
 	})
 	ms, err := s.Discharge(c, "is-authenticated-user", client)
 	c.Assert(err, gc.Equals, nil)
-	_, err = s.Bakery.Checker.Auth(ms).Allow(context.Background(), bakery.LoginOp)
+	_, err = s.Bakery.Checker.Auth(ms).Allow(context.Background(), identchecker.LoginOp)
 	c.Assert(err, gc.Equals, nil)
 }
 

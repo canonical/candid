@@ -17,7 +17,7 @@ import (
 	"golang.org/x/net/context"
 	errgo "gopkg.in/errgo.v1"
 	ldap "gopkg.in/ldap.v2"
-	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
+	"gopkg.in/macaroon-bakery.v2/httpbakery"
 
 	"github.com/CanonicalLtd/blues-identity/config"
 	"github.com/CanonicalLtd/blues-identity/idp"

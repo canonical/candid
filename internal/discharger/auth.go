@@ -3,7 +3,7 @@
 package discharger
 
 import (
-	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
+	"gopkg.in/macaroon-bakery.v2/bakery"
 
 	"github.com/CanonicalLtd/blues-identity/internal/auth"
 )

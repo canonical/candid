@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"golang.org/x/net/context"
-	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
+	"gopkg.in/macaroon-bakery.v2/bakery"
 )
 
 // Field represents a field in an identity record.

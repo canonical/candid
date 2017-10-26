@@ -10,9 +10,10 @@ import (
 	"github.com/juju/loggo"
 	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
-	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
-	macaroon "gopkg.in/macaroon.v2-unstable"
+	"gopkg.in/macaroon-bakery.v2/bakery"
+	"gopkg.in/macaroon-bakery.v2/bakery/checkers"
+	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
+	macaroon "gopkg.in/macaroon.v2"
 
 	"github.com/CanonicalLtd/blues-identity/idp"
 	"github.com/CanonicalLtd/blues-identity/store"
@@ -56,7 +57,7 @@ type Authorizer struct {
 	adminUsername  string
 	adminPassword  string
 	location       string
-	checker        *bakery.Checker
+	checker        *identchecker.Checker
 	store          store.Store
 	groupResolvers map[string]groupResolver
 }
@@ -78,7 +79,7 @@ type Params struct {
 
 	// MacaroonOpStore is the store of macaroon operations and root
 	// keys.
-	MacaroonOpStore bakery.MacaroonOpStore
+	MacaroonVerifier bakery.MacaroonVerifier
 
 	// Store is the identity store.
 	Store store.Store
@@ -104,15 +105,15 @@ func New(params Params) *Authorizer {
 		resolvers[idp.Name()] = idpGroupResolver{idp}
 	}
 	a.groupResolvers = resolvers
-	a.checker = bakery.NewChecker(bakery.CheckerParams{
+	a.checker = identchecker.NewChecker(identchecker.CheckerParams{
 		Checker: NewChecker(a),
-		Authorizer: bakery.ACLAuthorizer{
+		Authorizer: identchecker.ACLAuthorizer{
 			GetACL: func(ctx context.Context, op bakery.Op) ([]string, bool, error) {
 				return a.aclForOp(ctx, op)
 			},
 		},
-		IdentityClient:  identityClient{a},
-		MacaroonOpStore: params.MacaroonOpStore,
+		IdentityClient:   identityClient{a},
+		MacaroonVerifier: params.MacaroonVerifier,
 	})
 	return a
 }
@@ -133,14 +134,14 @@ func (a *Authorizer) aclForOp(ctx context.Context, op bakery.Op) (acl []string, 
 			return AdminACL, true, nil
 		case ActionVerify:
 			// Everyone is allowed to verify a macaroon.
-			return []string{bakery.Everyone}, true, nil
+			return []string{identchecker.Everyone}, true, nil
 		case ActionLogin:
 			// Everyone is allowed to log in.
-			return []string{bakery.Everyone}, true, nil
+			return []string{identchecker.Everyone}, true, nil
 		case ActionDischarge:
 			// Everyone is allowed to discharge, but they must authenticate themselves
 			// first.
-			return []string{bakery.Everyone}, false, nil
+			return []string{identchecker.Everyone}, false, nil
 		}
 	case kindUser:
 		if name == "" {
@@ -208,7 +209,7 @@ func (a *Authorizer) SetAdminPublicKey(ctx context.Context, pk *bakery.PublicKey
 // return an bakery.DischargeRequiredError when further checks are
 // required, or params.ErrUnauthorized if the user is authenticated but
 // does not have the required authorization.
-func (a *Authorizer) Auth(ctx context.Context, mss []macaroon.Slice, ops ...bakery.Op) (*bakery.AuthInfo, error) {
+func (a *Authorizer) Auth(ctx context.Context, mss []macaroon.Slice, ops ...bakery.Op) (*identchecker.AuthInfo, error) {
 	authInfo, err := a.checker.Auth(mss...).Allow(ctx, ops...)
 	if err != nil {
 		if errgo.Cause(err) == bakery.ErrPermissionDenied {
@@ -239,20 +240,16 @@ func (a *Authorizer) Identity(ctx context.Context, username string) (*Identity, 
 	return id, nil
 }
 
-// An identityClient is an implementation of bakery.IdentityClient that
+// An identityClient is an implementation of identchecker.IdentityClient that
 // uses the identity server's data store to get identity information.
 type identityClient struct {
 	a *Authorizer
 }
 
 // IdentityFromContext implements
-// bakery.IdentityClient.IdentityFromContext by looking for admin
+// identchecker.IdentityClient.IdentityFromContext by looking for admin
 // credentials in the context.
-func (c identityClient) IdentityFromContext(ctx context.Context) (_ident bakery.Identity, _ []checkers.Caveat, _ error) {
-	logger.Debugf("identity from context %v {", ctx)
-	defer func() {
-		logger.Debugf("} -> ident %#v", _ident)
-	}()
+func (c identityClient) IdentityFromContext(ctx context.Context) (_ident identchecker.Identity, _ []checkers.Caveat, _ error) {
 	if username := usernameFromContext(ctx); username != "" {
 		if err := CheckUserDomain(ctx, username); err != nil {
 			return nil, nil, errgo.Mask(err)
@@ -265,7 +262,6 @@ func (c identityClient) IdentityFromContext(ctx context.Context) (_ident bakery.
 	}
 	if username, password, ok := userCredentialsFromContext(ctx); ok {
 		if username == c.a.adminUsername && password == c.a.adminPassword {
-			logger.Debugf("admin login success as %q", AdminUsername)
 			return &Identity{
 				id: store.Identity{
 					Username: AdminUsername,
@@ -297,9 +293,9 @@ func CheckUserDomain(ctx context.Context, username string) error {
 	return nil
 }
 
-// DeclaredIdentity implements bakery.IdentityClient.DeclaredIdentity by
+// DeclaredIdentity implements identchecker.IdentityClient.DeclaredIdentity by
 // retrieving the user information from the declared map.
-func (c identityClient) DeclaredIdentity(ctx context.Context, declared map[string]string) (bakery.Identity, error) {
+func (c identityClient) DeclaredIdentity(ctx context.Context, declared map[string]string) (identchecker.Identity, error) {
 	username, ok := declared["username"]
 	if !ok {
 		return nil, errgo.Newf("no declared user")
@@ -315,7 +311,7 @@ func (c identityClient) DeclaredIdentity(ctx context.Context, declared map[strin
 	}, nil
 }
 
-// An Identity is the implementation of bakery.Identity used in the
+// An Identity is the implementation of identchecker.Identity used in the
 // identity server.
 type Identity struct {
 	id             store.Identity
@@ -323,39 +319,33 @@ type Identity struct {
 	resolvedGroups []string
 }
 
-// Id implements bakery.Identity.Id.
+// Id implements identchecker.Identity.Id.
 func (id *Identity) Id() string {
 	return string(id.id.Username)
 }
 
-// Domain implements bakery.Identity.Domain.
+// Domain implements identchecker.Identity.Domain.
 func (id *Identity) Domain() string {
 	return ""
 }
 
-// Allow implements bakery.ACLIdentity.Allow by checking whether the
+// Allow implements identchecker.ACLIdentity.Allow by checking whether the
 // given identity is in any of the required groups or users.
 func (id *Identity) Allow(ctx context.Context, acl []string) (bool, error) {
-	logger.Debugf("Identity.Allow %q, acl %q {", id, acl)
-	defer logger.Debugf("}")
 	if ok, isTrivial := trivialAllow(id.id.Username, acl); isTrivial {
-		logger.Debugf("trivial %v", ok)
 		return ok, nil
 	}
 	groups, err := id.Groups(ctx)
 	if err != nil {
-		logger.Debugf("error getting groups: %v", err)
 		return false, errgo.Mask(err)
 	}
 	for _, a := range acl {
 		for _, g := range groups {
 			if g == a {
-				logger.Infof("success (group %q)", g)
 				return true, nil
 			}
 		}
 	}
-	logger.Debugf("not in groups")
 	return false, nil
 }
 

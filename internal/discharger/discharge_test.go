@@ -20,10 +20,11 @@ import (
 	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
-	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
-	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
-	"gopkg.in/macaroon.v2-unstable"
+	"gopkg.in/macaroon-bakery.v2/bakery"
+	"gopkg.in/macaroon-bakery.v2/bakery/checkers"
+	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
+	"gopkg.in/macaroon-bakery.v2/httpbakery"
+	"gopkg.in/macaroon.v2"
 
 	"github.com/CanonicalLtd/blues-identity/idp"
 	"github.com/CanonicalLtd/blues-identity/idp/test"
@@ -60,10 +61,10 @@ func (s *dischargeSuite) TestDischargeWhenLoggedIn(c *gc.C) {
 	client := s.Client(webBrowserInteractor)
 	ms, err := s.Discharge(c, "is-authenticated-user", client)
 	c.Assert(err, gc.Equals, nil)
-	s.AssertMacaroon(c, ms, bakery.LoginOp, "test-interactive")
+	s.AssertMacaroon(c, ms, identchecker.LoginOp, "test-interactive")
 	ms, err = s.Discharge(c, "is-authenticated-user", client)
 	c.Assert(err, gc.Equals, nil)
-	s.AssertMacaroon(c, ms, bakery.LoginOp, "test-interactive")
+	s.AssertMacaroon(c, ms, identchecker.LoginOp, "test-interactive")
 }
 
 func (s *dischargeSuite) TestVisitURLWithDomainCookie(c *gc.C) {
@@ -327,7 +328,7 @@ func (s *dischargeSuite) TestDischargeForUser(c *gc.C) {
 		}
 		ms, err := bakery.DischargeAll(
 			s.Ctx,
-			s.NewMacaroon(c, test.condition, bakery.LoginOp),
+			s.NewMacaroon(c, test.condition, identchecker.LoginOp),
 			da.AcquireDischarge,
 		)
 		if test.expectErr != "" {
@@ -335,7 +336,7 @@ func (s *dischargeSuite) TestDischargeForUser(c *gc.C) {
 			continue
 		}
 		c.Assert(err, gc.Equals, nil)
-		ui, err := s.Bakery.Checker.Auth(ms).Allow(context.Background(), bakery.LoginOp)
+		ui, err := s.Bakery.Checker.Auth(ms).Allow(context.Background(), identchecker.LoginOp)
 		c.Assert(ui.Identity.Id(), gc.Equals, test.expectUser)
 	}
 }
@@ -467,12 +468,11 @@ func (s *dischargeSuite) TestDischargeStatusProxyAuthRequiredResponse(c *gc.C) {
 	m, err := s.Bakery.Oven.NewMacaroon(
 		testContext,
 		bakery.Version1,
-		time.Now().Add(time.Minute),
 		[]checkers.Caveat{{
 			Location:  s.URL,
 			Condition: "is-authenticated-user",
 		}},
-		bakery.LoginOp,
+		identchecker.LoginOp,
 	)
 	c.Assert(err, gc.IsNil)
 
@@ -501,12 +501,11 @@ func (s *dischargeSuite) TestDischargeStatusUnauthorizedResponse(c *gc.C) {
 	m, err := s.Bakery.Oven.NewMacaroon(
 		testContext,
 		bakery.Version2,
-		time.Now().Add(time.Minute),
 		[]checkers.Caveat{{
 			Location:  s.URL,
 			Condition: "is-authenticated-user",
 		}},
-		bakery.LoginOp,
+		identchecker.LoginOp,
 	)
 	c.Assert(err, gc.IsNil)
 
@@ -555,7 +554,7 @@ func (s *dischargeSuite) TestIdentityCookieParameters(c *gc.C) {
 	client.Client.Jar = jar
 	ms, err := s.Discharge(c, "is-authenticated-user", client)
 	c.Assert(err, gc.Equals, nil)
-	s.AssertMacaroon(c, ms, bakery.LoginOp, "test-interactive")
+	s.AssertMacaroon(c, ms, identchecker.LoginOp, "test-interactive")
 	c.Assert(jar.cookies, gc.HasLen, 1)
 	for k := range jar.cookies {
 		c.Assert(k.name, gc.Equals, "macaroon-identity")
@@ -674,7 +673,7 @@ func (s *dischargeSuite) TestDomainInInteractionURLs(c *gc.C) {
 		}
 		ms, err := s.Discharge(c, tst.condition, client)
 		c.Assert(err, gc.Equals, nil)
-		s.AssertMacaroon(c, ms, bakery.LoginOp, username)
+		s.AssertMacaroon(c, ms, identchecker.LoginOp, username)
 	}
 }
 
@@ -694,7 +693,7 @@ func (s *dischargeSuite) TestDischargeWithDomainWithExistingNonDomainAuth(c *gc.
 		},
 	}))
 	c.Assert(err, gc.Equals, nil)
-	s.AssertMacaroon(c, ms, bakery.LoginOp, "alice@test-domain")
+	s.AssertMacaroon(c, ms, identchecker.LoginOp, "alice@test-domain")
 }
 
 var interactor = &test.Interactor{

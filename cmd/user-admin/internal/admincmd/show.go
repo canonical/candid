@@ -10,7 +10,7 @@ import (
 	"github.com/juju/idmclient/params"
 	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
+	"gopkg.in/macaroon-bakery.v2/bakery"
 )
 
 type showCommand struct {

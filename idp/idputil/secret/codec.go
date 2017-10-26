@@ -9,7 +9,7 @@ import (
 
 	"golang.org/x/crypto/nacl/box"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
+	"gopkg.in/macaroon-bakery.v2/bakery"
 )
 
 var ErrDecryption = errgo.New("decryption error")

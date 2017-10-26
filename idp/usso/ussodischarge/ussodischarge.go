@@ -24,9 +24,10 @@ import (
 	"github.com/juju/loggo"
 	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
-	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
-	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
+	"gopkg.in/macaroon-bakery.v2/bakery"
+	"gopkg.in/macaroon-bakery.v2/bakery/checkers"
+	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
+	"gopkg.in/macaroon-bakery.v2/httpbakery"
 
 	"github.com/CanonicalLtd/blues-identity/config"
 	"github.com/CanonicalLtd/blues-identity/idp"
@@ -124,7 +125,7 @@ type identityProvider struct {
 	params      Params
 	initParams  idp.InitParams
 	ussoChecker *ussoCaveatChecker
-	checker     *bakery.Checker
+	checker     *identchecker.Checker
 }
 
 // Name gives the name of the identity provider (usso).
@@ -154,9 +155,9 @@ func (idp *identityProvider) Init(_ context.Context, params idp.InitParams) erro
 		fallback:  httpbakery.NewChecker(),
 		namespace: idp.hostname,
 	}
-	idp.checker = bakery.NewChecker(bakery.CheckerParams{
-		Checker:         idp.ussoChecker,
-		MacaroonOpStore: params.Oven,
+	idp.checker = identchecker.NewChecker(identchecker.CheckerParams{
+		Checker:          idp.ussoChecker,
+		MacaroonVerifier: params.Oven,
 	})
 	return nil
 }
@@ -275,8 +276,7 @@ func (idp *identityProvider) ussoMacaroon(ctx context.Context) (*bakery.Macaroon
 	m, err := idp.initParams.Oven.NewMacaroon(
 		ctx,
 		bakery.Version1,
-		time.Now().Add(ussoMacaroonDuration),
-		nil,
+		[]checkers.Caveat{checkers.TimeBeforeCaveat(time.Now().Add(ussoMacaroonDuration))},
 		ussoLoginOp,
 	)
 	if err != nil {
@@ -333,21 +333,32 @@ func (idp *identityProvider) verifyUSSOMacaroon(ctx context.Context, req *http.R
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrBadRequest))
 	}
-	if idp.ussoChecker.accountInfo == nil || idp.ussoChecker.accountInfo.OpenID == "" {
+	var acct accountInfo
+	if idp.ussoChecker.accountInfo == "" {
+		return nil, errgo.WithCausef(nil, params.ErrBadRequest, "account information not specified")
+	}
+	buf, err := base64.StdEncoding.DecodeString(idp.ussoChecker.accountInfo)
+	if err != nil {
+		return nil, ussoCaveatErrorf("account caveat badly formed: %v", err)
+	}
+	if err := json.Unmarshal(buf, &acct); err != nil {
+		return nil, ussoCaveatErrorf("account caveat badly formed: %v", err)
+	}
+	if acct.OpenID == "" {
 		return nil, errgo.WithCausef(nil, params.ErrBadRequest, "account information not specified")
 	}
 	return &store.Identity{
-		ProviderID: store.MakeProviderIdentity(idp.params.Domain, idp.ussoChecker.accountInfo.OpenID),
-		Username:   idp.ussoChecker.accountInfo.OpenID + "@" + idp.params.Domain,
-		Name:       idp.ussoChecker.accountInfo.DisplayName,
-		Email:      idp.ussoChecker.accountInfo.Email,
+		ProviderID: store.MakeProviderIdentity(idp.params.Domain, acct.OpenID),
+		Username:   acct.OpenID + "@" + idp.params.Domain,
+		Name:       acct.DisplayName,
+		Email:      acct.Email,
 	}, nil
 }
 
 type ussoCaveatChecker struct {
 	namespace   string
 	fallback    bakery.FirstPartyCaveatChecker
-	accountInfo *accountInfo
+	accountInfo string
 }
 
 func (c *ussoCaveatChecker) Namespace() *checkers.Namespace {
@@ -369,16 +380,10 @@ func (c *ussoCaveatChecker) CheckFirstPartyCaveat(ctx context.Context, caveat st
 	cond, arg := caveat[i1+1:i2], caveat[i2+1:]
 	switch cond {
 	case "account":
-		if c.accountInfo != nil {
-			return ussoCaveatErrorf("account specified multiple times")
+		if c.accountInfo != "" && c.accountInfo != arg {
+			return ussoCaveatErrorf("account specified inconsistently")
 		}
-		buf, err := base64.StdEncoding.DecodeString(arg)
-		if err != nil {
-			return ussoCaveatErrorf("account caveat badly formed: %v", err)
-		}
-		if err := json.Unmarshal(buf, &c.accountInfo); err != nil {
-			return ussoCaveatErrorf("account caveat badly formed: %v", err)
-		}
+		c.accountInfo = arg
 		return nil
 	case "valid_since":
 		// We don't check the valid_since value to prevent
