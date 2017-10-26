@@ -7,7 +7,7 @@ import (
 
 	"github.com/juju/httprequest"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery/agent"
+	"gopkg.in/macaroon-bakery.v2/httpbakery/agent"
 
 	"github.com/CanonicalLtd/blues-identity/idp"
 )

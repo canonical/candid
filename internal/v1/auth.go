@@ -4,8 +4,8 @@ package v1
 
 import (
 	"github.com/juju/idmclient/params"
-	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
-	"gopkg.in/macaroon-bakery.v2-unstable/bakery/identchecker"
+	"gopkg.in/macaroon-bakery.v2/bakery"
+	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
 
 	"github.com/CanonicalLtd/blues-identity/internal/auth"
 )

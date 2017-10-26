@@ -7,7 +7,7 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/juju/testing"
 	gc "gopkg.in/check.v1"
-	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
+	"gopkg.in/macaroon-bakery.v2/bakery"
 
 	"github.com/CanonicalLtd/blues-identity/meeting"
 	"github.com/CanonicalLtd/blues-identity/memstore"

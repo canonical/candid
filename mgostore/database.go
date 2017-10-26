@@ -6,8 +6,8 @@ import (
 	"github.com/juju/utils/debugstatus"
 	"golang.org/x/net/context"
 	errgo "gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
-	"gopkg.in/macaroon-bakery.v2-unstable/bakery/mgorootkeystore"
+	"gopkg.in/macaroon-bakery.v2/bakery"
+	"gopkg.in/macaroon-bakery.v2/bakery/mgorootkeystore"
 	mgo "gopkg.in/mgo.v2"
 
 	"github.com/CanonicalLtd/blues-identity/meeting"

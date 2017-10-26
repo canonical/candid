@@ -18,9 +18,9 @@ import (
 	"golang.org/x/net/context"
 	"golang.org/x/net/publicsuffix"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
-	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
-	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery/agent"
+	"gopkg.in/macaroon-bakery.v2/bakery"
+	"gopkg.in/macaroon-bakery.v2/httpbakery"
+	"gopkg.in/macaroon-bakery.v2/httpbakery/agent"
 
 	"github.com/CanonicalLtd/blues-identity/version"
 )

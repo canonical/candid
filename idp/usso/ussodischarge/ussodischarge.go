@@ -24,10 +24,10 @@ import (
 	"github.com/juju/loggo"
 	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
-	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
-	"gopkg.in/macaroon-bakery.v2-unstable/bakery/identchecker"
-	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
+	"gopkg.in/macaroon-bakery.v2/bakery"
+	"gopkg.in/macaroon-bakery.v2/bakery/checkers"
+	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
+	"gopkg.in/macaroon-bakery.v2/httpbakery"
 
 	"github.com/CanonicalLtd/blues-identity/config"
 	"github.com/CanonicalLtd/blues-identity/idp"
@@ -204,13 +204,10 @@ func (idp identityProvider) handleLogin(ctx context.Context, w http.ResponseWrit
 			Macaroon: m,
 		})
 	case "POST":
-		logger.Infof("verifying USSO macaroon")
 		user, err := idp.verifyUSSOMacaroon(ctx, req)
 		if err != nil {
-			logger.Infof("verify error: %v", err)
 			return err
 		}
-		logger.Infof("verified OK, user: %#v", user)
 		err = idp.initParams.Store.UpdateIdentity(
 			ctx,
 			user,

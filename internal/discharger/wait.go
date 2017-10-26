@@ -9,9 +9,9 @@ import (
 	"github.com/juju/idmclient/params"
 	"golang.org/x/net/context"
 	errgo "gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
-	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
-	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
+	"gopkg.in/macaroon-bakery.v2/bakery"
+	"gopkg.in/macaroon-bakery.v2/bakery/checkers"
+	"gopkg.in/macaroon-bakery.v2/httpbakery"
 )
 
 // waitTokenRequest is the request sent to the server to wait for logins to

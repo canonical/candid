@@ -10,9 +10,9 @@ import (
 	"github.com/juju/loggo"
 	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
-	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
-	"gopkg.in/macaroon-bakery.v2-unstable/bakery/identchecker"
+	"gopkg.in/macaroon-bakery.v2/bakery"
+	"gopkg.in/macaroon-bakery.v2/bakery/checkers"
+	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
 	macaroon "gopkg.in/macaroon.v2"
 
 	"github.com/CanonicalLtd/blues-identity/idp"
@@ -250,10 +250,6 @@ type identityClient struct {
 // identchecker.IdentityClient.IdentityFromContext by looking for admin
 // credentials in the context.
 func (c identityClient) IdentityFromContext(ctx context.Context) (_ident identchecker.Identity, _ []checkers.Caveat, _ error) {
-	logger.Debugf("identity from context %v {", ctx)
-	defer func() {
-		logger.Debugf("} -> ident %#v", _ident)
-	}()
 	if username := usernameFromContext(ctx); username != "" {
 		if err := CheckUserDomain(ctx, username); err != nil {
 			return nil, nil, errgo.Mask(err)
@@ -266,7 +262,6 @@ func (c identityClient) IdentityFromContext(ctx context.Context) (_ident identch
 	}
 	if username, password, ok := userCredentialsFromContext(ctx); ok {
 		if username == c.a.adminUsername && password == c.a.adminPassword {
-			logger.Debugf("admin login success as %q", AdminUsername)
 			return &Identity{
 				id: store.Identity{
 					Username: AdminUsername,
@@ -337,26 +332,20 @@ func (id *Identity) Domain() string {
 // Allow implements identchecker.ACLIdentity.Allow by checking whether the
 // given identity is in any of the required groups or users.
 func (id *Identity) Allow(ctx context.Context, acl []string) (bool, error) {
-	logger.Debugf("Identity.Allow %q, acl %q {", id, acl)
-	defer logger.Debugf("}")
 	if ok, isTrivial := trivialAllow(id.id.Username, acl); isTrivial {
-		logger.Debugf("trivial %v", ok)
 		return ok, nil
 	}
 	groups, err := id.Groups(ctx)
 	if err != nil {
-		logger.Debugf("error getting groups: %v", err)
 		return false, errgo.Mask(err)
 	}
 	for _, a := range acl {
 		for _, g := range groups {
 			if g == a {
-				logger.Infof("success (group %q)", g)
 				return true, nil
 			}
 		}
 	}
-	logger.Debugf("not in groups")
 	return false, nil
 }
 

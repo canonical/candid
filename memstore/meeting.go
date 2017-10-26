@@ -3,6 +3,7 @@
 package memstore
 
 import (
+	"sync"
 	"time"
 
 	"golang.org/x/net/context"
@@ -19,6 +20,7 @@ func NewMeetingStore() meeting.Store {
 }
 
 type meetingStore struct {
+	mu   sync.Mutex
 	data map[string]meetingStoreEntry
 }
 
@@ -35,6 +37,8 @@ func (s *meetingStore) Context(ctx context.Context) (_ context.Context, close fu
 
 // Put implements meeting.Store.Put.
 func (s *meetingStore) Put(_ context.Context, id, address string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.data[id] = meetingStoreEntry{
 		address: address,
 		time:    time.Now(),
@@ -44,6 +48,8 @@ func (s *meetingStore) Put(_ context.Context, id, address string) error {
 
 // Get implements meeting.Store.Get.
 func (s *meetingStore) Get(_ context.Context, id string) (address string, _ error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if e, ok := s.data[id]; ok {
 		return e.address, nil
 	}
@@ -52,6 +58,8 @@ func (s *meetingStore) Get(_ context.Context, id string) (address string, _ erro
 
 // Remove implements meeting.Store.Remove.
 func (s *meetingStore) Remove(_ context.Context, id string) (time.Time, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	e := s.data[id]
 	delete(s.data, id)
 	return e.time, nil
@@ -59,6 +67,8 @@ func (s *meetingStore) Remove(_ context.Context, id string) (time.Time, error) {
 
 // RemoveOld implements meeting.Store.RemoveOld.
 func (s *meetingStore) RemoveOld(_ context.Context, addr string, olderThan time.Time) (ids []string, err error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	for k, v := range s.data {
 		if v.time.Before(olderThan) {
 			delete(s.data, k)

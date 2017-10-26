@@ -12,7 +12,7 @@ import (
 	"github.com/juju/testing/httptesting"
 	"github.com/juju/utils/debugstatus"
 	gc "gopkg.in/check.v1"
-	"gopkg.in/macaroon-bakery.v2-unstable/bakery/mgorootkeystore"
+	"gopkg.in/macaroon-bakery.v2/bakery/mgorootkeystore"
 
 	"github.com/CanonicalLtd/blues-identity/internal/debug"
 	"github.com/CanonicalLtd/blues-identity/internal/identity"

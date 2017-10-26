@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"golang.org/x/net/context"
-	"gopkg.in/macaroon-bakery.v2-unstable/bakery"
+	"gopkg.in/macaroon-bakery.v2/bakery"
 	mgo "gopkg.in/mgo.v2"
 
 	"github.com/CanonicalLtd/blues-identity/cmd/migrate-db/internal/mongodoc"

@@ -9,7 +9,7 @@ import (
 	jc "github.com/juju/testing/checkers"
 	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
-	"gopkg.in/macaroon-bakery.v2-unstable/bakery/mgorootkeystore"
+	"gopkg.in/macaroon-bakery.v2/bakery/mgorootkeystore"
 
 	"github.com/CanonicalLtd/blues-identity/mgostore"
 )
