@@ -374,20 +374,77 @@ func (*suite) TestPutFailure(c *gc.C) {
 
 func (s *suite) TestWaitTimeout(c *gc.C) {
 	store := newFakeStore(nil, s.clock)
-	srv, err := meeting.NewServer(meeting.Params{
-		GetStore:    storeGetter(store, nil),
-		ListenAddr:  "localhost",
-		DisableGC:   true,
-		WaitTimeout: 100 * time.Millisecond,
-	})
+	s.PatchValue(&meeting.Clock, s.clock)
+	p := meeting.Params{
+		GetStore:       storeGetter(store, nil),
+		ListenAddr:     "localhost",
+		DisableGC:      true,
+		WaitTimeout:    time.Second,
+		ExpiryDuration: 5 * time.Second,
+	}
+	srv, err := meeting.NewServer(p)
 	c.Assert(err, gc.IsNil)
+
+	t0 := s.clock.Now()
 
 	m := srv.Place(store)
 	id, err := m.NewRendezvous(nil)
 	c.Assert(err, gc.IsNil)
-	_, _, err = m.Wait(id)
-	c.Logf("err: %#v", err)
-	c.Assert(err, gc.ErrorMatches, "rendezvous timed out after 100ms")
+	done := make(chan struct{})
+	go func() {
+		_, _, err = m.Wait(id)
+		c.Check(err, gc.ErrorMatches, "rendezvous wait timed out after 1s")
+		done <- struct{}{}
+	}()
+	err = s.clock.WaitAdvance(p.WaitTimeout+1, time.Second, 1)
+	c.Assert(err, gc.Equals, nil)
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		c.Fatalf("timed out waiting for Wait to time out")
+	}
+
+	// Try again. The item shouldn't have been removed, so we should be
+	// able to repeat the request.
+	go func() {
+		_, _, err = m.Wait(id)
+		c.Check(err, gc.ErrorMatches, "rendezvous wait timed out after 1s")
+		done <- struct{}{}
+	}()
+	err = s.clock.WaitAdvance(p.WaitTimeout+1, time.Second, 1)
+	c.Assert(err, gc.Equals, nil)
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		c.Fatalf("timed out waiting for Wait to time out")
+	}
+	c.Assert(err, gc.ErrorMatches, "rendezvous wait timed out after 1s")
+
+	c.Logf("after second wait, now: %v", s.clock.Now())
+	// When the actual expiry deadline passes while we're waiting,
+	// we should return when that happens.
+	// Advance the clock to just before the expiry duration.
+	expiryDeadline := t0.Add(p.ExpiryDuration)
+	c.Logf("expiry deadline %v", expiryDeadline)
+
+	s.clock.Advance(expiryDeadline.Add(-time.Millisecond).Sub(s.clock.Now()))
+
+	go func() {
+		_, _, err = m.Wait(id)
+		c.Check(err, gc.ErrorMatches, "rendezvous expired after 5s")
+		done <- struct{}{}
+	}()
+	waitDuration := expiryDeadline.Add(1).Sub(s.clock.Now())
+	c.Logf("final wait from %v: %v", s.clock.Now(), waitDuration)
+	err = s.clock.WaitAdvance(expiryDeadline.Add(1).Sub(s.clock.Now()), time.Second, 1)
+	c.Assert(err, gc.Equals, nil)
+	c.Logf("final time %v", s.clock.Now())
+
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		c.Fatalf("timed out waiting for Wait to time out")
+	}
 }
 
 func (s *suite) TestRequestCompletedCalled(c *gc.C) {

@@ -96,9 +96,10 @@ type Server struct {
 }
 
 type item struct {
-	c     chan struct{}
-	data0 []byte
-	data1 []byte
+	created time.Time
+	c       chan struct{}
+	data0   []byte
+	data1   []byte
 }
 
 // Place represents a meeting place for any number
@@ -281,30 +282,46 @@ func (srv *Server) localWait(id string, getStore func() Store) (data0, data1 []b
 	if item == nil {
 		return nil, nil, errgo.Newf("rendezvous %q not found", id)
 	}
-	// Wait for the channel to be closed by Done.
+
+	now := Clock.Now()
+	expiryDeadline := item.created.Add(srv.expiryDuration)
+	deadline := expiryDeadline
+	if t := now.Add(srv.waitTimeout); t.Before(deadline) {
+		deadline = t
+	}
+	// Wait for the channel to be closed by Done or for the overall
+	// expiry deadline or the wait to pass, whichever comes first.
 	timeout := false
 	select {
 	case <-item.c:
-	case <-Clock.After(srv.waitTimeout):
+	case <-Clock.After(deadline.Sub(now)):
 		timeout = true
 	}
-	// Note that we get the Store *after* waiting, so we
-	// don't tie up resources while waiting.
-	store := getStore()
-	defer store.Close()
-	srv.mu.Lock()
-	defer srv.mu.Unlock()
-	delete(srv.items, id)
-	t, err := store.Remove(id)
-	if err != nil {
-		logger.Errorf("cannot remove rendezvous %q: %v", id, err)
-	}
-	if !t.IsZero() {
-		srv.metrics.RequestCompleted(t)
+	removed := false
+	if !timeout || Clock.Now().After(expiryDeadline) {
+		// The client has acquired the rendezvous OK or the full
+		// expiry duration has elapsed, so remove the item. Note
+		// that we're getting the Store *after* waiting, so we
+		// don't tie up resources while waiting.
+		store := getStore()
+		defer store.Close()
+		srv.mu.Lock()
+		defer srv.mu.Unlock()
+		delete(srv.items, id)
+		_, err := store.Remove(id)
+		if err != nil {
+			logger.Errorf("cannot remove rendezvous %q: %v", id, err)
+		}
+		removed = true
 	}
 	if timeout {
-		return nil, nil, errgo.Newf("rendezvous timed out after %v", srv.waitTimeout)
+		if removed {
+			return nil, nil, errgo.Newf("rendezvous expired after %v", srv.expiryDuration)
+		}
+		return nil, nil, errgo.Newf("rendezvous wait timed out after %v", srv.waitTimeout)
 	}
+	// TODO what do we actual want RequestCompleted to signify?
+	srv.metrics.RequestCompleted(item.created)
 	return item.data0, item.data1, nil
 }
 
@@ -364,8 +381,9 @@ func (p *Place) NewRendezvous(data []byte) (string, error) {
 	srv := p.srv
 	srv.mu.Lock()
 	srv.items[id] = &item{
-		c:     make(chan struct{}),
-		data0: data,
+		created: Clock.Now(),
+		c:       make(chan struct{}),
+		data0:   data,
 	}
 	srv.mu.Unlock()
 	if err := p.store.Put(id, srv.localAddr); err != nil {
