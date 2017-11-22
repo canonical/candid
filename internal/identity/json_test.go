@@ -5,8 +5,6 @@ package identity_test
 import (
 	"net/http"
 
-	"github.com/juju/httprequest"
-	"github.com/juju/idmclient/params"
 	"github.com/juju/loggo"
 	jujutesting "github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"
@@ -14,6 +12,8 @@ import (
 	"github.com/julienschmidt/httprouter"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
+	"gopkg.in/httprequest.v1"
+	"gopkg.in/juju/idmclient.v1/params"
 
 	"github.com/CanonicalLtd/blues-identity/internal/identity"
 )

@@ -9,8 +9,8 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/juju/idmclient/params"
 	gc "gopkg.in/check.v1"
+	"gopkg.in/juju/idmclient.v1/params"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
 
 	"github.com/CanonicalLtd/blues-identity/idp"

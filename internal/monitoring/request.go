@@ -5,8 +5,8 @@ package monitoring
 import (
 	"time"
 
-	"github.com/juju/httprequest"
 	"github.com/prometheus/client_golang/prometheus"
+	"gopkg.in/httprequest.v1"
 )
 
 var (

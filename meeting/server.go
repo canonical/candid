@@ -3,8 +3,8 @@
 package meeting
 
 import (
-	"github.com/juju/httprequest"
 	"gopkg.in/errgo.v1"
+	"gopkg.in/httprequest.v1"
 )
 
 type handler struct {

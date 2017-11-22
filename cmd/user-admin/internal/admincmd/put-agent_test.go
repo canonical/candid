@@ -6,12 +6,13 @@ import (
 	"encoding/json"
 	"path/filepath"
 
-	"github.com/CanonicalLtd/blues-identity/cmd/user-admin/internal/admincmd"
-	"github.com/juju/idmclient"
-	"github.com/juju/idmclient/params"
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
+	"gopkg.in/juju/idmclient.v1"
+	"gopkg.in/juju/idmclient.v1/params"
 	"gopkg.in/macaroon-bakery.v2/httpbakery/agent"
+
+	"github.com/CanonicalLtd/blues-identity/cmd/user-admin/internal/admincmd"
 )
 
 type putAgentSuite struct {

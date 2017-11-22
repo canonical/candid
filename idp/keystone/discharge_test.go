@@ -8,10 +8,10 @@ import (
 	"net/url"
 	"regexp"
 
-	"github.com/juju/httprequest"
 	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
+	"gopkg.in/httprequest.v1"
 	envschemaform "gopkg.in/juju/environschema.v1/form"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
 	"gopkg.in/macaroon-bakery.v2/httpbakery/form"

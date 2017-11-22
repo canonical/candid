@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/juju/httprequest"
+	"gopkg.in/httprequest.v1"
 )
 
 // TokensRequest is the request sent to /v2.0/tokens to perform a login.

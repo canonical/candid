@@ -6,9 +6,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/juju/idmclient/params"
 	"golang.org/x/net/context"
 	errgo "gopkg.in/errgo.v1"
+	"gopkg.in/juju/idmclient.v1/params"
 	"gopkg.in/macaroon-bakery.v2/bakery"
 	"gopkg.in/macaroon-bakery.v2/bakery/checkers"
 	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
