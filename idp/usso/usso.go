@@ -11,10 +11,6 @@ import (
 	"strings"
 	"time"
 
-	"launchpad.net/lpad"
-
-	"github.com/juju/httprequest"
-	"github.com/juju/idmclient/params"
 	"github.com/juju/loggo"
 	"github.com/juju/names"
 	"github.com/juju/utils/cache"
@@ -22,7 +18,10 @@ import (
 	openid "github.com/yohcop/openid-go"
 	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
+	"gopkg.in/httprequest.v1"
+	"gopkg.in/juju/idmclient.v1/params"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
+	"launchpad.net/lpad"
 
 	"github.com/CanonicalLtd/blues-identity/config"
 	"github.com/CanonicalLtd/blues-identity/idp"

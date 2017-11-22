@@ -13,9 +13,9 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/juju/idmclient/params"
 	"golang.org/x/net/context"
 	errgo "gopkg.in/errgo.v1"
+	"gopkg.in/juju/idmclient.v1/params"
 	ldap "gopkg.in/ldap.v2"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
 

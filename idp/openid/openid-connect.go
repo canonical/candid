@@ -10,10 +10,10 @@ import (
 	"time"
 
 	"github.com/coreos/go-oidc"
-	"github.com/juju/idmclient/params"
 	"golang.org/x/net/context"
 	"golang.org/x/oauth2"
 	"gopkg.in/errgo.v1"
+	"gopkg.in/juju/idmclient.v1/params"
 	"gopkg.in/juju/names.v2"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
 

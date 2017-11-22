@@ -3,10 +3,10 @@
 package ussooauth_test
 
 import (
-	"github.com/juju/idmclient/ussologin"
 	"github.com/juju/usso"
 	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
+	"gopkg.in/juju/idmclient.v1/ussologin"
 
 	"github.com/CanonicalLtd/blues-identity/idp"
 	"github.com/CanonicalLtd/blues-identity/idp/usso/internal/mockusso"

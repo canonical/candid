@@ -5,9 +5,9 @@ package keystone
 import (
 	"net/http"
 
-	"github.com/juju/httprequest"
 	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
+	"gopkg.in/httprequest.v1"
 )
 
 const subjectTokenHeader = "X-Subject-Token"

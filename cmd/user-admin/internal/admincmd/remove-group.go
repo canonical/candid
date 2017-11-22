@@ -4,9 +4,9 @@ package admincmd
 
 import (
 	"github.com/juju/cmd"
-	"github.com/juju/idmclient/params"
 	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
+	"gopkg.in/juju/idmclient.v1/params"
 )
 
 type removeGroupCommand struct {

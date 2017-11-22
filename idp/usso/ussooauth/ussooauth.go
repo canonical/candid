@@ -14,10 +14,10 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/juju/httprequest"
-	"github.com/juju/idmclient/ussologin"
 	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
+	"gopkg.in/httprequest.v1"
+	"gopkg.in/juju/idmclient.v1/ussologin"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
 
 	"github.com/CanonicalLtd/blues-identity/config"

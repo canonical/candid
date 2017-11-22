@@ -9,12 +9,11 @@ import (
 	"strings"
 
 	"github.com/juju/cmd"
-	"github.com/juju/idmclient"
-	"github.com/juju/idmclient/params"
+	"github.com/juju/gnuflag"
 	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
-
-	"github.com/juju/gnuflag"
+	"gopkg.in/juju/idmclient.v1"
+	"gopkg.in/juju/idmclient.v1/params"
 	"gopkg.in/macaroon-bakery.v2/bakery"
 	"gopkg.in/macaroon-bakery.v2/httpbakery/agent"
 )

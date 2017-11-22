@@ -6,9 +6,9 @@ import (
 	"net/http"
 	"net/http/httptest"
 
-	"github.com/juju/httprequest"
 	"github.com/julienschmidt/httprouter"
 	"golang.org/x/net/context"
+	"gopkg.in/httprequest.v1"
 
 	"github.com/CanonicalLtd/blues-identity/idp/keystone/internal/keystone"
 )

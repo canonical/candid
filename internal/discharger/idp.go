@@ -8,11 +8,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/juju/idmclient"
 	"github.com/julienschmidt/httprouter"
 	"golang.org/x/net/context"
 	"golang.org/x/net/trace"
 	"gopkg.in/errgo.v1"
+	"gopkg.in/juju/idmclient.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery"
 	"gopkg.in/macaroon-bakery.v2/bakery/checkers"
 	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"

@@ -5,12 +5,12 @@
 package discharger
 
 import (
-	"github.com/juju/httprequest"
-	"github.com/juju/idmclient/params"
 	"github.com/juju/loggo"
 	"golang.org/x/net/context"
 	"golang.org/x/net/trace"
 	"gopkg.in/errgo.v1"
+	"gopkg.in/httprequest.v1"
+	"gopkg.in/juju/idmclient.v1/params"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
 
 	"github.com/CanonicalLtd/blues-identity/internal/auth/httpauth"

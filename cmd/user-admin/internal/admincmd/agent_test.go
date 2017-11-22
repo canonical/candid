@@ -5,10 +5,10 @@ package admincmd_test
 import (
 	"net/http"
 
-	"github.com/juju/httprequest"
-	"github.com/juju/idmclient"
 	"golang.org/x/net/context"
 	errgo "gopkg.in/errgo.v1"
+	"gopkg.in/httprequest.v1"
+	"gopkg.in/juju/idmclient.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery"
 	"gopkg.in/macaroon-bakery.v2/bakery/checkers"
 	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"

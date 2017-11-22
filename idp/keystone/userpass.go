@@ -6,13 +6,13 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/juju/httprequest"
-	"github.com/juju/idmclient/params"
 	"github.com/juju/schema"
 	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
 	gooseidentity "gopkg.in/goose.v1/identity"
+	"gopkg.in/httprequest.v1"
 	"gopkg.in/juju/environschema.v1"
+	"gopkg.in/juju/idmclient.v1/params"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
 	"gopkg.in/macaroon-bakery.v2/httpbakery/form"
 

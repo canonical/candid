@@ -14,9 +14,9 @@ import (
 	"net/http/httptest"
 	"time"
 
-	udclient "github.com/juju/idmclient/ussodischarge"
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
+	udclient "gopkg.in/juju/idmclient.v1/ussodischarge"
 	"gopkg.in/macaroon-bakery.v2/bakery"
 	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"

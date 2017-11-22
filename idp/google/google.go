@@ -4,9 +4,8 @@
 package google
 
 import (
-	"gopkg.in/errgo.v1"
-
 	oidc "github.com/coreos/go-oidc"
+	"gopkg.in/errgo.v1"
 
 	"github.com/CanonicalLtd/blues-identity/config"
 	"github.com/CanonicalLtd/blues-identity/idp"

@@ -11,12 +11,12 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/juju/idmclient/params"
 	"github.com/juju/usso"
 	"github.com/juju/usso/openid"
 	"github.com/julienschmidt/httprouter"
 	"golang.org/x/crypto/nacl/box"
 	"gopkg.in/errgo.v1"
+	"gopkg.in/juju/idmclient.v1/params"
 	"gopkg.in/macaroon-bakery.v2/bakery"
 
 	"github.com/CanonicalLtd/blues-identity/internal/identity"
