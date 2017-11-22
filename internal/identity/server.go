@@ -7,6 +7,7 @@ import (
 	"html/template"
 	"net/http"
 	"runtime/debug"
+	"time"
 
 	"github.com/juju/loggo"
 	"github.com/juju/utils/debugstatus"
@@ -76,7 +77,12 @@ func New(sp ServerParams, versions map[string]NewAPIHandlerFunc) (*Server, error
 		return nil, errgo.Mask(err)
 	}
 
-	place, err := meeting.NewPlace(sp.MeetingStore, monitoring.NewMeetingMetrics(), sp.PrivateAddr)
+	place, err := meeting.NewPlace(meeting.Params{
+		Store:       sp.MeetingStore,
+		Metrics:     monitoring.NewMeetingMetrics(),
+		ListenAddr:  sp.PrivateAddr,
+		WaitTimeout: sp.WaitTimeout,
+	})
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot create meeting place")
 	}
@@ -201,6 +207,10 @@ type ServerParams struct {
 	// DebugStatusCheckerFuncs contains functions that will be
 	// executed as part of a /debug/status check.
 	DebugStatusCheckerFuncs []debugstatus.CheckerFunc
+
+	// WaitTimeout holds the time after which an interactive discharge wait
+	// request will timeout.
+	WaitTimeout time.Duration
 }
 
 type HandlerParams struct {

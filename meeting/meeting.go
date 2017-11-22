@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/juju/loggo"
+	"github.com/juju/utils"
 	"github.com/juju/utils/clock"
 	"github.com/julienschmidt/httprouter"
 	"golang.org/x/net/context"
@@ -29,12 +30,16 @@ var (
 	// rendezvous.
 	pollInterval = 30 * time.Second
 
-	// expiryDuration holds the length of time that we keep
+	// defaultExpiryDuration holds the length of time that we keep
 	// a rendezvous around before deleting it. This needs to
 	// be long enough that the user can do all the web page
 	// interaction that they need to before the rendezvous is
 	// completed.
-	expiryDuration = time.Hour
+	defaultExpiryDuration = time.Hour
+
+	// defaultWaitTimeout holds the default maximum
+	// length of time that a wait request can block for.
+	defaultWaitTimeout = time.Minute
 
 	// reallyOldExpiryDuration holds the length of time after
 	// which we'll delete rendezvous regardless of server.
@@ -83,49 +88,93 @@ type Store interface {
 
 // Place represents a rendezvous place.
 type Place struct {
-	tomb      tomb.Tomb
-	store     Store
-	localAddr string
-	listener  net.Listener
-	handler   *handler
-	metrics   Metrics
+	tomb           tomb.Tomb
+	store          Store
+	localAddr      string
+	listener       net.Listener
+	handler        *handler
+	metrics        Metrics
+	waitTimeout    time.Duration
+	expiryDuration time.Duration
 
 	mu    sync.Mutex
 	items map[string]*item
 }
 
 type item struct {
-	c     chan struct{}
-	data0 []byte
-	data1 []byte
+	created time.Time
+	c       chan struct{}
+	data0   []byte
+	data1   []byte
 }
 
+// Metrics represents a way to report metrics information
+// about the meeting service. It must be callable
+// concurrently.
 type Metrics interface {
+	// RequestCompleted is called every time an HTTP
+	// request has completed with the time the request started.
 	RequestCompleted(startTime time.Time)
+
+	// RequestsExpired is called when some requests
+	// have been garbage collected with the number
+	// of GC'd requests.
 	RequestsExpired(count int)
 }
 
-// NewPlace returns a new rendezvous place using the given store that
-// listens on the given address.
-//
-// Note that listenAddr must also be sufficient for other servers to use
-// to contact this one.
-func NewPlace(s Store, m Metrics, listenAddr string) (*Place, error) {
-	return newPlace(s, m, listenAddr, true)
+// Params holds parameters for the NewServer function.
+type Params struct {
+	// Store is used for storage of persistent data.
+	Store Store
+
+	// Metrics holds an object that's used to report server metrics.
+	// If it's nil, no metrics will be reported.
+	Metrics Metrics
+
+	// ListenAddr holds the host name to listen on. This
+	// should not have a port number.
+	// Note that ListenAddr must also be sufficient for other
+	// servers to use to contact this one.
+	ListenAddr string
+
+	// DisableGC holds whether the garbage collector is disabled.
+	DisableGC bool
+
+	// WaitTimeout holds the maximum time to that
+	// wait requests will wait. If it is zero, a default
+	// duration will be used.
+	WaitTimeout time.Duration
+
+	// ExpiryDuration holds the maximum amount of time
+	// a rendezvous will be kept around for. If it is zero, a default
+	// duration will be used.
+	ExpiryDuration time.Duration
 }
 
-func newPlace(s Store, m Metrics, listenAddr string, runGC bool) (*Place, error) {
-	listener, err := net.Listen("tcp", net.JoinHostPort(listenAddr, "0"))
+// NewServer returns a new rendezvous place using the given
+// parameters.
+func NewPlace(params Params) (*Place, error) {
+	listener, err := net.Listen("tcp", net.JoinHostPort(params.ListenAddr, "0"))
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot start listener")
 	}
-
+	if params.Metrics == nil {
+		params.Metrics = noMetrics{}
+	}
+	if params.WaitTimeout == 0 {
+		params.WaitTimeout = defaultWaitTimeout
+	}
+	if params.ExpiryDuration == 0 {
+		params.ExpiryDuration = defaultExpiryDuration
+	}
 	p := &Place{
-		store:     s,
-		listener:  listener,
-		localAddr: listener.Addr().String(),
-		items:     make(map[string]*item),
-		metrics:   m,
+		store:          params.Store,
+		listener:       listener,
+		localAddr:      listener.Addr().String(),
+		items:          make(map[string]*item),
+		metrics:        params.Metrics,
+		waitTimeout:    params.WaitTimeout,
+		expiryDuration: params.ExpiryDuration,
 	}
 	p.handler = &handler{
 		place: p,
@@ -134,7 +183,7 @@ func newPlace(s Store, m Metrics, listenAddr string, runGC bool) (*Place, error)
 	for _, h := range reqServer.Handlers(p.newHandler) {
 		router.Handle(h.Method, h.Path, h.Handle)
 	}
-	if runGC {
+	if !params.DisableGC {
 		p.tomb.Go(p.gc)
 	}
 	p.tomb.Go(func() error {
@@ -184,7 +233,7 @@ func (p *Place) runGC(ctx context.Context, dying bool, now time.Time) error {
 		// find all entries.
 		expiryTime = now.Add(time.Millisecond)
 	} else {
-		expiryTime = now.Add(-expiryDuration)
+		expiryTime = now.Add(-p.expiryDuration)
 	}
 	ids, err := p.store.RemoveOld(ctx, p.localAddr, expiryTime)
 	if len(ids) > 0 {
@@ -211,36 +260,55 @@ func (p *Place) runGC(ctx context.Context, dying bool, now time.Time) error {
 // localWait is the internal version of Place.Wait.
 // It only works if the given id is stored locally.
 func (p *Place) localWait(ctx context.Context, id string) (data0, data1 []byte, err error) {
+	logger.Infof("localWait %q", id)
 	p.mu.Lock()
 	item := p.items[id]
 	p.mu.Unlock()
 	if item == nil {
 		return nil, nil, errgo.Newf("rendezvous %q not found", id)
 	}
-	// Wait for the channel to be closed by Done.
-	ctx, cancel := context.WithTimeout(ctx, expiryDuration)
+	now := Clock.Now()
+	expiryDeadline := item.created.Add(p.expiryDuration)
+	deadline := expiryDeadline
+	if t := now.Add(p.waitTimeout); t.Before(deadline) {
+		deadline = t
+	}
+	logger.Infof("timeout %v", deadline.Sub(now))
+	ctx, cancel := utils.ContextWithTimeout(ctx, Clock, deadline.Sub(now))
 	defer cancel()
+	// Wait for the channel to be closed by Done or for the overall
+	// expiry deadline or the wait to pass, whichever comes first.
 	var expiredErr error
 	select {
 	case <-item.c:
 	case <-ctx.Done():
 		expiredErr = ctx.Err()
 	}
-	ctx, close := p.store.Context(ctx)
-	defer close()
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	delete(p.items, id)
-	t, err := p.store.Remove(ctx, id)
-	if err != nil {
-		logger.Errorf("cannot remove rendezvous %q: %v", id, err)
-	}
-	if !t.IsZero() {
-		p.metrics.RequestCompleted(t)
+	removed := false
+	if expiredErr == nil || Clock.Now().After(expiryDeadline) {
+		// The client has acquired the rendezvous OK or the full
+		// expiry duration has elapsed, so remove the item. Note
+		// that we're getting the Store *after* waiting, so we
+		// don't tie up resources while waiting.
+		ctx, close := p.store.Context(ctx)
+		defer close()
+		p.mu.Lock()
+		defer p.mu.Unlock()
+		delete(p.items, id)
+		_, err := p.store.Remove(ctx, id)
+		if err != nil {
+			logger.Errorf("cannot remove rendezvous %q: %v", id, err)
+		}
+		removed = true
 	}
 	if expiredErr != nil {
-		return nil, nil, errgo.WithCausef(expiredErr, expiredErr, "rendezvous has expired")
+		if removed {
+			return nil, nil, errgo.Newf("rendezvous expired after %v", p.expiryDuration)
+		}
+		return nil, nil, errgo.Notef(err, "rendezvous wait timed out")
 	}
+	// TODO what do we actually want RequestCompleted to signify?
+	p.metrics.RequestCompleted(item.created)
 	return item.data0, item.data1, nil
 }
 
@@ -287,8 +355,9 @@ var reqServer = httprequest.Server{
 func (p *Place) NewRendezvous(ctx context.Context, id string, data []byte) error {
 	p.mu.Lock()
 	p.items[id] = &item{
-		c:     make(chan struct{}),
-		data0: data,
+		created: Clock.Now(),
+		c:       make(chan struct{}),
+		data0:   data,
 	}
 	p.mu.Unlock()
 	if err := p.store.Put(ctx, id, p.localAddr); err != nil {
@@ -304,9 +373,11 @@ func (p *Place) NewRendezvous(ctx context.Context, id string, data []byte) error
 // and returns the data provided to NewRendezvous
 // and the data provided to Done.
 func (p *Place) Wait(ctx context.Context, id string) (data0, data1 []byte, err error) {
+	logger.Infof("Wait %q", id)
 	if p.isLocal(id) {
 		return p.localWait(ctx, id)
 	}
+	logger.Infof("not local wait")
 	client, err := p.clientForId(ctx, id)
 	if err != nil {
 		return nil, nil, errgo.Mask(err)
@@ -353,3 +424,10 @@ func (p *Place) clientForId(ctx context.Context, id string) (*client, error) {
 		},
 	}, nil
 }
+
+// noMetrics implements Metrics by doing nothing.
+type noMetrics struct{}
+
+func (noMetrics) RequestCompleted(startTime time.Time) {}
+
+func (noMetrics) RequestsExpired(count int) {}

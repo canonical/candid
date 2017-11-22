@@ -10,11 +10,6 @@ func ItemCount(p *Place) int {
 }
 
 var (
-	ExpiryDuration          = &expiryDuration
 	ReallyOldExpiryDuration = &reallyOldExpiryDuration
 	RunGC                   = (*Place).runGC
 )
-
-func NewPlaceNoGC(s Store, m Metrics, listenAddr string) (*Place, error) {
-	return newPlace(s, m, listenAddr, false)
-}
