@@ -115,6 +115,9 @@ func providerID(doc *mongodoc.Identity) store.ProviderIdentity {
 		// The only currently used openid provider is azure
 		return store.MakeProviderIdentity("azure", strings.TrimPrefix(doc.ExternalID, "openid-connect:"))
 	}
+	if strings.HasPrefix(doc.ExternalID, "usso-openid:") {
+		return store.MakeProviderIdentity("usso_macaroon", strings.TrimPrefix(doc.ExternalID, "usso-openid:"))
+	}
 	log.Printf("unrecognised external ID: %s", doc.ExternalID)
 	return ""
 }

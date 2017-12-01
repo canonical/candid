@@ -190,7 +190,7 @@ var postTests = []struct {
 	lastAuth:   timeString(-time.Minute),
 	expires:    timeString(time.Hour),
 	expectUser: &store.Identity{
-		ProviderID: store.MakeProviderIdentity("ussotest", "1234567"),
+		ProviderID: store.MakeProviderIdentity("usso_macaroon", "1234567"),
 		Username:   "1234567@ussotest",
 		Name:       "Test User",
 		Email:      "testuser@example.com",
