@@ -348,7 +348,7 @@ func (idp *identityProvider) verifyUSSOMacaroon(ctx context.Context, req *http.R
 		return nil, errgo.WithCausef(nil, params.ErrBadRequest, "account information not specified")
 	}
 	return &store.Identity{
-		ProviderID: store.MakeProviderIdentity(idp.params.Domain, acct.OpenID),
+		ProviderID: store.MakeProviderIdentity("usso_macaroon", acct.OpenID),
 		Username:   acct.OpenID + "@" + idp.params.Domain,
 		Name:       acct.DisplayName,
 		Email:      acct.Email,
