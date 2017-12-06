@@ -3,14 +3,25 @@
 package ldap_test
 
 import (
+	"net/http"
+	"net/http/httptest"
+	"net/url"
+	"strings"
+
 	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
 
 	"github.com/CanonicalLtd/blues-identity/idp"
+	"github.com/CanonicalLtd/blues-identity/idp/idptest"
 	"github.com/CanonicalLtd/blues-identity/idp/ldap"
+	"github.com/CanonicalLtd/blues-identity/store"
 )
 
-type ldapSuite struct{}
+type ldapSuite struct {
+	idptest.Suite
+
+	ldapDialer *mockLDAPDialer
+}
 
 var _ = gc.Suite(&ldapSuite{})
 
@@ -39,6 +50,48 @@ var newTests = []struct {
 	},
 	expectError: `unsupported scheme "ldaps"`,
 }}
+
+var sampleLdapDb = ldapDB{{
+	// admin user (used for search binds)
+	"dn":           {"cn=test,dc=example,dc=com"},
+	"userPassword": {"pass"},
+}, {
+	"dn":           {"uid=user1,ou=users,dc=example,dc=com"},
+	"objectClass":  {"account"},
+	"uid":          {"user1"},
+	"userPassword": {"pass1"},
+}, {
+	"dn":           {"uid=user2,ou=users,dc=example,dc=com"},
+	"objectClass":  {"account"},
+	"uid":          {"user2"},
+	"userPassword": {"pass2"},
+}}
+
+func (s *ldapSuite) setupIdp(c *gc.C, params ldap.Params, db ldapDB) idp.IdentityProvider {
+	i, err := ldap.NewIdentityProvider(params)
+	c.Assert(err, gc.IsNil)
+	s.ldapDialer = newMockLDAPDialer(db)
+	ldap.SetLDAP(i, s.ldapDialer.Dial)
+	i.Init(context.TODO(), s.InitParams(c, "https://example.com/test"))
+	return i
+}
+
+func (s *ldapSuite) makeLoginRequest(c *gc.C, i idp.IdentityProvider, username, password string) *httptest.ResponseRecorder {
+	req, err := http.NewRequest("POST", "/login",
+		strings.NewReader(
+			url.Values{
+				"username": {username},
+				"password": {password},
+			}.Encode(),
+		),
+	)
+	c.Assert(err, gc.IsNil)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.ParseForm()
+	rr := httptest.NewRecorder()
+	i.Handle(context.TODO(), rr, req)
+	return rr
+}
 
 func (s *ldapSuite) TestNewIdentityProvider(c *gc.C) {
 	for i, test := range newTests {
@@ -102,4 +155,69 @@ func (s *ldapSuite) TestURL(c *gc.C) {
 		URLPrefix: "https://example.com/test",
 	})
 	c.Assert(i.URL("1"), gc.Equals, "https://example.com/test/login?id=1")
+}
+
+func (s *ldapSuite) TestHandle(c *gc.C) {
+	params := ldap.Params{
+		Name:     "test",
+		Domain:   "ldap",
+		URL:      "ldap://localhost",
+		DN:       "cn=test,dc=example,dc=com",
+		Password: "pass",
+	}
+	i := s.setupIdp(c, params, sampleLdapDb)
+	s.makeLoginRequest(c, i, "user1", "pass1")
+	s.AssertLoginSuccess(c, "user1@ldap")
+	s.AssertUser(c, &store.Identity{
+		ProviderID: store.MakeProviderIdentity(
+			"test", "uid=user1,ou=users,dc=example,dc=com"),
+		Username: "user1@ldap",
+	})
+}
+
+func (s *ldapSuite) TestHandleWithGroups(c *gc.C) {
+	params := ldap.Params{
+		Name:     "test",
+		Domain:   "ldap",
+		URL:      "ldap://localhost",
+		DN:       "cn=test,dc=example,dc=com",
+		Password: "pass",
+	}
+	groups := []ldapDoc{{
+		"dn":          {"cn=group1,ou=users,dc=example,dc=com"},
+		"objectClass": {"groupOfNames"},
+		"cn":          {"group1"},
+		"member": {
+			"uid=user1,ou=users,dc=example,dc=com",
+			"uid=user2,ou=users,dc=example,dc=com",
+		},
+	}, {
+		"dn":          {"cn=group2,ou=users,dc=example,dc=com"},
+		"objectClass": {"groupOfNames"},
+		"cn":          {"group2"},
+		"member":      {"uid=user1,ou=users,dc=example,dc=com"},
+	}}
+	sampleDb := append(sampleLdapDb, groups...)
+	i := s.setupIdp(c, params, sampleDb)
+	s.makeLoginRequest(c, i, "user1", "pass1")
+	s.AssertLoginSuccess(c, "user1@ldap")
+	s.AssertUser(c, &store.Identity{
+		ProviderID: store.MakeProviderIdentity(
+			"test", "uid=user1,ou=users,dc=example,dc=com"),
+		Username: "user1@ldap",
+		Groups:   []string{"group1", "group2"},
+	})
+}
+
+func (s *ldapSuite) TestHandleFailedLogin(c *gc.C) {
+	params := ldap.Params{
+		Name:     "test",
+		Domain:   "ldap",
+		URL:      "ldap://localhost",
+		DN:       "cn=test,dc=example,dc=com",
+		Password: "pass",
+	}
+	i := s.setupIdp(c, params, sampleLdapDb)
+	s.makeLoginRequest(c, i, "user1", "wrong")
+	s.AssertLoginFailureMatches(c, `Login failure`)
 }
