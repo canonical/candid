@@ -15,18 +15,28 @@ import (
 	macaroon "gopkg.in/macaroon.v2"
 
 	"github.com/CanonicalLtd/blues-identity/internal/auth"
+	"github.com/CanonicalLtd/blues-identity/internal/discharger"
+	"github.com/CanonicalLtd/blues-identity/internal/identity"
+	"github.com/CanonicalLtd/blues-identity/internal/idmtest"
+	"github.com/CanonicalLtd/blues-identity/internal/v1"
 	"github.com/CanonicalLtd/blues-identity/store"
 )
 
+var versions = map[string]identity.NewAPIHandlerFunc{
+	"discharger": discharger.NewAPIHandler,
+	"v1":         v1.NewAPIHandler,
+}
+
 type usersSuite struct {
-	apiSuite
+	idmtest.StoreServerSuite
 	adminClient *idmclient.Client
 }
 
 var _ = gc.Suite(&usersSuite{})
 
 func (s *usersSuite) SetUpTest(c *gc.C) {
-	s.apiSuite.SetUpTest(c)
+	s.Versions = versions
+	s.StoreServerSuite.SetUpTest(c)
 	s.adminClient = s.AdminIdentityClient(c)
 }
 
