@@ -96,7 +96,7 @@ func (c *findCommand) Run(ctxt *cmd.Context) error {
 			Username: params.Username(u),
 		})
 		if err2 != nil {
-			fmt.Fprint(ctxt.Stderr, "%v ... continuing\n", err2)
+			fmt.Fprintf(ctxt.Stderr, "%v ... continuing\n", err2)
 		}
 		for _, f := range fields {
 			switch strings.ToLower(strings.Trim(f, " ")) {
