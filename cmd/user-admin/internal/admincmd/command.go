@@ -242,6 +242,7 @@ func writeAgentFile(f string, v *agent.AuthInfo) error {
 	if err != nil {
 		return errgo.Mask(err)
 	}
+	data = append(data, '\n')
 	// TODO should we write this atomically?
 	if err := ioutil.WriteFile(f, data, 0600); err != nil {
 		return errgo.Mask(err)

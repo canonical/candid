@@ -113,6 +113,37 @@ func (s *putAgentSuite) TestPutAgentWithNonExistentAgentsFile(c *gc.C) {
 	})
 }
 
+func (s *putAgentSuite) TestPutAgentWithExistingAgentsFile(c *gc.C) {
+	var calledReq *params.SetUserRequest
+	runf := s.RunServer(c, &handler{
+		setUser: func(req *params.SetUserRequest) error {
+			calledReq = req
+			return nil
+		},
+	})
+	out := CheckSuccess(c, runf, "put-agent", "-a", "admin.agent", "-f", "admin.agent", "bob@someone")
+	c.Assert(calledReq, gc.NotNil)
+	c.Assert(out, gc.Matches, `updated agent bob@someone for https://.* in .+\n`)
+
+	v, err := admincmd.ReadAgentFile(filepath.Join(s.Dir, "admin.agent"))
+	c.Assert(err, gc.Equals, nil)
+
+	agents := v.Agents
+	c.Assert(agents, gc.HasLen, 2)
+	c.Assert(calledReq.PublicKeys, gc.HasLen, 1)
+	c.Assert(&v.Key.Public, gc.DeepEquals, calledReq.PublicKeys[0])
+	c.Assert(agents[1].URL, gc.Matches, "https://.*")
+	c.Assert(agents[1].Username, gc.Equals, "bob@someone")
+
+	calledReq.PublicKeys = nil
+	c.Assert(calledReq, jc.DeepEquals, &params.SetUserRequest{
+		Username: "bob@someone",
+		User: params.User{
+			Owner: "someone",
+		},
+	})
+}
+
 func (s *putAgentSuite) TestPutAgentWithNFlag(c *gc.C) {
 	// With the -n flag, it doesn't contact the idm server at all.
 	out := CheckSuccess(c, s.Run, "put-agent", "-n", "admin@idm")

@@ -94,13 +94,17 @@ func (h *handler) SetUser(p httprequest.Params, u *params.SetUserRequest) error 
 	if err := validateUsername(u); err != nil {
 		return errgo.WithCausef(err, params.ErrForbidden, "")
 	}
+	pks, err := publicKeys(u.User.PublicKeys)
+	if err != nil {
+		return errgo.WithCausef(err, params.ErrBadRequest, "")
+	}
 	identity := store.Identity{
 		ProviderID: store.ProviderIdentity(u.User.ExternalID),
 		Username:   string(u.Username),
 		Name:       u.User.FullName,
 		Email:      u.User.Email,
 		Groups:     u.User.IDPGroups,
-		PublicKeys: publicKeys(u.User.PublicKeys),
+		PublicKeys: pks,
 	}
 	update := store.Update{
 		store.Username:   store.Set,
@@ -153,12 +157,15 @@ func validateUsername(u *params.SetUserRequest) error {
 	return nil
 }
 
-func publicKeys(pks []*bakery.PublicKey) []bakery.PublicKey {
+func publicKeys(pks []*bakery.PublicKey) ([]bakery.PublicKey, error) {
 	pks2 := make([]bakery.PublicKey, len(pks))
 	for i, pk := range pks {
+		if pk == nil {
+			return nil, errgo.New("null public key provided")
+		}
 		pks2[i] = *pk
 	}
-	return pks2
+	return pks2, nil
 }
 
 // gravatarHash calculates the gravatar hash based on the following
