@@ -97,7 +97,7 @@ func (c *putAgentCommand) Run(cmdctx *cmd.Context) error {
 	var key *bakery.KeyPair
 	var agents *agent.AuthInfo
 	if c.agentFile != "" {
-		agents, err = readAgentFile(c.agentFile)
+		agents, err = readAgentFile(cmdctx.AbsPath(c.agentFile))
 		if err != nil {
 			if !os.IsNotExist(errgo.Cause(err)) {
 				return errgo.Mask(err)
@@ -107,12 +107,15 @@ func (c *putAgentCommand) Run(cmdctx *cmd.Context) error {
 			key = agents.Key
 		}
 	}
-	if key == nil && c.publicKey == nil {
+	switch {
+	case key == nil && c.publicKey == nil:
 		key1, err := bakery.GenerateKey()
 		if err != nil {
 			return errgo.Notef(err, "cannot generate key")
 		}
 		key = key1
+		c.publicKey = &key.Public
+	case c.publicKey == nil:
 		c.publicKey = &key.Public
 	}
 	if !c.noPut {
@@ -136,7 +139,7 @@ func (c *putAgentCommand) Run(cmdctx *cmd.Context) error {
 			Username: string(agentName),
 		})
 
-		if err := writeAgentFile(c.agentFile, agents); err != nil {
+		if err := writeAgentFile(cmdctx.AbsPath(c.agentFile), agents); err != nil {
 			return errgo.Mask(err)
 		}
 		fmt.Fprintf(cmdctx.Stdout, "updated agent %s for %s in %s\n", agentName, client.Client.BaseURL, c.agentFile)

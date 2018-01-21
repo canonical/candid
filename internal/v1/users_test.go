@@ -290,6 +290,14 @@ var setUserErrorTests = []struct {
 		Owner:    "alice",
 	},
 	expectError: `Put .*/v1/u/agent@alice: owner must exist`,
+}, {
+	about: "nil public key",
+	user: params.User{
+		Username:   "agent@alice",
+		Owner:      "alice",
+		PublicKeys: []*bakery.PublicKey{nil},
+	},
+	expectError: `Put http://.*/v1/u/agent@alice: null public key provided`,
 }}
 
 func (s *usersSuite) TestSetUserErrors(c *gc.C) {
