@@ -1,5 +1,5 @@
 name: user-admin
-version: IDM_VERSION
+version: git
 summary: Manage users in identity servers.
 description: |
   Manage users in identity servers.
@@ -20,5 +20,5 @@ parts:
     source: ../..
     source-type: git
     go-importpath: github.com/CanonicalLtd/blues-identity
-    snap:
+    prime:
       - bin/user-admin

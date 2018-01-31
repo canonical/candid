@@ -36,6 +36,7 @@ import (
 var (
 	logger        = loggo.GetLogger("idserver")
 	loggingConfig = flag.String("logging-config", "", "specify log levels for modules e.g. <root>=TRACE")
+	resourcePath  = flag.String("resource-path", "", "specify the path for resource files")
 )
 
 func main() {
@@ -93,11 +94,16 @@ func serve(confPath string) error {
 			idps[i] = idp.IdentityProvider
 		}
 	}
-	resourcePath := "."
-	if conf.ResourcePath != "" {
-		resourcePath = conf.ResourcePath
+	// If a resource path is specified on the commandline, it takes precedence
+	// over the one in the config.
+	if *resourcePath == "" {
+		if conf.ResourcePath != "" {
+			*resourcePath = conf.ResourcePath
+		} else {
+			*resourcePath = "."
+		}
 	}
-	t, err := template.New("").ParseGlob(filepath.Join(resourcePath, "templates", "*"))
+	t, err := template.New("").ParseGlob(filepath.Join(*resourcePath, "templates", "*"))
 	if err != nil {
 		return errgo.Notef(err, "cannot parse templates")
 	}
@@ -127,7 +133,7 @@ func serve(confPath string) error {
 			PrivateAddr:             conf.PrivateAddr,
 			DebugTeams:              conf.DebugTeams,
 			AdminAgentPublicKey:     conf.AdminAgentPublicKey,
-			StaticFileSystem:        http.Dir(filepath.Join(resourcePath, "static")),
+			StaticFileSystem:        http.Dir(filepath.Join(*resourcePath, "static")),
 			Template:                t,
 			DebugStatusCheckerFuncs: database.DebugStatusCheckerFuncs(),
 		},

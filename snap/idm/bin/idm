@@ -1,3 +1,0 @@
-#!/bin/sh
-
-idserver --logging-config INFO ${SNAP_COMMON}/config.yaml

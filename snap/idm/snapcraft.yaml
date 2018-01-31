@@ -1,5 +1,5 @@
 name: idm
-version: IDM_VERSION
+version: git
 summary: Identity Manager.
 description: |
   Identity Manager.
@@ -9,7 +9,7 @@ confinement: strict
 
 apps:
   idm:
-    command: bin/idm
+    command: bin/idserver -resource-path ${SNAP} -logging-config INFO ${SNAP_COMMON}/config.yaml
     daemon: simple
     plugs:
      - network
@@ -26,13 +26,8 @@ parts:
     source: ../..
     source-type: git
     go-importpath: github.com/CanonicalLtd/blues-identity
-    snap:
-     - bin/idserver
-     - bin/user-admin
-  snap:
+  static:
     plugin: dump
-    source: .
-    stage:
-     - "bin/*"
-    snap:
-     - "bin/*"
+    source: ../..
+    prime:
+      - templates
