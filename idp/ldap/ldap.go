@@ -14,9 +14,9 @@ import (
 	"strings"
 
 	"golang.org/x/net/context"
-	errgo "gopkg.in/errgo.v1"
+	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/idmclient.v1/params"
-	ldap "gopkg.in/ldap.v2"
+	"gopkg.in/ldap.v2"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
 
 	"github.com/CanonicalLtd/blues-identity/config"
@@ -79,7 +79,8 @@ func NewIdentityProvider(p Params) (idp.IdentityProvider, error) {
 	}
 
 	idp := &identityProvider{
-		params: p,
+		params:   p,
+		dialLDAP: dialLDAP,
 	}
 
 	u, err := url.Parse(p.URL)
@@ -112,6 +113,7 @@ type identityProvider struct {
 	params     Params
 	initParams idp.InitParams
 
+	dialLDAP  func(network, addr string) (ldapConn, error)
 	network   string
 	address   string
 	baseDN    string
@@ -154,9 +156,35 @@ func (idp *identityProvider) SetInteraction(ierr *httpbakery.Error, dischargeID 
 }
 
 //  GetGroups implements idp.IdentityProvider.GetGroups.
-func (idp *identityProvider) GetGroups(context.Context, *store.Identity) ([]string, error) {
-	// TODO (mhilton) get groups.
-	return nil, nil
+func (idp *identityProvider) GetGroups(ctx context.Context, identity *store.Identity) ([]string, error) {
+	conn, err := idp.dial()
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
+	defer conn.Close()
+
+	_, uid := identity.ProviderID.Split()
+	req := &ldap.SearchRequest{
+		BaseDN:       idp.baseDN,
+		Scope:        ldap.ScopeWholeSubtree,
+		DerefAliases: ldap.NeverDerefAliases,
+		Filter: fmt.Sprintf(
+			"(&(objectClass=groupOfNames)(member=%s))", ldap.EscapeFilter(uid)),
+		Attributes: []string{"cn"},
+	}
+	res, err := conn.Search(req)
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
+
+	groups := []string{}
+	for _, entry := range res.Entries {
+		if entry == nil || len(entry.Attributes) == 0 || len(entry.Attributes[0].Values) == 0 {
+			continue
+		}
+		groups = append(groups, entry.Attributes[0].Values[0])
+	}
+	return groups, nil
 }
 
 // Handle implements idp.IdentityProvider.Handle.
@@ -172,7 +200,7 @@ func (idp *identityProvider) Handle(ctx context.Context, w http.ResponseWriter, 
 func (idp *identityProvider) handleLogin(ctx context.Context, w http.ResponseWriter, req *http.Request) error {
 	switch req.Method {
 	default:
-		return errgo.WithCausef(nil, params.ErrBadRequest, "unsuppoered method %q", req.Method)
+		return errgo.WithCausef(nil, params.ErrBadRequest, "unsupported method %q", req.Method)
 	case "GET":
 		return errgo.Mask(idp.initParams.Template.ExecuteTemplate(w, "login-form", nil))
 	case "POST":
@@ -191,25 +219,15 @@ func (idp *identityProvider) loginUID(ctx context.Context, uid, password string)
 		return nil, errgo.Mask(err)
 	}
 	defer conn.Close()
-	req := &ldap.SearchRequest{
-		BaseDN:       idp.baseDN,
-		Scope:        ldap.ScopeWholeSubtree,
-		DerefAliases: ldap.NeverDerefAliases,
-		SizeLimit:    1,
-		Filter:       fmt.Sprintf("(uid=%s)", ldap.EscapeFilter(uid)),
-		Attributes:   []string{"dn"},
-	}
-	res, err := conn.Search(req)
+
+	dn, err := idp.resolveUID(conn, uid)
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}
-	if len(res.Entries) < 1 {
-		return nil, errgo.Newf("user %s not found", uid)
-	}
-	return idp.loginDN(ctx, conn, res.Entries[0].DN, password)
+	return idp.loginDN(ctx, conn, dn, password)
 }
 
-func (idp *identityProvider) loginDN(ctx context.Context, conn *ldap.Conn, dn, password string) (*store.Identity, error) {
+func (idp *identityProvider) loginDN(ctx context.Context, conn ldapConn, dn, password string) (*store.Identity, error) {
 	if err := conn.Bind(dn, password); err != nil {
 		return nil, errgo.Mask(err)
 	}
@@ -218,7 +236,7 @@ func (idp *identityProvider) loginDN(ctx context.Context, conn *ldap.Conn, dn, p
 		Scope:        ldap.ScopeBaseObject,
 		DerefAliases: ldap.NeverDerefAliases,
 		SizeLimit:    1,
-		Filter:       "(objectClass=*)", // (objectClass=*) matches everything.
+		Filter:       "(objectClass=account)",
 		Attributes:   []string{"uid", "displayName", "mail"},
 	}
 	res, err := conn.Search(req)
@@ -236,16 +254,25 @@ func (idp *identityProvider) loginDN(ctx context.Context, conn *ldap.Conn, dn, p
 			name = attr.Values[0]
 		}
 	}
+	// set groups
 	id := &store.Identity{
 		ProviderID: store.MakeProviderIdentity(idp.params.Name, dn),
 		Username:   username,
 		Name:       name,
 		Email:      email,
 	}
+	groups, err := idp.GetGroups(ctx, id)
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
+	if len(groups) > 0 {
+		id.Groups = groups
+	}
 	err = idp.initParams.Store.UpdateIdentity(ctx, id, store.Update{
 		store.Username: store.Set,
 		store.Name:     store.Set,
 		store.Email:    store.Set,
+		store.Groups:   store.Push,
 	})
 	if err != nil {
 		return nil, errgo.Mask(err)
@@ -253,10 +280,29 @@ func (idp *identityProvider) loginDN(ctx context.Context, conn *ldap.Conn, dn, p
 	return id, nil
 }
 
+// resolveUID returns the DN for a UID
+func (idp *identityProvider) resolveUID(conn ldapConn, uid string) (string, error) {
+	req := &ldap.SearchRequest{
+		BaseDN:       idp.baseDN,
+		Scope:        ldap.ScopeWholeSubtree,
+		DerefAliases: ldap.NeverDerefAliases,
+		SizeLimit:    1,
+		Filter:       fmt.Sprintf("(uid=%s)", ldap.EscapeFilter(uid)),
+	}
+	res, err := conn.Search(req)
+	if err != nil {
+		return "", errgo.Mask(err)
+	}
+	if len(res.Entries) < 1 {
+		return "", errgo.Newf("user %s not found", uid)
+	}
+	return res.Entries[0].DN, nil
+}
+
 // dial establishes a connection to the LDAP server and binds as the
 // search user (if specified).
-func (idp *identityProvider) dial() (*ldap.Conn, error) {
-	conn, err := ldap.Dial(idp.network, idp.address)
+func (idp *identityProvider) dial() (ldapConn, error) {
+	conn, err := idp.dialLDAP(idp.network, idp.address)
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}
@@ -269,4 +315,21 @@ func (idp *identityProvider) dial() (*ldap.Conn, error) {
 		}
 	}
 	return conn, nil
+}
+
+func dialLDAP(network, addr string) (ldapConn, error) {
+	c, err := ldap.Dial(network, addr)
+	if err != nil {
+		return nil, err
+	}
+	return c, nil
+}
+
+// ldapConn represents the subset of ldap connection methods used
+// by the provider. It is defined so that it can be replaced for testing.
+type ldapConn interface {
+	StartTLS(config *tls.Config) error
+	Bind(username, password string) error
+	Search(searchRequest *ldap.SearchRequest) (*ldap.SearchResult, error)
+	Close()
 }
