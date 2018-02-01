@@ -5,6 +5,7 @@
 package ldap
 
 import (
+	"bytes"
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
@@ -12,6 +13,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"text/template"
 
 	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
@@ -70,6 +72,37 @@ type Params struct {
 	// Password contains the password to use to when binding to the
 	// LDAP server as DN.
 	Password string `yaml:"password"`
+
+	// UserQueryFilter defines the filter for searching users.
+	UserQueryFilter string `yaml:"user-query-filter"`
+
+	// UserQueryAttrs defines how user attributes are mapped to attributes in
+	// the LDAP entry.
+	UserQueryAttrs UserQueryAttrs `yaml:"user-query-attrs"`
+
+	// GroupQueryFilter defines the template for the LDAP filter to search for
+	// the groups that a user belongs to. The .User value is defined to hold
+	// the user id being searched for - e.g.
+	//    (&(objectClass=groupOfNames)(member={{.User}}))
+	GroupQueryFilter string `yaml:"group-query-filter"`
+}
+
+// UserQueryAttrs defines how user attributes are mapped to attributes in the
+// LDAP entry.
+type UserQueryAttrs struct {
+	// ID defines the attribute used to identify a user.
+	ID string `yaml:"id"`
+
+	// UserQueryEmailAttr defines the attribute for a user e-mail.
+	Email string `yaml:"email"`
+
+	// UserQueryDisplayNameAttr defines the attribute for a user display name.
+	// If not specified, "displayName" is used.
+	DisplayName string `yaml:"display-name"`
+}
+
+type groupQueryArg struct {
+	User string
 }
 
 // NewIdentityProvider creates a new LDAP identity provider.
@@ -78,9 +111,42 @@ func NewIdentityProvider(p Params) (idp.IdentityProvider, error) {
 		p.Description = p.Name
 	}
 
+	if p.UserQueryAttrs.ID == "" {
+		return nil, errgo.Newf("missing 'id' config parameter in 'user-query-attrs'")
+	}
+	userQueryAttrs := []string{p.UserQueryAttrs.ID}
+	if p.UserQueryAttrs.Email != "" {
+		userQueryAttrs = append(userQueryAttrs, p.UserQueryAttrs.Email)
+	}
+	if p.UserQueryAttrs.DisplayName != "" {
+		userQueryAttrs = append(userQueryAttrs, p.UserQueryAttrs.DisplayName)
+	}
+
+	if p.UserQueryFilter == "" {
+		return nil, errgo.Newf("missing 'user-query-filter' config parameter")
+	}
+	if p.GroupQueryFilter == "" {
+		return nil, errgo.Newf("missing 'group-query-filter' config parameter")
+	}
+
+	groupQueryFilterTemplate, err := template.New(
+		"group-query-filter").Parse(p.GroupQueryFilter)
+	if err != nil {
+		return nil, errgo.Notef(err, "invalid 'group-query-filter' config parameter")
+	}
+	testFilter, err := renderTemplate(groupQueryFilterTemplate, groupQueryArg{User: "sample"})
+	if err != nil {
+		return nil, errgo.Notef(err, "invalid 'group-query-filter' config parameter")
+	}
+	if _, err = ldap.CompileFilter(testFilter); err != nil {
+		return nil, errgo.Notef(err, "invalid 'group-query-filter' config parameter")
+	}
+
 	idp := &identityProvider{
-		params:   p,
-		dialLDAP: dialLDAP,
+		params:                   p,
+		dialLDAP:                 dialLDAP,
+		userQueryAttrs:           userQueryAttrs,
+		groupQueryFilterTemplate: groupQueryFilterTemplate,
 	}
 
 	u, err := url.Parse(p.URL)
@@ -118,6 +184,9 @@ type identityProvider struct {
 	address   string
 	baseDN    string
 	tlsConfig tls.Config
+
+	userQueryAttrs           []string
+	groupQueryFilterTemplate *template.Template
 }
 
 // Name implements idp.IdentityProvider.Name.
@@ -164,13 +233,18 @@ func (idp *identityProvider) GetGroups(ctx context.Context, identity *store.Iden
 	defer conn.Close()
 
 	_, uid := identity.ProviderID.Split()
+	filter, err := renderTemplate(
+		idp.groupQueryFilterTemplate, groupQueryArg{User: ldap.EscapeFilter(uid)})
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
+
 	req := &ldap.SearchRequest{
 		BaseDN:       idp.baseDN,
 		Scope:        ldap.ScopeWholeSubtree,
 		DerefAliases: ldap.NeverDerefAliases,
-		Filter: fmt.Sprintf(
-			"(&(objectClass=groupOfNames)(member=%s))", ldap.EscapeFilter(uid)),
-		Attributes: []string{"cn"},
+		Filter:       filter,
+		Attributes:   []string{"cn"},
 	}
 	res, err := conn.Search(req)
 	if err != nil {
@@ -204,7 +278,7 @@ func (idp *identityProvider) handleLogin(ctx context.Context, w http.ResponseWri
 	case "GET":
 		return errgo.Mask(idp.initParams.Template.ExecuteTemplate(w, "login-form", nil))
 	case "POST":
-		id, err := idp.loginUID(ctx, req.Form.Get("username"), req.Form.Get("password"))
+		id, err := idp.loginUser(ctx, req.Form.Get("username"), req.Form.Get("password"))
 		if err != nil {
 			return err
 		}
@@ -213,14 +287,14 @@ func (idp *identityProvider) handleLogin(ctx context.Context, w http.ResponseWri
 	}
 }
 
-func (idp *identityProvider) loginUID(ctx context.Context, uid, password string) (*store.Identity, error) {
+func (idp *identityProvider) loginUser(ctx context.Context, username, password string) (*store.Identity, error) {
 	conn, err := idp.dial()
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}
 	defer conn.Close()
 
-	dn, err := idp.resolveUID(conn, uid)
+	dn, err := idp.resolveUsername(conn, username)
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}
@@ -236,8 +310,8 @@ func (idp *identityProvider) loginDN(ctx context.Context, conn ldapConn, dn, pas
 		Scope:        ldap.ScopeBaseObject,
 		DerefAliases: ldap.NeverDerefAliases,
 		SizeLimit:    1,
-		Filter:       "(objectClass=account)",
-		Attributes:   []string{"uid", "displayName", "mail"},
+		Filter:       idp.params.UserQueryFilter,
+		Attributes:   idp.userQueryAttrs,
 	}
 	res, err := conn.Search(req)
 	if err != nil {
@@ -246,11 +320,11 @@ func (idp *identityProvider) loginDN(ctx context.Context, conn ldapConn, dn, pas
 	var username, email, name string
 	for _, attr := range res.Entries[0].Attributes {
 		switch attr.Name {
-		case "uid":
+		case idp.params.UserQueryAttrs.ID:
 			username = idputil.NameWithDomain(attr.Values[0], idp.params.Domain)
-		case "mail":
+		case idp.params.UserQueryAttrs.Email:
 			email = attr.Values[0]
-		case "displayName":
+		case idp.params.UserQueryAttrs.DisplayName:
 			name = attr.Values[0]
 		}
 	}
@@ -280,21 +354,22 @@ func (idp *identityProvider) loginDN(ctx context.Context, conn ldapConn, dn, pas
 	return id, nil
 }
 
-// resolveUID returns the DN for a UID
-func (idp *identityProvider) resolveUID(conn ldapConn, uid string) (string, error) {
+// resolveUsername returns the DN for a username
+func (idp *identityProvider) resolveUsername(conn ldapConn, username string) (string, error) {
 	req := &ldap.SearchRequest{
 		BaseDN:       idp.baseDN,
 		Scope:        ldap.ScopeWholeSubtree,
 		DerefAliases: ldap.NeverDerefAliases,
 		SizeLimit:    1,
-		Filter:       fmt.Sprintf("(uid=%s)", ldap.EscapeFilter(uid)),
+		Filter: fmt.Sprintf(
+			"(%s=%s)", idp.params.UserQueryAttrs.ID, ldap.EscapeFilter(username)),
 	}
 	res, err := conn.Search(req)
 	if err != nil {
 		return "", errgo.Mask(err)
 	}
 	if len(res.Entries) < 1 {
-		return "", errgo.Newf("user %s not found", uid)
+		return "", errgo.Newf("user %q not found", username)
 	}
 	return res.Entries[0].DN, nil
 }
@@ -315,6 +390,14 @@ func (idp *identityProvider) dial() (ldapConn, error) {
 		}
 	}
 	return conn, nil
+}
+
+func renderTemplate(tmpl *template.Template, ctx interface{}) (string, error) {
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, ctx); err != nil {
+		return "", err
+	}
+	return buf.String(), nil
 }
 
 func dialLDAP(network, addr string) (ldapConn, error) {
