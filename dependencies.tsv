@@ -13,6 +13,7 @@ github.com/juju/httpprof	git	14bf14c307672fd2456bdbf35d19cf0ccd3cf565	2014-12-17
 github.com/juju/loggo	git	8232ab8918d91c72af1a9fb94d3edbe31d88b790	2017-06-05T01:46:07Z
 github.com/juju/names	git	8a0aa0963bbacdc790914892e9ff942e94d6f795	2016-03-30T15:05:33Z
 github.com/juju/persistent-cookiejar	git	d67418f14c93a698e37b52468958d5d4dcf8a7dd	2017-04-28T16:15:59Z
+github.com/juju/postgrestest	git	95c1ddb2775d334cd3011baf1639f72ee497a288	2018-01-11T15:03:07Z
 github.com/juju/retry	git	62c62032529169c7ec02fa48f93349604c345e1f	2015-10-29T02:48:21Z
 github.com/juju/schema	git	075de04f9b7d7580d60a1e12a0b3f50bb18e6998	2016-04-20T04:42:03Z
 github.com/juju/testing	git	2fe0e88cf2321d801acedd2b4f0d7f63735fb732	2017-06-08T05:44:51Z
@@ -21,6 +22,7 @@ github.com/juju/utils	git	4d9b38694f1e441c16421e2320f2b2fbd97fa597	2017-11-22T09
 github.com/juju/version	git	1f41e27e54f21acccf9b2dddae063a782a8a7ceb	2016-10-31T05:19:06Z
 github.com/juju/webbrowser	git	54b8c57083b4afb7dc75da7f13e2967b2606a507	2016-03-09T14:36:29Z
 github.com/julienschmidt/httprouter	git	77a895ad01ebc98a4dc95d8355bc825ce80a56f6	2015-10-13T22:55:20Z
+github.com/lib/pq	git	83612a56d3dd153a94a629cd64925371c9adad78	2017-11-26T05:04:59Z
 github.com/lunixbochs/vtclean	git	4fbf7632a2c6d3fbdb9931439bdbbeded02cbe36	2016-01-25T03:51:06Z
 github.com/mattn/go-colorable	git	ed8eb9e318d7a84ce5915b495b7d35e0cfe7b5a8	2016-07-31T23:54:17Z
 github.com/mattn/go-isatty	git	66b8e73f3f5cda9f96b69efd03dd3d7fc4a5cdb8	2016-08-06T12:27:52Z

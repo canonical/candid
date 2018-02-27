@@ -3,10 +3,12 @@
 package store
 
 import (
+	"database/sql/driver"
 	"strings"
 	"time"
 
 	"golang.org/x/net/context"
+	errgo "gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery"
 )
 
@@ -126,11 +128,12 @@ type Store interface {
 	// one matching the first non-zero value of ID, ProviderID or
 	// Username. If the ID or username does not find a match then an
 	// error with a cause of ErrNotFound will be returned. If there
-	// is no match for an identity specified by ProviderID then a new
-	// record will be created for the identity, in this case the
-	// assigned ID will be written back into the given identity.
+	// is no match for an identity specified by ProviderID and the
+	// update specifies setting the username then a new record will
+	// be created for the identity, in this case the assigned ID will
+	// be written back into the given identity.
 	//
-	// The fields that are written to the database are dictateted by
+	// The fields that are written to the database are dictated by
 	// the given UpdateOperations parameter. For each updatable field
 	// this parameter will be consulted for the type of update to
 	// perform. If the update would result in a duplicate username
@@ -153,6 +156,20 @@ func (p ProviderIdentity) Split() (provider, id string) {
 	s := string(p)
 	n := strings.IndexByte(s, ':')
 	return s[:n], s[n+1:]
+}
+
+// Scan implements sql.Scanner by converting a string value into a ProviderIdentity.
+func (p *ProviderIdentity) Scan(src interface{}) error {
+	if s, ok := src.(string); ok {
+		*p = ProviderIdentity(s)
+		return nil
+	}
+	return errgo.Newf("unsupported Scan, storing driver.Value type %T into type %T", src, p)
+}
+
+// Value implements driver.Valuer.
+func (p ProviderIdentity) Value() (driver.Value, error) {
+	return string(p), nil
 }
 
 // Identity represents an identity in the store.

@@ -156,11 +156,14 @@ func NewIdentityProvider(p Params) (idp.IdentityProvider, error) {
 	switch u.Scheme {
 	case "ldap":
 		idp.network = "tcp"
-		port := u.Port()
-		if port == "" {
+		// It would be nice to use u.Host and u.Port here, but
+		// these aren't available in go 1.6.
+		host, port, _ := net.SplitHostPort(u.Host)
+		if host == "" {
+			// Asume that the URL didn't specify a port.
+			host = u.Host
 			port = "ldap"
 		}
-		host := u.Hostname()
 		idp.address = net.JoinHostPort(host, port)
 		idp.tlsConfig.ServerName = host
 	default:

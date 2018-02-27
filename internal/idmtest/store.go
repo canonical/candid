@@ -74,6 +74,10 @@ func AssertEqualIdentity(c *gc.C, obtained, expected *store.Identity) {
 	if expected.ID == "" {
 		obtained.ID = ""
 	}
+	normalizeInfoMap(obtained.ProviderInfo)
+	normalizeInfoMap(obtained.ExtraInfo)
+	normalizeInfoMap(expected.ProviderInfo)
+	normalizeInfoMap(expected.ExtraInfo)
 	opts := []cmp.Option{
 		cmpopts.EquateEmpty(),
 		cmpopts.SortSlices(func(s, t string) bool { return s < t }),
@@ -83,4 +87,15 @@ func AssertEqualIdentity(c *gc.C, obtained, expected *store.Identity) {
 	if msg != "" {
 		c.Fatalf("identities do not match: %s", msg)
 	}
+}
+
+// normalizeInfoMap normalizes a providerInfo or extraInfo map by
+// removing any keys that have a 0 length value.
+func normalizeInfoMap(m map[string][]string) {
+	for k, v := range m {
+		if len(v) == 0 {
+			delete(m, k)
+		}
+	}
+
 }

@@ -108,3 +108,7 @@ func (d *updateDocument) addUpdate(op store.Operation, name string, v interface{
 		panic("invalid update operation")
 	}
 }
+
+func (d *updateDocument) IsZero() bool {
+	return len(d.Set)+len(d.Unset)+len(d.AddToSet)+len(d.PullAll) == 0
+}

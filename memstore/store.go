@@ -242,6 +242,9 @@ func (s *memStore) UpdateIdentity(_ context.Context, identity *store.Identity, u
 	case identity.ProviderID != "":
 		id = s.identityFromProviderID(identity.ProviderID)
 		if id == nil {
+			if identity.Username == "" || update[store.Username] == store.NoUpdate {
+				return store.NotFoundError("", identity.ProviderID, "")
+			}
 			n := len(s.identities)
 			id = &store.Identity{
 				ID:           fmt.Sprintf("%d", n),

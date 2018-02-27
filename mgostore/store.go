@@ -160,15 +160,24 @@ func (s *identityStore) UpdateIdentity(ctx context.Context, identity *store.Iden
 	coll := s.db.c(ctx, identitiesCollection)
 	defer coll.Database.Session.Close()
 
-	if identity.ID == "" && identity.ProviderID != "" {
+	if identity.ID == "" && identity.ProviderID != "" && identity.Username != "" && update[store.Username] == store.Set {
 		return errgo.Mask(s.upsertIdentity(coll, identity, update), errgo.Is(store.ErrDuplicateUsername))
 	}
-	err := coll.Update(identityQuery(identity), identityUpdate(identity, update))
+	updateDoc := identityUpdate(identity, update)
+	if updateDoc.IsZero() {
+		identity := store.Identity{
+			ID:         identity.ID,
+			ProviderID: identity.ProviderID,
+			Username:   identity.Username,
+		}
+		return errgo.Mask(s.Identity(ctx, &identity), errgo.Is(store.ErrNotFound))
+	}
+	err := coll.Update(identityQuery(identity), updateDoc)
 	if err == nil {
 		return nil
 	}
 	if err == mgo.ErrNotFound {
-		return store.NotFoundError(identity.ID, "", identity.Username)
+		return store.NotFoundError(identity.ID, identity.ProviderID, identity.Username)
 	}
 	if mgo.IsDup(err) {
 		return store.DuplicateUsernameError(identity.Username)
