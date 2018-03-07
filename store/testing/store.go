@@ -202,6 +202,16 @@ var updateIdentityTests = []struct {
 		Groups: []string{"g3", "g4"},
 	},
 }, {
+	about: "set groups empty",
+	startIdentity: &store.Identity{
+		Groups: []string{"g1", "g2"},
+	},
+	updateIdentity: &store.Identity{},
+	update: store.Update{
+		store.Groups: store.Set,
+	},
+	expectIdentity: &store.Identity{},
+}, {
 	about: "clear groups",
 	startIdentity: &store.Identity{
 		Groups: []string{"g1", "g2"},
@@ -226,6 +236,18 @@ var updateIdentityTests = []struct {
 		Groups: []string{"g1", "g2", "g3", "g4"},
 	},
 }, {
+	about: "push groups empty",
+	startIdentity: &store.Identity{
+		Groups: []string{"g1", "g2"},
+	},
+	updateIdentity: &store.Identity{},
+	update: store.Update{
+		store.Groups: store.Push,
+	},
+	expectIdentity: &store.Identity{
+		Groups: []string{"g1", "g2"},
+	},
+}, {
 	about: "pull groups",
 	startIdentity: &store.Identity{
 		Groups: []string{"g1", "g2", "g3", "g4"},
@@ -238,6 +260,18 @@ var updateIdentityTests = []struct {
 	},
 	expectIdentity: &store.Identity{
 		Groups: []string{"g1", "g3"},
+	},
+}, {
+	about: "pull groups empty",
+	startIdentity: &store.Identity{
+		Groups: []string{"g1", "g2", "g3", "g4"},
+	},
+	updateIdentity: &store.Identity{},
+	update: store.Update{
+		store.Groups: store.Pull,
+	},
+	expectIdentity: &store.Identity{
+		Groups: []string{"g1", "g2", "g3", "g4"},
 	},
 }, {
 	about: "set public keys",
@@ -253,6 +287,16 @@ var updateIdentityTests = []struct {
 	expectIdentity: &store.Identity{
 		PublicKeys: []bakery.PublicKey{pk2},
 	},
+}, {
+	about: "set public keys empty",
+	startIdentity: &store.Identity{
+		PublicKeys: []bakery.PublicKey{pk1},
+	},
+	updateIdentity: &store.Identity{},
+	update: store.Update{
+		store.PublicKeys: store.Set,
+	},
+	expectIdentity: &store.Identity{},
 }, {
 	about: "clear public keys",
 	startIdentity: &store.Identity{
@@ -278,6 +322,18 @@ var updateIdentityTests = []struct {
 		PublicKeys: []bakery.PublicKey{pk1, pk2},
 	},
 }, {
+	about: "push public keys empty",
+	startIdentity: &store.Identity{
+		PublicKeys: []bakery.PublicKey{pk1},
+	},
+	updateIdentity: &store.Identity{},
+	update: store.Update{
+		store.PublicKeys: store.Push,
+	},
+	expectIdentity: &store.Identity{
+		PublicKeys: []bakery.PublicKey{pk1},
+	},
+}, {
 	about: "pull public keys",
 	startIdentity: &store.Identity{
 		PublicKeys: []bakery.PublicKey{pk1, pk2},
@@ -290,6 +346,18 @@ var updateIdentityTests = []struct {
 	},
 	expectIdentity: &store.Identity{
 		PublicKeys: []bakery.PublicKey{pk2},
+	},
+}, {
+	about: "pull public keys empty",
+	startIdentity: &store.Identity{
+		PublicKeys: []bakery.PublicKey{pk1, pk2},
+	},
+	updateIdentity: &store.Identity{},
+	update: store.Update{
+		store.PublicKeys: store.Pull,
+	},
+	expectIdentity: &store.Identity{
+		PublicKeys: []bakery.PublicKey{pk1, pk2},
 	},
 }, {
 	about: "set provider info",
@@ -310,6 +378,27 @@ var updateIdentityTests = []struct {
 	expectIdentity: &store.Identity{
 		ProviderInfo: map[string][]string{
 			"k1": {"e", "f"},
+			"k2": {"c", "d"},
+		},
+	},
+}, {
+	about: "set provider info empty",
+	startIdentity: &store.Identity{
+		ProviderInfo: map[string][]string{
+			"k1": {"a", "b"},
+			"k2": {"c", "d"},
+		},
+	},
+	updateIdentity: &store.Identity{
+		ProviderInfo: map[string][]string{
+			"k1": nil,
+		},
+	},
+	update: store.Update{
+		store.ProviderInfo: store.Set,
+	},
+	expectIdentity: &store.Identity{
+		ProviderInfo: map[string][]string{
 			"k2": {"c", "d"},
 		},
 	},
@@ -357,6 +446,28 @@ var updateIdentityTests = []struct {
 		},
 	},
 }, {
+	about: "push provider info empty",
+	startIdentity: &store.Identity{
+		ProviderInfo: map[string][]string{
+			"k1": {"a", "b"},
+			"k2": {"c", "d"},
+		},
+	},
+	updateIdentity: &store.Identity{
+		ProviderInfo: map[string][]string{
+			"k1": nil,
+		},
+	},
+	update: store.Update{
+		store.ProviderInfo: store.Push,
+	},
+	expectIdentity: &store.Identity{
+		ProviderInfo: map[string][]string{
+			"k1": {"a", "b"},
+			"k2": {"c", "d"},
+		},
+	},
+}, {
 	about: "pull provider info",
 	startIdentity: &store.Identity{
 		ProviderInfo: map[string][]string{
@@ -379,6 +490,28 @@ var updateIdentityTests = []struct {
 		},
 	},
 }, {
+	about: "pull provider info empty",
+	startIdentity: &store.Identity{
+		ProviderInfo: map[string][]string{
+			"k1": {"a", "b"},
+			"k2": {"c", "d"},
+		},
+	},
+	updateIdentity: &store.Identity{
+		ProviderInfo: map[string][]string{
+			"k2": nil,
+		},
+	},
+	update: store.Update{
+		store.ProviderInfo: store.Pull,
+	},
+	expectIdentity: &store.Identity{
+		ProviderInfo: map[string][]string{
+			"k1": {"a", "b"},
+			"k2": {"c", "d"},
+		},
+	},
+}, {
 	about: "set extra info",
 	startIdentity: &store.Identity{
 		ExtraInfo: map[string][]string{
@@ -397,6 +530,27 @@ var updateIdentityTests = []struct {
 	expectIdentity: &store.Identity{
 		ExtraInfo: map[string][]string{
 			"k1": {"e", "f"},
+			"k2": {"c", "d"},
+		},
+	},
+}, {
+	about: "set extra info empty",
+	startIdentity: &store.Identity{
+		ExtraInfo: map[string][]string{
+			"k1": {"a", "b"},
+			"k2": {"c", "d"},
+		},
+	},
+	updateIdentity: &store.Identity{
+		ExtraInfo: map[string][]string{
+			"k1": nil,
+		},
+	},
+	update: store.Update{
+		store.ExtraInfo: store.Set,
+	},
+	expectIdentity: &store.Identity{
+		ExtraInfo: map[string][]string{
 			"k2": {"c", "d"},
 		},
 	},
@@ -444,6 +598,28 @@ var updateIdentityTests = []struct {
 		},
 	},
 }, {
+	about: "push extra info empty",
+	startIdentity: &store.Identity{
+		ExtraInfo: map[string][]string{
+			"k1": {"a", "b"},
+			"k2": {"c", "d"},
+		},
+	},
+	updateIdentity: &store.Identity{
+		ExtraInfo: map[string][]string{
+			"k1": nil,
+		},
+	},
+	update: store.Update{
+		store.ExtraInfo: store.Push,
+	},
+	expectIdentity: &store.Identity{
+		ExtraInfo: map[string][]string{
+			"k1": {"a", "b"},
+			"k2": {"c", "d"},
+		},
+	},
+}, {
 	about: "pull extra info",
 	startIdentity: &store.Identity{
 		ExtraInfo: map[string][]string{
@@ -463,6 +639,28 @@ var updateIdentityTests = []struct {
 		ExtraInfo: map[string][]string{
 			"k1": {"a", "b"},
 			"k2": {"d"},
+		},
+	},
+}, {
+	about: "pull extra info empty",
+	startIdentity: &store.Identity{
+		ExtraInfo: map[string][]string{
+			"k1": {"a", "b"},
+			"k2": {"c", "d"},
+		},
+	},
+	updateIdentity: &store.Identity{
+		ExtraInfo: map[string][]string{
+			"k2": nil,
+		},
+	},
+	update: store.Update{
+		store.ExtraInfo: store.Pull,
+	},
+	expectIdentity: &store.Identity{
+		ExtraInfo: map[string][]string{
+			"k1": {"a", "b"},
+			"k2": {"c", "d"},
 		},
 	},
 }, {
@@ -486,6 +684,31 @@ var updateIdentityTests = []struct {
 	},
 	expectError:      `identity "not-an-id" not found`,
 	expectErrorCause: store.ErrNotFound,
+}, {
+	about: "providerid not found",
+	updateIdentity: &store.Identity{
+		ProviderID: "not-a-providerid",
+		Name:       "Test User",
+	},
+	update: store.Update{
+		store.Name: store.Set,
+	},
+	expectError:      `identity "not-a-providerid" not found`,
+	expectErrorCause: store.ErrNotFound,
+}, {
+	about:          "empty update",
+	startIdentity:  &store.Identity{},
+	updateIdentity: &store.Identity{},
+	update:         store.Update{},
+}, {
+	about: "providerID empty update",
+	startIdentity: &store.Identity{
+		ProviderID: store.MakeProviderIdentity("test", "empty-update-user"),
+	},
+	updateIdentity: &store.Identity{
+		ProviderID: store.MakeProviderIdentity("test", "empty-update-user"),
+	},
+	update: store.Update{},
 }}
 
 func (s *StoreSuite) TestUpdateIdentity(c *gc.C) {
@@ -654,6 +877,31 @@ func (s *StoreSuite) TestUpdateIDDuplicateUsername(c *gc.C) {
 	)
 	c.Assert(err, gc.ErrorMatches, `username existing-user already in use`)
 	c.Assert(errgo.Cause(err), gc.Equals, store.ErrDuplicateUsername)
+}
+
+func (s *StoreSuite) TestUpdateIDEmpty(c *gc.C) {
+	identity := store.Identity{
+		ProviderID: store.MakeProviderIdentity("test", "test-user"),
+		Username:   "test-user",
+	}
+	err := s.Store.UpdateIdentity(
+		s.ctx,
+		&identity,
+		store.Update{
+			store.Username: store.Set,
+		},
+	)
+	c.Assert(err, gc.Equals, nil)
+
+	identity2 := store.Identity{
+		ID: identity.ID,
+	}
+	err = s.Store.UpdateIdentity(
+		s.ctx,
+		&identity2,
+		store.Update{},
+	)
+	c.Assert(err, gc.Equals, nil)
 }
 
 func (s *StoreSuite) TestIdentity(c *gc.C) {

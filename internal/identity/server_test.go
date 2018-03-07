@@ -3,7 +3,6 @@
 package identity_test
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -15,6 +14,7 @@ import (
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/testing/httptesting"
 	"github.com/julienschmidt/httprouter"
+	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/httprequest.v1"
 	"gopkg.in/juju/idmclient.v1/params"

@@ -124,7 +124,7 @@ ifeq ($(shell lsb_release -cs|sed -r 's/precise|quantal|raring/old/'),old)
 endif
 	@echo Installing dependencies
 	sudo apt-get update
-	@sudo apt-get --force-yes install $(strip $(DEPENDENCIES)) \
+	@sudo apt-get -y install $(strip $(DEPENDENCIES)) \
 	$(shell apt-cache madison juju-mongodb mongodb-server snapcraft | head -1 | cut -d '|' -f1)
 else
 	@echo sysdeps runs only on systems with apt-get
