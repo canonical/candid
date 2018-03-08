@@ -2,6 +2,7 @@ package sqlstore
 
 import (
 	"database/sql"
+	sqldriver "database/sql/driver"
 	"fmt"
 	"strconv"
 	"time"
@@ -480,6 +481,14 @@ func (n *nullTime) Scan(src interface{}) error {
 		return nil
 	}
 	return errgo.Newf("unsupported Scan, storing driver.Value type %T into type %T", src, n)
+}
+
+// Value implements sqldriver.Valuer.
+func (n nullTime) Value() (sqldriver.Value, error) {
+	if n.Valid {
+		return n.Time, nil
+	}
+	return nil, nil
 }
 
 type scanner interface {

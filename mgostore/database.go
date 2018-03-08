@@ -100,8 +100,8 @@ func (d *Database) BakeryRootKeyStore(policy mgorootkeystore.Policy) bakery.Root
 	}
 }
 
-// ProviderDataStore returns a new store.IDPDataStore implementation using
-// this database for persistent storage.
+// ProviderDataStore returns a new store.ProviderDataStore implementation
+// using this database for persistent storage.
 func (d *Database) ProviderDataStore() store.ProviderDataStore {
 	return &providerDataStore{d}
 }
