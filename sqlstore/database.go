@@ -40,6 +40,18 @@ func (d *Database) Close() error {
 	return errgo.Mask(d.driver.Close())
 }
 
+// Store returns a new store.Store implementation using this database for
+// persistent storage.
+func (d *Database) Store() store.Store {
+	return &identityStore{d}
+}
+
+// ProviderDataStore returns a new store.ProviderDataStore implementation
+// using this database for persistent storage.
+func (d *Database) ProviderDataStore() store.ProviderDataStore {
+	return &providerDataStore{d}
+}
+
 // withTx runs f in a new transaction. any error returned by f will not
 // have it's cause masked.
 func (d *Database) withTx(f func(*sql.Tx) error) error {
@@ -68,6 +80,8 @@ const (
 	tmplClearIdentitySet
 	tmplPushIdentitySet
 	tmplPullIdentitySet
+	tmplGetProviderData
+	tmplInsertProviderData
 	numTmpl
 )
 
@@ -81,6 +95,9 @@ const (
 	stmtPublicKeys
 	stmtProviderInfo
 	stmtExtraInfo
+	stmtGetProviderData
+	stmtSetProviderData
+	stmtAddProviderData
 	numStmt
 )
 
@@ -92,12 +109,6 @@ type queryer interface {
 
 type stmter interface {
 	Stmt(stmt *sql.Stmt) *sql.Stmt
-}
-
-// Store returns a new store.Store implementation using this database for
-// persistent storage.
-func (d *Database) Store() store.Store {
-	return &identityStore{d}
 }
 
 type driver struct {
@@ -164,6 +175,9 @@ func (d *driver) Prepare(db *sql.DB, stmtID stmtID, tmplID tmplID, params interf
 }
 
 func (d *driver) Stmt(s stmter, stmtID stmtID) *sql.Stmt {
+	if s == nil {
+		return d.stmts[stmtID]
+	}
 	return s.Stmt(d.stmts[stmtID])
 }
 

@@ -95,3 +95,37 @@ func (s *postgresSuite) TestUpdateProviderIDEmptyNotFound(c *gc.C) {
 	c.Assert(err, gc.ErrorMatches, `identity "test:no-user" not found`)
 	c.Assert(errgo.Cause(err), gc.Equals, store.ErrNotFound)
 }
+
+type postgresKeyValueSuite struct {
+	storetesting.KeyValueSuite
+	db *sqlstore.Database
+	pg *postgrestest.DB
+}
+
+var _ = gc.Suite(&postgresKeyValueSuite{})
+
+func (s *postgresKeyValueSuite) SetUpTest(c *gc.C) {
+	var err error
+	s.pg, err = postgrestest.New()
+	if errgo.Cause(err) == postgrestest.ErrDisabled {
+		c.Skip(err.Error())
+		return
+	}
+	c.Assert(err, gc.Equals, nil)
+	s.db, err = sqlstore.NewDatabase("postgres", s.pg.DB)
+	c.Assert(err, gc.Equals, nil)
+	s.Store = s.db.ProviderDataStore()
+	s.KeyValueSuite.SetUpTest(c)
+}
+
+func (s *postgresKeyValueSuite) TearDownTest(c *gc.C) {
+	if s.Store != nil {
+		s.KeyValueSuite.TearDownTest(c)
+	}
+	if s.db != nil {
+		s.db.Close()
+	}
+	if s.pg != nil {
+		s.pg.Close()
+	}
+}
