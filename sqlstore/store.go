@@ -3,7 +3,6 @@ package sqlstore
 import (
 	"database/sql"
 	sqldriver "database/sql/driver"
-	"fmt"
 	"strconv"
 	"time"
 
@@ -42,25 +41,35 @@ func (s *identityStore) Identity(ctx context.Context, identity *store.Identity) 
 	}), errgo.Is(store.ErrNotFound))
 }
 
+type identityFromParams struct {
+	argBuilder
+
+	Column   string
+	Identity interface{}
+}
+
 func (s *identityStore) identity(tx *sql.Tx, identity *store.Identity) error {
-	var stmtID stmtID
-	var arg interface{}
+	params := &identityFromParams{
+		argBuilder: s.driver.argBuilderFunc(),
+	}
 	switch {
 	case identity.ID != "":
-		stmtID = stmtIdentityFromID
-		arg = identity.ID
+		params.Column = "id"
+		params.Identity = identity.ID
 	case identity.ProviderID != "":
-		stmtID = stmtIdentityFromProviderID
-		arg = identity.ProviderID
+		params.Column = "providerid"
+		params.Identity = identity.ProviderID
 	case identity.Username != "":
-		stmtID = stmtIdentityFromUsername
-		arg = identity.Username
+		params.Column = "username"
+		params.Identity = identity.Username
 	default:
 		return store.NotFoundError("", "", "")
 	}
-	stmt := s.driver.Stmt(tx, stmtID)
-	err := scanIdentity(stmt.QueryRow(arg), identity)
-	stmt.Close()
+	row, err := s.driver.queryRow(tx, tmplIdentityFrom, params)
+	if err != nil {
+		return errgo.Mask(err)
+	}
+	err = scanIdentity(row, identity)
 	if errgo.Cause(err) == sql.ErrNoRows {
 		return store.NotFoundError(identity.ID, identity.ProviderID, identity.Username)
 	}
@@ -87,17 +96,22 @@ func (s *identityStore) FindIdentities(ctx context.Context, ref *store.Identity,
 	return identities, nil
 }
 
-type findParams struct {
-	Where []string
+type where struct {
+	Column     string
+	Comparison string
+	Value      interface{}
+}
+
+type findIdentitiesParams struct {
+	argBuilder
+	Where []where
 	Sort  []string
 	Limit int
 	Skip  int
 }
 
 func (s *identityStore) findIdentities(tx *sql.Tx, ref *store.Identity, filter store.Filter, sort []store.Sort, skip, limit int) ([]store.Identity, error) {
-	var where []string
-	var args []interface{}
-	n := 1
+	var wheres []where
 	for f, op := range filter {
 		col := identityColumns[f]
 		cond := comparisons[op]
@@ -105,9 +119,7 @@ func (s *identityStore) findIdentities(tx *sql.Tx, ref *store.Identity, filter s
 			continue
 		}
 
-		where = append(where, fmt.Sprintf("%s%s%s", col, cond, s.driver.parameterFunc(n)))
-		args = append(args, fieldValue(store.Field(f), ref))
-		n++
+		wheres = append(wheres, where{col, cond, fieldValue(store.Field(f), ref)})
 	}
 
 	sorts := make([]string, 0, len(sort))
@@ -122,13 +134,14 @@ func (s *identityStore) findIdentities(tx *sql.Tx, ref *store.Identity, filter s
 		sorts = append(sorts, col)
 	}
 
-	params := findParams{
-		Where: where,
-		Sort:  sorts,
-		Limit: limit,
-		Skip:  skip,
+	params := &findIdentitiesParams{
+		argBuilder: s.driver.argBuilderFunc(),
+		Where:      wheres,
+		Sort:       sorts,
+		Limit:      limit,
+		Skip:       skip,
 	}
-	rows, err := s.driver.Query(tx, tmplFindIdentities, params, args...)
+	rows, err := s.driver.query(tx, tmplFindIdentities, params)
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}
@@ -159,25 +172,13 @@ func fieldValue(f store.Field, id *store.Identity) interface{} {
 	case store.Username:
 		return id.Username
 	case store.Name:
-		if id.Name == "" {
-			return nil
-		}
-		return id.Name
+		return sql.NullString{id.Name, id.Name != ""}
 	case store.Email:
-		if id.Email == "" {
-			return nil
-		}
-		return id.Email
+		return sql.NullString{id.Email, id.Email != ""}
 	case store.LastLogin:
-		if id.LastLogin.IsZero() {
-			return nil
-		}
-		return id.LastLogin
+		return nullTime{id.LastLogin, !id.LastLogin.IsZero()}
 	case store.LastDischarge:
-		if id.LastDischarge.IsZero() {
-			return nil
-		}
-		return id.LastDischarge
+		return nullTime{id.LastDischarge, !id.LastDischarge.IsZero()}
 	}
 	return nil
 }
@@ -192,21 +193,32 @@ func (s *identityStore) completeIdentity(tx *sql.Tx, identity *store.Identity) e
 	if err != nil {
 		return errgo.Mask(err)
 	}
-	identity.ProviderInfo, err = s.getInfoMap(tx, stmtProviderInfo, identity.ID)
+	identity.ProviderInfo, err = s.getInfoMap(tx, "identity_providerinfo", identity.ID)
 	if err != nil {
 		return errgo.Mask(err)
 	}
-	identity.ExtraInfo, err = s.getInfoMap(tx, stmtExtraInfo, identity.ID)
+	identity.ExtraInfo, err = s.getInfoMap(tx, "identity_extrainfo", identity.ID)
 	if err != nil {
 		return errgo.Mask(err)
 	}
 	return nil
 }
 
+type selectIdentitySetParams struct {
+	argBuilder
+
+	Table    string
+	Identity string
+	Key      bool
+}
+
 func (s *identityStore) getGroups(tx *sql.Tx, id string) ([]string, error) {
-	stmt := s.driver.Stmt(tx, stmtGroups)
-	defer stmt.Close()
-	rows, err := stmt.Query(id)
+	params := selectIdentitySetParams{
+		argBuilder: s.driver.argBuilderFunc(),
+		Table:      "identity_groups",
+		Identity:   id,
+	}
+	rows, err := s.driver.query(tx, tmplSelectIdentitySet, params)
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}
@@ -223,9 +235,12 @@ func (s *identityStore) getGroups(tx *sql.Tx, id string) ([]string, error) {
 }
 
 func (s *identityStore) getPublicKeys(tx *sql.Tx, id string) ([]bakery.PublicKey, error) {
-	stmt := s.driver.Stmt(tx, stmtPublicKeys)
-	defer stmt.Close()
-	rows, err := stmt.Query(id)
+	params := selectIdentitySetParams{
+		argBuilder: s.driver.argBuilderFunc(),
+		Table:      "identity_publickeys",
+		Identity:   id,
+	}
+	rows, err := s.driver.query(tx, tmplSelectIdentitySet, params)
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}
@@ -246,10 +261,14 @@ func (s *identityStore) getPublicKeys(tx *sql.Tx, id string) ([]bakery.PublicKey
 	return pks, errgo.Mask(rows.Err())
 }
 
-func (s *identityStore) getInfoMap(tx *sql.Tx, stmtID stmtID, id string) (map[string][]string, error) {
-	stmt := s.driver.Stmt(tx, stmtID)
-	defer stmt.Close()
-	rows, err := stmt.Query(id)
+func (s *identityStore) getInfoMap(tx *sql.Tx, table string, id string) (map[string][]string, error) {
+	params := selectIdentitySetParams{
+		argBuilder: s.driver.argBuilderFunc(),
+		Table:      table,
+		Identity:   id,
+		Key:        true,
+	}
+	rows, err := s.driver.query(tx, tmplSelectIdentitySet, params)
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}
@@ -272,24 +291,34 @@ func (s *identityStore) UpdateIdentity(_ context.Context, identity *store.Identi
 	}), errgo.Is(store.ErrDuplicateUsername), errgo.Is(store.ErrNotFound))
 }
 
-type updateParams struct {
+type update struct {
+	// Column contains the column to set.
+	Column string
+
+	// Value contains the value to set the column to.
+	Value interface{}
+}
+
+type updateIdentityParams struct {
+	argBuilder
+
 	// Column contains the name of the column to use to determine the
 	// identity to be updated or returned.
 	Column string
 
-	// Columns contains the list of columns to be updated or
-	// returned.
-	Columns []string
+	// Identity contains the value to match with the identity column
+	// above.
+	Identity string
 
-	// Args contains the list of argument numbers that will be
-	// substituted in when the query is executed.
-	Args []int
+	// Updates contains the updates to apply.
+	Updates []update
 }
 
-func (s *identityStore) updateIdentity(tx *sql.Tx, identity *store.Identity, update store.Update) error {
+func (s *identityStore) updateIdentity(tx *sql.Tx, identity *store.Identity, upd store.Update) error {
 	tmpl := tmplUpdateIdentity
-	var params updateParams
-	args := make([]interface{}, 0, len(update)+1)
+	params := updateIdentityParams{
+		argBuilder: s.driver.argBuilderFunc(),
+	}
 	switch {
 	case identity.ID != "":
 		if _, err := strconv.Atoi(identity.ID); err != nil {
@@ -297,20 +326,20 @@ func (s *identityStore) updateIdentity(tx *sql.Tx, identity *store.Identity, upd
 			return store.NotFoundError(identity.ID, "", "")
 		}
 		params.Column = "id"
-		args = append(args, identity.ID)
+		params.Identity = identity.ID
 	case identity.ProviderID != "":
-		if update[store.Username] == store.Set {
+		if upd[store.Username] == store.Set {
 			tmpl = tmplUpsertIdentity
 		}
 		params.Column = "providerid"
-		args = append(args, identity.ProviderID)
+		params.Identity = string(identity.ProviderID)
 	case identity.Username != "":
 		params.Column = "username"
-		args = append(args, identity.Username)
+		params.Identity = identity.Username
 	default:
 		return store.NotFoundError("", "", "")
 	}
-	for i, op := range update {
+	for i, op := range upd {
 		field := store.Field(i)
 		if field == store.ProviderID {
 			continue
@@ -322,21 +351,19 @@ func (s *identityStore) updateIdentity(tx *sql.Tx, identity *store.Identity, upd
 		var arg interface{}
 		switch op {
 		case store.Clear:
-			arg = nil
+			arg = null{}
 		case store.Set:
 			arg = fieldValue(field, identity)
 		default:
 			// ignore push and pull as they don't make sense for scalar values.
 			continue
 		}
-		args = append(args, arg)
-		params.Columns = append(params.Columns, col)
-		params.Args = append(params.Args, len(args))
+		params.Updates = append(params.Updates, update{col, arg})
 	}
-	if len(params.Columns) == 0 {
+	if len(params.Updates) == 0 {
 		tmpl = tmplIdentityID
 	}
-	row, err := s.driver.QueryRow(tx, tmpl, params, args...)
+	row, err := s.driver.queryRow(tx, tmpl, params)
 	if err != nil {
 		return errgo.Notef(err, "cannot update identity")
 	}
@@ -350,19 +377,19 @@ func (s *identityStore) updateIdentity(tx *sql.Tx, identity *store.Identity, upd
 		return errgo.Notef(err, "cannot update identity")
 	}
 
-	if err := s.updateGroups(tx, identity.ID, update[store.Groups], identity.Groups); err != nil {
+	if err := s.updateGroups(tx, identity.ID, upd[store.Groups], identity.Groups); err != nil {
 		return errgo.Notef(err, "cannot update identity")
 	}
-	if err := s.updatePublicKeys(tx, identity.ID, update[store.PublicKeys], identity.PublicKeys); err != nil {
+	if err := s.updatePublicKeys(tx, identity.ID, upd[store.PublicKeys], identity.PublicKeys); err != nil {
 		return errgo.Notef(err, "cannot update identity")
 	}
 	for k, vs := range identity.ProviderInfo {
-		if err := s.updateProviderInfo(tx, identity.ID, k, update[store.ProviderInfo], vs); err != nil {
+		if err := s.updateProviderInfo(tx, identity.ID, k, upd[store.ProviderInfo], vs); err != nil {
 			return errgo.Notef(err, "cannot update identity")
 		}
 	}
 	for k, vs := range identity.ExtraInfo {
-		if err := s.updateExtraInfo(tx, identity.ID, k, update[store.ExtraInfo], vs); err != nil {
+		if err := s.updateExtraInfo(tx, identity.ID, k, upd[store.ExtraInfo], vs); err != nil {
 			return errgo.Notef(err, "cannot update identity")
 		}
 	}
@@ -371,60 +398,48 @@ func (s *identityStore) updateIdentity(tx *sql.Tx, identity *store.Identity, upd
 }
 
 type updateSetParams struct {
+	argBuilder
 	Table  string
-	Key    bool
-	Values int
+	ID     string
+	Key    string
+	Values []interface{}
 }
 
 func (s *identityStore) updateSet(tx *sql.Tx, table, id, key string, op store.Operation, values []interface{}) error {
 	if op == store.NoUpdate {
 		return nil
 	}
-	params := updateSetParams{
-		Table:  table,
-		Key:    key != "",
-		Values: len(values),
+	params := &updateSetParams{
+		argBuilder: s.driver.argBuilderFunc(),
+		Table:      table,
+		ID:         id,
+		Key:        key,
+		Values:     values,
 	}
 	if op == store.Clear || op == store.Set {
 		args := []interface{}{id}
 		if key != "" {
 			args = append(args, key)
 		}
-		if _, err := s.driver.Exec(tx, tmplClearIdentitySet, params, args...); err != nil {
+		if _, err := s.driver.exec(tx, tmplClearIdentitySet, params); err != nil {
 			return errgo.Mask(err)
 		}
 	}
 	if len(values) == 0 {
 		return nil
 	}
-
+	// Reset the arg builder
+	params.argBuilder = s.driver.argBuilderFunc()
 	var tmpl tmplID
-	var args []interface{}
 	switch op {
 	case store.Set, store.Push:
 		tmpl = tmplPushIdentitySet
-		args = make([]interface{}, 0, 3*len(values))
-		for _, v := range values {
-			args = append(args, id)
-			if key != "" {
-				args = append(args, key)
-			}
-			args = append(args, v)
-		}
 	case store.Pull:
 		tmpl = tmplPullIdentitySet
-		args = make([]interface{}, 0, len(values)+2)
-		args = append(args, id)
-		if key != "" {
-			args = append(args, key)
-		}
-		for _, v := range values {
-			args = append(args, v)
-		}
 	default:
 		return nil
 	}
-	if _, err := s.driver.Exec(tx, tmpl, params, args...); err != nil {
+	if _, err := s.driver.exec(tx, tmpl, params); err != nil {
 		return errgo.Mask(err)
 	}
 	return nil
@@ -488,6 +503,16 @@ func (n nullTime) Value() (sqldriver.Value, error) {
 	if n.Valid {
 		return n.Time, nil
 	}
+	return nil, nil
+}
+
+// null is value that represents a null in the SQL database. Bug
+// https://github.com/golang/go/issues/18716 prevents us from using a
+// plain nil.
+type null struct{}
+
+// Value implements sqldriver.Valuer.
+func (n null) Value() (sqldriver.Value, error) {
 	return nil, nil
 }
 

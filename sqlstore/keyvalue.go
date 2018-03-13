@@ -35,12 +35,30 @@ func (s *keyValueStore) Context(ctx context.Context) (context.Context, func()) {
 	return ctx, func() {}
 }
 
+type providerDataParams struct {
+	argBuilder
+
+	Provider string
+	Key      string
+	Value    []byte
+	Expire   nullTime
+	Update   bool
+}
+
 // Get implements store.KeyValueStore.Get by selecting the blob with the
 // given key from the provider_data table.
 func (s *keyValueStore) Get(_ context.Context, key string) ([]byte, error) {
-	stmt := s.driver.Stmt(nil, stmtGetProviderData)
+	params := &providerDataParams{
+		argBuilder: s.driver.argBuilderFunc(),
+		Provider:   s.idp,
+		Key:        key,
+	}
 	var value []byte
-	if err := stmt.QueryRow(s.idp, key).Scan(&value); err != nil {
+	row, err := s.driver.queryRow(s.db, tmplGetProviderData, params)
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
+	if err := row.Scan(&value); err != nil {
 		if errgo.Cause(err) == sql.ErrNoRows {
 			return nil, store.KeyNotFoundError(key)
 		}
@@ -51,18 +69,32 @@ func (s *keyValueStore) Get(_ context.Context, key string) ([]byte, error) {
 
 // Set implements store.KeyValueStore.Set by upserting the blob with the
 // given key, value and expire time into the provider_data table.
-func (s *keyValueStore) Set(ctx context.Context, key string, value []byte, expire time.Time) error {
-	stmt := s.driver.Stmt(nil, stmtSetProviderData)
-	_, err := stmt.Exec(s.idp, key, value, nullTime{expire, !expire.IsZero()})
+func (s *keyValueStore) Set(_ context.Context, key string, value []byte, expire time.Time) error {
+	params := &providerDataParams{
+		argBuilder: s.driver.argBuilderFunc(),
+		Provider:   s.idp,
+		Key:        key,
+		Value:      value,
+		Expire:     nullTime{expire, !expire.IsZero()},
+		Update:     true,
+	}
+	_, err := s.driver.exec(s.db, tmplInsertProviderData, params)
 	return errgo.Mask(err)
 }
 
 // Add implements store.KeyValueStore.Add by inserting a blob with the
 // given key, value and expire time into the provider_data table.
-func (s *keyValueStore) Add(ctx context.Context, key string, value []byte, expire time.Time) error {
-	stmt := s.driver.Stmt(nil, stmtAddProviderData)
-	_, err := stmt.Exec(s.idp, key, value, nullTime{expire, !expire.IsZero()})
-	if s.driver.isDuplicateFunc(err) {
+func (s *keyValueStore) Add(_ context.Context, key string, value []byte, expire time.Time) error {
+	params := &providerDataParams{
+		argBuilder: s.driver.argBuilderFunc(),
+		Provider:   s.idp,
+		Key:        key,
+		Value:      value,
+		Expire:     nullTime{expire, !expire.IsZero()},
+		Update:     false,
+	}
+	_, err := s.driver.exec(s.db, tmplInsertProviderData, params)
+	if s.driver.isDuplicateFunc(errgo.Cause(err)) {
 		return store.DuplicateKeyError(key)
 	}
 	return errgo.Mask(err)
