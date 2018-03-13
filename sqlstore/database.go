@@ -37,7 +37,7 @@ func NewDatabase(driverName string, db *sql.DB) (*Database, error) {
 }
 
 func (d *Database) Close() error {
-	return errgo.Mask(d.driver.Close())
+	return nil
 }
 
 // Store returns a new store.Store implementation using this database for
@@ -85,108 +85,71 @@ const (
 	numTmpl
 )
 
-type stmtID int
-
-const (
-	stmtIdentityFromID stmtID = iota
-	stmtIdentityFromProviderID
-	stmtIdentityFromUsername
-	stmtGroups
-	stmtPublicKeys
-	stmtProviderInfo
-	stmtExtraInfo
-	stmtGetProviderData
-	stmtSetProviderData
-	stmtAddProviderData
-	numStmt
-)
-
 type queryer interface {
 	Exec(query string, args ...interface{}) (sql.Result, error)
 	Query(query string, args ...interface{}) (*sql.Rows, error)
 	QueryRow(query string, args ...interface{}) *sql.Row
 }
 
-type stmter interface {
-	Stmt(stmt *sql.Stmt) *sql.Stmt
+// argBuilder is an interface that can be embedded in template parameters
+// to record the arguments needed to be supplied with SQL queries.
+type argBuilder interface {
+	// Arg is a method that is called in templates with the value of
+	// the next argument to be used in the query. Arg should remmebre
+	// the value and return a valid placeholder to access that
+	// argument when executing the query.
+	Arg(interface{}) string
+
+	// args returns the slice of arguments that should be used when
+	// executing the query.
+	args() []interface{}
 }
 
 type driver struct {
-	stmts           [numStmt]*sql.Stmt
 	tmpls           [numTmpl]*template.Template
-	parameterFunc   func(int) string
+	argBuilderFunc  func() argBuilder
 	isDuplicateFunc func(error) bool
 }
 
-func (d *driver) Close() error {
-	for _, s := range d.stmts {
-		if err := s.Close(); err != nil {
-			return errgo.Mask(err)
-		}
-	}
-	return nil
-}
-
-// Exec performs the Exec method on the given queryer by processing the
+// exec performs the Exec method on the given queryer by processing the
 // given template with the given params to determine the query to
 // execute.
-func (d *driver) Exec(q queryer, tmplID tmplID, params interface{}, args ...interface{}) (sql.Result, error) {
+func (d *driver) exec(q queryer, tmplID tmplID, params argBuilder) (sql.Result, error) {
 	query, err := d.executeTemplate(tmplID, params)
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot build query")
 	}
-	res, err := q.Exec(query, args...)
+	res, err := q.Exec(query, params.args()...)
 	return res, errgo.Mask(err, errgo.Any)
 }
 
-// Query performs the Query method on the given queryer by processing the
+// query performs the Query method on the given queryer by processing the
 // given template with the given params to determine the query to
 // execute.
-func (d *driver) Query(q queryer, tmplID tmplID, params interface{}, args ...interface{}) (*sql.Rows, error) {
+func (d *driver) query(q queryer, tmplID tmplID, params argBuilder) (*sql.Rows, error) {
 	query, err := d.executeTemplate(tmplID, params)
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot build query")
 	}
-	rows, err := q.Query(query, args...)
+	rows, err := q.Query(query, params.args()...)
 	return rows, errgo.Mask(err, errgo.Any)
 }
 
-// QueryRow performs the QueryRow method on the given queryer by
+// queryRow performs the QueryRow method on the given queryer by
 // processing the given template with the given params to determine the
 // query to execute.
-func (d *driver) QueryRow(q queryer, tmplID tmplID, params interface{}, args ...interface{}) (*sql.Row, error) {
+func (d *driver) queryRow(q queryer, tmplID tmplID, params argBuilder) (*sql.Row, error) {
 	query, err := d.executeTemplate(tmplID, params)
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot build query")
 	}
-	return q.QueryRow(query, args...), nil
-}
-
-// Prepare performs the Prepare method on the given db by processing the
-// given template with the given params to determine the statement to
-// prepare.
-func (d *driver) Prepare(db *sql.DB, stmtID stmtID, tmplID tmplID, params interface{}) error {
-	stmt, err := d.executeTemplate(tmplID, params)
-	if err != nil {
-		return errgo.Notef(err, "cannot build query")
-	}
-	d.stmts[stmtID], err = db.Prepare(stmt)
-	return errgo.Mask(err)
-}
-
-func (d *driver) Stmt(s stmter, stmtID stmtID) *sql.Stmt {
-	if s == nil {
-		return d.stmts[stmtID]
-	}
-	return s.Stmt(d.stmts[stmtID])
+	return q.QueryRow(query, params.args()...), nil
 }
 
 func (d *driver) parseTemplate(tmplID tmplID, tmpl string) error {
 	var err error
 	d.tmpls[tmplID], err = template.New("").Funcs(template.FuncMap{
-		"join":      strings.Join,
-		"parameter": d.parameterFunc,
-		"values":    d.values,
+		"join": strings.Join,
 	}).Parse(tmpl)
 	return errgo.Mask(err)
 }
@@ -197,26 +160,6 @@ func (d *driver) executeTemplate(tmplID tmplID, params interface{}) (string, err
 		return "", errgo.Mask(err)
 	}
 	return buf.String(), nil
-}
-
-func (d *driver) values(start, rows, columns int) string {
-	buf := new(bytes.Buffer)
-	n := start
-	for i := 0; i < rows; i++ {
-		if i > 0 {
-			buf.WriteString(", ")
-		}
-		buf.WriteByte('(')
-		for j := 0; j < columns; j++ {
-			if j > 0 {
-				buf.WriteString(", ")
-			}
-			buf.WriteString(d.parameterFunc(n))
-			n++
-		}
-		buf.WriteByte(')')
-	}
-	return buf.String()
 }
 
 var comparisons = map[store.Comparison]string{
