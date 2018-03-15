@@ -20,7 +20,7 @@ type bakerySuite struct {
 
 var _ = gc.Suite(&bakerySuite{})
 
-func (s *meetingSuite) TestRootKeyStore(c *gc.C) {
+func (s *bakerySuite) TestRootKeyStore(c *gc.C) {
 	db, err := mgostore.NewDatabase(s.Session.DB("bakery-test"))
 	c.Assert(err, gc.Equals, nil)
 	defer db.Close()
