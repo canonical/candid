@@ -8,6 +8,7 @@ import (
 
 	errgo "gopkg.in/errgo.v1"
 
+	"github.com/CanonicalLtd/blues-identity/meeting"
 	"github.com/CanonicalLtd/blues-identity/store"
 )
 
@@ -52,6 +53,12 @@ func (d *Database) ProviderDataStore() store.ProviderDataStore {
 	return &providerDataStore{d}
 }
 
+// MeetingStore returns a new meeting.Stor implementation using this
+// database for persistent storage.
+func (d *Database) MeetingStore() meeting.Store {
+	return &meetingStore{d}
+}
+
 // withTx runs f in a new transaction. any error returned by f will not
 // have it's cause masked.
 func (d *Database) withTx(f func(*sql.Tx) error) error {
@@ -82,6 +89,10 @@ const (
 	tmplPullIdentitySet
 	tmplGetProviderData
 	tmplInsertProviderData
+	tmplGetMeeting
+	tmplPutMeeting
+	tmplFindMeetings
+	tmplRemoveMeetings
 	numTmpl
 )
 
