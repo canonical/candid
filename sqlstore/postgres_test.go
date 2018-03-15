@@ -129,3 +129,38 @@ func (s *postgresKeyValueSuite) TearDownTest(c *gc.C) {
 		s.pg.Close()
 	}
 }
+
+type postgresMeetingSuite struct {
+	storetesting.MeetingSuite
+	db *sqlstore.Database
+	pg *postgrestest.DB
+}
+
+var _ = gc.Suite(&postgresMeetingSuite{})
+
+func (s *postgresMeetingSuite) SetUpTest(c *gc.C) {
+	var err error
+	s.pg, err = postgrestest.New()
+	if errgo.Cause(err) == postgrestest.ErrDisabled {
+		c.Skip(err.Error())
+		return
+	}
+	c.Assert(err, gc.Equals, nil)
+	s.db, err = sqlstore.NewDatabase("postgres", s.pg.DB)
+	c.Assert(err, gc.Equals, nil)
+	s.Store = s.db.MeetingStore()
+	s.PutAtTimeFunc = sqlstore.PutAtTime
+	s.MeetingSuite.SetUpTest(c)
+}
+
+func (s *postgresMeetingSuite) TearDownTest(c *gc.C) {
+	if s.Store != nil {
+		s.MeetingSuite.TearDownTest(c)
+	}
+	if s.db != nil {
+		s.db.Close()
+	}
+	if s.pg != nil {
+		s.pg.Close()
+	}
+}

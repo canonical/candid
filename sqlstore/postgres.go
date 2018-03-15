@@ -67,6 +67,12 @@ DROP TRIGGER IF EXISTS provider_data_expire_tr ON provider_data;
 CREATE TRIGGER provider_data_expire_tr
    BEFORE INSERT ON provider_data
    EXECUTE PROCEDURE provider_data_expire_fn();
+
+CREATE TABLE IF NOT EXISTS meetings ( 
+	id TEXT NOT NULL PRIMARY KEY,
+	address TEXT NOT NULL,
+	created TIMESTAMP WITH TIME ZONE NOT NULL
+);
 `
 
 var postgresTmpls = [numTmpl]string{
@@ -117,6 +123,18 @@ var postgresTmpls = [numTmpl]string{
 		VALUES ({{.Provider | .Arg}}, {{.Key | .Arg}}, {{.Value | .Arg}}, {{.Expire | .Arg}})
 		{{if .Update}}ON CONFLICT (provider, key) DO UPDATE
 		SET value={{.Value | .Arg}}, expire={{.Expire | .Arg}}{{end}}`,
+	tmplGetMeeting: `
+		SELECT address, created FROM meetings
+		WHERE id={{.ID | .Arg}}`,
+	tmplPutMeeting: `
+		INSERT INTO meetings (id, address, created)
+		VALUES ({{.ID | .Arg}}, {{.Address | .Arg}}, {{.Time | .Arg}})`,
+	tmplFindMeetings: `
+		SELECT id FROM meetings
+		WHERE created < {{.Time | .Arg}}{{if .Address}} AND address={{.Address | .Arg}}{{end}}`,
+	tmplRemoveMeetings: `
+		DELETE FROM meetings
+		WHERE id IN({{range $i, $id := .IDs}}{{if gt $i 0}}, {{end}}{{$id | $.Arg}}{{end}})`,
 }
 
 // newPostgresDriver creates a postgres driver using the given DB.
