@@ -23,25 +23,26 @@ var logger = loggo.GetLogger("identity.config")
 
 // Config holds the configuration parameters for the identity service.
 type Config struct {
-	MongoAddr           string             `yaml:"mongo-addr"`
-	APIAddr             string             `yaml:"api-addr"`
-	AuthUsername        string             `yaml:"auth-username"`
-	AuthPassword        string             `yaml:"auth-password"`
-	Location            string             `yaml:"location"`
-	AccessLog           string             `yaml:"access-log"`
-	MaxMgoSessions      int                `yaml:"max-mgo-sessions"`
-	WaitTimeout         DurationString     `yaml:"wait-timeout"`
-	IdentityProviders   []IdentityProvider `yaml:"identity-providers"`
-	PrivateAddr         string             `yaml:"private-addr"`
-	DebugTeams          []string           `yaml:"debug-teams"`
-	TLSCert             string             `yaml:"tls-cert"`
-	TLSKey              string             `yaml:"tls-key"`
-	PublicKey           *bakery.PublicKey  `yaml:"public-key"`
-	PrivateKey          *bakery.PrivateKey `yaml:"private-key"`
-	AdminAgentPublicKey *bakery.PublicKey  `yaml:"admin-agent-public-key"`
-	ResourcePath        string             `yaml:"resource-path"`
-	HTTPProxy           string             `yaml:"http-proxy"`
-	NoProxy             string             `yaml:"no-proxy"`
+	MongoAddr                string             `yaml:"mongo-addr"`
+	PostgresConnectionString string             `yaml:"postgres-connection-string"`
+	APIAddr                  string             `yaml:"api-addr"`
+	AuthUsername             string             `yaml:"auth-username"`
+	AuthPassword             string             `yaml:"auth-password"`
+	Location                 string             `yaml:"location"`
+	AccessLog                string             `yaml:"access-log"`
+	MaxMgoSessions           int                `yaml:"max-mgo-sessions"`
+	WaitTimeout              DurationString     `yaml:"wait-timeout"`
+	IdentityProviders        []IdentityProvider `yaml:"identity-providers"`
+	PrivateAddr              string             `yaml:"private-addr"`
+	DebugTeams               []string           `yaml:"debug-teams"`
+	TLSCert                  string             `yaml:"tls-cert"`
+	TLSKey                   string             `yaml:"tls-key"`
+	PublicKey                *bakery.PublicKey  `yaml:"public-key"`
+	PrivateKey               *bakery.PrivateKey `yaml:"private-key"`
+	AdminAgentPublicKey      *bakery.PublicKey  `yaml:"admin-agent-public-key"`
+	ResourcePath             string             `yaml:"resource-path"`
+	HTTPProxy                string             `yaml:"http-proxy"`
+	NoProxy                  string             `yaml:"no-proxy"`
 }
 
 func (c *Config) TLSConfig() *tls.Config {
@@ -63,8 +64,8 @@ func (c *Config) TLSConfig() *tls.Config {
 
 func (c *Config) validate() error {
 	var missing []string
-	if c.MongoAddr == "" {
-		missing = append(missing, "mongo-addr")
+	if c.MongoAddr == "" && c.PostgresConnectionString == "" {
+		missing = append(missing, "mongo-addr or postgres-connection-string")
 	}
 	if c.APIAddr == "" {
 		missing = append(missing, "api-addr")

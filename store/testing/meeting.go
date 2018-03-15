@@ -65,6 +65,26 @@ func (s *MeetingSuite) TestPutGetRemove(c *gc.C) {
 	c.Assert(addr, gc.Equals, "xaddr")
 }
 
+func (s *MeetingSuite) TestRemoveNothingRemoved(c *gc.C) {
+	now := time.Now()
+
+	allIds := make(map[string]bool)
+	for i := 0; i < 10; i++ {
+		id := fmt.Sprint("a", i)
+		err := s.PutAtTimeFunc(s.ctx, s.Store, id, "a", now.Add(time.Duration(-i)*time.Second))
+		c.Assert(err, gc.Equals, nil)
+		allIds[id] = true
+
+		id = fmt.Sprint("b", i)
+		err = s.PutAtTimeFunc(s.ctx, s.Store, id, "b", now.Add(time.Duration(-i)*time.Second))
+		c.Assert(err, gc.Equals, nil)
+		allIds[id] = true
+	}
+	ids, err := s.Store.RemoveOld(s.ctx, "a", now.Add(time.Duration(-11)*time.Second))
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(len(ids), gc.Equals, 0)
+}
+
 func (s *MeetingSuite) TestRemoveOld(c *gc.C) {
 	now := time.Now()
 

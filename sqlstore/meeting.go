@@ -125,6 +125,9 @@ func (s *meetingStore) RemoveOld(_ context.Context, addr string, olderThan time.
 		if err := rows.Err(); err != nil {
 			return errgo.Mask(err)
 		}
+		if len(ids) == 0 {
+			return nil
+		}
 		removeParams := removeMeetingParams{
 			argBuilder: s.driver.argBuilderFunc(),
 			IDs:        ids,

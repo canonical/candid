@@ -29,6 +29,7 @@ var _ = gc.Suite(&configSuite{})
 
 const testConfig = `
 mongo-addr: localhost:23456
+postgres-connection-string: host=/var/run/postgresql user=test
 api-addr: 1.2.3.4:5678
 foo: 1
 bar: false
@@ -134,16 +135,17 @@ func (s *configSuite) TestRead(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 
 	c.Assert(conf, jc.DeepEquals, &config.Config{
-		MongoAddr:           "localhost:23456",
-		APIAddr:             "1.2.3.4:5678",
-		AuthUsername:        "myuser",
-		AuthPassword:        "mypasswd",
-		PrivateKey:          &key.Private,
-		PublicKey:           &key.Public,
-		AdminAgentPublicKey: &adminPubKey,
-		Location:            "http://foo.com:1234",
-		MaxMgoSessions:      10,
-		WaitTimeout:         config.DurationString{Duration: time.Minute},
+		MongoAddr:                "localhost:23456",
+		PostgresConnectionString: "host=/var/run/postgresql user=test",
+		APIAddr:                  "1.2.3.4:5678",
+		AuthUsername:             "myuser",
+		AuthPassword:             "mypasswd",
+		PrivateKey:               &key.Private,
+		PublicKey:                &key.Public,
+		AdminAgentPublicKey:      &adminPubKey,
+		Location:                 "http://foo.com:1234",
+		MaxMgoSessions:           10,
+		WaitTimeout:              config.DurationString{Duration: time.Minute},
 		IdentityProviders: []config.IdentityProvider{{
 			IdentityProvider: IdentityProvider{
 				Params: map[string]string{
@@ -175,7 +177,7 @@ func (s *configSuite) TestReadErrorNotFound(c *gc.C) {
 
 func (s *configSuite) TestReadErrorEmpty(c *gc.C) {
 	cfg, err := s.readConfig(c, "")
-	c.Assert(err, gc.ErrorMatches, "missing fields mongo-addr, api-addr, auth-username, auth-password, private-key, public-key, location, max-mgo-sessions, private-addr in config file")
+	c.Assert(err, gc.ErrorMatches, "missing fields mongo-addr or postgres-connection-string, api-addr, auth-username, auth-password, private-key, public-key, location, max-mgo-sessions, private-addr in config file")
 	c.Assert(cfg, gc.IsNil)
 }
 
