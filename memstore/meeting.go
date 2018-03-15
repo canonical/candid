@@ -36,12 +36,18 @@ func (s *meetingStore) Context(ctx context.Context) (_ context.Context, close fu
 }
 
 // Put implements meeting.Store.Put.
-func (s *meetingStore) Put(_ context.Context, id, address string) error {
+func (s *meetingStore) Put(ctx context.Context, id, address string) error {
+	return errgo.Mask(s.put(ctx, id, address, time.Now()))
+}
+
+// put is the internal version of Put which takes a time
+// for testing purposes.
+func (s *meetingStore) put(_ context.Context, id, address string, now time.Time) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.data[id] = meetingStoreEntry{
 		address: address,
-		time:    time.Now(),
+		time:    now,
 	}
 	return nil
 }
@@ -70,6 +76,9 @@ func (s *meetingStore) RemoveOld(_ context.Context, addr string, olderThan time.
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for k, v := range s.data {
+		if addr != "" && v.address != addr {
+			continue
+		}
 		if v.time.Before(olderThan) {
 			delete(s.data, k)
 			ids = append(ids, k)
