@@ -90,16 +90,22 @@ func (h *handler) User(p httprequest.Params, r *params.UserRequest) (*params.Use
 // request will be ignored. See SetUserGroups, ModifyUserGroups,
 // SetSSHKeys and DeleteSSHKeys if you wish to manipulate these for a
 // user.
+// TODO change this into a create-agent function.
 func (h *handler) SetUser(p httprequest.Params, u *params.SetUserRequest) error {
 	if err := validateUsername(u); err != nil {
 		return errgo.WithCausef(err, params.ErrForbidden, "")
+	}
+	if u.User.ExternalID != "" {
+		return errgo.WithCausef(nil, params.ErrBadRequest, "external ID provided but not allowed")
+	}
+	if u.User.Username != "" {
+		return errgo.WithCausef(nil, params.ErrBadRequest, "username provided but not allowed")
 	}
 	pks, err := publicKeys(u.User.PublicKeys)
 	if err != nil {
 		return errgo.WithCausef(err, params.ErrBadRequest, "")
 	}
 	identity := store.Identity{
-		ProviderID: store.ProviderIdentity(u.User.ExternalID),
 		Username:   string(u.Username),
 		Name:       u.User.FullName,
 		Email:      u.User.Email,
@@ -107,32 +113,26 @@ func (h *handler) SetUser(p httprequest.Params, u *params.SetUserRequest) error 
 		PublicKeys: pks,
 	}
 	update := store.Update{
-		store.Username:   store.Set,
 		store.PublicKeys: store.Set,
-		store.Groups:     store.Push,
+		store.Groups:     store.Set,
 	}
 	if u.Owner != "" {
-		if u.ExternalID != "" {
-			return errgo.WithCausef(nil, params.ErrBadRequest, `both owner and external_id specified`)
-		}
+		// TODO check that groups are a subset of the owner's groups.
 		owner := store.Identity{
 			Username: string(u.Owner),
 		}
 		if err := h.params.Store.Identity(p.Context, &owner); err != nil {
 			if errgo.Cause(err) == store.ErrNotFound {
-				return errgo.WithCausef(nil, params.ErrForbidden, `owner must exist`)
+				return errgo.WithCausef(nil, params.ErrForbidden, `owner %q must exist`, u.Owner)
 			}
 			return errgo.Mask(err)
 		}
 		identity.ProviderID = store.MakeProviderIdentity("idm", identity.Username)
 		identity.ProviderInfo = map[string][]string{
-			"owner": []string{string(owner.ProviderID), owner.Username},
+			"owner": {string(owner.ProviderID), owner.Username},
 		}
-		update[store.ProviderInfo] = store.Push
-		update[store.Groups] = store.Set
-	}
-	if identity.ProviderID == "" {
-		return errgo.WithCausef(nil, params.ErrBadRequest, `external_id not specified`)
+		update[store.Username] = store.Set
+		update[store.ProviderInfo] = store.Set
 	}
 	if identity.Name != "" {
 		update[store.Name] = store.Set
@@ -415,13 +415,10 @@ func checkExtraInfoKey(key string) error {
 }
 
 func (h *handler) userFromIdentity(ctx context.Context, id *store.Identity) (*params.User, error) {
-	var publicKeys []*bakery.PublicKey
-	if len(id.PublicKeys) > 0 {
-		publicKeys = make([]*bakery.PublicKey, len(id.PublicKeys))
-		for i, key := range id.PublicKeys {
-			pk := key
-			publicKeys[i] = &pk
-		}
+	publicKeys := make([]*bakery.PublicKey, len(id.PublicKeys))
+	for i, key := range id.PublicKeys {
+		pk := key
+		publicKeys[i] = &pk
 	}
 	authID, err := h.params.Authorizer.Identity(ctx, id.Username)
 	if err != nil {

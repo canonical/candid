@@ -114,5 +114,6 @@ type IdentityProvider interface {
 
 	// GetGroups retrieves additional group information that is
 	// stored in the identity provider for the given identity.
+	// TODO define what happens when the identity doesn't exist.
 	GetGroups(ctx context.Context, id *store.Identity) (groups []string, err error)
 }

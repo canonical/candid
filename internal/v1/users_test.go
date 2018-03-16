@@ -14,6 +14,8 @@ import (
 	"gopkg.in/macaroon-bakery.v2/bakery"
 	macaroon "gopkg.in/macaroon.v2"
 
+	"github.com/CanonicalLtd/blues-identity/idp"
+	idptest "github.com/CanonicalLtd/blues-identity/idp/test"
 	"github.com/CanonicalLtd/blues-identity/internal/auth"
 	"github.com/CanonicalLtd/blues-identity/internal/discharger"
 	"github.com/CanonicalLtd/blues-identity/internal/identity"
@@ -35,34 +37,40 @@ type usersSuite struct {
 var _ = gc.Suite(&usersSuite{})
 
 func (s *usersSuite) SetUpTest(c *gc.C) {
+	// Ensure that there's an identity provider for the test identities
+	// we add so that group resolution on test identities works correctly.
+	s.Params.IdentityProviders = []idp.IdentityProvider{
+		idptest.NewIdentityProvider(idptest.Params{
+			Name:   "test",
+			Domain: "test",
+			GetGroups: func(id *store.Identity) ([]string, error) {
+				return id.Groups, nil
+			},
+		}),
+	}
 	s.Versions = versions
 	s.StoreServerSuite.SetUpTest(c)
 	s.adminClient = s.AdminIdentityClient(c)
 }
 
 func (s *usersSuite) TestRoundTripUser(c *gc.C) {
-	user := &params.User{
+	user := params.User{
 		Username:   "jbloggs",
 		ExternalID: "test:http://example.com/jbloggs",
 		FullName:   "Joe Bloggs",
 		Email:      "jbloggs@example.com",
-		GravatarID: "62300f8842b68279680736dc1f9fc52e",
 		IDPGroups: []string{
 			"test",
 		},
 	}
-	err := s.adminClient.SetUser(s.Ctx, &params.SetUserRequest{
-		Username: user.Username,
-		User:     *user,
-	})
-	c.Assert(err, gc.Equals, nil)
+	s.addUser(c, user)
 
 	resp, err := s.adminClient.User(s.Ctx, &params.UserRequest{
 		Username: user.Username,
 	})
 	c.Assert(err, gc.Equals, nil)
 
-	s.assertUser(c, *resp, *user)
+	s.assertUser(c, *resp, user)
 }
 
 var userErrorTests = []struct {
@@ -96,54 +104,54 @@ var (
 
 var setUserTests = []struct {
 	about      string
+	username   params.Username
+	existing   []params.User
 	user       params.User
 	expectUser params.User
 }{{
-	about: "create user",
-	user: params.User{
-		Username:   "jbloggs",
-		ExternalID: "test:http://example.com/jbloggs",
-		FullName:   "Joe Bloggs",
-		Email:      "jbloggs@example.com",
-		IDPGroups: []string{
-			"test1",
-		},
-	},
-	expectUser: params.User{
-		Username:   "jbloggs",
-		ExternalID: "test:http://example.com/jbloggs",
-		FullName:   "Joe Bloggs",
-		Email:      "jbloggs@example.com",
-		IDPGroups: []string{
-			"test1",
-		},
-	},
-}, {
 	about: "update user",
-	user: params.User{
-		Username:   "jbloggsToo",
+	existing: []params.User{{
+		Username:   "jbloggs2",
 		ExternalID: "test:http://example.com/jbloggs2",
-		FullName:   "Joe Bloggs The Second",
-		Email:      "jbloggsii@example.com",
+		FullName:   "Joe Bloggs II",
+		Email:      "jbloggs2@example.com",
 		IDPGroups: []string{
+			"test1",
+		},
+	}},
+	username: "jbloggs2",
+	user: params.User{
+		FullName: "Joe Bloggs The Second",
+		Email:    "jbloggsii@example.com",
+		IDPGroups: []string{
+			"test2",
 			"test3",
 		},
 	},
 	expectUser: params.User{
-		Username:   "jbloggsToo",
+		Username:   "jbloggs2",
 		ExternalID: "test:http://example.com/jbloggs2",
 		FullName:   "Joe Bloggs The Second",
 		Email:      "jbloggsii@example.com",
 		IDPGroups: []string{
-			"test1",
+			"test2",
 			"test3",
 		},
 	},
 }, {
 	about: "create agent",
+	existing: []params.User{{
+		Username:   "jbloggs2",
+		ExternalID: "test:http://example.com/jbloggs2",
+		FullName:   "Joe Bloggs II",
+		Email:      "jbloggs2@example.com",
+		IDPGroups: []string{
+			"test1",
+		},
+	}},
+	username: "agent@jbloggs2",
 	user: params.User{
-		Username: "agent@jbloggs3",
-		Owner:    "jbloggs3",
+		Owner: "jbloggs2",
 		IDPGroups: []string{
 			"test1",
 		},
@@ -152,8 +160,8 @@ var setUserTests = []struct {
 		},
 	},
 	expectUser: params.User{
-		Username: "agent@jbloggs3",
-		Owner:    "jbloggs3",
+		Username: "agent@jbloggs2",
+		Owner:    "jbloggs2",
 		IDPGroups: []string{
 			"test1",
 		},
@@ -163,19 +171,39 @@ var setUserTests = []struct {
 	},
 }, {
 	about: "update agent",
+	existing: []params.User{{
+		Username:   "jbloggs2",
+		ExternalID: "test:http://example.com/jbloggs2",
+		FullName:   "Joe Bloggs II",
+		Email:      "jbloggs2@example.com",
+		IDPGroups: []string{
+			"test1",
+			"test3",
+		},
+	}, {
+		Username:   "agent2@jbloggs2",
+		ExternalID: "idm:agent2@jbloggs2",
+		Owner:      "jbloggs2",
+		IDPGroups: []string{
+			"test1",
+		},
+		PublicKeys: []*bakery.PublicKey{
+			&pk1,
+		},
+	}},
+	username: "agent2@jbloggs2",
 	user: params.User{
-		Username: "agent2@jbloggs3",
-		Owner:    "jbloggs3",
 		IDPGroups: []string{
 			"test3",
+			"test4", // Note: not present in owner's groups.
 		},
 		PublicKeys: []*bakery.PublicKey{
 			&pk2,
 		},
 	},
 	expectUser: params.User{
-		Username: "agent2@jbloggs3",
-		Owner:    "jbloggs3",
+		Username: "agent2@jbloggs2",
+		Owner:    "jbloggs2",
 		IDPGroups: []string{
 			"test3",
 		},
@@ -186,114 +214,83 @@ var setUserTests = []struct {
 }}
 
 func (s *usersSuite) TestSetUser(c *gc.C) {
-	err := s.adminClient.SetUser(s.Ctx, &params.SetUserRequest{
-		Username: "jbloggs2",
-		User: params.User{
-			ExternalID: "test:http://example.com/jbloggs2",
-			FullName:   "Joe Bloggs II",
-			Email:      "jbloggs2@example.com",
-			IDPGroups: []string{
-				"test1",
-			},
-		},
-	})
-	c.Assert(err, gc.Equals, nil)
-
-	err = s.adminClient.SetUser(s.Ctx, &params.SetUserRequest{
-		Username: "jbloggs3",
-		User: params.User{
-			ExternalID: "test:http://example.com/jbloggs3",
-			FullName:   "Joe Bloggs III",
-			Email:      "jbloggs3@example.com",
-		},
-	})
-	c.Assert(err, gc.Equals, nil)
-
-	err = s.adminClient.SetUser(s.Ctx, &params.SetUserRequest{
-		Username: "agent2@jbloggs2",
-		User: params.User{
-			Owner: "jbloggs2",
-			IDPGroups: []string{
-				"test1",
-			},
-			PublicKeys: []*bakery.PublicKey{
-				&pk1,
-			},
-		},
-	})
-	c.Assert(err, gc.Equals, nil)
-
 	for i, test := range setUserTests {
-		c.Logf("test %d. %s", i, test.about)
+		c.Logf("\ntest %d. %s", i, test.about)
+		s.clearIdentities(c)
+		for _, u := range test.existing {
+			s.addUser(c, u)
+		}
 		err := s.adminClient.SetUser(s.Ctx, &params.SetUserRequest{
-			Username: test.user.Username,
+			Username: test.username,
 			User:     test.user,
 		})
 		c.Assert(err, gc.Equals, nil)
 		u, err := s.adminClient.User(s.Ctx, &params.UserRequest{
-			Username: test.user.Username,
+			Username: test.username,
 		})
 		c.Assert(err, gc.Equals, nil)
 		s.assertUser(c, *u, test.expectUser)
 	}
 }
 
+func (s *usersSuite) clearIdentities(c *gc.C) {
+	store, ok := s.Store.(interface{ RemoveAll() })
+	if !ok {
+		c.Fatalf("store type %T does not implement RemoveAll", s.Store)
+	}
+	store.RemoveAll()
+}
+
 var setUserErrorTests = []struct {
 	about       string
+	username    params.Username
 	user        params.User
 	expectError string
 }{{
-	about: "bad username",
-	user: params.User{
-		Username: "bad-name-",
-	},
+	about:       "bad username",
+	username:    "bad-name-",
 	expectError: `Put .*/v1/u/bad-name-: cannot unmarshal parameters: cannot unmarshal into field Username: illegal username "bad-name-"`,
 }, {
-	about: "name in use",
-	user: params.User{
-		Username:   "jbloggs2",
-		ExternalID: "test:http://example.com/jbloggs",
-	},
-	expectError: `Put .*/v1/u/jbloggs2: username jbloggs2 already in use`,
-}, {
-	about: "no external_id",
+	about:    "username specified",
+	username: "jbloggs",
 	user: params.User{
 		Username: "jbloggs",
 	},
-	expectError: `Put .*/v1/u/jbloggs: external_id not specified`,
+	expectError: `Put .*/v1/u/jbloggs: username provided but not allowed`,
 }, {
-	about: "external_id and owner",
+	about:    "external_id specified",
+	username: "jbloggs",
 	user: params.User{
-		Username:   "jbloggs@bob",
-		ExternalID: "test:http://example.com/jbloggs",
-		Owner:      "bob",
+		ExternalID: "someid",
 	},
-	expectError: `Put .*/v1/u/jbloggs@bob: both owner and external_id specified`,
+	expectError: `Put .*/v1/u/jbloggs: external ID provided but not allowed`,
 }, {
-	about: "reserved name",
+	about:    "reserved name",
+	username: "everyone",
 	user: params.User{
 		Username:   "everyone",
 		ExternalID: "test:http://example.com/jbloggs",
 	},
 	expectError: `Put .*/v1/u/everyone: username "everyone" is reserved`,
 }, {
-	about: "invalid agent name",
+	about:    "invalid agent name",
+	username: "agent",
 	user: params.User{
 		Username: "agent",
 		Owner:    "bob",
 	},
 	expectError: `Put .*/v1/u/agent: bob cannot create user "agent" \(suffix must be "@bob"\)`,
 }, {
-	about: "agent owner doesn't exist",
+	about:    "agent owner doesn't exist",
+	username: "agent@alice",
 	user: params.User{
-		Username: "agent@alice",
-		Owner:    "alice",
+		Owner: "alice",
 	},
-	expectError: `Put .*/v1/u/agent@alice: owner must exist`,
+	expectError: `Put .*/v1/u/agent@alice: owner "alice" must exist`,
 }, {
-	about: "nil public key",
+	about:    "nil public key",
+	username: "agent@alice",
 	user: params.User{
-		Username:   "agent@alice",
 		Owner:      "alice",
 		PublicKeys: []*bakery.PublicKey{nil},
 	},
@@ -301,24 +298,20 @@ var setUserErrorTests = []struct {
 }}
 
 func (s *usersSuite) TestSetUserErrors(c *gc.C) {
-	err := s.adminClient.SetUser(s.Ctx, &params.SetUserRequest{
-		Username: "jbloggs2",
-		User: params.User{
-			Username:   "jbloggs2",
-			ExternalID: "test:http://example.com/jbloggs2",
-			FullName:   "Joe Bloggs II",
-			Email:      "jbloggs2@example.com",
-			IDPGroups: []string{
-				"test1",
-			},
+	s.addUser(c, params.User{
+		Username:   "jbloggs2",
+		ExternalID: "test:http://example.com/jbloggs2",
+		FullName:   "Joe Bloggs II",
+		Email:      "jbloggs2@example.com",
+		IDPGroups: []string{
+			"test1",
 		},
 	})
-	c.Assert(err, gc.Equals, nil)
 
 	for i, test := range setUserErrorTests {
 		c.Logf("test %d. %s", i, test.about)
 		err := s.adminClient.SetUser(s.Ctx, &params.SetUserRequest{
-			Username: test.user.Username,
+			Username: test.username,
 			User:     test.user,
 		})
 		c.Assert(err, gc.ErrorMatches, test.expectError)
@@ -386,27 +379,24 @@ var queryUserTests = []struct {
 }}
 
 func (s *usersSuite) TestQueryUsers(c *gc.C) {
-	err := s.adminClient.SetUser(s.Ctx, &params.SetUserRequest{
-		Username: "jbloggs2",
-		User: params.User{
-			Username:   "jbloggs2",
-			ExternalID: "test:http://example.com/jbloggs2",
-			Email:      "jbloggs2@example.com",
-			FullName:   "Joe Bloggs II",
-			IDPGroups: []string{
-				"test",
-			},
-		},
-	})
-	c.Assert(err, gc.Equals, nil)
-	err = s.Params.Store.UpdateIdentity(
+	err := s.Params.Store.UpdateIdentity(
 		s.Ctx,
 		&store.Identity{
 			Username:      "jbloggs2",
+			ProviderID:    "test:http://example.com/jbloggs2",
+			Name:          "Joe Bloggs II",
+			Email:         "jbloggs2@example.com",
 			LastLogin:     time.Now().AddDate(0, 0, -29),
 			LastDischarge: time.Now().AddDate(0, 0, -14),
+			Groups: []string{
+				"test",
+			},
 		},
 		store.Update{
+			store.Username:      store.Set,
+			store.Name:          store.Set,
+			store.Groups:        store.Set,
+			store.Email:         store.Set,
 			store.LastLogin:     store.Set,
 			store.LastDischarge: store.Set,
 		},
@@ -451,19 +441,15 @@ func (s *usersSuite) TestQueryUsersUnauthorized(c *gc.C) {
 }
 
 func (s *usersSuite) TestSSHKeys(c *gc.C) {
-	err := s.adminClient.SetUser(s.Ctx, &params.SetUserRequest{
-		Username: "jbloggs",
-		User: params.User{
-			Username:   "jbloggs",
-			ExternalID: "http://example.com/jbloggs",
-			Email:      "jbloggs@example.com",
-			FullName:   "Joe Bloggs",
-			IDPGroups: []string{
-				"test",
-			},
+	s.addUser(c, params.User{
+		Username:   "jbloggs",
+		ExternalID: "http://example.com/jbloggs",
+		Email:      "jbloggs@example.com",
+		FullName:   "Joe Bloggs",
+		IDPGroups: []string{
+			"test",
 		},
 	})
-	c.Assert(err, gc.Equals, nil)
 
 	// Check there is no ssh key for the user.
 	sshKeys, err := s.adminClient.GetSSHKeys(s.Ctx, &params.SSHKeysRequest{
@@ -551,19 +537,15 @@ func (s *usersSuite) TestSSHKeys(c *gc.C) {
 }
 
 func (s *usersSuite) TestVerifyUserToken(c *gc.C) {
-	err := s.adminClient.SetUser(s.Ctx, &params.SetUserRequest{
-		Username: "jbloggs",
-		User: params.User{
-			Username:   "jbloggs",
-			ExternalID: "http://example.com/jbloggs",
-			Email:      "jbloggs@example.com",
-			FullName:   "Joe Bloggs",
-			IDPGroups: []string{
-				"test",
-			},
+	s.addUser(c, params.User{
+		Username:   "jbloggs",
+		ExternalID: "http://example.com/jbloggs",
+		Email:      "jbloggs@example.com",
+		FullName:   "Joe Bloggs",
+		IDPGroups: []string{
+			"test",
 		},
 	})
-	c.Assert(err, gc.Equals, nil)
 
 	m, err := s.adminClient.UserToken(s.Ctx, &params.UserTokenRequest{
 		Username: "jbloggs",
@@ -594,26 +576,22 @@ func (s *usersSuite) TestUserTokenNotFound(c *gc.C) {
 }
 
 func (s *usersSuite) TestDischargeToken(c *gc.C) {
-	err := s.adminClient.SetUser(s.Ctx, &params.SetUserRequest{
-		Username: "jbloggs",
-		User: params.User{
-			Username:   "jbloggs",
-			ExternalID: "http://example.com/jbloggs",
-			Email:      "jbloggs@example.com",
-			FullName:   "Joe Bloggs",
-			IDPGroups: []string{
-				"test",
-			},
+	s.addUser(c, params.User{
+		Username:   "jbloggs",
+		ExternalID: "http://example.com/jbloggs",
+		Email:      "jbloggs@example.com",
+		FullName:   "Joe Bloggs",
+		IDPGroups: []string{
+			"test",
 		},
 	})
-	c.Assert(err, gc.Equals, nil)
 
 	client := &httprequest.Client{
 		BaseURL: s.URL,
 		Doer:    s.AdminClient(),
 	}
 	var resp params.DischargeTokenForUserResponse
-	err = client.Get(s.Ctx, "/v1/discharge-token-for-user?username=jbloggs", &resp)
+	err := client.Get(s.Ctx, "/v1/discharge-token-for-user?username=jbloggs", &resp)
 	c.Assert(err, gc.Equals, nil)
 
 	declared, err := s.adminClient.VerifyToken(s.Ctx, &params.VerifyTokenRequest{
@@ -645,31 +623,22 @@ var userGroupTests = []struct {
 }}
 
 func (s *usersSuite) TestUserGroups(c *gc.C) {
-	err := s.adminClient.SetUser(s.Ctx, &params.SetUserRequest{
-		Username: "jbloggs",
-		User: params.User{
-			Username:   "jbloggs",
-			ExternalID: "http://example.com/jbloggs",
-			Email:      "jbloggs@example.com",
-			FullName:   "Joe Bloggs",
+	s.addUser(c, params.User{
+		Username:   "jbloggs",
+		ExternalID: "http://example.com/jbloggs",
+		Email:      "jbloggs@example.com",
+		FullName:   "Joe Bloggs",
+	})
+	s.addUser(c, params.User{
+		Username:   "jbloggs2",
+		ExternalID: "http://example.com/jbloggs2",
+		Email:      "jbloggs2@example.com",
+		FullName:   "Joe Bloggs II",
+		IDPGroups: []string{
+			"test1",
+			"test2",
 		},
 	})
-	c.Assert(err, gc.Equals, nil)
-
-	err = s.adminClient.SetUser(s.Ctx, &params.SetUserRequest{
-		Username: "jbloggs2",
-		User: params.User{
-			Username:   "jbloggs2",
-			ExternalID: "http://example.com/jbloggs2",
-			Email:      "jbloggs2@example.com",
-			FullName:   "Joe Bloggs II",
-			IDPGroups: []string{
-				"test1",
-				"test2",
-			},
-		},
-	})
-	c.Assert(err, gc.Equals, nil)
 
 	for i, test := range userGroupTests {
 		c.Logf("test %d. %s", i, test.about)
@@ -686,22 +655,18 @@ func (s *usersSuite) TestUserGroups(c *gc.C) {
 }
 
 func (s *usersSuite) TestSetUserGroups(c *gc.C) {
-	err := s.adminClient.SetUser(s.Ctx, &params.SetUserRequest{
-		Username: "jbloggs",
-		User: params.User{
-			Username:   "jbloggs",
-			ExternalID: "http://example.com/jbloggs",
-			Email:      "jbloggs@example.com",
-			FullName:   "Joe Bloggs",
-			IDPGroups: []string{
-				"test1",
-				"test2",
-			},
+	s.addUser(c, params.User{
+		Username:   "jbloggs",
+		ExternalID: "http://example.com/jbloggs",
+		Email:      "jbloggs@example.com",
+		FullName:   "Joe Bloggs",
+		IDPGroups: []string{
+			"test1",
+			"test2",
 		},
 	})
-	c.Assert(err, gc.Equals, nil)
 
-	err = s.adminClient.SetUserGroups(s.Ctx, &params.SetUserGroupsRequest{
+	err := s.adminClient.SetUserGroups(s.Ctx, &params.SetUserGroupsRequest{
 		Username: "jbloggs",
 		Groups:   params.Groups{Groups: []string{"test3", "test4"}},
 	})
@@ -762,16 +727,12 @@ func (s *usersSuite) TestModifyUserGroups(c *gc.C) {
 		if test.username == "" {
 			test.username = username
 		}
-		err := s.adminClient.SetUser(s.Ctx, &params.SetUserRequest{
-			Username: username,
-			User: params.User{
-				ExternalID: "test:http://example.com/" + string(username),
-				IDPGroups:  test.startGroups,
-			},
+		s.addUser(c, params.User{
+			Username:   username,
+			ExternalID: "test:http://example.com/" + string(username),
+			IDPGroups:  test.startGroups,
 		})
-		c.Assert(err, gc.Equals, nil)
-
-		err = s.adminClient.ModifyUserGroups(s.Ctx, &params.ModifyUserGroupsRequest{
+		err := s.adminClient.ModifyUserGroups(s.Ctx, &params.ModifyUserGroupsRequest{
 			Username: test.username,
 			Groups: params.ModifyGroups{
 				Add:    test.addGroups,
@@ -794,20 +755,16 @@ func (s *usersSuite) TestModifyUserGroups(c *gc.C) {
 }
 
 func (s *usersSuite) TestUserIDPGroups(c *gc.C) {
-	err := s.adminClient.SetUser(s.Ctx, &params.SetUserRequest{
-		Username: "jbloggs",
-		User: params.User{
-			Username:   "jbloggs",
-			ExternalID: "http://example.com/jbloggs",
-			Email:      "jbloggs@example.com",
-			FullName:   "Joe Bloggs",
-			IDPGroups: []string{
-				"test1",
-				"test2",
-			},
+	s.addUser(c, params.User{
+		Username:   "jbloggs",
+		ExternalID: "http://example.com/jbloggs",
+		Email:      "jbloggs@example.com",
+		FullName:   "Joe Bloggs",
+		IDPGroups: []string{
+			"test1",
+			"test2",
 		},
 	})
-	c.Assert(err, gc.Equals, nil)
 
 	groups, err := s.adminClient.UserIDPGroups(s.Ctx, &params.UserIDPGroupsRequest{
 		UserGroupsRequest: params.UserGroupsRequest{
@@ -836,15 +793,11 @@ func (s *usersSuite) TestWhoAmIWithNoUser(c *gc.C) {
 }
 
 func (s *usersSuite) TestExtraInfo(c *gc.C) {
-	err := s.adminClient.SetUser(s.Ctx, &params.SetUserRequest{
-		Username: "jbloggs",
-		User: params.User{
-			ExternalID: "http://example.com/jbloggs",
-		},
+	s.addUser(c, params.User{
+		Username:   "jbloggs",
+		ExternalID: "http://example.com/jbloggs",
 	})
-	c.Assert(err, gc.Equals, nil)
-
-	err = s.adminClient.SetUserExtraInfo(s.Ctx, &params.SetUserExtraInfoRequest{
+	err := s.adminClient.SetUserExtraInfo(s.Ctx, &params.SetUserExtraInfoRequest{
 		Username: "jbloggs",
 		ExtraInfo: map[string]interface{}{
 			"item1": 1,
@@ -948,5 +901,56 @@ func (s *usersSuite) assertUser(c *gc.C, u1, u2 params.User) {
 	}
 	u1.PublicKeys = nil
 	u2.PublicKeys = nil
-	c.Assert(u1, gc.DeepEquals, u2)
+	c.Assert(u1, jc.DeepEquals, u2)
+}
+
+func (s *usersSuite) addUser(c *gc.C, u params.User) {
+	identity := store.Identity{
+		Username:   string(u.Username),
+		ProviderID: store.ProviderIdentity(u.ExternalID),
+		Name:       u.FullName,
+		Email:      u.Email,
+		Groups:     u.IDPGroups,
+		PublicKeys: publicKeys(u.PublicKeys),
+	}
+	if u.Owner != "" {
+		// Note: this mirrors the logic in handler.SetUser.
+		owner := store.Identity{
+			Username: string(u.Owner),
+		}
+		err := s.Store.Identity(s.Ctx, &owner)
+		c.Assert(err, gc.Equals, nil)
+		identity.ProviderInfo = map[string][]string{
+			"owner": {string(owner.ProviderID), owner.Username},
+		}
+	}
+	err := s.Store.UpdateIdentity(s.Ctx, &identity, store.Update{
+		store.Username:     store.Set,
+		store.ProviderInfo: store.Set,
+		store.Name:         store.Set,
+		store.Groups:       store.Set,
+		store.PublicKeys:   store.Set,
+		store.Email:        store.Set,
+	})
+	c.Assert(err, gc.Equals, nil)
+}
+
+func publicKeys(pks []*bakery.PublicKey) []bakery.PublicKey {
+	pks1 := make([]bakery.PublicKey, len(pks))
+	for i, pk := range pks {
+		if pk == nil {
+			panic("nil public key")
+		}
+		pks1[i] = *pk
+	}
+	return pks1
+}
+
+func publicKeyPtrs(pks []bakery.PublicKey) []*bakery.PublicKey {
+	pks1 := make([]*bakery.PublicKey, len(pks))
+	for i, key := range pks {
+		pk := key
+		pks1[i] = &pk
+	}
+	return pks1
 }

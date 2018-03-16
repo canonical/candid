@@ -35,6 +35,25 @@ func (s *memStore) Context(ctx context.Context) (_ context.Context, cancel func(
 	return ctx, func() {}
 }
 
+var adminID = store.MakeProviderIdentity("idm", "admin")
+
+// RemoveAll is implemented so that tests can clear out the data.
+// It removes all identities except the admin identity created at
+// init time.
+// TODO provide a standard store.Store way of removing
+// identities.
+func (s *memStore) RemoveAll() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	var identities []*store.Identity
+	for _, identity := range s.identities {
+		if identity.ProviderID == adminID {
+			identities = append(identities, identity)
+		}
+	}
+	s.identities = identities
+}
+
 // Identity implements store.Store.Identity.
 func (s *memStore) Identity(_ context.Context, identity *store.Identity) error {
 	s.mu.Lock()
@@ -272,7 +291,7 @@ func (s *memStore) UpdateIdentity(_ context.Context, identity *store.Identity, u
 
 func (s *memStore) updateIdentity(dst, src *store.Identity, update store.Update) error {
 	if update[store.ProviderID] != store.NoUpdate {
-		panic("unsupported operation requested on ProviderID field")
+		panic(errgo.Newf("unsupported operation %v requested on ProviderID field", update[store.ProviderID]))
 	}
 	switch update[store.Username] {
 	case store.NoUpdate:
