@@ -234,7 +234,7 @@ var aclForOpTests = []struct {
 	expect: append([]string{"bob"}, auth.AdminACL...),
 }, {
 	op:     auth.UserOp("bob", "createAgent"),
-	expect: append([]string{"+create-agent@bob"}, auth.AdminACL...),
+	expect: append([]string{"bob", "+create-agent@bob"}, auth.AdminACL...),
 }, {
 	op:     auth.UserOp("bob", "readAdmin"),
 	expect: auth.AdminACL,
@@ -271,7 +271,7 @@ func (s *authSuite) TestAdminUserGroups(c *gc.C) {
 	ctx := auth.ContextWithUserCredentials(context.Background(), "admin", "password")
 	authInfo, err := s.authorizer.Auth(ctx, nil, identchecker.LoginOp)
 	c.Assert(err, gc.IsNil)
-	assertAuthorizedGroups(c, authInfo, []string{auth.AdminUsername})
+	assertAuthorizedGroups(c, authInfo, nil)
 }
 
 func (s *authSuite) TestNonExistentUserGroups(c *gc.C) {

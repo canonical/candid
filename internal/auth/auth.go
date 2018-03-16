@@ -27,6 +27,8 @@ const (
 	GroupListGroup    = "grouplist@idm"
 )
 
+var AdminProviderID = store.MakeProviderIdentity("idm", "admin")
+
 const (
 	kindGlobal = "global"
 	kindUser   = "u"
@@ -104,6 +106,12 @@ func New(params Params) *Authorizer {
 		idp := idp
 		resolvers[idp.Name()] = idpGroupResolver{idp}
 	}
+	// Add a group resolver for the built-in idm provider.
+	resolvers["idm"] = idmGroupResolver{
+		store:     params.Store,
+		resolvers: resolvers,
+	}
+
 	a.groupResolvers = resolvers
 	a.checker = identchecker.NewChecker(identchecker.CheckerParams{
 		Checker: NewChecker(a),
@@ -154,7 +162,10 @@ func (a *Authorizer) aclForOp(ctx context.Context, op bakery.Op) (acl []string, 
 		case ActionRead:
 			return append(acl, username), false, nil
 		case ActionCreateAgent:
-			return append(acl, "+create-agent@"+username), false, nil
+			// Anyone can create an agent owned by themselves;
+			// it's also possible to specifically grant a user or an agent
+			// permission to create other agents.
+			return append(acl, username, "+create-agent@"+username), false, nil
 		case ActionReadAdmin:
 			return acl, false, nil
 		case ActionWriteAdmin:
@@ -191,9 +202,8 @@ func (a *Authorizer) SetAdminPublicKey(ctx context.Context, pk *bakery.PublicKey
 	return errgo.Mask(a.store.UpdateIdentity(
 		ctx,
 		&store.Identity{
-			ProviderID: store.MakeProviderIdentity("idm", "admin"),
+			ProviderID: AdminProviderID,
 			Username:   AdminUsername,
-			Groups:     []string{AdminUsername},
 			PublicKeys: pks,
 		},
 		store.Update{
@@ -232,7 +242,7 @@ func (a *Authorizer) Identity(ctx context.Context, username string) (*Identity, 
 		id: store.Identity{
 			Username: username,
 		},
-		a: a,
+		authorizer: a,
 	}
 	if err := id.lookup(ctx); err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
@@ -243,7 +253,7 @@ func (a *Authorizer) Identity(ctx context.Context, username string) (*Identity, 
 // An identityClient is an implementation of identchecker.IdentityClient that
 // uses the identity server's data store to get identity information.
 type identityClient struct {
-	a *Authorizer
+	authorizer *Authorizer
 }
 
 // IdentityFromContext implements
@@ -254,19 +264,19 @@ func (c identityClient) IdentityFromContext(ctx context.Context) (_ident identch
 		if err := CheckUserDomain(ctx, username); err != nil {
 			return nil, nil, errgo.Mask(err)
 		}
-		id, err := c.a.Identity(ctx, username)
+		id, err := c.authorizer.Identity(ctx, username)
 		if err != nil {
 			return nil, nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 		}
 		return id, nil, nil
 	}
 	if username, password, ok := userCredentialsFromContext(ctx); ok {
-		if username == c.a.adminUsername && password == c.a.adminPassword {
+		if username == c.authorizer.adminUsername && password == c.authorizer.adminPassword {
 			return &Identity{
 				id: store.Identity{
 					Username: AdminUsername,
 				},
-				a: c.a,
+				authorizer: c.authorizer,
 			}, nil, nil
 		}
 		return nil, nil, errgo.WithCausef(nil, params.ErrUnauthorized, "invalid credentials")
@@ -274,7 +284,7 @@ func (c identityClient) IdentityFromContext(ctx context.Context) (_ident identch
 	return nil, []checkers.Caveat{
 		checkers.NeedDeclaredCaveat(
 			checkers.Caveat{
-				Location:  c.a.location,
+				Location:  c.authorizer.location,
 				Condition: "is-authenticated-user",
 			},
 			"username",
@@ -307,7 +317,7 @@ func (c identityClient) DeclaredIdentity(ctx context.Context, declared map[strin
 		id: store.Identity{
 			Username: username,
 		},
-		a: c.a,
+		authorizer: c.authorizer,
 	}, nil
 }
 
@@ -315,7 +325,7 @@ func (c identityClient) DeclaredIdentity(ctx context.Context, declared map[strin
 // identity server.
 type Identity struct {
 	id             store.Identity
-	a              *Authorizer
+	authorizer     *Authorizer
 	resolvedGroups []string
 }
 
@@ -361,8 +371,7 @@ func (id *Identity) Groups(ctx context.Context) ([]string, error) {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 	}
 	groups := id.id.Groups
-	provider, _ := id.id.ProviderID.Split()
-	if gr := id.a.groupResolvers[provider]; gr != nil {
+	if gr := id.authorizer.groupResolvers[id.id.ProviderID.Provider()]; gr != nil {
 		var err error
 		groups, err = gr.resolveGroups(ctx, &id.id)
 		if err != nil {
@@ -378,7 +387,7 @@ func (id *Identity) lookup(ctx context.Context) error {
 	if id.id.ID != "" {
 		return nil
 	}
-	if err := id.a.store.Identity(ctx, &id.id); err != nil {
+	if err := id.authorizer.store.Identity(ctx, &id.id); err != nil {
 		if errgo.Cause(err) == store.ErrNotFound {
 			return errgo.WithCausef(err, params.ErrNotFound, "")
 		}
@@ -445,6 +454,56 @@ type groupResolver interface {
 	// but the returned list of groups will still be taken as the set
 	// of groups to be associated with the identity.
 	resolveGroups(context.Context, *store.Identity) ([]string, error)
+}
+
+type idmGroupResolver struct {
+	store     store.Store
+	resolvers map[string]groupResolver
+}
+
+// resolveGroups implements groupResolver by checking returning
+// groups that are in both the identity and the owner of the
+// identity.
+func (r idmGroupResolver) resolveGroups(ctx context.Context, identity *store.Identity) ([]string, error) {
+	if len(identity.ProviderInfo["owner"]) == 0 {
+		// No owner - no groups. This applies to admin@idm, but for
+		// other users, it's probably an internal inconsistency error.
+		return nil, nil
+	}
+	ownerID := store.ProviderIdentity(identity.ProviderInfo["owner"][0])
+	if ownerID == AdminProviderID {
+		// The admin user is a member of all groups by definition.
+		return identity.Groups, nil
+	}
+	ownerIdentity := store.Identity{
+		ProviderID: ownerID,
+	}
+	if err := r.store.Identity(ctx, &ownerIdentity); err != nil {
+		if errgo.Cause(err) != store.ErrNotFound {
+			return nil, errgo.Mask(err)
+		}
+		return nil, nil
+	}
+	resolver := r.resolvers[ownerID.Provider()]
+	if resolver == nil {
+		// Owner is somehow in an unknown provider.
+		// TODO log/return an error?
+		return nil, nil
+	}
+	ownerGroups, err := resolver.resolveGroups(ctx, &ownerIdentity)
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
+	allowedGroups := make([]string, 0, len(identity.Groups))
+	for _, g1 := range identity.Groups {
+		for _, g2 := range ownerGroups {
+			if g2 == g1 {
+				allowedGroups = append(allowedGroups, g1)
+				break
+			}
+		}
+	}
+	return allowedGroups, nil
 }
 
 type idpGroupResolver struct {

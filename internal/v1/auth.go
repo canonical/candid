@@ -12,6 +12,8 @@ import (
 
 // opForRequest returns the operation that will be performed
 // by the API handler method which takes the given argument r.
+// See aclForOp in ../auth/auth.go for the mapping from
+// operation to ACLs.
 func opForRequest(r interface{}) bakery.Op {
 	switch r := r.(type) {
 	case *params.QueryUsersRequest:
@@ -19,6 +21,8 @@ func opForRequest(r interface{}) bakery.Op {
 	case *params.UserRequest:
 		return auth.UserOp(r.Username, auth.ActionRead)
 	case *params.SetUserRequest:
+		// TODO require special permissions if the user
+		// expiry time is less than some threshold?
 		if r.Owner != "" {
 			return auth.UserOp(r.Owner, auth.ActionCreateAgent)
 		}

@@ -158,6 +158,12 @@ func (p ProviderIdentity) Split() (provider, id string) {
 	return s[:n], s[n+1:]
 }
 
+// Provider returns the provider part of the identity.
+func (p ProviderIdentity) Provider() string {
+	provider, _ := p.Split()
+	return provider
+}
+
 // Scan implements sql.Scanner by converting a string value into a ProviderIdentity.
 func (p *ProviderIdentity) Scan(src interface{}) error {
 	if s, ok := src.(string); ok {
