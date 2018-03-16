@@ -3,6 +3,7 @@
 package main
 
 import (
+	"database/sql"
 	"flag"
 	"fmt"
 	"html/template"
@@ -13,9 +14,11 @@ import (
 
 	"github.com/gorilla/handlers"
 	"github.com/juju/loggo"
+	_ "github.com/lib/pq"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery"
 	"gopkg.in/macaroon-bakery.v2/bakery/mgorootkeystore"
+	"gopkg.in/macaroon-bakery.v2/bakery/postgresrootkeystore"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/natefinch/lumberjack.v2"
 
@@ -31,6 +34,7 @@ import (
 	_ "github.com/CanonicalLtd/blues-identity/idp/usso/ussodischarge"
 	"github.com/CanonicalLtd/blues-identity/idp/usso/ussooauth"
 	"github.com/CanonicalLtd/blues-identity/mgostore"
+	"github.com/CanonicalLtd/blues-identity/sqlstore"
 )
 
 var (
@@ -78,6 +82,18 @@ func serve(confPath string) error {
 		os.Setenv("NO_PROXY", conf.NoProxy)
 	}
 
+	switch {
+	case conf.MongoAddr != "":
+		return serveMgoServer(conf)
+	case conf.PostgresConnectionString != "":
+		return servePostgresServer(conf)
+	default:
+		// This should be detected when reading the config earlier
+		return errgo.Newf("no database configured")
+	}
+}
+
+func serveMgoServer(conf *config.Config) error {
 	logger.Infof("connecting to mongo")
 	session, err := mgo.Dial(conf.MongoAddr)
 	if err != nil {
@@ -85,15 +101,55 @@ func serve(confPath string) error {
 	}
 	defer session.Close()
 	db := session.DB("identity")
+	database, err := mgostore.NewDatabase(db)
+	if err != nil {
+		return errgo.Notef(err, "cannot initialise database")
+	}
+	defer database.Close()
+	return serveIdentity(conf, identity.ServerParams{
+		Store:             database.Store(),
+		ProviderDataStore: database.ProviderDataStore(),
+		MeetingStore:      database.MeetingStore(),
+		RootKeyStore: database.BakeryRootKeyStore(mgorootkeystore.Policy{
+			ExpiryDuration: 365 * 24 * time.Hour,
+		}),
+		DebugStatusCheckerFuncs: database.DebugStatusCheckerFuncs(),
+	})
+}
 
+func servePostgresServer(conf *config.Config) error {
+	logger.Infof("connecting to postgresql")
+	db, err := sql.Open("postgres", conf.PostgresConnectionString)
+	if err != nil {
+		return errgo.Notef(err, "cannot connect to database")
+	}
+	database, err := sqlstore.NewDatabase("postgres", db)
+	if err != nil {
+		return errgo.Notef(err, "cannot initialise database")
+	}
+	defer database.Close()
+	rootkeys := postgresrootkeystore.NewRootKeys(db, "rootkeys", 1000)
+	defer rootkeys.Close()
+	return serveIdentity(conf, identity.ServerParams{
+		Store:             database.Store(),
+		ProviderDataStore: database.ProviderDataStore(),
+		MeetingStore:      database.MeetingStore(),
+		RootKeyStore: rootkeys.NewStore(postgresrootkeystore.Policy{
+			ExpiryDuration: 365 * 24 * time.Hour,
+		}),
+	})
+}
+
+func serveIdentity(conf *config.Config, params identity.ServerParams) error {
 	logger.Infof("setting up the identity server")
-	idps := defaultIDPs
+	params.IdentityProviders = defaultIDPs
 	if len(conf.IdentityProviders) > 0 {
-		idps = make([]idp.IdentityProvider, len(conf.IdentityProviders))
+		params.IdentityProviders = make([]idp.IdentityProvider, len(conf.IdentityProviders))
 		for i, idp := range conf.IdentityProviders {
-			idps[i] = idp.IdentityProvider
+			params.IdentityProviders[i] = idp.IdentityProvider
 		}
 	}
+
 	// If a resource path is specified on the commandline, it takes precedence
 	// over the one in the config.
 	if *resourcePath == "" {
@@ -103,40 +159,27 @@ func serve(confPath string) error {
 			*resourcePath = "."
 		}
 	}
-	t, err := template.New("").ParseGlob(filepath.Join(*resourcePath, "templates", "*"))
+	params.StaticFileSystem = http.Dir(filepath.Join(*resourcePath, "static"))
+
+	var err error
+	params.Template, err = template.New("").ParseGlob(filepath.Join(*resourcePath, "templates", "*"))
 	if err != nil {
 		return errgo.Notef(err, "cannot parse templates")
 	}
-	database, err := mgostore.NewDatabase(db)
-	if err != nil {
-		return errgo.Notef(err, "cannot create meeting store")
-	}
-	defer database.Close()
 
+	params.AuthUsername = conf.AuthUsername
+	params.AuthPassword = conf.AuthPassword
+	params.Key = &bakery.KeyPair{
+		Private: *conf.PrivateKey,
+		Public:  *conf.PublicKey,
+	}
+	params.WaitTimeout = conf.WaitTimeout.Duration
+	params.Location = conf.Location
+	params.PrivateAddr = conf.PrivateAddr
+	params.DebugTeams = conf.DebugTeams
+	params.AdminAgentPublicKey = conf.AdminAgentPublicKey
 	srv, err := identity.NewServer(
-		identity.ServerParams{
-			Store:             database.Store(),
-			ProviderDataStore: database.ProviderDataStore(),
-			MeetingStore:      database.MeetingStore(),
-			RootKeyStore: database.BakeryRootKeyStore(mgorootkeystore.Policy{
-				ExpiryDuration: 365 * 24 * time.Hour,
-			}),
-			AuthUsername: conf.AuthUsername,
-			AuthPassword: conf.AuthPassword,
-			Key: &bakery.KeyPair{
-				Private: *conf.PrivateKey,
-				Public:  *conf.PublicKey,
-			},
-			IdentityProviders:       idps,
-			WaitTimeout:             conf.WaitTimeout.Duration,
-			Location:                conf.Location,
-			PrivateAddr:             conf.PrivateAddr,
-			DebugTeams:              conf.DebugTeams,
-			AdminAgentPublicKey:     conf.AdminAgentPublicKey,
-			StaticFileSystem:        http.Dir(filepath.Join(*resourcePath, "static")),
-			Template:                t,
-			DebugStatusCheckerFuncs: database.DebugStatusCheckerFuncs(),
-		},
+		params,
 		identity.V1,
 		identity.Debug,
 		identity.Discharger,
@@ -145,6 +188,7 @@ func serve(confPath string) error {
 		return errgo.Notef(err, "cannot create new server at %q", conf.APIAddr)
 	}
 	defer srv.Close()
+
 	// Cast the Server to an http.Handler so that it can be
 	// optionally wrapped by the logging handler below.
 	var server http.Handler = srv
