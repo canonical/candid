@@ -4,6 +4,7 @@ package v1_test
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	jc "github.com/juju/testing/checkers"
@@ -12,10 +13,11 @@ import (
 	"gopkg.in/juju/idmclient.v1"
 	"gopkg.in/juju/idmclient.v1/params"
 	"gopkg.in/macaroon-bakery.v2/bakery"
+	"gopkg.in/macaroon-bakery.v2/httpbakery"
 	macaroon "gopkg.in/macaroon.v2"
 
 	"github.com/CanonicalLtd/blues-identity/idp"
-	idptest "github.com/CanonicalLtd/blues-identity/idp/test"
+	testidp "github.com/CanonicalLtd/blues-identity/idp/test"
 	"github.com/CanonicalLtd/blues-identity/internal/auth"
 	"github.com/CanonicalLtd/blues-identity/internal/discharger"
 	"github.com/CanonicalLtd/blues-identity/internal/identity"
@@ -40,7 +42,7 @@ func (s *usersSuite) SetUpTest(c *gc.C) {
 	// Ensure that there's an identity provider for the test identities
 	// we add so that group resolution on test identities works correctly.
 	s.Params.IdentityProviders = []idp.IdentityProvider{
-		idptest.NewIdentityProvider(idptest.Params{
+		testidp.NewIdentityProvider(testidp.Params{
 			Name:   "test",
 			Domain: "test",
 			GetGroups: func(id *store.Identity) ([]string, error) {
@@ -98,8 +100,10 @@ func (s *usersSuite) TestUserErrors(c *gc.C) {
 }
 
 var (
-	pk1 = bakery.MustGenerateKey().Public
-	pk2 = bakery.MustGenerateKey().Public
+	privKey1 = bakery.MustGenerateKey()
+	pk1      = privKey1.Public
+	privKey2 = bakery.MustGenerateKey()
+	pk2      = privKey2.Public
 )
 
 var setUserTests = []struct {
@@ -213,14 +217,141 @@ var setUserTests = []struct {
 	},
 }}
 
+func (s *usersSuite) TestCreateAgent(c *gc.C) {
+	client, err := idmclient.New(idmclient.NewParams{
+		BaseURL: s.URL,
+		Client: &httpbakery.Client{
+			Client: httpbakery.NewHTTPClient(),
+			InteractionMethods: []httpbakery.Interactor{testidp.Interactor{
+				User: &params.User{
+					Username:   "bob",
+					ExternalID: "test:bob",
+					IDPGroups:  []string{"testgroup"},
+				},
+			}},
+		},
+	})
+	c.Assert(err, gc.Equals, nil)
+	resp, err := client.CreateAgent(s.Ctx, &params.CreateAgentRequest{
+		CreateAgentBody: params.CreateAgentBody{
+			FullName:   "my agent",
+			PublicKeys: []*bakery.PublicKey{&pk1},
+		},
+	})
+	c.Assert(err, gc.Equals, nil)
+	if !strings.HasPrefix(string(resp.Username), "a-") {
+		c.Errorf("unexpected agent username %q", resp.Username)
+	}
+	agentClient, err := idmclient.New(idmclient.NewParams{
+		BaseURL: s.URL,
+		Client: &httpbakery.Client{
+			Client: httpbakery.NewHTTPClient(),
+			Key:    privKey1,
+		},
+		AgentUsername: string(resp.Username),
+	})
+	c.Assert(err, gc.Equals, nil)
+
+	whoAmIResp, err := agentClient.WhoAmI(s.Ctx, nil)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(whoAmIResp.User, gc.Equals, string(resp.Username))
+
+	groups, err := agentClient.UserGroups(s.Ctx, &params.UserGroupsRequest{
+		Username: resp.Username,
+	})
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(groups, gc.HasLen, 0)
+}
+
+func (s *usersSuite) TestCreateAgentAsAgent(c *gc.C) {
+	client := s.IdentityClient(c, "testagent@idm", "testgroup")
+	_, err := client.CreateAgent(s.Ctx, &params.CreateAgentRequest{
+		CreateAgentBody: params.CreateAgentBody{
+			FullName:   "my agent",
+			PublicKeys: []*bakery.PublicKey{&pk1},
+		},
+	})
+	c.Assert(err, gc.ErrorMatches, `Post.*: cannot create an agent using an agent account`)
+}
+
+func (s *usersSuite) TestCreateAgentWithGroups(c *gc.C) {
+	client, err := idmclient.New(idmclient.NewParams{
+		BaseURL: s.URL,
+		Client: &httpbakery.Client{
+			Client: httpbakery.NewHTTPClient(),
+			InteractionMethods: []httpbakery.Interactor{testidp.Interactor{
+				User: &params.User{
+					Username:   "bob",
+					ExternalID: "test:bob",
+					IDPGroups:  []string{"g1", "g2", "g3"},
+				},
+			}},
+		},
+	})
+	c.Assert(err, gc.Equals, nil)
+
+	// We can't create agents in groups that aren't in the owner's
+	// group list.
+	resp, err := client.CreateAgent(s.Ctx, &params.CreateAgentRequest{
+		CreateAgentBody: params.CreateAgentBody{
+			PublicKeys: []*bakery.PublicKey{&pk1},
+			Groups:     []string{"g1", "other", "g2"},
+		},
+	})
+	c.Assert(err, gc.ErrorMatches, `Post .*: cannot add agent to groups that you are not a member of`)
+
+	// We can create agents in groups that are a subset of the
+	// owner's groups.
+	resp, err = client.CreateAgent(s.Ctx, &params.CreateAgentRequest{
+		CreateAgentBody: params.CreateAgentBody{
+			PublicKeys: []*bakery.PublicKey{&pk1},
+			Groups:     []string{"g1", "g3"},
+		},
+	})
+	c.Assert(err, gc.Equals, nil)
+
+	// If the owner is removed from a group, the agent won't be
+	// in that group any more.
+	err = s.Store.UpdateIdentity(s.Ctx, &store.Identity{
+		Username: "bob",
+		Groups:   []string{"g3"},
+	}, store.Update{
+		store.Groups: store.Set,
+	})
+	c.Assert(err, gc.Equals, nil)
+
+	groups, err := s.adminClient.UserGroups(s.Ctx, &params.UserGroupsRequest{
+		Username: resp.Username,
+	})
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(groups, gc.DeepEquals, []string{"g3"})
+
+	// If the owner is added back to the group, the agent
+	// gets added back too.
+	err = s.Store.UpdateIdentity(s.Ctx, &store.Identity{
+		Username: "bob",
+		Groups:   []string{"g1", "g2", "g3", "g4"},
+	}, store.Update{
+		store.Groups: store.Set,
+	})
+	c.Assert(err, gc.Equals, nil)
+
+	groups, err = s.adminClient.UserGroups(s.Ctx, &params.UserGroupsRequest{
+		Username: resp.Username,
+	})
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(groups, gc.DeepEquals, []string{"g1", "g3"})
+}
+
 func (s *usersSuite) TestSetUser(c *gc.C) {
+	c.Skip("deprecated")
 	for i, test := range setUserTests {
 		c.Logf("\ntest %d. %s", i, test.about)
 		s.clearIdentities(c)
 		for _, u := range test.existing {
 			s.addUser(c, u)
 		}
-		err := s.adminClient.SetUser(s.Ctx, &params.SetUserRequest{
+		err := s.adminClient.SetUserDeprecated(s.Ctx, &params.SetUserRequest{
 			Username: test.username,
 			User:     test.user,
 		})
@@ -298,6 +429,7 @@ var setUserErrorTests = []struct {
 }}
 
 func (s *usersSuite) TestSetUserErrors(c *gc.C) {
+	c.Skip("deprecated setuser")
 	s.addUser(c, params.User{
 		Username:   "jbloggs2",
 		ExternalID: "test:http://example.com/jbloggs2",
@@ -310,7 +442,7 @@ func (s *usersSuite) TestSetUserErrors(c *gc.C) {
 
 	for i, test := range setUserErrorTests {
 		c.Logf("test %d. %s", i, test.about)
-		err := s.adminClient.SetUser(s.Ctx, &params.SetUserRequest{
+		err := s.adminClient.SetUserDeprecated(s.Ctx, &params.SetUserRequest{
 			Username: test.username,
 			User:     test.user,
 		})
@@ -435,7 +567,7 @@ func (s *usersSuite) TestQueryUsersBadLastDischarge(c *gc.C) {
 }
 
 func (s *usersSuite) TestQueryUsersUnauthorized(c *gc.C) {
-	client := s.IdentityClient(c, "bob@admin@idm", "admin@idm", "bob")
+	client := s.IdentityClient(c, "a-bob@idm", "bob")
 	_, err := client.QueryUsers(s.Ctx, &params.QueryUsersRequest{})
 	c.Assert(err, gc.ErrorMatches, `Get http://.*/v1/u?.*: permission denied`)
 }
@@ -776,10 +908,10 @@ func (s *usersSuite) TestUserIDPGroups(c *gc.C) {
 }
 
 func (s *usersSuite) TestWhoAmIWithAuthenticatedUser(c *gc.C) {
-	client := s.IdentityClient(c, "bob", "admin@idm")
+	client := s.IdentityClient(c, "bob@idm")
 	resp, err := client.WhoAmI(s.Ctx, nil)
 	c.Assert(err, gc.Equals, nil)
-	c.Assert(resp.User, gc.Equals, "bob@admin@idm")
+	c.Assert(resp.User, gc.Equals, "bob@idm")
 }
 
 func (s *usersSuite) TestWhoAmIWithNoUser(c *gc.C) {

@@ -19,7 +19,6 @@ import (
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
 	"gopkg.in/macaroon-bakery.v2/httpbakery/agent"
 
-	"github.com/CanonicalLtd/blues-identity/internal/auth"
 	"github.com/CanonicalLtd/blues-identity/internal/idmtest"
 )
 
@@ -30,14 +29,14 @@ type agentSuite struct {
 var _ = gc.Suite(&agentSuite{})
 
 func (s *agentSuite) TestHTTPBakeryAgentDischarge(c *gc.C) {
-	username, key := s.CreateAgent(c, "bob", auth.AdminUsername)
+	key := s.CreateAgent(c, "bob@idm")
 	client := s.Client(nil)
 	client.Key = key
 	err := agent.SetUpAuth(client, &agent.AuthInfo{
 		Key: client.Key,
 		Agents: []agent.Agent{{
 			URL:      s.URL,
-			Username: username,
+			Username: "bob@idm",
 		}},
 	})
 	c.Assert(err, gc.Equals, nil)
@@ -56,11 +55,11 @@ func (s *agentSuite) TestGetAgentDischargeNoCookie(c *gc.C) {
 }
 
 func (s *agentSuite) TestLegacyAgentDischarge(c *gc.C) {
-	username, key := s.CreateAgent(c, "bob", auth.AdminUsername)
+	key := s.CreateAgent(c, "bob@idm")
 	client := s.Client(nil)
 	client.Key = key
 	visitor := &legacyAgentVisitor{
-		username: params.Username(username),
+		username: "bob@idm",
 		pk:       &key.Public,
 		client:   client,
 	}
@@ -74,11 +73,11 @@ func (s *agentSuite) TestLegacyAgentDischarge(c *gc.C) {
 }
 
 func (s *agentSuite) TestLegacyCookieAgentDischarge(c *gc.C) {
-	username, key := s.CreateAgent(c, "bob", auth.AdminUsername)
+	key := s.CreateAgent(c, "bob@idm")
 	client := s.Client(nil)
 	client.Key = key
 	visitor := &legacyAgentVisitor{
-		username: params.Username(username),
+		username: "bob@idm",
 		pk:       &key.Public,
 		client:   client,
 	}

@@ -36,7 +36,7 @@ func main() {
 
 func usage() {
 	fmt.Fprintf(os.Stderr, "Usage of %s:\n", os.Args[0])
-	fmt.Fprintln(os.Stderr, `
+	fmt.Fprint(os.Stderr, `
 Migrate all of the identities from one store to another. Stores are
 specified by a string containing the store type, a colon, and connection
 information specific to the store type. For the -from store the valid
@@ -52,6 +52,7 @@ For "legacy" and "mgo" type stores the connection string is a mgo URL
 (see https://godoc.org/gopkg.in/mgo.v2#Dial). For "postgres" type
 stores the connection string is as documented in
 https://godoc.org/github.com/lib/pq.
+
 `)
 	flag.PrintDefaults()
 }

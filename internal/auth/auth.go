@@ -150,6 +150,10 @@ func (a *Authorizer) aclForOp(ctx context.Context, op bakery.Op) (acl []string, 
 			// Everyone is allowed to discharge, but they must authenticate themselves
 			// first.
 			return []string{identchecker.Everyone}, false, nil
+		case ActionCreateAgent:
+			// Anyone can create an agent, as long as they've authenticated
+			// themselves.
+			return []string{identchecker.Everyone}, false, nil
 		}
 	case kindUser:
 		if name == "" {
@@ -161,11 +165,6 @@ func (a *Authorizer) aclForOp(ctx context.Context, op bakery.Op) (acl []string, 
 		switch op.Action {
 		case ActionRead:
 			return append(acl, username), false, nil
-		case ActionCreateAgent:
-			// Anyone can create an agent owned by themselves;
-			// it's also possible to specifically grant a user or an agent
-			// permission to create other agents.
-			return append(acl, username, "+create-agent@"+username), false, nil
 		case ActionReadAdmin:
 			return acl, false, nil
 		case ActionWriteAdmin:
@@ -324,6 +323,9 @@ func (c identityClient) DeclaredIdentity(ctx context.Context, declared map[strin
 // An Identity is the implementation of identchecker.Identity used in the
 // identity server.
 type Identity struct {
+	// Initially id is populated only with the Username field,
+	// but calls that require more information call Identity.lookup
+	// which fills out the rest.
 	id             store.Identity
 	authorizer     *Authorizer
 	resolvedGroups []string
@@ -381,6 +383,16 @@ func (id *Identity) Groups(ctx context.Context) ([]string, error) {
 		}
 	}
 	return groups, nil
+}
+
+// StoreIdentity returns the store identity document.
+// Callers must not mutate the contents of the returned
+// value.
+func (id *Identity) StoreIdentity(ctx context.Context) (*store.Identity, error) {
+	if err := id.lookup(ctx); err != nil {
+		return nil, errgo.Mask(err)
+	}
+	return &id.id, nil
 }
 
 func (id *Identity) lookup(ctx context.Context) error {
@@ -515,7 +527,7 @@ type idpGroupResolver struct {
 func (r idpGroupResolver) resolveGroups(ctx context.Context, id *store.Identity) ([]string, error) {
 	groups, err := r.idp.GetGroups(ctx, id)
 	if err != nil {
-		// if we couldn't get the groups just return the ones stored in the database.
+		// We couldn't get the groups, so return only those stored in the database.
 		return id.Groups, errgo.Mask(err)
 	}
 	return uniqueStrings(append(groups, id.Groups...)), nil

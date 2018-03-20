@@ -222,6 +222,9 @@ var aclForOpTests = []struct {
 	expect:       []string{identchecker.Everyone},
 	expectPublic: true,
 }, {
+	op:     auth.GlobalOp("createAgent"),
+	expect: []string{identchecker.Everyone},
+}, {
 	op: op("global-foo", "login"),
 }, {
 	op: auth.GlobalOp("unknown"),
@@ -232,9 +235,6 @@ var aclForOpTests = []struct {
 }, {
 	op:     auth.UserOp("bob", "read"),
 	expect: append([]string{"bob"}, auth.AdminACL...),
-}, {
-	op:     auth.UserOp("bob", "createAgent"),
-	expect: append([]string{"bob", "+create-agent@bob"}, auth.AdminACL...),
 }, {
 	op:     auth.UserOp("bob", "readAdmin"),
 	expect: auth.AdminACL,

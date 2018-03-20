@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 
 	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
@@ -62,6 +63,7 @@ type ServerSuite struct {
 	adminAgentKey     *bakery.KeyPair
 	closeStore        func()
 	closeMeetingStore func()
+	agentID           int
 }
 
 // SetUpTest creates a new identity server and serves it. The server is
@@ -179,23 +181,28 @@ func (s *ServerSuite) AdminIdentityClient(c *gc.C) *idmclient.Client {
 }
 
 // CreateAgent creates a new agent user in the identity server's store
-// with the given name owner and groups. The agent's username and key are
+// with the given name and groups. The agent's username and key are
 // returned.
-func (s *ServerSuite) CreateAgent(c *gc.C, name, owner string, groups ...string) (string, *bakery.KeyPair) {
+//
+// The agent will be owned by admin@idm.
+func (s *ServerSuite) CreateAgent(c *gc.C, username string, groups ...string) *bakery.KeyPair {
 	key, err := bakery.GenerateKey()
 	c.Assert(err, gc.Equals, nil)
-	username := name + "@" + owner
+	name := strings.TrimSuffix(username, "@idm")
+	if name == username {
+		c.Fatalf("agent username must end in @idm")
+	}
 	err = s.Params.Store.UpdateIdentity(
 		context.Background(),
 		&store.Identity{
-			ProviderID: store.MakeProviderIdentity("idm", username),
+			ProviderID: store.MakeProviderIdentity("idm", name),
 			Username:   username,
 			Groups:     groups,
 			PublicKeys: []bakery.PublicKey{
 				key.Public,
 			},
 			ProviderInfo: map[string][]string{
-				"owner": {owner},
+				"owner": {string(auth.AdminProviderID), auth.AdminUsername},
 			},
 		},
 		store.Update{
@@ -206,7 +213,7 @@ func (s *ServerSuite) CreateAgent(c *gc.C, name, owner string, groups ...string)
 		},
 	)
 	c.Assert(err, gc.Equals, nil)
-	return username, key
+	return key
 }
 
 // CreateUser creates a new user in the identity server's store with the
@@ -228,11 +235,12 @@ func (s *ServerSuite) CreateUser(c *gc.C, name string, groups ...string) string 
 	return name
 }
 
-// IdentityClient creates a new agent with the given name, owner and
-// groups and then creates an idmclient.Client which authenticates using
-// that agent.
-func (s *ServerSuite) IdentityClient(c *gc.C, name, owner string, groups ...string) *idmclient.Client {
-	username, key := s.CreateAgent(c, name, owner, groups...)
+// IdentityClient creates a new agent with the given username
+// (which must end in @idm) and groups and then creates an
+// idmclient.Client
+// which authenticates using that agent.
+func (s *ServerSuite) IdentityClient(c *gc.C, username string, groups ...string) *idmclient.Client {
+	key := s.CreateAgent(c, username, groups...)
 	client, err := idmclient.New(idmclient.NewParams{
 		BaseURL: s.URL,
 		Client: &httpbakery.Client{

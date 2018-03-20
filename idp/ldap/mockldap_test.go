@@ -6,9 +6,10 @@ import (
 	"crypto/tls"
 	"fmt"
 
-	idpldap "github.com/CanonicalLtd/blues-identity/idp/ldap"
 	"gopkg.in/asn1-ber.v1"
 	"gopkg.in/ldap.v2"
+
+	idpldap "github.com/CanonicalLtd/blues-identity/idp/ldap"
 )
 
 type mockLDAPDialer struct {

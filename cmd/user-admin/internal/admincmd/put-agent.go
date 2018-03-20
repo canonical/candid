@@ -6,25 +6,25 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"strings"
 
 	"github.com/juju/cmd"
 	"github.com/juju/gnuflag"
 	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/juju/idmclient.v1"
 	"gopkg.in/juju/idmclient.v1/params"
 	"gopkg.in/macaroon-bakery.v2/bakery"
 	"gopkg.in/macaroon-bakery.v2/httpbakery/agent"
+
+	"github.com/CanonicalLtd/blues-identity/internal/auth"
 )
 
 type putAgentCommand struct {
 	idmCommand
-	agentName string
-	groups    []string
-	agentFile string
-	noPut     bool
-	publicKey *bakery.PublicKey
+	groups        []string
+	agentFile     string
+	agentFullName string
+	admin         bool
+	publicKey     *bakery.PublicKey
 }
 
 func newPutAgentCommand() cmd.Command {
@@ -37,16 +37,14 @@ The put-agent command creates or updates an agent user.
 An agent user has an associated public key - the private key pair can
 be used to authenticate as that agent.
 
-The agent user name is of the form $agentname@$username where $agentname
-is a name chosen for the agent and $username is the user that "owns" the
-agent. If the specified agent name does not contain any @ characters,
-the currently authenticated user will be used for $username.
+The name of the agent is chosen by the identity manager itself
+and is written to the agent file.
 
 The agent will be made a member of any of the specified groups as long
 as the currently authenticated user is a member of those groups.
 
-If a key is not specified with the -k flag, a new key will be generated
-unless one is found from the agent file (see below).
+A new key will be generated unless a key is specified with the -k
+flag or a key is found in the agent file (see below).
 
 If the --agent-file flag is specified, the specified file will be updated with
 the new agent information, otherwise the new agent information will be
@@ -57,7 +55,7 @@ this information will be missing the private key.
 func (c *putAgentCommand) Info() *cmd.Info {
 	return &cmd.Info{
 		Name:    "put-agent",
-		Args:    "agent-username [group...]",
+		Args:    "[group...]",
 		Purpose: "create or update an agent user",
 		Doc:     putAgentDoc,
 	}
@@ -69,15 +67,12 @@ func (c *putAgentCommand) SetFlags(f *gnuflag.FlagSet) {
 	publicKeyVar(f, &c.publicKey, "public-key", "")
 	f.StringVar(&c.agentFile, "f", "", "agent file to update")
 	f.StringVar(&c.agentFile, "agent-file", "", "")
-	f.BoolVar(&c.noPut, "n", false, "do not actually create the agent on the identity manager")
+	f.BoolVar(&c.admin, "admin", false, "generate an agent file for the admin user; does not contact the identity manager service")
+	f.StringVar(&c.agentFullName, "name", "", "name of agent")
 }
 
 func (c *putAgentCommand) Init(args []string) error {
-	if len(args) < 1 {
-		return errgo.Newf("missing agent username argument")
-	}
-	c.agentName = args[0]
-	c.groups = args[1:]
+	c.groups = args
 	if c.agentFile != "" && c.publicKey != nil {
 		return errgo.Newf("cannot specify public key and an agent file")
 	}
@@ -87,10 +82,6 @@ func (c *putAgentCommand) Init(args []string) error {
 func (c *putAgentCommand) Run(cmdctx *cmd.Context) error {
 	ctx := context.Background()
 	client, err := c.Client(cmdctx)
-	if err != nil {
-		return errgo.Mask(err)
-	}
-	agentName, owner, err := inferAgentName(ctx, client, c.agentName)
 	if err != nil {
 		return errgo.Mask(err)
 	}
@@ -118,17 +109,21 @@ func (c *putAgentCommand) Run(cmdctx *cmd.Context) error {
 	case c.publicKey == nil:
 		c.publicKey = &key.Public
 	}
-	if !c.noPut {
-		if err := client.SetUser(ctx, &params.SetUserRequest{
-			Username: agentName,
-			User: params.User{
-				Owner:      owner,
-				IDPGroups:  c.groups,
+	var username params.Username
+	if c.admin {
+		username = auth.AdminUsername
+	} else {
+		resp, err := client.CreateAgent(ctx, &params.CreateAgentRequest{
+			CreateAgentBody: params.CreateAgentBody{
+				FullName:   c.agentFullName,
+				Groups:     c.groups,
 				PublicKeys: []*bakery.PublicKey{c.publicKey},
 			},
-		}); err != nil {
+		})
+		if err != nil {
 			return errgo.Mask(err)
 		}
+		username = resp.Username
 	}
 	if agents != nil {
 		if agents.Key == nil {
@@ -136,19 +131,18 @@ func (c *putAgentCommand) Run(cmdctx *cmd.Context) error {
 		}
 		agents.Agents = append(agents.Agents, agent.Agent{
 			URL:      client.Client.BaseURL,
-			Username: string(agentName),
+			Username: string(username),
 		})
-
 		if err := writeAgentFile(cmdctx.AbsPath(c.agentFile), agents); err != nil {
 			return errgo.Mask(err)
 		}
-		fmt.Fprintf(cmdctx.Stdout, "updated agent %s for %s in %s\n", agentName, client.Client.BaseURL, c.agentFile)
+		fmt.Fprintf(cmdctx.Stdout, "added agent %s for %s to %s\n", username, client.Client.BaseURL, c.agentFile)
 		return nil
 	}
 	agentsData := &agent.AuthInfo{
 		Agents: []agent.Agent{{
 			URL:      client.Client.BaseURL,
-			Username: string(agentName),
+			Username: string(username),
 		}},
 	}
 	if key != nil {
@@ -165,19 +159,4 @@ func (c *putAgentCommand) Run(cmdctx *cmd.Context) error {
 	data = append(data, '\n')
 	cmdctx.Stdout.Write(data)
 	return nil
-}
-
-// inferAgentName infers the agent name if it's not already fully specified,
-// and returns the inferred name and the agent's owner.
-func inferAgentName(ctx context.Context, client *idmclient.Client, agentName0 string) (agentName, owner params.Username, err error) {
-	agentName = params.Username(agentName0)
-	if i := strings.Index(string(agentName), "@"); i >= 0 {
-		return agentName, agentName[i+1:], nil
-	}
-	r, err := client.WhoAmI(ctx, &params.WhoAmIRequest{})
-	if err != nil {
-		return "", "", errgo.Notef(err, "cannot retrieve current user name")
-	}
-	owner = params.Username(r.User)
-	return agentName + "@" + owner, owner, nil
 }
