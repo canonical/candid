@@ -237,7 +237,7 @@ func (s *ldapSuite) TestHandle(c *gc.C) {
 	})
 }
 
-func (s *ldapSuite) TestHandleCustomUserfilter(c *gc.C) {
+func (s *ldapSuite) TestHandleCustomUserFilter(c *gc.C) {
 	params := s.getSampleParams()
 	params.UserQueryFilter = "(customAttr=customValue)"
 	sampleDB := s.getSampleLdapDB()
@@ -289,7 +289,7 @@ func (s *ldapSuite) TestHandleUserDetailsCustomIDAttr(c *gc.C) {
 }
 
 func (s *ldapSuite) TestHandleWithGroups(c *gc.C) {
-	groups := []ldapDoc{{
+	docs := []ldapDoc{{
 		"dn":          {"cn=group1,ou=users,dc=example,dc=com"},
 		"objectClass": {"groupOfNames"},
 		"cn":          {"group1"},
@@ -303,22 +303,24 @@ func (s *ldapSuite) TestHandleWithGroups(c *gc.C) {
 		"cn":          {"group2"},
 		"member":      {"uid=user1,ou=users,dc=example,dc=com"},
 	}}
-	sampleDB := append(s.getSampleLdapDB(), groups...)
+	sampleDB := append(s.getSampleLdapDB(), docs...)
 	i := s.setupIdp(c, s.getSampleParams(), sampleDB)
 	s.makeLoginRequest(c, i, "user1", "pass1")
 	s.AssertLoginSuccess(c, "user1")
-	s.AssertUser(c, &store.Identity{
+	identity := s.AssertUser(c, &store.Identity{
 		ProviderID: store.MakeProviderIdentity(
 			"test", "uid=user1,ou=users,dc=example,dc=com"),
 		Username: "user1",
-		Groups:   []string{"group1", "group2"},
 	})
+	groups, err := i.GetGroups(s.Ctx, identity)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(groups, gc.DeepEquals, []string{"group1", "group2"})
 }
 
 func (s *ldapSuite) TestHandleCustomGroupFilter(c *gc.C) {
 	params := s.getSampleParams()
 	params.GroupQueryFilter = "(&(customAttr=customValue)(user={{.User}}))"
-	groups := []ldapDoc{{
+	docs := []ldapDoc{{
 		"dn":         {"cn=group1,ou=users,dc=example,dc=com"},
 		"customAttr": {"customValue"},
 		"cn":         {"group1"},
@@ -332,16 +334,18 @@ func (s *ldapSuite) TestHandleCustomGroupFilter(c *gc.C) {
 		"cn":         {"group2"},
 		"user":       {"uid=user1,ou=users,dc=example,dc=com"},
 	}}
-	sampleDB := append(s.getSampleLdapDB(), groups...)
+	sampleDB := append(s.getSampleLdapDB(), docs...)
 	i := s.setupIdp(c, params, sampleDB)
 	s.makeLoginRequest(c, i, "user1", "pass1")
 	s.AssertLoginSuccess(c, "user1")
-	s.AssertUser(c, &store.Identity{
+	identity := s.AssertUser(c, &store.Identity{
 		ProviderID: store.MakeProviderIdentity(
 			"test", "uid=user1,ou=users,dc=example,dc=com"),
 		Username: "user1",
-		Groups:   []string{"group1", "group2"},
 	})
+	groups, err := i.GetGroups(s.Ctx, identity)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(groups, gc.DeepEquals, []string{"group1", "group2"})
 }
 
 func (s *ldapSuite) TestHandleFailedLogin(c *gc.C) {

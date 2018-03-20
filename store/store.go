@@ -197,7 +197,9 @@ type Identity struct {
 	Email string
 
 	// Groups contains the stored set of groups of which the identity
-	// is a member.
+	// is a member. This should not be used by identity providers
+	// to store group information acquired at login time (that's
+	// what ProviderInfo is for).
 	Groups []string
 
 	// PublicKeys contains any public keys associated with the

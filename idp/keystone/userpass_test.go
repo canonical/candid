@@ -84,11 +84,16 @@ func (s *userpassSuite) TestKeystoneUserpassIdentityProviderHandleResponse(c *gc
 	rr := httptest.NewRecorder()
 	s.idp.Handle(s.Ctx, rr, req)
 	s.AssertLoginSuccess(c, "testuser@openstack")
-	s.AssertUser(c, &store.Identity{
+	identity := s.AssertUser(c, &store.Identity{
 		ProviderID: store.MakeProviderIdentity("openstack", "abc@openstack"),
 		Username:   "testuser@openstack",
-		Groups:     []string{"abc_project@openstack"},
+		ProviderInfo: map[string][]string{
+			"groups": {"abc_project@openstack"},
+		},
 	})
+	groups, err := s.idp.GetGroups(s.Ctx, identity)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(groups, gc.DeepEquals, []string{"abc_project@openstack"})
 }
 
 func (s *userpassSuite) TestKeystoneUserpassIdentityProviderHandleBadRequest(c *gc.C) {
