@@ -27,6 +27,8 @@ func opForRequest(r interface{}) bakery.Op {
 			return auth.UserOp(r.Owner, auth.ActionCreateAgent)
 		}
 		return auth.UserOp(r.Username, auth.ActionWriteAdmin)
+	case *params.CreateAgentRequest:
+		return auth.GlobalOp(auth.ActionCreateAgent)
 	case *params.UserGroupsRequest:
 		return auth.UserOp(r.Username, auth.ActionReadGroups)
 	case *params.SetUserGroupsRequest:

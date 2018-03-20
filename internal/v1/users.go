@@ -4,6 +4,7 @@ package v1
 
 import (
 	"crypto/md5"
+	"crypto/rand"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -85,98 +86,78 @@ func (h *handler) User(p httprequest.Params, r *params.UserRequest) (*params.Use
 	return h.userFromIdentity(p.Context, &id)
 }
 
-// SetUser creates or updates the user with the given username. If the
+// CreateAgent creates a new agent and returns the newly chosen username
+// for the agent.
+func (h *handler) CreateAgent(p httprequest.Params, u *params.CreateAgentRequest) (*params.CreateAgentResponse, error) {
+	ctx := p.Context
+	pks, err := publicKeys(u.PublicKeys)
+	if err != nil {
+		return nil, errgo.WithCausef(err, params.ErrBadRequest, "")
+	}
+	if len(pks) == 0 {
+		// TODO if a we an endpoint to push/pull public keys, we won't need
+		// to require this any more, because it could be done afterwards
+		// (by someone with permission).
+		return nil, errgo.WithCausef(nil, params.ErrBadRequest, "no public keys specified")
+	}
+	ownerAuthIdentity := identityFromContext(ctx)
+	if ownerAuthIdentity == nil {
+		return nil, errgo.Newf("no identity found (should not happen)")
+	}
+	if err := checkAuthIdentityIsMemberOf(ctx, ownerAuthIdentity, u.Groups); err != nil {
+		return nil, errgo.Mask(err, errgo.Is(params.ErrForbidden))
+	}
+	owner, err := ownerAuthIdentity.StoreIdentity(ctx)
+	if err != nil {
+		return nil, errgo.Notef(err, "cannot find identity for authenticated user")
+	}
+	if owner.ProviderID.Provider() == "idm" && owner.ProviderInfo["owner"] != nil {
+		// The authenticated user is an agent, so we don't allow it to create other agents.
+		// TODO a nicer way to do this check might be to express it as a group
+		// permission - all non-agent users are in the "can create agents" group.
+		// TODO In the future, we might allow agents to create other agents, but
+		// we'll have to work out what to do about hierarchy - if agent A creates
+		// agent B, then A is removed from a group but its owner is still a member
+		// of that group, should B still have access to the group?
+		return nil, errgo.Newf("cannot create an agent using an agent account")
+	}
+	agentName, err := newAgentName()
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
+	identity := &store.Identity{
+		Username:   agentName + "@idm",
+		ProviderID: store.MakeProviderIdentity("idm", agentName),
+		ProviderInfo: map[string][]string{
+			"owner": {string(owner.ProviderID), owner.Username},
+		},
+		Name:       u.FullName,
+		Groups:     u.Groups,
+		PublicKeys: pks,
+	}
+	// TODO add tags to Identity?
+	if err := h.params.Store.UpdateIdentity(p.Context, identity, store.Update{
+		store.Username:     store.Set,
+		store.PublicKeys:   store.Set,
+		store.Groups:       store.Set,
+		store.Name:         store.Set,
+		store.ProviderInfo: store.Set,
+	}); err != nil {
+		return nil, translateStoreError(err)
+	}
+	return &params.CreateAgentResponse{
+		Username: params.Username(identity.Username),
+	}, nil
+}
+
+// SetUserDeprecated creates or updates the user with the given username. If the
 // user already exists then any IDPGroups or SSHKeys specified in the
 // request will be ignored. See SetUserGroups, ModifyUserGroups,
 // SetSSHKeys and DeleteSSHKeys if you wish to manipulate these for a
 // user.
 // TODO change this into a create-agent function.
-func (h *handler) SetUser(p httprequest.Params, u *params.SetUserRequest) error {
-	if err := validateUsername(u); err != nil {
-		return errgo.WithCausef(err, params.ErrForbidden, "")
-	}
-	if u.User.ExternalID != "" {
-		return errgo.WithCausef(nil, params.ErrBadRequest, "external ID provided but not allowed")
-	}
-	if u.User.Username != "" {
-		return errgo.WithCausef(nil, params.ErrBadRequest, "username provided but not allowed")
-	}
-	pks, err := publicKeys(u.User.PublicKeys)
-	if err != nil {
-		return errgo.WithCausef(err, params.ErrBadRequest, "")
-	}
-	identity := store.Identity{
-		Username:   string(u.Username),
-		Name:       u.User.FullName,
-		Email:      u.User.Email,
-		Groups:     u.User.IDPGroups,
-		PublicKeys: pks,
-	}
-	update := store.Update{
-		store.PublicKeys: store.Set,
-		store.Groups:     store.Set,
-	}
-	if u.Owner != "" {
-		// TODO check that groups are a subset of the owner's groups.
-		owner := store.Identity{
-			Username: string(u.Owner),
-		}
-		if err := h.params.Store.Identity(p.Context, &owner); err != nil {
-			if errgo.Cause(err) == store.ErrNotFound {
-				return errgo.WithCausef(nil, params.ErrForbidden, `owner %q must exist`, u.Owner)
-			}
-			return errgo.Mask(err)
-		}
-		identity.ProviderID = store.MakeProviderIdentity("idm", identity.Username)
-		identity.ProviderInfo = map[string][]string{
-			"owner": {string(owner.ProviderID), owner.Username},
-		}
-		update[store.Username] = store.Set
-		update[store.ProviderInfo] = store.Set
-	}
-	if identity.Name != "" {
-		update[store.Name] = store.Set
-	}
-	if identity.Email != "" {
-		update[store.Email] = store.Set
-	}
-	if len(u.User.SSHKeys) > 0 {
-		update[store.ExtraInfo] = store.Push
-		identity.ExtraInfo["sshkeys"] = u.User.SSHKeys
-	}
-	return translateStoreError(h.params.Store.UpdateIdentity(p.Context, &identity, update))
-}
-
-func validateUsername(u *params.SetUserRequest) error {
-	if blacklistUsernames[u.Username] {
-		return errgo.Newf("username %q is reserved", u.Username)
-	}
-	if u.User.Owner != "" && !strings.HasSuffix(string(u.Username), "@"+string(u.User.Owner)) {
-		return errgo.Newf(`%s cannot create user %q (suffix must be "@%s")`, u.User.Owner, u.Username, u.User.Owner)
-	}
-	return nil
-}
-
-func publicKeys(pks []*bakery.PublicKey) ([]bakery.PublicKey, error) {
-	pks2 := make([]bakery.PublicKey, len(pks))
-	for i, pk := range pks {
-		if pk == nil {
-			return nil, errgo.New("null public key provided")
-		}
-		pks2[i] = *pk
-	}
-	return pks2, nil
-}
-
-// gravatarHash calculates the gravatar hash based on the following
-// specification : https://en.gravatar.com/site/implement/hash
-func gravatarHash(s string) string {
-	if s == "" {
-		return ""
-	}
-	hasher := md5.New()
-	hasher.Write([]byte(strings.ToLower(strings.TrimSpace(s))))
-	return fmt.Sprintf("%x", hasher.Sum(nil))
+func (h *handler) SetUserDeprecated(p httprequest.Params, u *params.SetUserRequest) error {
+	return errgo.WithCausef(nil, params.ErrForbidden, "PUT to /u/:username is disabled - please use a newer version of the client")
 }
 
 // WhoAmI returns details of the authenticated user.
@@ -474,6 +455,38 @@ func (h *handler) userFromIdentity(ctx context.Context, id *store.Identity) (*pa
 	}, nil
 }
 
+func validateUsername(u *params.SetUserRequest) error {
+	if blacklistUsernames[u.Username] {
+		return errgo.Newf("username %q is reserved", u.Username)
+	}
+	if u.User.Owner != "" && !strings.HasSuffix(string(u.Username), "@"+string(u.User.Owner)) {
+		return errgo.Newf(`%s cannot create user %q (suffix must be "@%s")`, u.User.Owner, u.Username, u.User.Owner)
+	}
+	return nil
+}
+
+func publicKeys(pks []*bakery.PublicKey) ([]bakery.PublicKey, error) {
+	pks2 := make([]bakery.PublicKey, len(pks))
+	for i, pk := range pks {
+		if pk == nil {
+			return nil, errgo.New("null public key provided")
+		}
+		pks2[i] = *pk
+	}
+	return pks2, nil
+}
+
+// gravatarHash calculates the gravatar hash based on the following
+// specification : https://en.gravatar.com/site/implement/hash
+func gravatarHash(s string) string {
+	if s == "" {
+		return ""
+	}
+	hasher := md5.New()
+	hasher.Write([]byte(strings.ToLower(strings.TrimSpace(s))))
+	return fmt.Sprintf("%x", hasher.Sum(nil))
+}
+
 func translateStoreError(err error) error {
 	var cause error
 	switch errgo.Cause(err) {
@@ -519,4 +532,40 @@ func (h *handler) DischargeTokenForUser(p httprequest.Params, req *params.Discha
 	return params.DischargeTokenForUserResponse{
 		DischargeToken: m,
 	}, nil
+}
+
+// checkAuthIdentityIsMemberOf checks that the given identity is a member
+// of all the given groups.
+func checkAuthIdentityIsMemberOf(ctx context.Context, identity *auth.Identity, groups []string) error {
+	// Note that the admin user is considered a member of all groups.
+	if identity.Id() == auth.AdminUsername {
+		// Admin is a member of all groups by definition.
+		return nil
+	}
+	identityGroups, err := identity.Groups(ctx)
+	if err != nil {
+		return errgo.Notef(err, "cannot get groups for authenticated user")
+	}
+	for _, g := range groups {
+		found := false
+		for _, idg := range identityGroups {
+			if idg == g {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return errgo.WithCausef(nil, params.ErrForbidden, "cannot add agent to groups that you are not a member of")
+		}
+	}
+	return nil
+}
+
+func newAgentName() (string, error) {
+	buf := make([]byte, 16)
+	_, err := rand.Read(buf)
+	if err != nil {
+		return "", errgo.Mask(err)
+	}
+	return fmt.Sprintf("a-%x", buf), nil
 }

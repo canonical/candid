@@ -68,7 +68,6 @@ func new(hParams identity.HandlerParams) func(p httprequest.Params, arg interfac
 type handler struct {
 	params identity.HandlerParams
 
-	h      *handler
 	trace  trace.Trace
 	monReq monitoring.Request
 	close  func()

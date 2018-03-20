@@ -140,7 +140,7 @@ func (srv *server) newHandler(p httprequest.Params) (*handler, context.Context, 
 type handler struct {
 	modifyGroups func(*params.ModifyUserGroupsRequest) error
 	queryUsers   func(*params.QueryUsersRequest) ([]string, error)
-	setUser      func(*params.SetUserRequest) error
+	createAgent  func(*params.CreateAgentRequest) (*params.CreateAgentResponse, error)
 	user         func(*params.UserRequest) (*params.User, error)
 	whoAmI       func(*params.WhoAmIRequest) (*params.WhoAmIResponse, error)
 }
@@ -153,8 +153,8 @@ func (h *handler) QueryUsers(req *params.QueryUsersRequest) ([]string, error) {
 	return h.queryUsers(req)
 }
 
-func (h *handler) SetUser(req *params.SetUserRequest) error {
-	return h.setUser(req)
+func (h *handler) CreateAgent(req *params.CreateAgentRequest) (*params.CreateAgentResponse, error) {
+	return h.createAgent(req)
 }
 
 func (h *handler) User(req *params.UserRequest) (*params.User, error) {

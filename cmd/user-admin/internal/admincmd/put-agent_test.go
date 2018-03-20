@@ -26,9 +26,6 @@ var putAgentUsageTests = []struct {
 	args        []string
 	expectError string
 }{{
-	about:       "no username",
-	expectError: `missing agent username argument`,
-}, {
 	about:       "agent file and agent key specified together",
 	args:        []string{"-k", "S2oglf2m3F7oN6o4d517Y/aRjObgw/S7ZNevIIp+NnQ=", "-f", "foo", "bob"},
 	expectError: `cannot specify public key and an agent file`,
@@ -49,15 +46,17 @@ func (s *putAgentSuite) TestUsage(c *gc.C) {
 	}
 }
 
-func (s *putAgentSuite) TestPutAgentWithGeneratedKeyAndNoAgentsFile(c *gc.C) {
-	var calledReq *params.SetUserRequest
+func (s *putAgentSuite) TestPutAgentWithGeneratedKeyAndAgentFileNotSpecified(c *gc.C) {
+	var calledReq *params.CreateAgentRequest
 	runf := s.RunServer(c, &handler{
-		setUser: func(req *params.SetUserRequest) error {
+		createAgent: func(req *params.CreateAgentRequest) (*params.CreateAgentResponse, error) {
 			calledReq = req
-			return nil
+			return &params.CreateAgentResponse{
+				Username: "a-foo@idm",
+			}, nil
 		},
 	})
-	out := CheckSuccess(c, runf, "put-agent", "-a", "admin.agent", "bob@someone")
+	out := CheckSuccess(c, runf, "put-agent", "--name", "agentname", "-a", "admin.agent")
 	c.Assert(calledReq, gc.NotNil)
 	// The output should be valid input to an agent.Visitor unmarshal.
 	var v agent.AuthInfo
@@ -70,29 +69,30 @@ func (s *putAgentSuite) TestPutAgentWithGeneratedKeyAndNoAgentsFile(c *gc.C) {
 	c.Assert(calledReq.PublicKeys, gc.HasLen, 1)
 	c.Assert(&v.Key.Public, gc.DeepEquals, calledReq.PublicKeys[0])
 	c.Assert(agents[0].URL, gc.Matches, "https://.*")
-	c.Assert(agents[0].Username, gc.Equals, "bob@someone")
+	c.Assert(agents[0].Username, gc.Matches, "a-.+@idm")
 
 	calledReq.PublicKeys = nil
-	c.Assert(calledReq, jc.DeepEquals, &params.SetUserRequest{
-		Username: "bob@someone",
-		User: params.User{
-			Owner: "someone",
+	c.Assert(calledReq, jc.DeepEquals, &params.CreateAgentRequest{
+		CreateAgentBody: params.CreateAgentBody{
+			FullName: "agentname",
 		},
 	})
 }
 
-func (s *putAgentSuite) TestPutAgentWithNonExistentAgentsFile(c *gc.C) {
-	var calledReq *params.SetUserRequest
+func (s *putAgentSuite) TestPutAgentWithNonExistentAgentsFileSpecified(c *gc.C) {
+	var calledReq *params.CreateAgentRequest
 	runf := s.RunServer(c, &handler{
-		setUser: func(req *params.SetUserRequest) error {
+		createAgent: func(req *params.CreateAgentRequest) (*params.CreateAgentResponse, error) {
 			calledReq = req
-			return nil
+			return &params.CreateAgentResponse{
+				Username: "a-foo@idm",
+			}, nil
 		},
 	})
 	agentFile := filepath.Join(c.MkDir(), ".agents")
-	out := CheckSuccess(c, runf, "put-agent", "-a", "admin.agent", "-f", agentFile, "bob@someone")
+	out := CheckSuccess(c, runf, "put-agent", "-a", "admin.agent", "-f", agentFile)
 	c.Assert(calledReq, gc.NotNil)
-	c.Assert(out, gc.Matches, `updated agent bob@someone for https://.* in .+\n`)
+	c.Assert(out, gc.Matches, `added agent a-foo@idm for https://.* to .+\n`)
 
 	v, err := admincmd.ReadAgentFile(agentFile)
 	c.Assert(err, gc.Equals, nil)
@@ -102,28 +102,27 @@ func (s *putAgentSuite) TestPutAgentWithNonExistentAgentsFile(c *gc.C) {
 	c.Assert(calledReq.PublicKeys, gc.HasLen, 1)
 	c.Assert(&v.Key.Public, gc.DeepEquals, calledReq.PublicKeys[0])
 	c.Assert(agents[0].URL, gc.Matches, "https://.*")
-	c.Assert(agents[0].Username, gc.Equals, "bob@someone")
+	c.Assert(agents[0].Username, gc.Equals, "a-foo@idm")
 
 	calledReq.PublicKeys = nil
-	c.Assert(calledReq, jc.DeepEquals, &params.SetUserRequest{
-		Username: "bob@someone",
-		User: params.User{
-			Owner: "someone",
-		},
+	c.Assert(calledReq, jc.DeepEquals, &params.CreateAgentRequest{
+		CreateAgentBody: params.CreateAgentBody{},
 	})
 }
 
 func (s *putAgentSuite) TestPutAgentWithExistingAgentsFile(c *gc.C) {
-	var calledReq *params.SetUserRequest
+	var calledReq *params.CreateAgentRequest
 	runf := s.RunServer(c, &handler{
-		setUser: func(req *params.SetUserRequest) error {
+		createAgent: func(req *params.CreateAgentRequest) (*params.CreateAgentResponse, error) {
 			calledReq = req
-			return nil
+			return &params.CreateAgentResponse{
+				Username: "a-foo@idm",
+			}, nil
 		},
 	})
-	out := CheckSuccess(c, runf, "put-agent", "-a", "admin.agent", "-f", "admin.agent", "bob@someone")
+	out := CheckSuccess(c, runf, "put-agent", "-a", "admin.agent", "-f", "admin.agent", "somegroup")
 	c.Assert(calledReq, gc.NotNil)
-	c.Assert(out, gc.Matches, `updated agent bob@someone for https://.* in .+\n`)
+	c.Assert(out, gc.Matches, `added agent a-foo@idm for https://.* to .+\n`)
 
 	v, err := admincmd.ReadAgentFile(filepath.Join(s.Dir, "admin.agent"))
 	c.Assert(err, gc.Equals, nil)
@@ -133,20 +132,19 @@ func (s *putAgentSuite) TestPutAgentWithExistingAgentsFile(c *gc.C) {
 	c.Assert(calledReq.PublicKeys, gc.HasLen, 1)
 	c.Assert(&v.Key.Public, gc.DeepEquals, calledReq.PublicKeys[0])
 	c.Assert(agents[1].URL, gc.Matches, "https://.*")
-	c.Assert(agents[1].Username, gc.Equals, "bob@someone")
+	c.Assert(agents[1].Username, gc.Equals, "a-foo@idm")
 
 	calledReq.PublicKeys = nil
-	c.Assert(calledReq, jc.DeepEquals, &params.SetUserRequest{
-		Username: "bob@someone",
-		User: params.User{
-			Owner: "someone",
+	c.Assert(calledReq, jc.DeepEquals, &params.CreateAgentRequest{
+		CreateAgentBody: params.CreateAgentBody{
+			Groups: []string{"somegroup"},
 		},
 	})
 }
 
-func (s *putAgentSuite) TestPutAgentWithNFlag(c *gc.C) {
+func (s *putAgentSuite) TestPutAgentWithAdminFlag(c *gc.C) {
 	// With the -n flag, it doesn't contact the idm server at all.
-	out := CheckSuccess(c, s.Run, "put-agent", "-n", "admin@idm")
+	out := CheckSuccess(c, s.Run, "put-agent", "--admin")
 	var v agent.AuthInfo
 	err := json.Unmarshal([]byte(out), &v)
 	c.Assert(err, gc.Equals, nil)
@@ -154,31 +152,4 @@ func (s *putAgentSuite) TestPutAgentWithNFlag(c *gc.C) {
 	c.Assert(agents, gc.HasLen, 1)
 	c.Assert(agents[0].Username, gc.Equals, "admin@idm")
 	c.Assert(agents[0].URL, gc.Equals, idmclient.Production)
-}
-
-func (s *putAgentSuite) TestInferOwner(c *gc.C) {
-	var calledReq *params.SetUserRequest
-	runf := s.RunServer(c, &handler{
-		setUser: func(req *params.SetUserRequest) error {
-			calledReq = req
-			return nil
-		},
-		whoAmI: func(*params.WhoAmIRequest) (*params.WhoAmIResponse, error) {
-			return &params.WhoAmIResponse{
-				User: "nemo",
-			}, nil
-		},
-	})
-	out := CheckSuccess(c, runf, "put-agent", "-a", "admin.agent", "myagent")
-	c.Assert(calledReq, gc.NotNil)
-
-	var v agent.AuthInfo
-	err := json.Unmarshal([]byte(out), &v)
-	c.Assert(err, gc.Equals, nil)
-
-	// Check that the public key looks right.
-	agents := v.Agents
-	c.Assert(agents, gc.HasLen, 1)
-	c.Assert(calledReq.PublicKeys, gc.HasLen, 1)
-	c.Assert(agents[0].Username, gc.Equals, "myagent@nemo")
 }
