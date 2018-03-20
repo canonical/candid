@@ -3,121 +3,131 @@
 package main
 
 import (
+	"database/sql"
 	"flag"
+	"fmt"
 	"log"
 	"os"
-	"strings"
 
+	_ "github.com/lib/pq"
 	"golang.org/x/net/context"
-	"gopkg.in/macaroon-bakery.v2/bakery"
+	errgo "gopkg.in/errgo.v1"
 	mgo "gopkg.in/mgo.v2"
 
-	"github.com/CanonicalLtd/blues-identity/cmd/migrate-db/internal/mongodoc"
+	"github.com/CanonicalLtd/blues-identity/cmd/migrate-db/internal"
 	"github.com/CanonicalLtd/blues-identity/mgostore"
+	"github.com/CanonicalLtd/blues-identity/sqlstore"
 	"github.com/CanonicalLtd/blues-identity/store"
 )
 
 var (
-	server    = flag.String("server", "", "URL of mongodb server.")
-	oldDBName = flag.String("old", "identity", "name of legacy identity database")
-	newDBName = flag.String("new", "idm", "name of identity database")
+	from = flag.String("from", "legacy:mongodb://localhost/identity", "store `specification` to copy the identities from.")
+	to   = flag.String("to", "mgo:mongodb://localhost/idm", "store `specification` to copy the identities to.")
 )
 
 func main() {
+	flag.Usage = usage
 	flag.Parse()
-	s, err := mgo.Dial(*server)
-	if err != nil {
-		log.Printf("cannot connnect to database: %s", err)
+	if err := migrate(context.Background()); err != nil {
+		log.Println(err)
 		os.Exit(1)
 	}
-	defer s.Close()
-	db, err := mgostore.NewDatabase(s.DB(*newDBName))
-	if err != nil {
-		log.Printf("cannot initialize database: %s", err)
-		os.Exit(1)
+}
+
+func usage() {
+	fmt.Fprintf(os.Stderr, "Usage of %s:\n", os.Args[0])
+	fmt.Fprintln(os.Stderr, `
+Migrate all of the identities from one store to another. Stores are
+specified by a string containing the store type, a colon, and connection
+information specific to the store type. For the -from store the valid
+prefixes are:
+
+	"legacy" - old style mgo based store
+	"mgo" - new style mgo based store 
+	"postgres" - postgres based store
+
+The -to store only supports "mgo" and "postgres".
+
+For "legacy" and "mgo" type stores the connection string is a mgo URL
+(see https://godoc.org/gopkg.in/mgo.v2#Dial). For "postgres" type
+stores the connection string is as documented in
+https://godoc.org/github.com/lib/pq.
+`)
+	flag.PrintDefaults()
+}
+
+func migrate(ctx context.Context) error {
+	var source internal.Source
+	type_, addr := internal.SplitStoreSpecification(*from)
+	switch type_ {
+	case "legacy":
+		s, err := mgo.Dial(addr)
+		if err != nil {
+			return errgo.Notef(err, "cannot connnect to mongodb server")
+		}
+		defer s.Close()
+		source = internal.NewLegacySource(s.DB(""))
+	case "mgo":
+		s, err := mgo.Dial(addr)
+		if err != nil {
+			return errgo.Notef(err, "cannot connnect to mongodb server")
+		}
+		defer s.Close()
+		db, err := mgostore.NewDatabase(s.DB(""))
+		if err != nil {
+			return errgo.Notef(err, "cannot initialize mgo store")
+		}
+		defer db.Close()
+		source = internal.NewStoreSource(ctx, db.Store())
+	case "postgres":
+		sqldb, err := sql.Open("postgres", addr)
+		if err != nil {
+			return errgo.Notef(err, "cannot connect to postgresql server")
+		}
+		defer sqldb.Close()
+		db, err := sqlstore.NewDatabase("postgres", sqldb)
+		if err != nil {
+			return errgo.Notef(err, "cannot initialize postgresql database")
+		}
+		defer db.Close()
+		source = internal.NewStoreSource(ctx, db.Store())
+	default:
+		return errgo.Newf("invalid source type %q", type_)
 	}
-	defer db.Close()
-	st := db.Store()
-	ctx, close := st.Context(context.Background())
+
+	var store store.Store
+	type_, addr = internal.SplitStoreSpecification(*to)
+	switch type_ {
+	case "mgo":
+		s, err := mgo.Dial(addr)
+		if err != nil {
+			return errgo.Notef(err, "cannot connnect to mongodb server")
+		}
+		defer s.Close()
+		db, err := mgostore.NewDatabase(s.DB(""))
+		if err != nil {
+			return errgo.Notef(err, "cannot initialize mgo store")
+		}
+		defer db.Close()
+		store = db.Store()
+	case "postgres":
+		sqldb, err := sql.Open("postgres", addr)
+		if err != nil {
+			return errgo.Notef(err, "cannot connect to postgresql server")
+		}
+		defer sqldb.Close()
+		db, err := sqlstore.NewDatabase("postgres", sqldb)
+		if err != nil {
+			return errgo.Notef(err, "cannot initialize postgresql database")
+		}
+		defer db.Close()
+		store = db.Store()
+	default:
+		return errgo.Newf("invalid destination type %q", type_)
+	}
+
+	ctx, close := store.Context(ctx)
 	defer close()
 
-	legacy := s.DB(*oldDBName)
-	it := legacy.C("identities").Find(nil).Iter()
-	var doc mongodoc.Identity
-	for it.Next(&doc) {
-		err := st.UpdateIdentity(ctx, migrateIdentity(&doc), store.Update{
-			store.ProviderID:    store.Set,
-			store.Username:      store.Set,
-			store.Name:          store.Set,
-			store.Email:         store.Set,
-			store.Groups:        store.Set,
-			store.PublicKeys:    store.Set,
-			store.LastLogin:     store.Set,
-			store.LastDischarge: store.Set,
-			store.ProviderInfo:  store.Set,
-			store.ExtraInfo:     store.Set,
-		})
-		if err != nil {
-			log.Printf("cannot update user %s: %s", doc.Username, err)
-		}
-	}
-	err = it.Err()
-	if err != nil {
-		log.Printf("cannot process identities: %s", err)
-		os.Exit(1)
-	}
-}
-
-func migrateIdentity(doc *mongodoc.Identity) *store.Identity {
-	id := &store.Identity{
-		Username:   doc.Username,
-		ProviderID: providerID(doc),
-		Name:       doc.FullName,
-		Email:      doc.Email,
-		Groups:     doc.Groups,
-	}
-	if doc.LastLogin != nil {
-		id.LastLogin = *doc.LastLogin
-	}
-	if doc.LastDischarge != nil {
-		id.LastDischarge = *doc.LastDischarge
-	}
-	for _, k := range doc.PublicKeys {
-		var key bakery.Key
-		copy(key[:], k.Key)
-		id.PublicKeys = append(id.PublicKeys, bakery.PublicKey{key})
-	}
-	if doc.Owner != "" {
-		if doc.Owner == "admin@idm" {
-			id.ProviderInfo = map[string][]string{
-				"owner": {string(store.MakeProviderIdentity("idm", "admin@idm")), "admin@idm"},
-			}
-		} else {
-			log.Printf("unrecognised owner for %s (%q), not migrating", doc.Username, doc.Owner)
-		}
-	}
-	if len(doc.SSHKeys) > 0 {
-		id.ExtraInfo = map[string][]string{
-			"sshkeys": doc.SSHKeys,
-		}
-	}
-	return id
-}
-
-func providerID(doc *mongodoc.Identity) store.ProviderIdentity {
-	if doc.ExternalID == "" {
-		return store.MakeProviderIdentity("idm", doc.Username)
-	}
-	if strings.HasPrefix(doc.ExternalID, "https://login.ubuntu.com/+id") {
-		return store.MakeProviderIdentity("usso", doc.ExternalID)
-	}
-	if strings.HasPrefix(doc.ExternalID, "openid-connect:") {
-		// The only currently used openid provider is azure
-		return store.MakeProviderIdentity("azure", strings.TrimPrefix(doc.ExternalID, "openid-connect:"))
-	}
-	if strings.HasPrefix(doc.ExternalID, "usso-openid:") {
-		return store.MakeProviderIdentity("usso_macaroon", strings.TrimPrefix(doc.ExternalID, "usso-openid:"))
-	}
-	log.Printf("unrecognised external ID: %s", doc.ExternalID)
-	return ""
+	return errgo.Mask(internal.Copy(ctx, store, source))
 }
