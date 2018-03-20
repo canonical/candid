@@ -104,7 +104,8 @@ func (s *Suite) AssertLoginNotComplete(c *gc.C) {
 }
 
 // AssertUser asserts that the specified user is stored in the store.
-func (s *Suite) AssertUser(c *gc.C, id *store.Identity) {
+// It returns the stored identity.
+func (s *Suite) AssertUser(c *gc.C, id *store.Identity) *store.Identity {
 	id1 := store.Identity{
 		ProviderID: id.ProviderID,
 		Username:   id.Username,
@@ -112,6 +113,7 @@ func (s *Suite) AssertUser(c *gc.C, id *store.Identity) {
 	err := s.Store.Identity(s.Ctx, &id1)
 	c.Assert(err, gc.Equals, nil)
 	idmtest.AssertEqualIdentity(c, &id1, id)
+	return &id1
 }
 
 type visitCompleter struct {

@@ -338,18 +338,10 @@ func (idp *identityProvider) loginDN(ctx context.Context, conn ldapConn, dn, pas
 		Name:       name,
 		Email:      email,
 	}
-	groups, err := idp.GetGroups(ctx, id)
-	if err != nil {
-		return nil, errgo.Mask(err)
-	}
-	if len(groups) > 0 {
-		id.Groups = groups
-	}
 	err = idp.initParams.Store.UpdateIdentity(ctx, id, store.Update{
 		store.Username: store.Set,
 		store.Name:     store.Set,
 		store.Email:    store.Set,
-		store.Groups:   store.Push,
 	})
 	if err != nil {
 		return nil, errgo.Mask(err)

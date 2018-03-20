@@ -76,7 +76,9 @@ func (s *tokenSuite) TestKeystoneTokenIdentityProviderHandle(c *gc.C) {
 	s.AssertUser(c, &store.Identity{
 		ProviderID: store.MakeProviderIdentity("openstack", "abc@openstack"),
 		Username:   "testuser@openstack",
-		Groups:     []string{"abc_project@openstack"},
+		ProviderInfo: map[string][]string{
+			"groups": {"abc_project@openstack"},
+		},
 	})
 }
 

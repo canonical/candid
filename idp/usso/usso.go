@@ -204,10 +204,10 @@ func (idp *identityProvider) callback(ctx context.Context, w http.ResponseWriter
 	}
 
 	if err := idp.initParams.Store.UpdateIdentity(ctx, user, store.Update{
-		store.Username: store.Set,
-		store.Name:     store.Set,
-		store.Email:    store.Set,
-		store.Groups:   store.Push,
+		store.Username:     store.Set,
+		store.Name:         store.Set,
+		store.Email:        store.Set,
+		store.ProviderInfo: store.Set,
 	}); err != nil {
 		return errgo.Mask(err)
 	}
@@ -244,7 +244,9 @@ func userFromCallback(r *callbackRequest) (*store.Identity, error) {
 		Username:   r.Nickname,
 		Email:      r.Email,
 		Name:       r.Fullname,
-		Groups:     groups,
+		ProviderInfo: map[string][]string{
+			"groups": groups,
+		},
 	}, nil
 }
 
@@ -252,7 +254,7 @@ func userFromCallback(r *callbackRequest) (*store.Identity, error) {
 // information from launchpad.
 func (idp *identityProvider) GetGroups(_ context.Context, id *store.Identity) ([]string, error) {
 	_, ussoID := id.ProviderID.Split()
-	groups, err := idp.groupCache.Get(ussoID, func() (interface{}, error) {
+	groups0, err := idp.groupCache.Get(ussoID, func() (interface{}, error) {
 		t := time.Now()
 		groups, err := idp.getLaunchpadGroupsNoCache(ussoID)
 		idp.groupMonitor.Observe(float64(time.Since(t)) / float64(time.Microsecond))
@@ -261,7 +263,18 @@ func (idp *identityProvider) GetGroups(_ context.Context, id *store.Identity) ([
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}
-	return groups.([]string), nil
+	groups := groups0.([]string)
+	if len(groups) == 0 {
+		return id.ProviderInfo["groups"], nil
+	}
+	privateGroups := id.ProviderInfo["groups"]
+	if len(privateGroups) == 0 {
+		return groups, nil
+	}
+	allGroups := make([]string, len(groups)+len(privateGroups))
+	copy(allGroups, groups)
+	copy(allGroups[len(groups):], privateGroups)
+	return allGroups, nil
 }
 
 // getLaunchpadGroups tries to fetch the list of teams the user

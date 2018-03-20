@@ -126,10 +126,10 @@ func (idp *identityProvider) SetInteraction(ierr *httpbakery.Error, dischargeID 
 }
 
 //  GetGroups implements idp.IdentityProvider.GetGroups.
-func (*identityProvider) GetGroups(context.Context, *store.Identity) ([]string, error) {
+func (*identityProvider) GetGroups(ctx context.Context, identity *store.Identity) ([]string, error) {
 	// TODO(mhilton) store the token in the identity ProviderInfo and
 	// retrieve groups on demand rather than on login.
-	return nil, nil
+	return identity.ProviderInfo["groups"], nil
 }
 
 // Handle implements idp.IdentityProvider.Handle.
@@ -190,15 +190,17 @@ func (idp *identityProvider) doLogin(ctx context.Context, a keystone.Auth) (*sto
 	user := &store.Identity{
 		ProviderID: store.MakeProviderIdentity(idp.Name(), idp.qualifiedName(resp.Access.User.ID)),
 		Username:   idp.qualifiedName(resp.Access.User.Username),
-		Groups:     groups,
+		ProviderInfo: map[string][]string{
+			"groups": groups,
+		},
 	}
 
 	if err := idp.initParams.Store.UpdateIdentity(
 		ctx,
 		user,
 		store.Update{
-			store.Username: store.Set,
-			store.Groups:   store.Push,
+			store.Username:     store.Set,
+			store.ProviderInfo: store.Set,
 		},
 	); err != nil {
 		return nil, errgo.Notef(err, "cannot update identity")
@@ -240,15 +242,17 @@ func (idp *identityProvider) doLoginV3(ctx context.Context, a keystone.AuthV3) (
 	user := &store.Identity{
 		ProviderID: store.MakeProviderIdentity(idp.Name(), idp.qualifiedName(resp.Token.User.ID)),
 		Username:   idp.qualifiedName(resp.Token.User.Name),
-		Groups:     groups,
+		ProviderInfo: map[string][]string{
+			"groups": groups,
+		},
 	}
 
 	if err := idp.initParams.Store.UpdateIdentity(
 		ctx,
 		user,
 		store.Update{
-			store.Username: store.Set,
-			store.Groups:   store.Push,
+			store.Username:     store.Set,
+			store.ProviderInfo: store.Set,
 		},
 	); err != nil {
 		return nil, errgo.Notef(err, "cannot update identity")
