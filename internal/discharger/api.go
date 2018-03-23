@@ -40,7 +40,7 @@ func NewAPIHandler(params identity.HandlerParams) ([]httprequest.Handler, error)
 		place:   place,
 		reqAuth: reqAuth,
 	}
-	handlers := identity.ReqServer.Handlers(new(handlerParams{
+	handlers := identity.ReqServer.Handlers(handlerCreator(handlerParams{
 		HandlerParams:         params,
 		checker:               checker,
 		dischargeTokenCreator: dt,
@@ -49,7 +49,7 @@ func NewAPIHandler(params identity.HandlerParams) ([]httprequest.Handler, error)
 		reqAuth:               reqAuth,
 	}))
 	d := httpbakery.NewDischarger(httpbakery.DischargerParams{
-		Checker:         checker,
+		CheckerP:        checker,
 		Key:             params.Key,
 		ErrorToResponse: identity.ReqServer.ErrorMapper,
 	})
@@ -76,8 +76,8 @@ type handlerParams struct {
 	reqAuth               *httpauth.Authorizer
 }
 
-// new returns a function that creates new instances of the discharger API handler for a request.
-func new(hParams handlerParams) func(p httprequest.Params, arg interface{}) (*handler, context.Context, error) {
+// handlerCreator returns a function that creates new instances of the discharger API handler for a request.
+func handlerCreator(hParams handlerParams) func(p httprequest.Params, arg interface{}) (*handler, context.Context, error) {
 	return func(p httprequest.Params, arg interface{}) (*handler, context.Context, error) {
 		t := trace.New(p.Request.URL.Path, p.PathPattern)
 		ctx := trace.NewContext(p.Context, t)
