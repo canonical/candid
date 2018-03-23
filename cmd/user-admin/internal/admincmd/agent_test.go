@@ -3,8 +3,6 @@
 package admincmd_test
 
 import (
-	"net/http"
-
 	"golang.org/x/net/context"
 	errgo "gopkg.in/errgo.v1"
 	"gopkg.in/httprequest.v1"
@@ -51,7 +49,7 @@ func NewAgentDischarger() *AgentDischarger {
 	srv := &httprequest.Server{
 		ErrorMapper: httpbakery.ErrorToResponse,
 	}
-	d.Discharger.Checker = httpbakery.ThirdPartyCaveatCheckerFunc(d.CheckThirdPartyCaveat)
+	d.Discharger.CheckerP = d
 	d.Discharger.AddHTTPHandlers([]httprequest.Handler{srv.Handle(d.visit)})
 	return d
 }
@@ -88,14 +86,14 @@ func (d *AgentDischarger) visit(p httprequest.Params, req *agentMacaroonRequest)
 	}, nil
 }
 
-func (d *AgentDischarger) CheckThirdPartyCaveat(ctx context.Context, req *http.Request, info *bakery.ThirdPartyCaveatInfo, token *httpbakery.DischargeToken) ([]checkers.Caveat, error) {
-	if token == nil || token.Kind != "agent" {
-		ierr := httpbakery.NewInteractionRequiredError(nil, req)
+func (d *AgentDischarger) CheckThirdPartyCaveat(ctx context.Context, p httpbakery.ThirdPartyCaveatCheckerParams) ([]checkers.Caveat, error) {
+	if p.Token == nil || p.Token.Kind != "agent" {
+		ierr := httpbakery.NewInteractionRequiredError(nil, p.Request)
 		agent.SetInteraction(ierr, "/login/agent")
 		return nil, ierr
 	}
 	var ms macaroon.Slice
-	if err := ms.UnmarshalBinary(token.Value); err != nil {
+	if err := ms.UnmarshalBinary(p.Token.Value); err != nil {
 		return nil, errgo.Mask(err)
 	}
 	ai, err := d.bakery.Checker.Auth(ms).Allow(ctx, identchecker.LoginOp)

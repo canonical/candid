@@ -427,13 +427,13 @@ func trivialAllow(username string, acl []string) (allow, isTrivial bool) {
 // DomainDischargeOp creates an operation that is discharging the
 // specified domain.
 func DomainDischargeOp(domain string) bakery.Op {
-	return op("domain-"+domain, "discharge")
+	return op("domain-"+domain, ActionDischarge)
 }
 
 // GroupsDischargeOp creates an operation that is discharging as a user
 // in one of the specified groups.
 func GroupsDischargeOp(groups []string) bakery.Op {
-	return op("groups-"+strings.Join(groups, " "), "discharge")
+	return op("groups-"+strings.Join(groups, " "), ActionDischarge)
 }
 
 func UserOp(u params.Username, action string) bakery.Op {

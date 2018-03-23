@@ -39,13 +39,15 @@ func (h *handler) WaitToken(p httprequest.Params, req *waitTokenRequest) (*httpb
 // complete. Discharging caveats will normally be handled by the bakery
 // it would be unusual to use this type directly in client software.
 type waitRequest struct {
-	httprequest.Route `httprequest:"GET /wait"`
+	httprequest.Route `httprequest:"GET /wait-legacy"`
 	DischargeID       string `httprequest:"did,form"`
 }
 
 // Wait serves an HTTP endpoint that waits until a macaroon has been
 // discharged, and returns the discharge macaroon.
-func (h *handler) Wait(p httprequest.Params, req *waitRequest) (*httpbakery.WaitResponse, error) {
+// This is part of the legacy visit-wait protocol; newer clients will use WaitToken
+// instead.
+func (h *handler) WaitLegacy(p httprequest.Params, req *waitRequest) (*httpbakery.WaitResponse, error) {
 	reqInfo, dt, err := h.wait(p.Context, req.DischargeID)
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Any)
@@ -55,7 +57,12 @@ func (h *handler) Wait(p httprequest.Params, req *waitRequest) (*httpbakery.Wait
 		Caveat: reqInfo.Caveat,
 		Key:    h.params.Key,
 		Checker: bakery.ThirdPartyCaveatCheckerFunc(func(ctx context.Context, ci *bakery.ThirdPartyCaveatInfo) ([]checkers.Caveat, error) {
-			return h.params.checker.checkThirdPartyCaveat(ctx, ci, p.Request, dt)
+			return h.params.checker.checkThirdPartyCaveat(ctx, httpbakery.ThirdPartyCaveatCheckerParams{
+				Caveat:   ci,
+				Request:  p.Request,
+				Response: p.Response,
+				Token:    dt,
+			})
 		}),
 	})
 	if err != nil {

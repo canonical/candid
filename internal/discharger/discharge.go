@@ -41,41 +41,44 @@ type thirdPartyCaveatChecker struct {
 // CheckThirdPartyCaveat implements httpbakery.ThirdPartyCaveatChecker.
 // It acquires a handler before checking the caveat, so that we have a
 // database connection for the purpose.
-func (c *thirdPartyCaveatChecker) CheckThirdPartyCaveat(ctx context.Context, ci *bakery.ThirdPartyCaveatInfo, req *http.Request, token *httpbakery.DischargeToken) ([]checkers.Caveat, error) {
-	t := trace.New(req.URL.Path, "")
+func (c *thirdPartyCaveatChecker) CheckThirdPartyCaveat(ctx context.Context, p httpbakery.ThirdPartyCaveatCheckerParams) ([]checkers.Caveat, error) {
+	t := trace.New(p.Request.URL.Path, "")
 	defer t.Finish()
-	return c.checkThirdPartyCaveat(trace.NewContext(ctx, t), ci, req, token)
+	return c.checkThirdPartyCaveat(trace.NewContext(ctx, t), p)
 }
 
 // checkThirdPartyCaveat checks the given caveat. This function is called
 // by the httpbakery discharge logic. See httpbakery.DischargeHandler
 // for futher details.
-func (c *thirdPartyCaveatChecker) checkThirdPartyCaveat(ctx context.Context, ci *bakery.ThirdPartyCaveatInfo, req *http.Request, token *httpbakery.DischargeToken) ([]checkers.Caveat, error) {
-	dischargeID := dischargeID(ci)
+//
+// This is implemented as a separate method so that it can be called from
+// WaitLegacy without nesting the trace context.
+func (c *thirdPartyCaveatChecker) checkThirdPartyCaveat(ctx context.Context, p httpbakery.ThirdPartyCaveatCheckerParams) ([]checkers.Caveat, error) {
+	dischargeID := dischargeID(p.Caveat)
 	ctx = auth.ContextWithDischargeID(ctx, dischargeID)
 	interactionRequiredParams := interactionRequiredParams{
-		req: req,
+		req: p.Request,
 		info: &dischargeRequestInfo{
-			Caveat:    ci.Caveat,
-			CaveatId:  ci.Id,
-			Condition: string(ci.Condition),
-			Origin:    req.Header.Get("Origin"),
+			Caveat:    p.Caveat.Caveat,
+			CaveatId:  p.Caveat.Id,
+			Condition: string(p.Caveat.Condition),
+			Origin:    p.Request.Header.Get("Origin"),
 		},
 		dischargeID: dischargeID,
 	}
 
 	domain := ""
-	if c, err := req.Cookie("domain"); err == nil && names.IsValidUserDomain(c.Value) {
+	if c, err := p.Request.Cookie("domain"); err == nil && names.IsValidUserDomain(c.Value) {
 		domain = c.Value
 	}
-	cond, args, err := checkers.ParseCaveat(string(ci.Condition))
+	cond, args, err := checkers.ParseCaveat(string(p.Caveat.Condition))
 	if err != nil {
-		return nil, errgo.WithCausef(err, params.ErrBadRequest, "cannot parse caveat %q", ci.Condition)
+		return nil, errgo.WithCausef(err, params.ErrBadRequest, "cannot parse caveat %q", p.Caveat.Condition)
 	}
 	var op bakery.Op
 	switch cond {
 	case "is-authenticated-user":
-		op = auth.GlobalOp("discharge")
+		op = auth.GlobalOp(auth.ActionDischarge)
 		if len(args) == 0 {
 			break
 		}
@@ -96,20 +99,21 @@ func (c *thirdPartyCaveatChecker) checkThirdPartyCaveat(ctx context.Context, ci 
 	// TODO add discharge id to context
 
 	var mss []macaroon.Slice
-	if user := req.Form.Get("discharge-for-user"); user != "" {
-		_, err = c.reqAuth.Auth(ctx, req, auth.GlobalOp(auth.ActionDischargeFor))
+	if user := p.Request.Form.Get("discharge-for-user"); user != "" {
+		_, err = c.reqAuth.Auth(ctx, p.Request, auth.GlobalOp(auth.ActionDischargeFor))
 		if err != nil {
 			return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized), isDischargeRequiredError)
 		}
 		ctx = auth.ContextWithUsername(ctx, user)
-	} else if token != nil {
-		mss, err = c.macaroonsFromDischargeToken(ctx, token)
+	} else if p.Token != nil {
+		mss, err = c.macaroonsFromDischargeToken(ctx, p.Token)
 		if err != nil {
 			return nil, errgo.Mask(err)
 		}
-	} else {
-		mss = httpbakery.RequestMacaroons(req)
 	}
+	// Append any macaroons from the request so that we'll take
+	// account of the identity cookie if present.
+	mss = append(mss, httpbakery.RequestMacaroons(p.Request)...)
 
 	authInfo, err := c.params.Authorizer.Auth(ctx, mss, op)
 	if _, ok := errgo.Cause(err).(*bakery.DischargeRequiredError); ok {
@@ -189,14 +193,18 @@ func (c *thirdPartyCaveatChecker) interactionRequiredError(ctx context.Context, 
 		}
 		idp.SetInteraction(ierr, p.dischargeID)
 	}
-	visitURL := c.params.Location + "/login?did=" + p.dischargeID
+	visitParams := "?did=" + p.dischargeID
 	if p.domain != "" {
-		visitURL += "&domain=" + url.QueryEscape(p.domain)
+		visitParams += "&domain=" + url.QueryEscape(p.domain)
 	}
-	waitURL := c.params.Location + "/wait?did=" + p.dischargeID
+	visitURL := c.params.Location + "/login" + visitParams
 	waitTokenURL := c.params.Location + "/wait-token?did=" + p.dischargeID
 	httpbakery.SetWebBrowserInteraction(ierr, visitURL, waitTokenURL)
-	httpbakery.SetLegacyInteraction(ierr, visitURL, waitURL)
+
+	// Set the URLs used by old clients for backward compatibility.
+	legacyVisitURL := c.params.Location + "/login-legacy" + visitParams
+	legacyWaitURL := c.params.Location + "/wait-legacy?did=" + p.dischargeID
+	httpbakery.SetLegacyInteraction(ierr, legacyVisitURL, legacyWaitURL)
 	return ierr
 }
 

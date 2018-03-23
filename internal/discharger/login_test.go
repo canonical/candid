@@ -117,7 +117,7 @@ func (s *loginSuite) TestInteractiveIdentityProviderSelectionWithDomain(c *gc.C)
 }
 
 func (s *loginSuite) TestLoginMethodsIncludesAgent(c *gc.C) {
-	req, err := http.NewRequest("GET", "/login", nil)
+	req, err := http.NewRequest("GET", "/login-legacy", nil)
 	c.Assert(err, gc.Equals, nil)
 	req.Header.Set("Accept", "application/json")
 	resp := s.Do(c, req)
