@@ -1,4 +1,5 @@
 // Copyright 2015 Canonical Ltd.
+// Licensed under the AGPLv3, see LICENCE file for details.
 
 // Package idp defines the API provided by all identity providers.
 package idp

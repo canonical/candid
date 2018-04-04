@@ -1,4 +1,5 @@
 // Copyright 2015 Canonical Ltd.
+// Licensed under the AGPLv3, see LICENCE file for details.
 
 // Pacakge usso is an identity provider that authenticates against Ubuntu
 // SSO using OpenID.

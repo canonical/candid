@@ -1,4 +1,5 @@
 // Copyright 2017 Canonical Ltd.
+// Licensed under the AGPLv3, see LICENCE file for details.
 
 // Package google is an identity provider that authenticates with google.
 package google

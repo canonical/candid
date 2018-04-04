@@ -1,4 +1,5 @@
 // Copyright 2016 Canonical Ltd.
+// Licensed under the AGPLv3, see LICENCE file for details.
 
 // Pacakge ussodischarge is an identity provider that authenticates against
 // Ubuntu SSO using Ubuntu SSO's macaroon protocol.

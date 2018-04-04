@@ -1,4 +1,5 @@
 // Copyright 2017 Canonical Ltd.
+// Licensed under the AGPLv3, see LICENCE file for details.
 
 // Package ldap contains identity providers that validate against ldap
 // servers.

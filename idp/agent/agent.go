@@ -1,4 +1,5 @@
 // Copyright 2015 Canonical Ltd.
+// Licensed under the AGPLv3, see LICENCE file for details.
 
 // Package agent is an identity provider that uses the agent authentication scheme.
 package agent

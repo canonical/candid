@@ -1,4 +1,5 @@
 // Copyright 2014 Canonical Ltd.
+// Licensed under the AGPLv3, see LICENCE file for details.
 
 // The config package defines configuration parameters for the id server.
 package config
