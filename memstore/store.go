@@ -1,4 +1,5 @@
 // Copyright 2017 Canonical Ltd.
+// Licensed under the AGPLv3, see LICENCE file for details.
 
 // Package memstore provides an in-memory implementation of the store.
 // This might be useful for simple test systems.

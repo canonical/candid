@@ -1,4 +1,5 @@
 // Copyright 2017 Canonical Ltd.
+// Licensed under the AGPLv3, see LICENCE file for details.
 
 // Package testing provides useful tools for testing Store
 // implementations.

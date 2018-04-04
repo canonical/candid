@@ -1,4 +1,5 @@
 // Copyright 2015 Canonical Ltd.
+// Licensed under the AGPLv3, see LICENCE file for details.
 
 // Package test contains an identity provider useful for testing other
 // parts of the system. The test identity provider is insecure by design

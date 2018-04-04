@@ -1,4 +1,5 @@
 // Copyright 2014 Canonical Ltd.
+// Licensed under the AGPLv3, see LICENCE file for details.
 
 // Pacakage discharger serves all of the endpoints related to discharging
 // macaroon and logging in.

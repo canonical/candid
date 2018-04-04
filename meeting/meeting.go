@@ -1,4 +1,5 @@
 // Copyright 2014 Canonical Ltd.
+// Licensed under the AGPLv3, see LICENCE file for details.
 
 // Package meeting provides a way for one thread of control
 // to wait for information provided by another thread.

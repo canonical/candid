@@ -1,4 +1,5 @@
 // Copyright 2015 Canonical Ltd.
+// Licensed under the AGPLv3, see LICENCE file for details.
 
 // Package keystone contains identity providers that validate against
 // keystone servers.
