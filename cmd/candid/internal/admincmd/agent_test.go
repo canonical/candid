@@ -5,9 +5,9 @@ package admincmd_test
 
 import (
 	"golang.org/x/net/context"
+	"gopkg.in/CanonicalLtd/candidclient.v1"
 	errgo "gopkg.in/errgo.v1"
 	"gopkg.in/httprequest.v1"
-	"gopkg.in/juju/idmclient.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery"
 	"gopkg.in/macaroon-bakery.v2/bakery/checkers"
 	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
@@ -74,7 +74,7 @@ func (d *AgentDischarger) visit(p httprequest.Params, req *agentMacaroonRequest)
 		p.Context,
 		httpbakery.RequestVersion(p.Request),
 		[]checkers.Caveat{
-			idmclient.UserDeclaration(req.Username),
+			candidclient.UserDeclaration(req.Username),
 			bakery.LocalThirdPartyCaveat(req.PublicKey, httpbakery.RequestVersion(p.Request)),
 		},
 		identchecker.LoginOp,
@@ -102,7 +102,7 @@ func (d *AgentDischarger) CheckThirdPartyCaveat(ctx context.Context, p httpbaker
 		return nil, errgo.Mask(err)
 	}
 	return []checkers.Caveat{
-		idmclient.UserDeclaration(ai.Identity.Id()),
+		candidclient.UserDeclaration(ai.Identity.Id()),
 	}, nil
 }
 

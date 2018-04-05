@@ -9,18 +9,18 @@ import (
 
 	"github.com/juju/schema"
 	"golang.org/x/net/context"
+	"gopkg.in/CanonicalLtd/candidclient.v1/params"
 	"gopkg.in/errgo.v1"
 	gooseidentity "gopkg.in/goose.v1/identity"
 	"gopkg.in/httprequest.v1"
 	"gopkg.in/juju/environschema.v1"
-	"gopkg.in/juju/idmclient.v1/params"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
 	"gopkg.in/macaroon-bakery.v2/httpbakery/form"
 
-	"github.com/CanonicalLtd/blues-identity/config"
-	"github.com/CanonicalLtd/blues-identity/idp"
-	"github.com/CanonicalLtd/blues-identity/idp/idputil"
-	"github.com/CanonicalLtd/blues-identity/idp/keystone/internal/keystone"
+	"github.com/CanonicalLtd/candid/config"
+	"github.com/CanonicalLtd/candid/idp"
+	"github.com/CanonicalLtd/candid/idp/idputil"
+	"github.com/CanonicalLtd/candid/idp/keystone/internal/keystone"
 )
 
 func init() {

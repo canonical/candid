@@ -13,14 +13,14 @@ type MeetingMetrics struct {
 
 func NewMeetingMetrics() *MeetingMetrics {
 	meetingCompleted := prometheus.NewSummary(prometheus.SummaryOpts{
-		Namespace: "blues_identity",
+		Namespace: "candid",
 		Subsystem: "rendevous",
 		Name:      "meetings_completed_times",
 		Help:      "The time between rendevous creation and its completion.",
 	})
 	mustRegisterPrometheusCollector(meetingCompleted)
 	meetingsExpired := prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: "blues_identity",
+		Namespace: "candid",
 		Subsystem: "rendevous",
 		Name:      "meetings_expired_count",
 		Help:      "Count of rendevous which were never completed.",

@@ -12,17 +12,17 @@ import (
 	"github.com/julienschmidt/httprouter"
 	"golang.org/x/net/context"
 	"golang.org/x/net/trace"
+	"gopkg.in/CanonicalLtd/candidclient.v1"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/juju/idmclient.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery"
 	"gopkg.in/macaroon-bakery.v2/bakery/checkers"
 	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
 
-	"github.com/CanonicalLtd/blues-identity/idp"
-	"github.com/CanonicalLtd/blues-identity/internal/auth"
-	"github.com/CanonicalLtd/blues-identity/internal/identity"
-	"github.com/CanonicalLtd/blues-identity/store"
+	"github.com/CanonicalLtd/candid/idp"
+	"github.com/CanonicalLtd/candid/internal/auth"
+	"github.com/CanonicalLtd/candid/internal/identity"
+	"github.com/CanonicalLtd/candid/store"
 )
 
 const (
@@ -77,7 +77,7 @@ type dischargeTokenCreator struct {
 
 func (d *dischargeTokenCreator) DischargeToken(ctx context.Context, dischargeID string, id *store.Identity) (*httpbakery.DischargeToken, error) {
 	cavs := []checkers.Caveat{
-		idmclient.UserDeclaration(id.Username),
+		candidclient.UserDeclaration(id.Username),
 	}
 	if dischargeID != "" {
 		cavs = append(cavs, auth.DischargeIDCaveat(dischargeID))

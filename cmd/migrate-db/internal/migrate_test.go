@@ -13,9 +13,9 @@ import (
 	errgo "gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery"
 
-	"github.com/CanonicalLtd/blues-identity/cmd/migrate-db/internal"
-	"github.com/CanonicalLtd/blues-identity/memstore"
-	"github.com/CanonicalLtd/blues-identity/store"
+	"github.com/CanonicalLtd/candid/cmd/migrate-db/internal"
+	"github.com/CanonicalLtd/candid/memstore"
+	"github.com/CanonicalLtd/candid/store"
 )
 
 type migrateSuite struct {

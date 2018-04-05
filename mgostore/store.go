@@ -12,7 +12,7 @@ import (
 	mgo "gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 
-	"github.com/CanonicalLtd/blues-identity/store"
+	"github.com/CanonicalLtd/candid/store"
 )
 
 const identitiesCollection = "identities"

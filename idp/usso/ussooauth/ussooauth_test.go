@@ -11,12 +11,12 @@ import (
 	gc "gopkg.in/check.v1"
 	"gopkg.in/yaml.v2"
 
-	"github.com/CanonicalLtd/blues-identity/config"
-	"github.com/CanonicalLtd/blues-identity/idp"
-	"github.com/CanonicalLtd/blues-identity/idp/idptest"
-	"github.com/CanonicalLtd/blues-identity/idp/usso/internal/mockusso"
-	"github.com/CanonicalLtd/blues-identity/idp/usso/ussooauth"
-	"github.com/CanonicalLtd/blues-identity/store"
+	"github.com/CanonicalLtd/candid/config"
+	"github.com/CanonicalLtd/candid/idp"
+	"github.com/CanonicalLtd/candid/idp/idptest"
+	"github.com/CanonicalLtd/candid/idp/usso/internal/mockusso"
+	"github.com/CanonicalLtd/candid/idp/usso/ussooauth"
+	"github.com/CanonicalLtd/candid/store"
 )
 
 type ussooauthSuite struct {

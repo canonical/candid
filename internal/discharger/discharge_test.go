@@ -17,20 +17,20 @@ import (
 
 	"github.com/juju/testing/httptesting"
 	"golang.org/x/net/context"
+	"gopkg.in/CanonicalLtd/candidclient.v1/params"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/httprequest.v1"
-	"gopkg.in/juju/idmclient.v1/params"
 	"gopkg.in/macaroon-bakery.v2/bakery"
 	"gopkg.in/macaroon-bakery.v2/bakery/checkers"
 	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
 	"gopkg.in/macaroon.v2"
 
-	"github.com/CanonicalLtd/blues-identity/idp"
-	"github.com/CanonicalLtd/blues-identity/idp/test"
-	"github.com/CanonicalLtd/blues-identity/internal/idmtest"
-	"github.com/CanonicalLtd/blues-identity/store"
+	"github.com/CanonicalLtd/candid/idp"
+	"github.com/CanonicalLtd/candid/idp/test"
+	"github.com/CanonicalLtd/candid/internal/candidtest"
+	"github.com/CanonicalLtd/candid/store"
 )
 
 var groupOp = bakery.Op{"group", "group"}
@@ -38,7 +38,7 @@ var groupOp = bakery.Op{"group", "group"}
 var testContext = context.Background()
 
 type dischargeSuite struct {
-	idmtest.DischargeSuite
+	candidtest.DischargeSuite
 }
 
 var _ = gc.Suite(&dischargeSuite{})
@@ -213,7 +213,7 @@ func (s *dischargeSuite) TestDischargeFromDifferentOriginWhenLoggedIn(c *gc.C) {
 	_, err = s.Discharge(c, "is-authenticated-user", client)
 	c.Assert(err, gc.Equals, nil)
 
-	// Check that we can't discharge using the idm macaroon
+	// Check that we can't discharge using the candid macaroon
 	// when we've got a different origin header.
 	client.Transport = originTransport{client.Transport, "somewhere"}
 	_, err = s.Discharge(c, "is-authenticated-user", client)
@@ -253,8 +253,8 @@ var dischargeForUserTests = []struct {
 }{{
 	about:            "discharge macaroon",
 	condition:        "is-authenticated-user",
-	username:         idmtest.AdminUsername,
-	password:         idmtest.AdminPassword,
+	username:         candidtest.AdminUsername,
+	password:         candidtest.AdminPassword,
 	dischargeForUser: "jbloggs",
 	expectUser:       "jbloggs",
 }, {
@@ -265,50 +265,50 @@ var dischargeForUserTests = []struct {
 }, {
 	about:            "unsupported user",
 	condition:        "is-authenticated-user",
-	username:         idmtest.AdminUsername,
-	password:         idmtest.AdminPassword,
+	username:         candidtest.AdminUsername,
+	password:         candidtest.AdminPassword,
 	dischargeForUser: "jbloggs2",
 	expectErr:        `cannot get discharge from ".*": Post .*/discharge: cannot discharge: could not determine identity: user jbloggs2 not found`,
 }, {
 	about:            "unsupported condition",
 	condition:        "is-authenticated-group",
-	username:         idmtest.AdminUsername,
-	password:         idmtest.AdminPassword,
+	username:         candidtest.AdminUsername,
+	password:         candidtest.AdminPassword,
 	dischargeForUser: "jbloggs",
 	expectErr:        `.*caveat not recognized`,
 }, {
 	about:            "bad credentials",
 	condition:        "is-authenticated-user",
 	username:         "not-admin-username",
-	password:         idmtest.AdminPassword,
+	password:         candidtest.AdminPassword,
 	dischargeForUser: "jbloggs",
 	expectErr:        `cannot get discharge from ".*": Post .*/discharge: cannot discharge: could not determine identity: invalid credentials`,
 }, {
 	about:            "is-authenticated-user with domain",
 	condition:        "is-authenticated-user @test",
-	username:         idmtest.AdminUsername,
-	password:         idmtest.AdminPassword,
+	username:         candidtest.AdminUsername,
+	password:         candidtest.AdminPassword,
 	dischargeForUser: "jbloggs@test",
 	expectUser:       "jbloggs@test",
 }, {
 	about:            "is-authenticated-user with wrong domain",
 	condition:        "is-authenticated-user @test2",
-	username:         idmtest.AdminUsername,
-	password:         idmtest.AdminPassword,
+	username:         candidtest.AdminUsername,
+	password:         candidtest.AdminPassword,
 	dischargeForUser: "jbloggs@test",
 	expectErr:        `cannot get discharge from ".*": Post .*/discharge: cannot discharge: could not determine identity: "jbloggs@test" not in required domain "test2"`,
 }, {
 	about:            "is-authenticated-user with invalid domain",
 	condition:        "is-authenticated-user @test-",
-	username:         idmtest.AdminUsername,
-	password:         idmtest.AdminPassword,
+	username:         candidtest.AdminUsername,
+	password:         candidtest.AdminPassword,
 	dischargeForUser: "jbloggs@test",
 	expectErr:        `cannot get discharge from ".*": Post .*/discharge: cannot discharge: invalid domain "test-"`,
 }, {
 	about:            "invalid caveat",
 	condition:        " invalid caveat",
-	username:         idmtest.AdminUsername,
-	password:         idmtest.AdminPassword,
+	username:         candidtest.AdminUsername,
+	password:         candidtest.AdminPassword,
 	dischargeForUser: "jbloggs@test",
 	expectErr:        `cannot get discharge from ".*": Post .*/discharge: cannot discharge: cannot parse caveat " invalid caveat": caveat starts with space character`,
 }}

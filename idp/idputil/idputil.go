@@ -16,7 +16,7 @@ import (
 	"gopkg.in/httprequest.v1"
 )
 
-var logger = loggo.GetLogger("identity.idp.idputil")
+var logger = loggo.GetLogger("candid.idp.idputil")
 
 var ReservedUsernames = map[string]bool{
 	"admin":    true,

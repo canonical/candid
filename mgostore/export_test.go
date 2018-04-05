@@ -8,7 +8,7 @@ import (
 
 	"golang.org/x/net/context"
 
-	"github.com/CanonicalLtd/blues-identity/meeting"
+	"github.com/CanonicalLtd/candid/meeting"
 )
 
 var PutAtTime = func(ctx context.Context, s meeting.Store, id, address string, now time.Time) error {

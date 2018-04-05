@@ -13,10 +13,10 @@ import (
 	"gopkg.in/macaroon-bakery.v2/bakery"
 	mgo "gopkg.in/mgo.v2"
 
-	"github.com/CanonicalLtd/blues-identity/cmd/migrate-db/internal"
-	"github.com/CanonicalLtd/blues-identity/cmd/migrate-db/internal/mongodoc"
-	"github.com/CanonicalLtd/blues-identity/memstore"
-	"github.com/CanonicalLtd/blues-identity/store"
+	"github.com/CanonicalLtd/candid/cmd/migrate-db/internal"
+	"github.com/CanonicalLtd/candid/cmd/migrate-db/internal/mongodoc"
+	"github.com/CanonicalLtd/candid/memstore"
+	"github.com/CanonicalLtd/candid/store"
 )
 
 type legacySuite struct {

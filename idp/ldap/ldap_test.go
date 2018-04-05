@@ -12,10 +12,10 @@ import (
 	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
 
-	"github.com/CanonicalLtd/blues-identity/idp"
-	"github.com/CanonicalLtd/blues-identity/idp/idptest"
-	"github.com/CanonicalLtd/blues-identity/idp/ldap"
-	"github.com/CanonicalLtd/blues-identity/store"
+	"github.com/CanonicalLtd/candid/idp"
+	"github.com/CanonicalLtd/candid/idp/idptest"
+	"github.com/CanonicalLtd/candid/idp/ldap"
+	"github.com/CanonicalLtd/candid/store"
 )
 
 type ldapSuite struct {

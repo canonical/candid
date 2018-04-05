@@ -1,7 +1,7 @@
 // Copyright 2017 Canonical Ltd.
 // Licensed under the AGPLv3, see LICENCE file for details.
 
-package idmtest
+package candidtest
 
 import (
 	"github.com/google/go-cmp/cmp"
@@ -10,9 +10,9 @@ import (
 	gc "gopkg.in/check.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery"
 
-	"github.com/CanonicalLtd/blues-identity/meeting"
-	"github.com/CanonicalLtd/blues-identity/memstore"
-	"github.com/CanonicalLtd/blues-identity/store"
+	"github.com/CanonicalLtd/candid/meeting"
+	"github.com/CanonicalLtd/candid/memstore"
+	"github.com/CanonicalLtd/candid/store"
 )
 
 // A StoreSuite is a test suite that initializes a store.Store,

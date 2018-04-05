@@ -1,5 +1,5 @@
 # Copyright 2016 Canonical Ltd.
-# Makefile for the idm snap.
+# Makefile for the candidsrv snap.
 
 snap:
 	snapcraft

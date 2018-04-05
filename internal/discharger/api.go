@@ -9,17 +9,17 @@ import (
 	"github.com/juju/loggo"
 	"golang.org/x/net/context"
 	"golang.org/x/net/trace"
+	"gopkg.in/CanonicalLtd/candidclient.v1/params"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/httprequest.v1"
-	"gopkg.in/juju/idmclient.v1/params"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
 
-	"github.com/CanonicalLtd/blues-identity/internal/auth/httpauth"
-	"github.com/CanonicalLtd/blues-identity/internal/identity"
-	"github.com/CanonicalLtd/blues-identity/internal/monitoring"
+	"github.com/CanonicalLtd/candid/internal/auth/httpauth"
+	"github.com/CanonicalLtd/candid/internal/identity"
+	"github.com/CanonicalLtd/candid/internal/monitoring"
 )
 
-var logger = loggo.GetLogger("identity.internal.discharger")
+var logger = loggo.GetLogger("candid.internal.discharger")
 
 // NewAPIHandler is an identity.NewAPIHandlerFunc.
 func NewAPIHandler(params identity.HandlerParams) ([]httprequest.Handler, error) {
@@ -31,7 +31,7 @@ func NewAPIHandler(params identity.HandlerParams) ([]httprequest.Handler, error)
 	vc := &visitCompleter{
 		params:                params,
 		dischargeTokenCreator: dt,
-		place: place,
+		place:                 place,
 	}
 	if err := initIDPs(context.Background(), params, dt, vc); err != nil {
 		return nil, errgo.Mask(err)

@@ -7,7 +7,7 @@ import (
 
 	"github.com/juju/cmd"
 
-	"github.com/CanonicalLtd/blues-identity/cmd/user-admin/internal/admincmd"
+	"github.com/CanonicalLtd/candid/cmd/candid/internal/admincmd"
 )
 
 func main() {

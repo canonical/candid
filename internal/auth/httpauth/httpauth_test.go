@@ -7,20 +7,20 @@ import (
 	"net/http"
 
 	"golang.org/x/net/context"
+	"gopkg.in/CanonicalLtd/candidclient.v1/params"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/juju/idmclient.v1/params"
 	"gopkg.in/macaroon-bakery.v2/bakery"
 	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
 
-	"github.com/CanonicalLtd/blues-identity/internal/auth"
-	"github.com/CanonicalLtd/blues-identity/internal/auth/httpauth"
-	"github.com/CanonicalLtd/blues-identity/internal/idmtest"
+	"github.com/CanonicalLtd/candid/internal/auth"
+	"github.com/CanonicalLtd/candid/internal/auth/httpauth"
+	"github.com/CanonicalLtd/candid/internal/candidtest"
 )
 
 type authSuite struct {
-	idmtest.StoreSuite
+	candidtest.StoreSuite
 	oven       *bakery.Oven
 	auth       *auth.Authorizer
 	authorizer *httpauth.Authorizer
@@ -106,7 +106,7 @@ func (s *authSuite) TestAuthorizeMacaroonRequired(c *gc.C) {
 	c.Assert(authInfo, gc.IsNil)
 	c.Assert(errgo.Cause(err), gc.FitsTypeOf, (*httpbakery.Error)(nil))
 	derr := errgo.Cause(err).(*httpbakery.Error)
-	c.Assert(derr.Info.CookieNameSuffix, gc.Equals, "idm")
+	c.Assert(derr.Info.CookieNameSuffix, gc.Equals, "candid")
 	c.Assert(derr.Info.MacaroonPath, gc.Equals, "../")
 	c.Assert(derr.Info.Macaroon, gc.NotNil)
 }

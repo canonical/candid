@@ -18,20 +18,20 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	openid "github.com/yohcop/openid-go"
 	"golang.org/x/net/context"
+	"gopkg.in/CanonicalLtd/candidclient.v1/params"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/httprequest.v1"
-	"gopkg.in/juju/idmclient.v1/params"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
 	"launchpad.net/lpad"
 
-	"github.com/CanonicalLtd/blues-identity/config"
-	"github.com/CanonicalLtd/blues-identity/idp"
-	"github.com/CanonicalLtd/blues-identity/idp/idputil"
-	"github.com/CanonicalLtd/blues-identity/idp/usso/internal/kvnoncestore"
-	"github.com/CanonicalLtd/blues-identity/store"
+	"github.com/CanonicalLtd/candid/config"
+	"github.com/CanonicalLtd/candid/idp"
+	"github.com/CanonicalLtd/candid/idp/idputil"
+	"github.com/CanonicalLtd/candid/idp/usso/internal/kvnoncestore"
+	"github.com/CanonicalLtd/candid/store"
 )
 
-var logger = loggo.GetLogger("identity.idp.usso")
+var logger = loggo.GetLogger("candid.idp.usso")
 
 func init() {
 	config.RegisterIDP("usso", func(func(interface{}) error) (idp.IdentityProvider, error) {
@@ -45,7 +45,7 @@ var IdentityProvider idp.IdentityProvider = &identityProvider{
 	discoveryCache: openid.NewSimpleDiscoveryCache(),
 	groupCache:     cache.New(10 * time.Minute),
 	groupMonitor: prometheus.NewSummary(prometheus.SummaryOpts{
-		Namespace: "blues_identity",
+		Namespace: "candid",
 		Subsystem: "launchpad",
 		Name:      "get_launchpad_groups",
 		Help:      "The duration of launchpad login, /people, and super_teams_collection_link requests.",
@@ -58,6 +58,7 @@ const (
 
 // TODO It should not be necessary to know all the possible
 // groups in advance.
+// TODO move this list into the USSO idp configuration.
 //
 // This list needs to contain any private teams that the system needs to know about.
 const openIdRequestedTeams = "blues-development,charm-beta"

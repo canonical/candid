@@ -15,8 +15,8 @@ import (
 	errgo "gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery"
 
-	"github.com/CanonicalLtd/blues-identity/internal/idmtest"
-	"github.com/CanonicalLtd/blues-identity/store"
+	"github.com/CanonicalLtd/candid/internal/candidtest"
+	"github.com/CanonicalLtd/candid/store"
 )
 
 var pk1 = bakery.MustGenerateKey().Public
@@ -789,7 +789,7 @@ func (s *StoreSuite) TestUpdateIdentity(c *gc.C) {
 		}
 		err = s.Store.Identity(s.ctx, &obtained)
 		c.Assert(err, gc.Equals, nil)
-		idmtest.AssertEqualIdentity(c, &obtained, test.expectIdentity)
+		candidtest.AssertEqualIdentity(c, &obtained, test.expectIdentity)
 	}
 }
 
@@ -1384,7 +1384,7 @@ func (s *StoreSuite) TestFindIdentities(c *gc.C) {
 		c.Assert(err, gc.Equals, nil)
 		c.Assert(len(identities), gc.Equals, len(test.expect))
 		for i, identity := range identities {
-			idmtest.AssertEqualIdentity(c, &identity, &testIdentities[test.expect[i]])
+			candidtest.AssertEqualIdentity(c, &identity, &testIdentities[test.expect[i]])
 		}
 	}
 }

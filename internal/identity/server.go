@@ -15,19 +15,19 @@ import (
 	"github.com/julienschmidt/httprouter"
 	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/net/context"
+	"gopkg.in/CanonicalLtd/candidclient.v1/params"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/httprequest.v1"
-	"gopkg.in/juju/idmclient.v1/params"
 	"gopkg.in/macaroon-bakery.v2/bakery"
 
-	"github.com/CanonicalLtd/blues-identity/idp"
-	"github.com/CanonicalLtd/blues-identity/internal/auth"
-	"github.com/CanonicalLtd/blues-identity/internal/monitoring"
-	"github.com/CanonicalLtd/blues-identity/meeting"
-	"github.com/CanonicalLtd/blues-identity/store"
+	"github.com/CanonicalLtd/candid/idp"
+	"github.com/CanonicalLtd/candid/internal/auth"
+	"github.com/CanonicalLtd/candid/internal/monitoring"
+	"github.com/CanonicalLtd/candid/meeting"
+	"github.com/CanonicalLtd/candid/store"
 )
 
-var logger = loggo.GetLogger("identity.internal.identity")
+var logger = loggo.GetLogger("candid.internal.identity")
 
 // NewAPIHandlerFunc is a function that returns set of httprequest
 // handlers that uses the given Store pool, and server params.

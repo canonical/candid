@@ -11,9 +11,9 @@ import (
 	errgo "gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
 
-	"github.com/CanonicalLtd/blues-identity/config"
-	"github.com/CanonicalLtd/blues-identity/idp"
-	"github.com/CanonicalLtd/blues-identity/store"
+	"github.com/CanonicalLtd/candid/config"
+	"github.com/CanonicalLtd/candid/idp"
+	"github.com/CanonicalLtd/candid/store"
 )
 
 // IdentityProvider is the instance of the agent identity provider.

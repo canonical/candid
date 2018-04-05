@@ -8,14 +8,14 @@ import (
 	"time"
 
 	"golang.org/x/net/context"
+	"gopkg.in/CanonicalLtd/candidclient.v1/params"
 	errgo "gopkg.in/errgo.v1"
-	"gopkg.in/juju/idmclient.v1/params"
 	"gopkg.in/macaroon-bakery.v2/bakery"
 	"gopkg.in/macaroon-bakery.v2/bakery/checkers"
 	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
 
-	"github.com/CanonicalLtd/blues-identity/internal/auth"
+	"github.com/CanonicalLtd/candid/internal/auth"
 )
 
 // An Authorizer is used to authorize HTTP requests.
@@ -65,6 +65,6 @@ func (a *Authorizer) Auth(ctx context.Context, req *http.Request, ops ...bakery.
 		Macaroon:         m,
 		Request:          req,
 		OriginalError:    derr,
-		CookieNameSuffix: "idm",
+		CookieNameSuffix: "candid",
 	})
 }

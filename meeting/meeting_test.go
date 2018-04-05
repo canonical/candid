@@ -16,7 +16,7 @@ import (
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
 
-	"github.com/CanonicalLtd/blues-identity/meeting"
+	"github.com/CanonicalLtd/candid/meeting"
 )
 
 type suite struct {

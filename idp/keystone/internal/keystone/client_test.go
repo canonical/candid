@@ -12,7 +12,7 @@ import (
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
 
-	"github.com/CanonicalLtd/blues-identity/idp/keystone/internal/keystone"
+	"github.com/CanonicalLtd/candid/idp/keystone/internal/keystone"
 )
 
 type clientSuite struct{}

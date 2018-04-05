@@ -6,9 +6,9 @@ package discharger_test
 import (
 	gc "gopkg.in/check.v1"
 
-	"github.com/CanonicalLtd/blues-identity/internal/discharger"
-	"github.com/CanonicalLtd/blues-identity/internal/identity"
-	"github.com/CanonicalLtd/blues-identity/internal/idmtest"
+	"github.com/CanonicalLtd/candid/internal/candidtest"
+	"github.com/CanonicalLtd/candid/internal/discharger"
+	"github.com/CanonicalLtd/candid/internal/identity"
 )
 
 var versions = map[string]identity.NewAPIHandlerFunc{
@@ -16,7 +16,7 @@ var versions = map[string]identity.NewAPIHandlerFunc{
 }
 
 type apiSuite struct {
-	idmtest.StoreServerSuite
+	candidtest.StoreServerSuite
 }
 
 func (s *apiSuite) SetUpTest(c *gc.C) {

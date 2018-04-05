@@ -1,11 +1,11 @@
 # Copyright 2014 Canonical Ltd.
-# Makefile for the identity service.
+# Makefile for the candid identity service.
 
 ifndef GOPATH
 $(warning You need to set up a GOPATH.)
 endif
 
-PROJECT := github.com/CanonicalLtd/blues-identity
+PROJECT := github.com/CanonicalLtd/candid
 PROJECT_DIR := $(shell go list -e -f '{{.Dir}}' $(PROJECT))
 
 GIT_COMMIT := $(shell git rev-parse --verify HEAD)
@@ -42,14 +42,14 @@ build: version/init.go
 check: version/init.go
 	go test $(PROJECT)/...
 
-release: identity-$(GIT_VERSION).tar.xz
+release: candid-$(GIT_VERSION).tar.xz
 
 install: version/init.go
 	go install $(INSTALL_FLAGS) -v $(PROJECT)/...
 
 clean:
-	$(MAKE) -C snap/idm clean
-	$(MAKE) -C snap/user-admin clean
+	$(MAKE) -C snap/candidsrv clean
+	$(MAKE) -C snap/candid clean
 	go clean $(PROJECT)/...
 	-$(RM) version/init.go
 
@@ -81,9 +81,9 @@ format:
 simplify:
 	gofmt -w -l -s .
 
-# Run the identity server.
+# Run the candid server.
 server: install
-	idserver -logging-config INFO cmd/idserver/config.yaml
+	candidsrv -logging-config INFO cmd/candidsrv/config.yaml
 
 # Update the project Go dependencies to the required revision.
 deps: $(GOPATH)/bin/godeps
@@ -99,21 +99,21 @@ version/init.go: version/init.go.tmpl FORCE
 
 # Generate snaps
 snap:
-	$(MAKE) -C snap/idm
-	$(MAKE) -C snap/user-admin
+	$(MAKE) -C snap/candidsrv
+	$(MAKE) -C snap/candid
 
 # Build a release tarball
-identity-$(GIT_VERSION).tar.xz: version/init.go
-	mkdir -p identity-$(GIT_VERSION)/bin
-	GOBIN=$(CURDIR)/identity-$(GIT_VERSION)/bin go install $(INSTALL_FLAGS) -v $(PROJECT)/...
-	mv identity-$(GIT_VERSION)/bin/idserver identity-$(GIT_VERSION)/bin/identity
-	cp -r $(CURDIR)/templates identity-$(GIT_VERSION)
-	cp -r $(CURDIR)/static identity-$(GIT_VERSION)
-	tar cv identity-$(GIT_VERSION) | xz > $@
-	-rm -r identity-$(GIT_VERSION)
+candid-$(GIT_VERSION).tar.xz: version/init.go
+	mkdir -p candid-$(GIT_VERSION)/bin
+	GOBIN=$(CURDIR)/candid-$(GIT_VERSION)/bin go install $(INSTALL_FLAGS) -v $(PROJECT)/...
+	mv candid-$(GIT_VERSION)/bin/candidsrv candid-$(GIT_VERSION)/bin/candidsrv
+	cp -r $(CURDIR)/templates candid-$(GIT_VERSION)
+	cp -r $(CURDIR)/static candid-$(GIT_VERSION)
+	tar cv candid-$(GIT_VERSION) | xz > $@
+	-rm -r candid-$(GIT_VERSION)
 
 
-# Install packages required to develop the identity service and run tests.
+# Install packages required to develop the candid service and run tests.
 APT_BASED := $(shell command -v apt-get >/dev/null; echo $$?)
 sysdeps:
 ifeq ($(APT_BASED),0)
@@ -137,7 +137,7 @@ help:
 	@echo 'make check - Run tests.'
 	@echo 'make install - Install the package.'
 	@echo 'make release - Build a binary tarball of the package.'
-	@echo 'make server - Start the identity server.'
+	@echo 'make server - Start the candid server.'
 	@echo 'make clean - Remove object files from package source directories.'
 	@echo 'make sysdeps - Install the development environment system packages.'
 	@echo 'make deps - Set up the project Go dependencies.'

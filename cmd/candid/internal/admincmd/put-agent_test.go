@@ -8,12 +8,12 @@ import (
 	"path/filepath"
 
 	jc "github.com/juju/testing/checkers"
+	"gopkg.in/CanonicalLtd/candidclient.v1"
+	"gopkg.in/CanonicalLtd/candidclient.v1/params"
 	gc "gopkg.in/check.v1"
-	"gopkg.in/juju/idmclient.v1"
-	"gopkg.in/juju/idmclient.v1/params"
 	"gopkg.in/macaroon-bakery.v2/httpbakery/agent"
 
-	"github.com/CanonicalLtd/blues-identity/cmd/user-admin/internal/admincmd"
+	"github.com/CanonicalLtd/candid/cmd/candid/internal/admincmd"
 )
 
 type putAgentSuite struct {
@@ -144,7 +144,7 @@ func (s *putAgentSuite) TestPutAgentWithExistingAgentsFile(c *gc.C) {
 }
 
 func (s *putAgentSuite) TestPutAgentWithAdminFlag(c *gc.C) {
-	// With the -n flag, it doesn't contact the idm server at all.
+	// With the -n flag, it doesn't contact the candid server at all.
 	out := CheckSuccess(c, s.Run, "put-agent", "--admin")
 	var v agent.AuthInfo
 	err := json.Unmarshal([]byte(out), &v)
@@ -152,5 +152,5 @@ func (s *putAgentSuite) TestPutAgentWithAdminFlag(c *gc.C) {
 	agents := v.Agents
 	c.Assert(agents, gc.HasLen, 1)
 	c.Assert(agents[0].Username, gc.Equals, "admin@idm")
-	c.Assert(agents[0].URL, gc.Equals, idmclient.Production)
+	c.Assert(agents[0].URL, gc.Equals, candidclient.Production)
 }

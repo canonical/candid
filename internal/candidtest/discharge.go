@@ -1,9 +1,9 @@
 // Copyright 2017 Canonical Ltd.
 // Licensed under the AGPLv3, see LICENCE file for details.
 
-// Package idmtest provides suites and functions useful for testing the
+// Package candidtest provides suites and functions useful for testing the
 // identity manager.
-package idmtest
+package candidtest
 
 import (
 	"net/url"
@@ -17,9 +17,9 @@ import (
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
 	macaroon "gopkg.in/macaroon.v2"
 
-	"github.com/CanonicalLtd/blues-identity/internal/discharger"
-	"github.com/CanonicalLtd/blues-identity/internal/identity"
-	"github.com/CanonicalLtd/blues-identity/mgostore"
+	"github.com/CanonicalLtd/candid/internal/discharger"
+	"github.com/CanonicalLtd/candid/internal/identity"
+	"github.com/CanonicalLtd/candid/mgostore"
 )
 
 // A DischargeSuite is a test suite useful for testing discharges.

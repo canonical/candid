@@ -6,9 +6,9 @@ import (
 	gc "gopkg.in/check.v1"
 	errgo "gopkg.in/errgo.v1"
 
-	"github.com/CanonicalLtd/blues-identity/sqlstore"
-	"github.com/CanonicalLtd/blues-identity/store"
-	storetesting "github.com/CanonicalLtd/blues-identity/store/testing"
+	"github.com/CanonicalLtd/candid/sqlstore"
+	"github.com/CanonicalLtd/candid/store"
+	storetesting "github.com/CanonicalLtd/candid/store/testing"
 )
 
 type postgresSuite struct {

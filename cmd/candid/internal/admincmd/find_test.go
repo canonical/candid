@@ -8,8 +8,8 @@ import (
 	"time"
 
 	jc "github.com/juju/testing/checkers"
+	"gopkg.in/CanonicalLtd/candidclient.v1/params"
 	gc "gopkg.in/check.v1"
-	"gopkg.in/juju/idmclient.v1/params"
 )
 
 type findSuite struct {

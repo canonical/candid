@@ -7,7 +7,7 @@ import (
 	gc "gopkg.in/check.v1"
 	"gopkg.in/yaml.v2"
 
-	"github.com/CanonicalLtd/blues-identity/config"
+	"github.com/CanonicalLtd/candid/config"
 )
 
 type azureSuite struct{}

@@ -1,5 +1,4 @@
 *.snap
-snapcraft.yaml
 parts/
 prime/
 stage/

@@ -21,22 +21,22 @@ import (
 
 	"github.com/juju/loggo"
 	"golang.org/x/net/context"
+	"gopkg.in/CanonicalLtd/candidclient.v1/params"
+	"gopkg.in/CanonicalLtd/candidclient.v1/ussodischarge"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/httprequest.v1"
-	"gopkg.in/juju/idmclient.v1/params"
-	"gopkg.in/juju/idmclient.v1/ussodischarge"
 	"gopkg.in/macaroon-bakery.v2/bakery"
 	"gopkg.in/macaroon-bakery.v2/bakery/checkers"
 	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
 
-	"github.com/CanonicalLtd/blues-identity/config"
-	"github.com/CanonicalLtd/blues-identity/idp"
-	"github.com/CanonicalLtd/blues-identity/idp/idputil"
-	"github.com/CanonicalLtd/blues-identity/store"
+	"github.com/CanonicalLtd/candid/config"
+	"github.com/CanonicalLtd/candid/idp"
+	"github.com/CanonicalLtd/candid/idp/idputil"
+	"github.com/CanonicalLtd/candid/store"
 )
 
-var logger = loggo.GetLogger("identity.idp.usso.ussodischarge")
+var logger = loggo.GetLogger("candid.idp.usso.ussodischarge")
 
 const (
 	operationName        = "usso-discharge-login"

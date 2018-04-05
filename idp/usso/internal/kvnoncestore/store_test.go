@@ -10,14 +10,14 @@ import (
 	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
 
-	"github.com/CanonicalLtd/blues-identity/idp/usso/internal/kvnoncestore"
-	"github.com/CanonicalLtd/blues-identity/internal/idmtest"
+	"github.com/CanonicalLtd/candid/idp/usso/internal/kvnoncestore"
+	"github.com/CanonicalLtd/candid/internal/candidtest"
 )
 
 var _ openid.NonceStore = (*kvnoncestore.Store)(nil)
 
 type storeSuite struct {
-	idmtest.StoreSuite
+	candidtest.StoreSuite
 	store *kvnoncestore.Store
 }
 

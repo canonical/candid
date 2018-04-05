@@ -11,8 +11,8 @@ import (
 	"gopkg.in/macaroon-bakery.v2/bakery"
 	mgo "gopkg.in/mgo.v2"
 
-	"github.com/CanonicalLtd/blues-identity/cmd/migrate-db/internal/mongodoc"
-	"github.com/CanonicalLtd/blues-identity/store"
+	"github.com/CanonicalLtd/candid/cmd/migrate-db/internal/mongodoc"
+	"github.com/CanonicalLtd/candid/store"
 )
 
 // A LegacySource is a Source from a legacy mgo store.

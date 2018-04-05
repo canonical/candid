@@ -23,7 +23,7 @@ import (
 
 //go:generate httprequest-generate-client . handler client
 
-var logger = loggo.GetLogger("meeting")
+var logger = loggo.GetLogger("candid.meeting")
 
 var (
 	// pollInterval holds the interval at which the

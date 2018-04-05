@@ -17,14 +17,14 @@ import (
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
 	"gopkg.in/macaroon-bakery.v2/httpbakery/form"
 
-	"github.com/CanonicalLtd/blues-identity/idp"
-	"github.com/CanonicalLtd/blues-identity/idp/keystone"
-	"github.com/CanonicalLtd/blues-identity/idp/keystone/internal/mockkeystone"
-	"github.com/CanonicalLtd/blues-identity/internal/idmtest"
+	"github.com/CanonicalLtd/candid/idp"
+	"github.com/CanonicalLtd/candid/idp/keystone"
+	"github.com/CanonicalLtd/candid/idp/keystone/internal/mockkeystone"
+	"github.com/CanonicalLtd/candid/internal/candidtest"
 )
 
 type dischargeSuite struct {
-	idmtest.DischargeSuite
+	candidtest.DischargeSuite
 	server *mockkeystone.Server
 	params keystone.Params
 }

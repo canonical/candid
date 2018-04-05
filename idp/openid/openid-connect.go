@@ -13,16 +13,16 @@ import (
 	"github.com/coreos/go-oidc"
 	"golang.org/x/net/context"
 	"golang.org/x/oauth2"
+	"gopkg.in/CanonicalLtd/candidclient.v1/params"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/juju/idmclient.v1/params"
 	"gopkg.in/juju/names.v2"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
 
-	"github.com/CanonicalLtd/blues-identity/config"
-	"github.com/CanonicalLtd/blues-identity/idp"
-	"github.com/CanonicalLtd/blues-identity/idp/idputil"
-	"github.com/CanonicalLtd/blues-identity/idp/idputil/secret"
-	"github.com/CanonicalLtd/blues-identity/store"
+	"github.com/CanonicalLtd/candid/config"
+	"github.com/CanonicalLtd/candid/idp"
+	"github.com/CanonicalLtd/candid/idp/idputil"
+	"github.com/CanonicalLtd/candid/idp/idputil/secret"
+	"github.com/CanonicalLtd/candid/store"
 )
 
 func init() {

@@ -10,7 +10,7 @@ Configuration File
 ------------------
 The identity manager loads its configuration at startup from a yaml
 file. In a usual installation this file is stored in
-/etc/blues-identity/config.yaml. An example configuration file is:
+/etc/candid/config.yaml. An example configuration file is:
 
 ```yaml
 api-addr: :8081
@@ -118,7 +118,7 @@ uses a previously obtained UbuntuSSO OAuth token to log in.
 
 The agent identity provider is a custom identity provider that uses
 the agent protocol to log in. See
-https://github.com/CanonicalLtd/blues-identity/blob/master/docs/login.txt
+https://github.com/CanonicalLtd/candid/blob/master/docs/login.txt
 for details on the agent login protocol.
 
 ### Keystone
@@ -228,7 +228,7 @@ authenticate the user.
 
 Charm Configuration
 -------------------
-If the blues-identity charm is being used then most of the parameters
+If the candid charm is being used then most of the parameters
 will be set with sensible defaults.
 
 The charm parameters that must be configured for each deployment are:

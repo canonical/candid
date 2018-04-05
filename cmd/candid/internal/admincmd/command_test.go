@@ -11,16 +11,16 @@ import (
 	"github.com/juju/cmd"
 	"github.com/juju/testing"
 	"golang.org/x/net/context"
+	"gopkg.in/CanonicalLtd/candidclient.v1/params"
 	gc "gopkg.in/check.v1"
 	errgo "gopkg.in/errgo.v1"
 	"gopkg.in/httprequest.v1"
-	"gopkg.in/juju/idmclient.v1/params"
 	"gopkg.in/macaroon-bakery.v2/bakery"
 	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
 	"gopkg.in/macaroon-bakery.v2/httpbakery/agent"
 
-	"github.com/CanonicalLtd/blues-identity/cmd/user-admin/internal/admincmd"
+	"github.com/CanonicalLtd/candid/cmd/candid/internal/admincmd"
 )
 
 type commandSuite struct {
@@ -75,7 +75,7 @@ func (s *commandSuite) RunContext(ctxt *cmd.Context, args ...string) int {
 
 // RunServer returns a RunFunc that starts a new server with the
 // given handlers, creates a new 'admin.agent' file in s.Dir, sets the
-// IDM_URL environment variable to point to the newly created server and
+// CANDID_URL environment variable to point to the newly created server and
 // then runs the given ocmmand line. The command line is expected to
 // contain the required flags to use the admin.agent file for login.
 func (s *commandSuite) RunServer(c *gc.C, handler *handler) func(args ...string) (code int, stdout, stderr string) {
@@ -85,7 +85,7 @@ func (s *commandSuite) RunServer(c *gc.C, handler *handler) func(args ...string)
 		ag := server.adminAgent()
 		err := admincmd.WriteAgentFile(filepath.Join(s.Dir, "admin.agent"), ag)
 		c.Assert(err, gc.Equals, nil)
-		s.PatchEnvironment("IDM_URL", server.Location())
+		s.PatchEnvironment("CANDID_URL", server.Location())
 		return s.Run(args...)
 	}
 }

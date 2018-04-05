@@ -13,14 +13,14 @@ import (
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery"
 
-	"github.com/CanonicalLtd/blues-identity/idp"
-	"github.com/CanonicalLtd/blues-identity/idp/agent"
-	"github.com/CanonicalLtd/blues-identity/internal/debug"
-	"github.com/CanonicalLtd/blues-identity/internal/discharger"
-	"github.com/CanonicalLtd/blues-identity/internal/identity"
-	"github.com/CanonicalLtd/blues-identity/internal/v1"
-	"github.com/CanonicalLtd/blues-identity/meeting"
-	"github.com/CanonicalLtd/blues-identity/store"
+	"github.com/CanonicalLtd/candid/idp"
+	"github.com/CanonicalLtd/candid/idp/agent"
+	"github.com/CanonicalLtd/candid/internal/debug"
+	"github.com/CanonicalLtd/candid/internal/discharger"
+	"github.com/CanonicalLtd/candid/internal/identity"
+	"github.com/CanonicalLtd/candid/internal/v1"
+	"github.com/CanonicalLtd/candid/meeting"
+	"github.com/CanonicalLtd/candid/store"
 )
 
 // Versions of the API that can be served.

@@ -8,24 +8,24 @@ import (
 
 	jc "github.com/juju/testing/checkers"
 	"golang.org/x/net/context"
+	"gopkg.in/CanonicalLtd/candidclient.v1"
+	"gopkg.in/CanonicalLtd/candidclient.v1/params"
 	gc "gopkg.in/check.v1"
 	errgo "gopkg.in/errgo.v1"
-	"gopkg.in/juju/idmclient.v1"
-	"gopkg.in/juju/idmclient.v1/params"
 	"gopkg.in/macaroon-bakery.v2/bakery"
 	"gopkg.in/macaroon-bakery.v2/bakery/checkers"
 	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
 	macaroon "gopkg.in/macaroon.v2"
 
-	"github.com/CanonicalLtd/blues-identity/idp"
-	"github.com/CanonicalLtd/blues-identity/idp/test"
-	"github.com/CanonicalLtd/blues-identity/internal/auth"
-	"github.com/CanonicalLtd/blues-identity/internal/idmtest"
-	"github.com/CanonicalLtd/blues-identity/store"
+	"github.com/CanonicalLtd/candid/idp"
+	"github.com/CanonicalLtd/candid/idp/test"
+	"github.com/CanonicalLtd/candid/internal/auth"
+	"github.com/CanonicalLtd/candid/internal/candidtest"
+	"github.com/CanonicalLtd/candid/store"
 )
 
 type authSuite struct {
-	idmtest.StoreSuite
+	candidtest.StoreSuite
 	oven                *bakery.Oven
 	authorizer          *auth.Authorizer
 	context             context.Context
@@ -108,7 +108,7 @@ func (s authSuite) identityMacaroon(c *gc.C, username string) *bakery.Macaroon {
 		s.context,
 		bakery.LatestVersion,
 		[]checkers.Caveat{
-			idmclient.UserDeclaration(username),
+			candidclient.UserDeclaration(username),
 		},
 		identchecker.LoginOp,
 	)

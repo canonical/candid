@@ -10,7 +10,7 @@ import (
 	"golang.org/x/net/context"
 	errgo "gopkg.in/errgo.v1"
 
-	"github.com/CanonicalLtd/blues-identity/store"
+	"github.com/CanonicalLtd/candid/store"
 )
 
 // A providerDataStore implements store.ProviderDataStore.

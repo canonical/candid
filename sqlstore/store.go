@@ -11,10 +11,10 @@ import (
 	errgo "gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery"
 
-	"github.com/CanonicalLtd/blues-identity/store"
+	"github.com/CanonicalLtd/candid/store"
 )
 
-var logger = loggo.GetLogger("blues-identity.sqlstore")
+var logger = loggo.GetLogger("candid.sqlstore")
 
 var identityColumns = [store.NumFields]string{
 	store.ProviderID:    "providerid",

@@ -12,7 +12,7 @@ import (
 
 var (
 	requestDuration = prometheus.NewSummaryVec(prometheus.SummaryOpts{
-		Namespace: "blues_identity",
+		Namespace: "candid",
 		Subsystem: "handler",
 		Name:      "request_duration",
 		Help:      "The duration of a web request.",
