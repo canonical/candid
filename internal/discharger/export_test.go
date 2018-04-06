@@ -4,8 +4,8 @@
 package discharger
 
 import (
-	"github.com/CanonicalLtd/blues-identity/idp"
-	"github.com/CanonicalLtd/blues-identity/internal/identity"
+	"github.com/CanonicalLtd/candid/idp"
+	"github.com/CanonicalLtd/candid/internal/identity"
 )
 
 var NewIDPHandler = newIDPHandler
@@ -16,6 +16,6 @@ func NewVisitCompleter(params identity.HandlerParams) idp.VisitCompleter {
 	return &visitCompleter{
 		params:                params,
 		dischargeTokenCreator: &dischargeTokenCreator{params: params},
-		place: &place{params.MeetingPlace},
+		place:                 &place{params.MeetingPlace},
 	}
 }

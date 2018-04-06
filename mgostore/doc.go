@@ -10,10 +10,10 @@ import (
 	"gopkg.in/macaroon-bakery.v2/bakery"
 	"gopkg.in/mgo.v2/bson"
 
-	"github.com/CanonicalLtd/blues-identity/store"
+	"github.com/CanonicalLtd/candid/store"
 )
 
-var logger = loggo.GetLogger("identity.store.mgostore")
+var logger = loggo.GetLogger("candid.store.mgostore")
 
 // fieldNames provides the name used in the mongo documents for each
 // field.

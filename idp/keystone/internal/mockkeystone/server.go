@@ -11,7 +11,7 @@ import (
 	"golang.org/x/net/context"
 	"gopkg.in/httprequest.v1"
 
-	"github.com/CanonicalLtd/blues-identity/idp/keystone/internal/keystone"
+	"github.com/CanonicalLtd/candid/idp/keystone/internal/keystone"
 )
 
 // Server provides a mock keystone server for use in tests.

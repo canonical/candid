@@ -10,7 +10,7 @@ import (
 	errgo "gopkg.in/errgo.v1"
 	mgo "gopkg.in/mgo.v2"
 
-	"github.com/CanonicalLtd/blues-identity/store"
+	"github.com/CanonicalLtd/candid/store"
 )
 
 // an providerDataStore implements store.ProviderDataStore.

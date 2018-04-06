@@ -12,7 +12,7 @@ import (
 	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
 
-	"github.com/CanonicalLtd/blues-identity/store"
+	"github.com/CanonicalLtd/candid/store"
 )
 
 var logger = loggo.GetLogger("idp.usso.internal.kvnoncestore")

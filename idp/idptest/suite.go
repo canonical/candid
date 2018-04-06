@@ -12,15 +12,15 @@ import (
 	"gopkg.in/macaroon-bakery.v2/bakery"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
 
-	"github.com/CanonicalLtd/blues-identity/idp"
-	"github.com/CanonicalLtd/blues-identity/internal/idmtest"
-	"github.com/CanonicalLtd/blues-identity/store"
+	"github.com/CanonicalLtd/candid/idp"
+	"github.com/CanonicalLtd/candid/internal/candidtest"
+	"github.com/CanonicalLtd/candid/store"
 )
 
 // Suite provides a test suite that is helpful for testing identity
 // providers.
 type Suite struct {
-	idmtest.StoreSuite
+	candidtest.StoreSuite
 
 	// Template contains a template that will be passed in the
 	// idp.InitParams.
@@ -113,7 +113,7 @@ func (s *Suite) AssertUser(c *gc.C, id *store.Identity) *store.Identity {
 	}
 	err := s.Store.Identity(s.Ctx, &id1)
 	c.Assert(err, gc.Equals, nil)
-	idmtest.AssertEqualIdentity(c, &id1, id)
+	candidtest.AssertEqualIdentity(c, &id1, id)
 	return &id1
 }
 

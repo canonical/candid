@@ -1,24 +1,24 @@
-name: user-admin
+name: candid
 version: git
-summary: Manage users in identity servers.
+summary: Manage users in the Candid identity server.
 description: |
-  Manage users in identity servers.
+  Manage users in the Candid identity server.
 
 grade: devel # must be 'stable' to release into candidate/stable channels
 confinement: devmode
 
 apps:
-  user-admin:
-    command: bin/user-admin
+  candid:
+    command: bin/candid
     plugs:
      - home
      - network
 
 parts:
-  blues-identity:
+  candid:
     plugin: godeps
     source: ../..
     source-type: git
-    go-importpath: github.com/CanonicalLtd/blues-identity
+    go-importpath: github.com/CanonicalLtd/candid
     prime:
-      - bin/user-admin
+      - bin/candid

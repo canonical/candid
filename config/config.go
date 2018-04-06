@@ -17,10 +17,10 @@ import (
 	"gopkg.in/macaroon-bakery.v2/bakery"
 	"gopkg.in/yaml.v2"
 
-	"github.com/CanonicalLtd/blues-identity/idp"
+	"github.com/CanonicalLtd/candid/idp"
 )
 
-var logger = loggo.GetLogger("identity.config")
+var logger = loggo.GetLogger("candid.config")
 
 // Config holds the configuration parameters for the identity service.
 type Config struct {

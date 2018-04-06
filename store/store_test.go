@@ -6,7 +6,7 @@ package store_test
 import (
 	gc "gopkg.in/check.v1"
 
-	"github.com/CanonicalLtd/blues-identity/store"
+	"github.com/CanonicalLtd/candid/store"
 )
 
 type storeSuite struct{}

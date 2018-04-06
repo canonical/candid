@@ -11,8 +11,8 @@ import (
 	"gopkg.in/macaroon-bakery.v2/bakery/mgorootkeystore"
 	mgo "gopkg.in/mgo.v2"
 
-	"github.com/CanonicalLtd/blues-identity/meeting"
-	"github.com/CanonicalLtd/blues-identity/store"
+	"github.com/CanonicalLtd/candid/meeting"
+	"github.com/CanonicalLtd/candid/store"
 )
 
 // A Database provides a wrapper around a single mongodb database that

@@ -1,7 +1,7 @@
 // Copyright 2017 Canonical Ltd.
 // Licensed under the AGPLv3, see LICENCE file for details.
 
-package idmtest
+package candidtest
 
 import (
 	"html/template"
@@ -11,16 +11,16 @@ import (
 	"strings"
 
 	"golang.org/x/net/context"
+	"gopkg.in/CanonicalLtd/candidclient.v1"
 	gc "gopkg.in/check.v1"
 	errgo "gopkg.in/errgo.v1"
-	"gopkg.in/juju/idmclient.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
 	"gopkg.in/macaroon-bakery.v2/httpbakery/agent"
 
-	"github.com/CanonicalLtd/blues-identity/internal/auth"
-	"github.com/CanonicalLtd/blues-identity/internal/identity"
-	"github.com/CanonicalLtd/blues-identity/store"
+	"github.com/CanonicalLtd/candid/internal/auth"
+	"github.com/CanonicalLtd/candid/internal/identity"
+	"github.com/CanonicalLtd/candid/store"
 )
 
 const (
@@ -166,10 +166,10 @@ func (s *ServerSuite) AdminClient() *httpbakery.Client {
 	return client
 }
 
-// AdminIdentityClient creates a new idmclient.Client that is configured to log
+// AdminIdentityClient creates a new candidclient.Client that is configured to log
 // in as an admin user.
-func (s *ServerSuite) AdminIdentityClient(c *gc.C) *idmclient.Client {
-	client, err := idmclient.New(idmclient.NewParams{
+func (s *ServerSuite) AdminIdentityClient(c *gc.C) *candidclient.Client {
+	client, err := candidclient.New(candidclient.NewParams{
 		BaseURL: s.URL,
 		Client: &httpbakery.Client{
 			Client: httpbakery.NewHTTPClient(),
@@ -238,11 +238,11 @@ func (s *ServerSuite) CreateUser(c *gc.C, name string, groups ...string) string 
 
 // IdentityClient creates a new agent with the given username
 // (which must end in @idm) and groups and then creates an
-// idmclient.Client
+// candidclient.Client
 // which authenticates using that agent.
-func (s *ServerSuite) IdentityClient(c *gc.C, username string, groups ...string) *idmclient.Client {
+func (s *ServerSuite) IdentityClient(c *gc.C, username string, groups ...string) *candidclient.Client {
 	key := s.CreateAgent(c, username, groups...)
-	client, err := idmclient.New(idmclient.NewParams{
+	client, err := candidclient.New(candidclient.NewParams{
 		BaseURL: s.URL,
 		Client: &httpbakery.Client{
 			Client: httpbakery.NewHTTPClient(),

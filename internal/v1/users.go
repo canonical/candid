@@ -12,18 +12,18 @@ import (
 	"time"
 
 	"golang.org/x/net/context"
+	"gopkg.in/CanonicalLtd/candidclient.v1"
+	"gopkg.in/CanonicalLtd/candidclient.v1/params"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/httprequest.v1"
-	"gopkg.in/juju/idmclient.v1"
-	"gopkg.in/juju/idmclient.v1/params"
 	"gopkg.in/macaroon-bakery.v2/bakery"
 	"gopkg.in/macaroon-bakery.v2/bakery/checkers"
 	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
 	macaroon "gopkg.in/macaroon.v2"
 
-	"github.com/CanonicalLtd/blues-identity/internal/auth"
-	"github.com/CanonicalLtd/blues-identity/store"
+	"github.com/CanonicalLtd/candid/internal/auth"
+	"github.com/CanonicalLtd/candid/store"
 )
 
 var blacklistUsernames = map[params.Username]bool{
@@ -285,7 +285,7 @@ func (h *handler) UserToken(p httprequest.Params, r *params.UserTokenRequest) (*
 		p.Context,
 		httpbakery.RequestVersion(p.Request),
 		[]checkers.Caveat{
-			idmclient.UserDeclaration(id.Id()),
+			candidclient.UserDeclaration(id.Id()),
 			checkers.TimeBeforeCaveat(time.Now().Add(24 * time.Hour)),
 		},
 		identchecker.LoginOp,
@@ -523,7 +523,7 @@ func (h *handler) DischargeTokenForUser(p httprequest.Params, req *params.Discha
 		httpbakery.RequestVersion(p.Request),
 		[]checkers.Caveat{
 			checkers.TimeBeforeCaveat(time.Now().Add(dischargeTokenDuration)),
-			idmclient.UserDeclaration(string(req.Username)),
+			candidclient.UserDeclaration(string(req.Username)),
 		},
 		identchecker.LoginOp,
 	)

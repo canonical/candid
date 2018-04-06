@@ -12,13 +12,13 @@ import (
 	gc "gopkg.in/check.v1"
 	yaml "gopkg.in/yaml.v2"
 
-	"github.com/CanonicalLtd/blues-identity"
-	"github.com/CanonicalLtd/blues-identity/config"
-	"github.com/CanonicalLtd/blues-identity/idp"
-	_ "github.com/CanonicalLtd/blues-identity/idp/agent"
-	_ "github.com/CanonicalLtd/blues-identity/idp/test"
-	"github.com/CanonicalLtd/blues-identity/internal/idmtest"
-	"github.com/CanonicalLtd/blues-identity/version"
+	"github.com/CanonicalLtd/candid"
+	"github.com/CanonicalLtd/candid/config"
+	"github.com/CanonicalLtd/candid/idp"
+	_ "github.com/CanonicalLtd/candid/idp/agent"
+	_ "github.com/CanonicalLtd/candid/idp/test"
+	"github.com/CanonicalLtd/candid/internal/candidtest"
+	"github.com/CanonicalLtd/candid/version"
 )
 
 func TestPackage(t *testing.T) {
@@ -26,7 +26,7 @@ func TestPackage(t *testing.T) {
 }
 
 type serverSuite struct {
-	idmtest.StoreSuite
+	candidtest.StoreSuite
 }
 
 var _ = gc.Suite(&serverSuite{})

@@ -6,18 +6,18 @@ package ussooauth_test
 import (
 	"github.com/juju/usso"
 	"golang.org/x/net/context"
+	"gopkg.in/CanonicalLtd/candidclient.v1/ussologin"
 	gc "gopkg.in/check.v1"
-	"gopkg.in/juju/idmclient.v1/ussologin"
 
-	"github.com/CanonicalLtd/blues-identity/idp"
-	"github.com/CanonicalLtd/blues-identity/idp/usso/internal/mockusso"
-	"github.com/CanonicalLtd/blues-identity/idp/usso/ussooauth"
-	"github.com/CanonicalLtd/blues-identity/internal/idmtest"
-	"github.com/CanonicalLtd/blues-identity/store"
+	"github.com/CanonicalLtd/candid/idp"
+	"github.com/CanonicalLtd/candid/idp/usso/internal/mockusso"
+	"github.com/CanonicalLtd/candid/idp/usso/ussooauth"
+	"github.com/CanonicalLtd/candid/internal/candidtest"
+	"github.com/CanonicalLtd/candid/store"
 )
 
 type dischargeSuite struct {
-	idmtest.DischargeSuite
+	candidtest.DischargeSuite
 	mockusso.Suite
 }
 

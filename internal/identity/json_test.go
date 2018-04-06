@@ -11,12 +11,12 @@ import (
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/testing/httptesting"
 	"github.com/julienschmidt/httprouter"
+	"gopkg.in/CanonicalLtd/candidclient.v1/params"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/httprequest.v1"
-	"gopkg.in/juju/idmclient.v1/params"
 
-	"github.com/CanonicalLtd/blues-identity/internal/identity"
+	"github.com/CanonicalLtd/candid/internal/identity"
 )
 
 type jsonSuite struct {

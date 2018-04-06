@@ -8,9 +8,9 @@ import (
 	oidc "github.com/coreos/go-oidc"
 	"gopkg.in/errgo.v1"
 
-	"github.com/CanonicalLtd/blues-identity/config"
-	"github.com/CanonicalLtd/blues-identity/idp"
-	"github.com/CanonicalLtd/blues-identity/idp/openid"
+	"github.com/CanonicalLtd/candid/config"
+	"github.com/CanonicalLtd/candid/idp"
+	"github.com/CanonicalLtd/candid/idp/openid"
 )
 
 func init() {

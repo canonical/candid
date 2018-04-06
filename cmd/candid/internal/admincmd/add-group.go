@@ -6,8 +6,8 @@ package admincmd
 import (
 	"github.com/juju/cmd"
 	"golang.org/x/net/context"
+	"gopkg.in/CanonicalLtd/candidclient.v1/params"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/juju/idmclient.v1/params"
 )
 
 type addGroupCommand struct {
@@ -25,11 +25,11 @@ The add-group command adds the specified user to the specified group,
 or groups.
 
 To add the group-1 and group-2 groups to the user bob:
-    user-admin add-group -u bob group-1 group-2
+    candid add-group -u bob group-1 group-2
 
 To add the group-1 and group-2 groups to the user with the email
 address bob@example.com:
-    user-admin add-group -e bob@example.com group-1 group-2
+    candid add-group -e bob@example.com group-1 group-2
 `
 
 func (c *addGroupCommand) Info() *cmd.Info {

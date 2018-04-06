@@ -12,7 +12,7 @@ import (
 	gc "gopkg.in/check.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery/mgorootkeystore"
 
-	"github.com/CanonicalLtd/blues-identity/mgostore"
+	"github.com/CanonicalLtd/candid/mgostore"
 )
 
 type bakerySuite struct {

@@ -23,23 +23,23 @@ import (
 	"gopkg.in/mgo.v2"
 	"gopkg.in/natefinch/lumberjack.v2"
 
-	"github.com/CanonicalLtd/blues-identity"
-	"github.com/CanonicalLtd/blues-identity/config"
-	"github.com/CanonicalLtd/blues-identity/idp"
-	_ "github.com/CanonicalLtd/blues-identity/idp/agent"
-	_ "github.com/CanonicalLtd/blues-identity/idp/azure"
-	_ "github.com/CanonicalLtd/blues-identity/idp/google"
-	_ "github.com/CanonicalLtd/blues-identity/idp/keystone"
-	_ "github.com/CanonicalLtd/blues-identity/idp/ldap"
-	"github.com/CanonicalLtd/blues-identity/idp/usso"
-	_ "github.com/CanonicalLtd/blues-identity/idp/usso/ussodischarge"
-	"github.com/CanonicalLtd/blues-identity/idp/usso/ussooauth"
-	"github.com/CanonicalLtd/blues-identity/mgostore"
-	"github.com/CanonicalLtd/blues-identity/sqlstore"
+	"github.com/CanonicalLtd/candid"
+	"github.com/CanonicalLtd/candid/config"
+	"github.com/CanonicalLtd/candid/idp"
+	_ "github.com/CanonicalLtd/candid/idp/agent"
+	_ "github.com/CanonicalLtd/candid/idp/azure"
+	_ "github.com/CanonicalLtd/candid/idp/google"
+	_ "github.com/CanonicalLtd/candid/idp/keystone"
+	_ "github.com/CanonicalLtd/candid/idp/ldap"
+	"github.com/CanonicalLtd/candid/idp/usso"
+	_ "github.com/CanonicalLtd/candid/idp/usso/ussodischarge"
+	"github.com/CanonicalLtd/candid/idp/usso/ussooauth"
+	"github.com/CanonicalLtd/candid/mgostore"
+	"github.com/CanonicalLtd/candid/sqlstore"
 )
 
 var (
-	logger        = loggo.GetLogger("idserver")
+	logger        = loggo.GetLogger("candidsrv")
 	loggingConfig = flag.String("logging-config", "", "specify log levels for modules e.g. <root>=TRACE")
 	resourcePath  = flag.String("resource-path", "", "specify the path for resource files")
 )

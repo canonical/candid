@@ -1,31 +1,31 @@
-name: idm
+name: candidsrv
 version: git
-summary: Identity Manager.
+summary: Candid Identity Manager.
 description: |
-  Identity Manager.
+  Candid Identity Manager.
 
 grade: devel # must be 'stable' to release into candidate/stable channels
 confinement: strict
 
 apps:
-  idm:
-    command: bin/idserver -resource-path ${SNAP} -logging-config INFO ${SNAP_COMMON}/config.yaml
+  candidsrv:
+    command: bin/candidsrv -resource-path ${SNAP} -logging-config INFO ${SNAP_COMMON}/config.yaml
     daemon: simple
     plugs:
      - network
      - network-bind
-  admin:
-    command: bin/user-admin
+  candid:
+    command: bin/candid
     plugs:
      - home
      - network
 
 parts:
-  blues-identity:
+  candid:
     plugin: godeps
     source: ../..
     source-type: git
-    go-importpath: github.com/CanonicalLtd/blues-identity
+    go-importpath: github.com/CanonicalLtd/candid
   static:
     plugin: dump
     source: ../..

@@ -4,11 +4,11 @@
 package v1
 
 import (
-	"gopkg.in/juju/idmclient.v1/params"
+	"gopkg.in/CanonicalLtd/candidclient.v1/params"
 	"gopkg.in/macaroon-bakery.v2/bakery"
 	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
 
-	"github.com/CanonicalLtd/blues-identity/internal/auth"
+	"github.com/CanonicalLtd/candid/internal/auth"
 )
 
 // opForRequest returns the operation that will be performed

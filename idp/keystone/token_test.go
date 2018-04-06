@@ -13,12 +13,12 @@ import (
 	gc "gopkg.in/check.v1"
 	"gopkg.in/yaml.v2"
 
-	"github.com/CanonicalLtd/blues-identity/config"
-	"github.com/CanonicalLtd/blues-identity/idp"
-	"github.com/CanonicalLtd/blues-identity/idp/idptest"
-	keystoneidp "github.com/CanonicalLtd/blues-identity/idp/keystone"
-	"github.com/CanonicalLtd/blues-identity/idp/keystone/internal/mockkeystone"
-	"github.com/CanonicalLtd/blues-identity/store"
+	"github.com/CanonicalLtd/candid/config"
+	"github.com/CanonicalLtd/candid/idp"
+	"github.com/CanonicalLtd/candid/idp/idptest"
+	keystoneidp "github.com/CanonicalLtd/candid/idp/keystone"
+	"github.com/CanonicalLtd/candid/idp/keystone/internal/mockkeystone"
+	"github.com/CanonicalLtd/candid/store"
 )
 
 type tokenSuite struct {

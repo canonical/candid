@@ -16,22 +16,22 @@ import (
 	"github.com/juju/testing/httptesting"
 	"github.com/julienschmidt/httprouter"
 	"golang.org/x/net/context"
+	"gopkg.in/CanonicalLtd/candidclient.v1/params"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/httprequest.v1"
-	"gopkg.in/juju/idmclient.v1/params"
 
-	"github.com/CanonicalLtd/blues-identity/idp"
-	"github.com/CanonicalLtd/blues-identity/idp/test"
-	"github.com/CanonicalLtd/blues-identity/internal/debug"
-	"github.com/CanonicalLtd/blues-identity/internal/discharger"
-	"github.com/CanonicalLtd/blues-identity/internal/identity"
-	"github.com/CanonicalLtd/blues-identity/internal/idmtest"
-	"github.com/CanonicalLtd/blues-identity/internal/v1"
-	"github.com/CanonicalLtd/blues-identity/store"
+	"github.com/CanonicalLtd/candid/idp"
+	"github.com/CanonicalLtd/candid/idp/test"
+	"github.com/CanonicalLtd/candid/internal/candidtest"
+	"github.com/CanonicalLtd/candid/internal/debug"
+	"github.com/CanonicalLtd/candid/internal/discharger"
+	"github.com/CanonicalLtd/candid/internal/identity"
+	"github.com/CanonicalLtd/candid/internal/v1"
+	"github.com/CanonicalLtd/candid/store"
 )
 
 type serverSuite struct {
-	idmtest.StoreSuite
+	candidtest.StoreSuite
 }
 
 var _ = gc.Suite(&serverSuite{})
@@ -253,7 +253,7 @@ func assertDoesNotServeVersion(c *gc.C, h http.Handler, vers string) {
 }
 
 type fullServerSuite struct {
-	idmtest.StoreServerSuite
+	candidtest.StoreServerSuite
 }
 
 var _ = gc.Suite(&fullServerSuite{})

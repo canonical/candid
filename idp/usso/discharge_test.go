@@ -11,14 +11,14 @@ import (
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
 
-	"github.com/CanonicalLtd/blues-identity/idp"
-	"github.com/CanonicalLtd/blues-identity/idp/usso"
-	"github.com/CanonicalLtd/blues-identity/idp/usso/internal/mockusso"
-	"github.com/CanonicalLtd/blues-identity/internal/idmtest"
+	"github.com/CanonicalLtd/candid/idp"
+	"github.com/CanonicalLtd/candid/idp/usso"
+	"github.com/CanonicalLtd/candid/idp/usso/internal/mockusso"
+	"github.com/CanonicalLtd/candid/internal/candidtest"
 )
 
 type dischargeSuite struct {
-	idmtest.DischargeSuite
+	candidtest.DischargeSuite
 	mockusso.Suite
 }
 

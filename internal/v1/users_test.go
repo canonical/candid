@@ -9,22 +9,22 @@ import (
 	"time"
 
 	jc "github.com/juju/testing/checkers"
+	"gopkg.in/CanonicalLtd/candidclient.v1"
+	"gopkg.in/CanonicalLtd/candidclient.v1/params"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/httprequest.v1"
-	"gopkg.in/juju/idmclient.v1"
-	"gopkg.in/juju/idmclient.v1/params"
 	"gopkg.in/macaroon-bakery.v2/bakery"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
 	macaroon "gopkg.in/macaroon.v2"
 
-	"github.com/CanonicalLtd/blues-identity/idp"
-	testidp "github.com/CanonicalLtd/blues-identity/idp/test"
-	"github.com/CanonicalLtd/blues-identity/internal/auth"
-	"github.com/CanonicalLtd/blues-identity/internal/discharger"
-	"github.com/CanonicalLtd/blues-identity/internal/identity"
-	"github.com/CanonicalLtd/blues-identity/internal/idmtest"
-	"github.com/CanonicalLtd/blues-identity/internal/v1"
-	"github.com/CanonicalLtd/blues-identity/store"
+	"github.com/CanonicalLtd/candid/idp"
+	testidp "github.com/CanonicalLtd/candid/idp/test"
+	"github.com/CanonicalLtd/candid/internal/auth"
+	"github.com/CanonicalLtd/candid/internal/candidtest"
+	"github.com/CanonicalLtd/candid/internal/discharger"
+	"github.com/CanonicalLtd/candid/internal/identity"
+	"github.com/CanonicalLtd/candid/internal/v1"
+	"github.com/CanonicalLtd/candid/store"
 )
 
 var versions = map[string]identity.NewAPIHandlerFunc{
@@ -33,8 +33,8 @@ var versions = map[string]identity.NewAPIHandlerFunc{
 }
 
 type usersSuite struct {
-	idmtest.StoreServerSuite
-	adminClient *idmclient.Client
+	candidtest.StoreServerSuite
+	adminClient *candidclient.Client
 }
 
 var _ = gc.Suite(&usersSuite{})
@@ -219,7 +219,7 @@ var setUserTests = []struct {
 }}
 
 func (s *usersSuite) TestCreateAgent(c *gc.C) {
-	client, err := idmclient.New(idmclient.NewParams{
+	client, err := candidclient.New(candidclient.NewParams{
 		BaseURL: s.URL,
 		Client: &httpbakery.Client{
 			Client: httpbakery.NewHTTPClient(),
@@ -243,7 +243,7 @@ func (s *usersSuite) TestCreateAgent(c *gc.C) {
 	if !strings.HasPrefix(string(resp.Username), "a-") {
 		c.Errorf("unexpected agent username %q", resp.Username)
 	}
-	agentClient, err := idmclient.New(idmclient.NewParams{
+	agentClient, err := candidclient.New(candidclient.NewParams{
 		BaseURL: s.URL,
 		Client: &httpbakery.Client{
 			Client: httpbakery.NewHTTPClient(),
@@ -276,7 +276,7 @@ func (s *usersSuite) TestCreateAgentAsAgent(c *gc.C) {
 }
 
 func (s *usersSuite) TestCreateAgentWithGroups(c *gc.C) {
-	client, err := idmclient.New(idmclient.NewParams{
+	client, err := candidclient.New(candidclient.NewParams{
 		BaseURL: s.URL,
 		Client: &httpbakery.Client{
 			Client: httpbakery.NewHTTPClient(),
@@ -366,7 +366,9 @@ func (s *usersSuite) TestSetUser(c *gc.C) {
 }
 
 func (s *usersSuite) clearIdentities(c *gc.C) {
-	store, ok := s.Store.(interface{ RemoveAll() })
+	store, ok := s.Store.(interface {
+		RemoveAll()
+	})
 	if !ok {
 		c.Fatalf("store type %T does not implement RemoveAll", s.Store)
 	}
@@ -916,7 +918,7 @@ func (s *usersSuite) TestWhoAmIWithAuthenticatedUser(c *gc.C) {
 }
 
 func (s *usersSuite) TestWhoAmIWithNoUser(c *gc.C) {
-	client, err := idmclient.New(idmclient.NewParams{
+	client, err := candidclient.New(candidclient.NewParams{
 		BaseURL: s.URL,
 		Client:  s.Client(nil),
 	})

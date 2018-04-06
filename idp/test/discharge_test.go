@@ -4,16 +4,16 @@
 package test_test
 
 import (
+	"gopkg.in/CanonicalLtd/candidclient.v1/params"
 	gc "gopkg.in/check.v1"
-	"gopkg.in/juju/idmclient.v1/params"
 
-	"github.com/CanonicalLtd/blues-identity/idp"
-	"github.com/CanonicalLtd/blues-identity/idp/test"
-	"github.com/CanonicalLtd/blues-identity/internal/idmtest"
+	"github.com/CanonicalLtd/candid/idp"
+	"github.com/CanonicalLtd/candid/idp/test"
+	"github.com/CanonicalLtd/candid/internal/candidtest"
 )
 
 type dischargeSuite struct {
-	idmtest.DischargeSuite
+	candidtest.DischargeSuite
 	interactor test.Interactor
 }
 

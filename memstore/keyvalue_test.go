@@ -6,8 +6,8 @@ package memstore_test
 import (
 	gc "gopkg.in/check.v1"
 
-	"github.com/CanonicalLtd/blues-identity/memstore"
-	"github.com/CanonicalLtd/blues-identity/store/testing"
+	"github.com/CanonicalLtd/candid/memstore"
+	"github.com/CanonicalLtd/candid/store/testing"
 )
 
 type keyvalueSuite struct {

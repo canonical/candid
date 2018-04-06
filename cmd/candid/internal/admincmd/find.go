@@ -12,12 +12,12 @@ import (
 	"github.com/juju/cmd"
 	"github.com/juju/gnuflag"
 	"golang.org/x/net/context"
+	"gopkg.in/CanonicalLtd/candidclient.v1/params"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/juju/idmclient.v1/params"
 )
 
 type findCommand struct {
-	idmCommand
+	candidCommand
 
 	out cmd.Output
 
@@ -34,8 +34,8 @@ func newFindCommand() cmd.Command {
 var findDoc = `
 The find command finds users that match the request parameters.
 
-    user-admin find -e bob@example.com
-    user-admin find --last-login=30
+    candid find -e bob@example.com
+    candid find --last-login=30
 `
 
 func (c *findCommand) Info() *cmd.Info {
@@ -47,7 +47,7 @@ func (c *findCommand) Info() *cmd.Info {
 }
 
 func (c *findCommand) SetFlags(f *gnuflag.FlagSet) {
-	c.idmCommand.SetFlags(f)
+	c.candidCommand.SetFlags(f)
 
 	c.out.AddFlags(f, "tab", map[string]cmd.Formatter{
 		"yaml":  cmd.FormatYaml,
@@ -64,11 +64,11 @@ func (c *findCommand) SetFlags(f *gnuflag.FlagSet) {
 }
 
 func (c *findCommand) Init(args []string) error {
-	return errgo.Mask(c.idmCommand.Init(nil))
+	return errgo.Mask(c.candidCommand.Init(nil))
 }
 
 func (c *findCommand) Run(ctxt *cmd.Context) error {
-	client, err := c.idmCommand.Client(ctxt)
+	client, err := c.candidCommand.Client(ctxt)
 	if err != nil {
 		return errgo.Mask(err)
 	}

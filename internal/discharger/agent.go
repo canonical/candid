@@ -8,18 +8,18 @@ import (
 	"time"
 
 	"golang.org/x/net/context"
+	"gopkg.in/CanonicalLtd/candidclient.v1"
+	"gopkg.in/CanonicalLtd/candidclient.v1/params"
 	errgo "gopkg.in/errgo.v1"
 	"gopkg.in/httprequest.v1"
-	"gopkg.in/juju/idmclient.v1"
-	"gopkg.in/juju/idmclient.v1/params"
 	"gopkg.in/macaroon-bakery.v2/bakery"
 	"gopkg.in/macaroon-bakery.v2/bakery/checkers"
 	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
 	"gopkg.in/macaroon-bakery.v2/httpbakery/agent"
 
-	"github.com/CanonicalLtd/blues-identity/internal/auth"
-	"github.com/CanonicalLtd/blues-identity/store"
+	"github.com/CanonicalLtd/candid/internal/auth"
+	"github.com/CanonicalLtd/candid/store"
 )
 
 const (
@@ -154,7 +154,7 @@ func (h *handler) agentMacaroon(ctx context.Context, vers bakery.Version, op bak
 		vers,
 		[]checkers.Caveat{
 			checkers.TimeBeforeCaveat(time.Now().Add(agentLoginMacaroonDuration)),
-			idmclient.UserDeclaration(user),
+			candidclient.UserDeclaration(user),
 			bakery.LocalThirdPartyCaveat(key, vers),
 			auth.UserHasPublicKeyCaveat(params.Username(user), key),
 			auth.DischargeIDCaveat(dischargeID),

@@ -8,8 +8,8 @@ import (
 
 	errgo "gopkg.in/errgo.v1"
 
-	"github.com/CanonicalLtd/blues-identity/meeting"
-	"github.com/CanonicalLtd/blues-identity/store"
+	"github.com/CanonicalLtd/candid/meeting"
+	"github.com/CanonicalLtd/candid/store"
 )
 
 // A Database provides a wrapper around an SQL database that can be used

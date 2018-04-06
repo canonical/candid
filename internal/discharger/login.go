@@ -10,7 +10,7 @@ import (
 	"gopkg.in/httprequest.v1"
 	"gopkg.in/macaroon-bakery.v2/httpbakery/agent"
 
-	"github.com/CanonicalLtd/blues-identity/idp"
+	"github.com/CanonicalLtd/candid/idp"
 )
 
 // legacyLoginRequest is a request to start a login to the identity manager

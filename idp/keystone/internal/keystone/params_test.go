@@ -8,7 +8,7 @@ import (
 
 	gc "gopkg.in/check.v1"
 
-	"github.com/CanonicalLtd/blues-identity/idp/keystone/internal/keystone"
+	"github.com/CanonicalLtd/candid/idp/keystone/internal/keystone"
 )
 
 type paramsSuite struct{}

@@ -9,18 +9,18 @@ import (
 
 	"github.com/juju/loggo"
 	"golang.org/x/net/context"
+	"gopkg.in/CanonicalLtd/candidclient.v1/params"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/juju/idmclient.v1/params"
 	"gopkg.in/macaroon-bakery.v2/bakery"
 	"gopkg.in/macaroon-bakery.v2/bakery/checkers"
 	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
 	macaroon "gopkg.in/macaroon.v2"
 
-	"github.com/CanonicalLtd/blues-identity/idp"
-	"github.com/CanonicalLtd/blues-identity/store"
+	"github.com/CanonicalLtd/candid/idp"
+	"github.com/CanonicalLtd/candid/store"
 )
 
-var logger = loggo.GetLogger("identity.internal.auth")
+var logger = loggo.GetLogger("candid.internal.auth")
 
 const (
 	AdminUsername     = "admin@idm"
@@ -107,8 +107,8 @@ func New(params Params) *Authorizer {
 		idp := idp
 		resolvers[idp.Name()] = idpGroupResolver{idp}
 	}
-	// Add a group resolver for the built-in idm provider.
-	resolvers["idm"] = idmGroupResolver{
+	// Add a group resolver for the built-in candid provider.
+	resolvers["idm"] = candidGroupResolver{
 		store:     params.Store,
 		resolvers: resolvers,
 	}
@@ -469,7 +469,7 @@ type groupResolver interface {
 	resolveGroups(context.Context, *store.Identity) ([]string, error)
 }
 
-type idmGroupResolver struct {
+type candidGroupResolver struct {
 	store     store.Store
 	resolvers map[string]groupResolver
 }
@@ -477,7 +477,7 @@ type idmGroupResolver struct {
 // resolveGroups implements groupResolver by checking returning
 // groups that are in both the identity and the owner of the
 // identity.
-func (r idmGroupResolver) resolveGroups(ctx context.Context, identity *store.Identity) ([]string, error) {
+func (r candidGroupResolver) resolveGroups(ctx context.Context, identity *store.Identity) ([]string, error) {
 	if len(identity.ProviderInfo["owner"]) == 0 {
 		// No owner - no groups. This applies to admin@idm, but for
 		// other users, it's probably an internal inconsistency error.

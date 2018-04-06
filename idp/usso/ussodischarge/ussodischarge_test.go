@@ -16,19 +16,19 @@ import (
 	"time"
 
 	jc "github.com/juju/testing/checkers"
+	udclient "gopkg.in/CanonicalLtd/candidclient.v1/ussodischarge"
 	gc "gopkg.in/check.v1"
-	udclient "gopkg.in/juju/idmclient.v1/ussodischarge"
 	"gopkg.in/macaroon-bakery.v2/bakery"
 	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
 	macaroon "gopkg.in/macaroon.v2"
 	yaml "gopkg.in/yaml.v2"
 
-	"github.com/CanonicalLtd/blues-identity/config"
-	"github.com/CanonicalLtd/blues-identity/idp"
-	"github.com/CanonicalLtd/blues-identity/idp/idptest"
-	"github.com/CanonicalLtd/blues-identity/idp/usso/ussodischarge"
-	"github.com/CanonicalLtd/blues-identity/store"
+	"github.com/CanonicalLtd/candid/config"
+	"github.com/CanonicalLtd/candid/idp"
+	"github.com/CanonicalLtd/candid/idp/idptest"
+	"github.com/CanonicalLtd/candid/idp/usso/ussodischarge"
+	"github.com/CanonicalLtd/candid/store"
 )
 
 type ussoMacaroonSuite struct {

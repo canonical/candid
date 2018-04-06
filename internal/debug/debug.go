@@ -12,11 +12,11 @@ import (
 	"gopkg.in/httprequest.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery"
 
-	"github.com/CanonicalLtd/blues-identity/internal/identity"
-	"github.com/CanonicalLtd/blues-identity/version"
+	"github.com/CanonicalLtd/candid/internal/identity"
+	"github.com/CanonicalLtd/candid/version"
 )
 
-var logger = loggo.GetLogger("identity.internal.debug")
+var logger = loggo.GetLogger("candid.internal.debug")
 
 var stdCheckers = []debugstatus.CheckerFunc{
 	debugstatus.ServerStartTime,

@@ -5,4 +5,4 @@
 
 package main
 
-import _ "github.com/CanonicalLtd/blues-identity/idp/test"
+import _ "github.com/CanonicalLtd/candid/idp/test"

@@ -11,16 +11,16 @@ import (
 	"github.com/juju/cmd"
 	"github.com/juju/gnuflag"
 	"golang.org/x/net/context"
+	"gopkg.in/CanonicalLtd/candidclient.v1/params"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/juju/idmclient.v1/params"
 	"gopkg.in/macaroon-bakery.v2/bakery"
 	"gopkg.in/macaroon-bakery.v2/httpbakery/agent"
 
-	"github.com/CanonicalLtd/blues-identity/internal/auth"
+	"github.com/CanonicalLtd/candid/internal/auth"
 )
 
 type putAgentCommand struct {
-	idmCommand
+	candidCommand
 	groups        []string
 	agentFile     string
 	agentFullName string
@@ -63,7 +63,7 @@ func (c *putAgentCommand) Info() *cmd.Info {
 }
 
 func (c *putAgentCommand) SetFlags(f *gnuflag.FlagSet) {
-	c.idmCommand.SetFlags(f)
+	c.candidCommand.SetFlags(f)
 	publicKeyVar(f, &c.publicKey, "k", "public key of agent")
 	publicKeyVar(f, &c.publicKey, "public-key", "")
 	f.StringVar(&c.agentFile, "f", "", "agent file to update")
@@ -77,7 +77,7 @@ func (c *putAgentCommand) Init(args []string) error {
 	if c.agentFile != "" && c.publicKey != nil {
 		return errgo.Newf("cannot specify public key and an agent file")
 	}
-	return errgo.Mask(c.idmCommand.Init(nil))
+	return errgo.Mask(c.candidCommand.Init(nil))
 }
 
 func (c *putAgentCommand) Run(cmdctx *cmd.Context) error {

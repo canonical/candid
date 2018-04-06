@@ -16,14 +16,14 @@ import (
 	"github.com/juju/persistent-cookiejar"
 	"golang.org/x/net/context"
 	"golang.org/x/net/publicsuffix"
+	"gopkg.in/CanonicalLtd/candidclient.v1"
+	"gopkg.in/CanonicalLtd/candidclient.v1/params"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/juju/idmclient.v1"
-	"gopkg.in/juju/idmclient.v1/params"
 	"gopkg.in/macaroon-bakery.v2/bakery"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
 	"gopkg.in/macaroon-bakery.v2/httpbakery/agent"
 
-	"github.com/CanonicalLtd/blues-identity/version"
+	"github.com/CanonicalLtd/candid/version"
 )
 
 // jujuLoggingConfigEnvKey matches osenv.JujuLoggingConfigEnvKey
@@ -33,13 +33,13 @@ const jujuLoggingConfigEnvKey = "JUJU_LOGGING_CONFIG"
 var cmdDoc = `
 Manage the users on an identity server. By default the identity server
 at https://api.jujucharms.com/identity will be modified. This can be
-overridden either by setting the IDM_URL environment variable, or by
-setting the --idm-url command line parameter.
+overridden either by setting the CANDID_URL environment variable, or by
+setting the --candid-url command line parameter.
 `
 
 func New() cmd.Command {
 	supercmd := cmd.NewSuperCommand(cmd.SuperCommandParams{
-		Name:    "user-admin",
+		Name:    "candid",
 		Doc:     cmdDoc,
 		Purpose: "manage users on an identity server",
 		Log: &cmd.Log{
@@ -55,10 +55,10 @@ func New() cmd.Command {
 	return supercmd
 }
 
-// idmCommand is a cmd.Command that provides a client for communicating
+// candidCommand is a cmd.Command that provides a client for communicating
 // with an identity manager. The identity manager can be sepcified via
-// the command line, or using the IDM_URL environment variable.
-type idmCommand struct {
+// the command line, or using the CANDID_URL environment variable.
+type candidCommand struct {
 	cmd.CommandBase
 
 	url       string
@@ -66,19 +66,19 @@ type idmCommand struct {
 
 	// mu protects the fields below it.
 	mu     sync.Mutex
-	client *idmclient.Client
+	client *candidclient.Client
 }
 
-func (c *idmCommand) SetFlags(f *gnuflag.FlagSet) {
+func (c *candidCommand) SetFlags(f *gnuflag.FlagSet) {
 	c.CommandBase.SetFlags(f)
-	f.StringVar(&c.url, "idm-url", "", "URL of the identity server (defaults to $IDM_URL)")
+	f.StringVar(&c.url, "candid-url", "", "URL of the identity server (defaults to $CANDID_URL)")
 	f.StringVar(&c.agentFile, "a", "", "name of file containing agent login details")
 	f.StringVar(&c.agentFile, "agent", "", "")
 }
 
-// Client creates a new idmclient.Client using the parameters specified
+// Client creates a new candidclient.Client using the parameters specified
 // in the flags and environment.
-func (c *idmCommand) Client(ctxt *cmd.Context) (*idmclient.Client, error) {
+func (c *candidCommand) Client(ctxt *cmd.Context) (*candidclient.Client, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.client != nil {
@@ -93,7 +93,7 @@ func (c *idmCommand) Client(ctxt *cmd.Context) (*idmclient.Client, error) {
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}
-	idmURL := idmURL(c.url)
+	candidURL := candidURL(c.url)
 	if c.agentFile != "" {
 		v, err := readAgentFile(ctxt.AbsPath(c.agentFile))
 		if err != nil {
@@ -102,8 +102,8 @@ func (c *idmCommand) Client(ctxt *cmd.Context) (*idmclient.Client, error) {
 		agent.SetUpAuth(bClient, v)
 	}
 
-	client, err := idmclient.New(idmclient.NewParams{
-		BaseURL: idmURL,
+	client, err := candidclient.New(candidclient.NewParams{
+		BaseURL: candidURL,
 		Client:  bClient,
 	})
 	if err != nil {
@@ -113,14 +113,14 @@ func (c *idmCommand) Client(ctxt *cmd.Context) (*idmclient.Client, error) {
 	return client, nil
 }
 
-func idmURL(url string) string {
+func candidURL(url string) string {
 	if url != "" {
 		return url
 	}
-	if url := os.Getenv("IDM_URL"); url != "" {
+	if url := os.Getenv("CANDID_URL"); url != "" {
 		return url
 	}
-	return idmclient.Production
+	return candidclient.Production
 }
 
 // usercmd is a cmd.Command that provides the ability to lookup and
@@ -129,14 +129,14 @@ func idmURL(url string) string {
 // on a particular user should embed this type and use lookupUser to find
 // the username to use in the subsequent requests.
 type userCommand struct {
-	idmCommand
+	candidCommand
 
 	username string
 	email    string
 }
 
 func (c *userCommand) SetFlags(f *gnuflag.FlagSet) {
-	c.idmCommand.SetFlags(f)
+	c.candidCommand.SetFlags(f)
 
 	f.StringVar(&c.username, "u", "", "username of the user")
 	f.StringVar(&c.username, "username", "", "")
@@ -150,7 +150,7 @@ func (c *userCommand) Init(args []string) error {
 	} else if c.username != "" && c.email != "" {
 		return errgo.New("both username and email specified, please specify either username or email")
 	}
-	return errgo.Mask(c.idmCommand.Init(args))
+	return errgo.Mask(c.candidCommand.Init(args))
 }
 
 // AllowInterspersedFlags implements cmd.Command.AllowInterspersedFlags,

@@ -11,7 +11,7 @@ import (
 	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
 
-	"github.com/CanonicalLtd/blues-identity/meeting"
+	"github.com/CanonicalLtd/candid/meeting"
 )
 
 // MeetingSuite contains a set of tests for meeting.Store

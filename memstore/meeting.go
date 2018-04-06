@@ -10,7 +10,7 @@ import (
 	"golang.org/x/net/context"
 	errgo "gopkg.in/errgo.v1"
 
-	"github.com/CanonicalLtd/blues-identity/meeting"
+	"github.com/CanonicalLtd/candid/meeting"
 )
 
 // NewMeetingStore creates a new in-memory meeting.Store implementation.

@@ -20,15 +20,15 @@ import (
 	"gopkg.in/macaroon-bakery.v2/bakery"
 	"gopkg.in/macaroon-bakery.v2/bakery/mgorootkeystore"
 
-	"github.com/CanonicalLtd/blues-identity/internal/debug"
-	"github.com/CanonicalLtd/blues-identity/internal/identity"
-	"github.com/CanonicalLtd/blues-identity/internal/idmtest"
-	"github.com/CanonicalLtd/blues-identity/mgostore"
+	"github.com/CanonicalLtd/candid/internal/candidtest"
+	"github.com/CanonicalLtd/candid/internal/debug"
+	"github.com/CanonicalLtd/candid/internal/identity"
+	"github.com/CanonicalLtd/candid/mgostore"
 )
 
 type loginSuite struct {
 	testing.IsolatedMgoSuite
-	idmtest.ServerSuite
+	candidtest.ServerSuite
 
 	db *mgostore.Database
 }
@@ -38,7 +38,7 @@ var _ = gc.Suite(&loginSuite{})
 func (s *loginSuite) SetUpTest(c *gc.C) {
 	s.IsolatedMgoSuite.SetUpTest(c)
 	var err error
-	s.db, err = mgostore.NewDatabase(s.Session.DB("idm-test"))
+	s.db, err = mgostore.NewDatabase(s.Session.DB("candid-test"))
 	c.Assert(err, gc.Equals, nil)
 
 	s.Params.MeetingStore = s.db.MeetingStore()

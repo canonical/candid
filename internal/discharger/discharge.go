@@ -14,9 +14,9 @@ import (
 
 	"golang.org/x/net/context"
 	"golang.org/x/net/trace"
+	"gopkg.in/CanonicalLtd/candidclient.v1"
+	"gopkg.in/CanonicalLtd/candidclient.v1/params"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/juju/idmclient.v1"
-	"gopkg.in/juju/idmclient.v1/params"
 	"gopkg.in/juju/names.v2"
 	"gopkg.in/macaroon-bakery.v2/bakery"
 	"gopkg.in/macaroon-bakery.v2/bakery/checkers"
@@ -24,10 +24,10 @@ import (
 	"gopkg.in/macaroon-bakery.v2/httpbakery/agent"
 	"gopkg.in/macaroon.v2"
 
-	"github.com/CanonicalLtd/blues-identity/internal/auth"
-	"github.com/CanonicalLtd/blues-identity/internal/auth/httpauth"
-	"github.com/CanonicalLtd/blues-identity/internal/identity"
-	"github.com/CanonicalLtd/blues-identity/store"
+	"github.com/CanonicalLtd/candid/internal/auth"
+	"github.com/CanonicalLtd/candid/internal/auth/httpauth"
+	"github.com/CanonicalLtd/candid/internal/identity"
+	"github.com/CanonicalLtd/candid/store"
 )
 
 // thirdPartyCaveatChecker implements an
@@ -130,7 +130,7 @@ func (c *thirdPartyCaveatChecker) checkThirdPartyCaveat(ctx context.Context, p h
 		return nil, nil
 	}
 	return []checkers.Caveat{
-		idmclient.UserDeclaration(authInfo.Identity.Id()),
+		candidclient.UserDeclaration(authInfo.Identity.Id()),
 		checkers.TimeBeforeCaveat(time.Now().Add(24 * time.Hour)),
 	}, nil
 }

@@ -6,7 +6,7 @@ package v1_test
 import (
 	gc "gopkg.in/check.v1"
 
-	"github.com/CanonicalLtd/blues-identity/internal/v1"
+	"github.com/CanonicalLtd/candid/internal/v1"
 )
 
 type gravatarSuite struct{}
