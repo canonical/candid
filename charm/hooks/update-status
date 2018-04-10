@@ -1,0 +1,10 @@
+#!/usr/bin/python3
+
+from charmhelpers.core import hookenv
+import jaascharm
+from status import charm_status
+
+
+if __name__ == '__main__':
+    hookenv.log('update-status')
+    jaascharm.update_status(failed_status=charm_status)

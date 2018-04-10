@@ -1,8 +1,6 @@
-# Identity service
+# Candid Identity service
 
-The identity service provides the ability to manage, create, remove and change
-Juju users and Juju environments. It is designed as a proxy to the external 
-identity providers.
+The Candid server provides a macaroon-based authentication service.
 
 ## Installation
 

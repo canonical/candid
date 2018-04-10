@@ -23,10 +23,7 @@ import (
 	"github.com/CanonicalLtd/candid/store"
 )
 
-const (
-	AdminUsername = "admin"
-	AdminPassword = "password"
-)
+const AdminPassword = "password"
 
 var DefaultTemplate = template.New("")
 
@@ -82,11 +79,8 @@ func (s *ServerSuite) SetUpTest(c *gc.C) {
 	s.server = httptest.NewUnstartedServer(nil)
 	s.params.Location = "http://" + s.server.Listener.Addr().String()
 
-	if s.params.AuthUsername == "" {
-		s.params.AuthUsername = AdminUsername
-	}
-	if s.params.AuthPassword == "" {
-		s.params.AuthPassword = AdminPassword
+	if s.params.AdminPassword == "" {
+		s.params.AdminPassword = AdminPassword
 	}
 	if s.params.Key == nil {
 		var err error

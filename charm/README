@@ -1,0 +1,3 @@
+# Candid Identity service
+
+The Candid server provides a macaroon-based authentication service.

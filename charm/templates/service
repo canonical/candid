@@ -1,0 +1,17 @@
+[Unit]
+Description=Candid identity service
+Requires=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=candid
+Group=candid
+WorkingDirectory={{resource_path}}
+ExecStart={{bin_path}} {{config_path}}
+Restart=on-failure
+RestartSec=5s
+RestartPreventExitStatus=2
+
+[Install]
+WantedBy=multi-user.target

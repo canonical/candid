@@ -67,8 +67,7 @@ func New(sp ServerParams, versions map[string]NewAPIHandlerFunc) (*Server, error
 		Location:           "identity",
 	})
 	auth := auth.New(auth.Params{
-		AdminUsername:     sp.AuthUsername,
-		AdminPassword:     sp.AuthPassword,
+		AdminPassword:     sp.AdminPassword,
 		Location:          sp.Location,
 		MacaroonVerifier:  oven,
 		Store:             sp.Store,
@@ -82,7 +81,7 @@ func New(sp ServerParams, versions map[string]NewAPIHandlerFunc) (*Server, error
 		Store:       sp.MeetingStore,
 		Metrics:     monitoring.NewMeetingMetrics(),
 		ListenAddr:  sp.PrivateAddr,
-		WaitTimeout: sp.WaitTimeout,
+		WaitTimeout: sp.RendezvousTimeout,
 	})
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot create meeting place")
@@ -168,11 +167,8 @@ type ServerParams struct {
 	// Store holds the identities store for the identity server.
 	Store store.Store
 
-	// AuthUsername holds the username for admin login.
-	AuthUsername string
-
-	// AuthPassword holds the password for admin login.
-	AuthPassword string
+	// AdminPassword holds the password for admin login.
+	AdminPassword string
 
 	// Key holds the keypair to use with the bakery service.
 	Key *bakery.KeyPair
@@ -192,6 +188,7 @@ type ServerParams struct {
 
 	// DebugTeams contains the set of launchpad teams that may access
 	// the restricted debug endpoints.
+	// TODO remove this.
 	DebugTeams []string
 
 	// AdminAgentPublicKey contains the public key of the admin agent.
@@ -209,9 +206,9 @@ type ServerParams struct {
 	// executed as part of a /debug/status check.
 	DebugStatusCheckerFuncs []debugstatus.CheckerFunc
 
-	// WaitTimeout holds the time after which an interactive discharge wait
-	// request will timeout.
-	WaitTimeout time.Duration
+	// RendezvousTimeout holds the time after which an interactive discharge wait
+	// request will time out.
+	RendezvousTimeout time.Duration
 }
 
 type HandlerParams struct {

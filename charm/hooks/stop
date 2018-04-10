@@ -1,0 +1,9 @@
+#!/usr/bin/python3
+
+from charmhelpers.core import hookenv
+import jaascharm
+
+
+if __name__ == '__main__':
+    hookenv.log('stop')
+    jaascharm.stop()

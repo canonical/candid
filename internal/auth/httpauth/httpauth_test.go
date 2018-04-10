@@ -4,6 +4,7 @@
 package httpauth_test
 
 import (
+	"encoding/base64"
 	"net/http"
 
 	"golang.org/x/net/context"
@@ -45,7 +46,6 @@ func (s *authSuite) SetUpTest(c *gc.C) {
 		Location: "identity",
 	})
 	s.auth = auth.New(auth.Params{
-		AdminUsername:    "test-admin",
 		AdminPassword:    "open sesame",
 		Location:         identityLocation,
 		Store:            s.Store,
@@ -66,18 +66,18 @@ func (s *authSuite) TestAuthorizeWithAdminCredentials(c *gc.C) {
 	}{{
 		about: "good credentials",
 		header: http.Header{
-			"Authorization": []string{"Basic dGVzdC1hZG1pbjpvcGVuIHNlc2FtZQ=="},
+			"Authorization": []string{"Basic " + b64str("admin:open sesame")},
 		},
 	}, {
 		about: "bad username",
 		header: http.Header{
-			"Authorization": []string{"Basic eGVzdC1hZG1pbjpvcGVuIHNlc2FtZQ=="},
+			"Authorization": []string{"Basic " + b64str("xadmin:open sesame")},
 		},
 		expectErrorMessage: "could not determine identity: invalid credentials",
 	}, {
 		about: "bad password",
 		header: http.Header{
-			"Authorization": []string{"Basic dGVzdC1hZG1pbjpvcGVuIHNlc2FtAQ=="},
+			"Authorization": []string{"Basic " + b64str("admin:open sesam")},
 		},
 		expectErrorMessage: "could not determine identity: invalid credentials",
 	}}
@@ -109,4 +109,8 @@ func (s *authSuite) TestAuthorizeMacaroonRequired(c *gc.C) {
 	c.Assert(derr.Info.CookieNameSuffix, gc.Equals, "candid")
 	c.Assert(derr.Info.MacaroonPath, gc.Equals, "../")
 	c.Assert(derr.Info.Macaroon, gc.NotNil)
+}
+
+func b64str(s string) string {
+	return base64.StdEncoding.EncodeToString([]byte(s))
 }
