@@ -22,9 +22,7 @@ import (
 
 type authSuite struct {
 	candidtest.StoreSuite
-	oven       *bakery.Oven
-	auth       *auth.Authorizer
-	authorizer *httpauth.Authorizer
+	oven *bakery.Oven
 }
 
 var _ = gc.Suite(&authSuite{})
@@ -45,13 +43,6 @@ func (s *authSuite) SetUpTest(c *gc.C) {
 		Locator:  locator,
 		Location: "identity",
 	})
-	s.auth = auth.New(auth.Params{
-		AdminPassword:    "open sesame",
-		Location:         identityLocation,
-		Store:            s.Store,
-		MacaroonVerifier: s.oven,
-	})
-	s.authorizer = httpauth.New(s.oven, s.auth)
 }
 
 func (s *authSuite) TearDownTest(c *gc.C) {
@@ -61,33 +52,50 @@ func (s *authSuite) TearDownTest(c *gc.C) {
 func (s *authSuite) TestAuthorizeWithAdminCredentials(c *gc.C) {
 	tests := []struct {
 		about              string
+		adminPassword      string
 		header             http.Header
 		expectErrorMessage string
 	}{{
-		about: "good credentials",
+		about:         "good credentials",
+		adminPassword: "open sesame",
 		header: http.Header{
 			"Authorization": []string{"Basic " + b64str("admin:open sesame")},
 		},
 	}, {
-		about: "bad username",
+		about:         "bad username",
+		adminPassword: "open sesame",
 		header: http.Header{
 			"Authorization": []string{"Basic " + b64str("xadmin:open sesame")},
 		},
 		expectErrorMessage: "could not determine identity: invalid credentials",
 	}, {
-		about: "bad password",
+		about:         "bad password",
+		adminPassword: "open sesame",
 		header: http.Header{
 			"Authorization": []string{"Basic " + b64str("admin:open sesam")},
+		},
+		expectErrorMessage: "could not determine identity: invalid credentials",
+	}, {
+		about:         "empty password denies access",
+		adminPassword: "",
+		header: http.Header{
+			"Authorization": []string{"Basic " + b64str("admin:")},
 		},
 		expectErrorMessage: "could not determine identity: invalid credentials",
 	}}
 	for i, test := range tests {
 		c.Logf("test %d. %s", i, test.about)
+		authorizer := httpauth.New(s.oven, auth.New(auth.Params{
+			AdminPassword:    test.adminPassword,
+			Location:         identityLocation,
+			Store:            s.Store,
+			MacaroonVerifier: s.oven,
+		}))
 		req, _ := http.NewRequest("GET", "/", nil)
 		for attr, val := range test.header {
 			req.Header[attr] = val
 		}
-		authInfo, err := s.authorizer.Auth(context.Background(), req, identchecker.LoginOp)
+		authInfo, err := authorizer.Auth(context.Background(), req, identchecker.LoginOp)
 		if test.expectErrorMessage != "" {
 			c.Assert(err, gc.ErrorMatches, test.expectErrorMessage)
 			c.Assert(errgo.Cause(err), gc.Equals, params.ErrUnauthorized)
@@ -99,9 +107,15 @@ func (s *authSuite) TestAuthorizeWithAdminCredentials(c *gc.C) {
 }
 
 func (s *authSuite) TestAuthorizeMacaroonRequired(c *gc.C) {
+	authorizer := httpauth.New(s.oven, auth.New(auth.Params{
+		AdminPassword:    "open sesame",
+		Location:         identityLocation,
+		Store:            s.Store,
+		MacaroonVerifier: s.oven,
+	}))
 	req, err := http.NewRequest("GET", "http://example.com/v1/test", nil)
 	c.Assert(err, gc.IsNil)
-	authInfo, err := s.authorizer.Auth(context.Background(), req, identchecker.LoginOp)
+	authInfo, err := authorizer.Auth(context.Background(), req, identchecker.LoginOp)
 	c.Assert(err, gc.ErrorMatches, `macaroon discharge required: authentication required`)
 	c.Assert(authInfo, gc.IsNil)
 	c.Assert(errgo.Cause(err), gc.FitsTypeOf, (*httpbakery.Error)(nil))

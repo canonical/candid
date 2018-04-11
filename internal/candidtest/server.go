@@ -23,8 +23,6 @@ import (
 	"github.com/CanonicalLtd/candid/store"
 )
 
-const AdminPassword = "password"
-
 var DefaultTemplate = template.New("")
 
 func init() {
@@ -65,9 +63,7 @@ type ServerSuite struct {
 }
 
 // SetUpTest creates a new identity server and serves it. The server is
-// configured based on the Params and Versions fields. If the
-// AdminUsername or Admin Password parameters are not set then these will
-// default to the AdminUsername and AdminPassword constants. If the Key
+// configured based on the Params and Versions fields. If the Key
 // parameter is not set then a new key will be generated. If the
 // PrivateAddr parameter is not set then it will default to localhost. If
 // the adminAgentPublicKey is not set then a new key will be generated,
@@ -78,10 +74,6 @@ func (s *ServerSuite) SetUpTest(c *gc.C) {
 	s.params = s.Params
 	s.server = httptest.NewUnstartedServer(nil)
 	s.params.Location = "http://" + s.server.Listener.Addr().String()
-
-	if s.params.AdminPassword == "" {
-		s.params.AdminPassword = AdminPassword
-	}
 	if s.params.Key == nil {
 		var err error
 		s.params.Key, err = bakery.GenerateKey()
