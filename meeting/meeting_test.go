@@ -91,7 +91,7 @@ func (s *suite) TestRendezvousWaitBeforeDone(c *gc.C) {
 	c.Assert(data1, gc.IsNil)
 	c.Assert(err, gc.ErrorMatches, `rendezvous ".*" not found`)
 
-	c.Assert(count, gc.Equals, int32(0))
+	c.Assert(atomic.LoadInt32(&count), gc.Equals, int32(0))
 }
 
 func (s *suite) TestRendezvousDoneBeforeWait(c *gc.C) {
@@ -396,7 +396,7 @@ func (s *suite) TestWaitTimeout(c *gc.C) {
 	done := make(chan struct{})
 	go func() {
 		c.Logf("starting wait %q", id)
-		_, _, err = m.Wait(ctx, id)
+		_, _, err := m.Wait(ctx, id)
 		c.Check(err, gc.ErrorMatches, "rendezvous wait timed out")
 		done <- struct{}{}
 	}()
@@ -411,7 +411,7 @@ func (s *suite) TestWaitTimeout(c *gc.C) {
 	// Try again. The item shouldn't have been removed, so we should be
 	// able to repeat the request.
 	go func() {
-		_, _, err = m.Wait(ctx, id)
+		_, _, err := m.Wait(ctx, id)
 		c.Check(err, gc.ErrorMatches, "rendezvous wait timed out")
 		done <- struct{}{}
 	}()
@@ -422,7 +422,6 @@ func (s *suite) TestWaitTimeout(c *gc.C) {
 	case <-time.After(time.Second):
 		c.Fatalf("timed out waiting for Wait to time out")
 	}
-	c.Assert(err, gc.ErrorMatches, "rendezvous wait timed out")
 
 	c.Logf("after second wait, now: %v", s.clock.Now())
 	// When the actual expiry deadline passes while we're waiting,
@@ -434,7 +433,7 @@ func (s *suite) TestWaitTimeout(c *gc.C) {
 	s.clock.Advance(expiryDeadline.Add(-time.Millisecond).Sub(s.clock.Now()))
 
 	go func() {
-		_, _, err = m.Wait(ctx, id)
+		_, _, err := m.Wait(ctx, id)
 		c.Check(err, gc.ErrorMatches, "rendezvous expired after 5s")
 		done <- struct{}{}
 	}()
