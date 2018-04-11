@@ -44,6 +44,7 @@ type dischargeSuite struct {
 var _ = gc.Suite(&dischargeSuite{})
 
 func (s *dischargeSuite) SetUpTest(c *gc.C) {
+	s.Params.AdminPassword = "test-password"
 	s.Params.IdentityProviders = []idp.IdentityProvider{
 		test.NewIdentityProvider(test.Params{Name: "test", Domain: "test-domain"}),
 	}
@@ -254,7 +255,7 @@ var dischargeForUserTests = []struct {
 	about:            "discharge macaroon",
 	condition:        "is-authenticated-user",
 	username:         "admin",
-	password:         candidtest.AdminPassword,
+	password:         "test-password",
 	dischargeForUser: "jbloggs",
 	expectUser:       "jbloggs",
 }, {
@@ -266,49 +267,49 @@ var dischargeForUserTests = []struct {
 	about:            "unsupported user",
 	condition:        "is-authenticated-user",
 	username:         "admin",
-	password:         candidtest.AdminPassword,
+	password:         "test-password",
 	dischargeForUser: "jbloggs2",
 	expectErr:        `cannot get discharge from ".*": Post .*/discharge: cannot discharge: could not determine identity: user jbloggs2 not found`,
 }, {
 	about:            "unsupported condition",
 	condition:        "is-authenticated-group",
 	username:         "admin",
-	password:         candidtest.AdminPassword,
+	password:         "test-password",
 	dischargeForUser: "jbloggs",
 	expectErr:        `.*caveat not recognized`,
 }, {
 	about:            "bad credentials",
 	condition:        "is-authenticated-user",
 	username:         "not-admin-username",
-	password:         candidtest.AdminPassword,
+	password:         "test-password",
 	dischargeForUser: "jbloggs",
 	expectErr:        `cannot get discharge from ".*": Post .*/discharge: cannot discharge: could not determine identity: invalid credentials`,
 }, {
 	about:            "is-authenticated-user with domain",
 	condition:        "is-authenticated-user @test",
 	username:         "admin",
-	password:         candidtest.AdminPassword,
+	password:         "test-password",
 	dischargeForUser: "jbloggs@test",
 	expectUser:       "jbloggs@test",
 }, {
 	about:            "is-authenticated-user with wrong domain",
 	condition:        "is-authenticated-user @test2",
 	username:         "admin",
-	password:         candidtest.AdminPassword,
+	password:         "test-password",
 	dischargeForUser: "jbloggs@test",
 	expectErr:        `cannot get discharge from ".*": Post .*/discharge: cannot discharge: could not determine identity: "jbloggs@test" not in required domain "test2"`,
 }, {
 	about:            "is-authenticated-user with invalid domain",
 	condition:        "is-authenticated-user @test-",
 	username:         "admin",
-	password:         candidtest.AdminPassword,
+	password:         "test-password",
 	dischargeForUser: "jbloggs@test",
 	expectErr:        `cannot get discharge from ".*": Post .*/discharge: cannot discharge: invalid domain "test-"`,
 }, {
 	about:            "invalid caveat",
 	condition:        " invalid caveat",
 	username:         "admin",
-	password:         candidtest.AdminPassword,
+	password:         "test-password",
 	dischargeForUser: "jbloggs@test",
 	expectErr:        `cannot get discharge from ".*": Post .*/discharge: cannot discharge: cannot parse caveat " invalid caveat": caveat starts with space character`,
 }}

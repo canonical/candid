@@ -55,6 +55,7 @@ func (s *suite) TestRendezvousWaitBeforeDone(c *gc.C) {
 	m, err := meeting.NewPlace(meeting.Params{
 		Store:      store,
 		ListenAddr: "localhost",
+		DisableGC:  true,
 	})
 	c.Assert(err, gc.IsNil)
 	defer m.Close()
@@ -101,6 +102,7 @@ func (s *suite) TestRendezvousDoneBeforeWait(c *gc.C) {
 	p, err := meeting.NewPlace(meeting.Params{
 		Store:      store,
 		ListenAddr: "localhost",
+		DisableGC:  true,
 	})
 	c.Assert(err, gc.IsNil)
 	defer p.Close()
@@ -130,9 +132,7 @@ func (s *suite) TestRendezvousDoneBeforeWait(c *gc.C) {
 	c.Assert(data1, gc.IsNil)
 	c.Assert(err, gc.ErrorMatches, `rendezvous ".*" not found`)
 
-	// TODO this test sometimes fails with a count of 1.
-	// e.g. http://ci-gce.theblues.io:8080/job/blues-identity/626/console
-	c.Assert(count, gc.Equals, int32(0))
+	c.Assert(atomic.LoadInt32(&count), gc.Equals, int32(0))
 }
 
 func (s *suite) TestRendezvousDifferentPlaces(c *gc.C) {
@@ -142,6 +142,7 @@ func (s *suite) TestRendezvousDifferentPlaces(c *gc.C) {
 	m1, err := meeting.NewPlace(meeting.Params{
 		Store:      store,
 		ListenAddr: "localhost",
+		DisableGC:  true,
 	})
 	c.Assert(err, gc.IsNil)
 	defer m1.Close()
@@ -193,7 +194,7 @@ func (s *suite) TestRendezvousDifferentPlaces(c *gc.C) {
 	c.Assert(data1, gc.IsNil)
 	c.Assert(err, gc.ErrorMatches, `rendezvous ".*" not found`)
 
-	c.Assert(count, gc.Equals, int32(0))
+	c.Assert(atomic.LoadInt32(&count), gc.Equals, int32(0))
 }
 
 func (s *suite) TestEntriesRemovedOnClose(c *gc.C) {
@@ -234,15 +235,15 @@ func (s *suite) TestRunGCNotDying(c *gc.C) {
 	m1, err := meeting.NewPlace(meeting.Params{
 		Store:          store,
 		ListenAddr:     "localhost",
-		DisableGC:      true,
 		ExpiryDuration: expiryDuration,
+		DisableGC:      true,
 	})
 	c.Assert(err, gc.IsNil)
 	m2, err := meeting.NewPlace(meeting.Params{
 		Store:          store,
 		ListenAddr:     "localhost",
-		DisableGC:      true,
 		ExpiryDuration: expiryDuration,
+		DisableGC:      true,
 	})
 	c.Assert(err, gc.IsNil)
 
@@ -307,8 +308,8 @@ func (s *suite) TestPartialRemoveOldFailure(c *gc.C) {
 	m, err := meeting.NewPlace(meeting.Params{
 		Store:          store,
 		ListenAddr:     "localhost",
-		DisableGC:      true,
 		ExpiryDuration: expiryDuration,
+		DisableGC:      true,
 	})
 	c.Assert(err, gc.IsNil)
 
