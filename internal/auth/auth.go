@@ -57,7 +57,6 @@ var AdminACL = []string{AdminUsername}
 
 // An Authorizer is used to authorize operations in the identity server.
 type Authorizer struct {
-	adminUsername  string
 	adminPassword  string
 	location       string
 	checker        *identchecker.Checker
@@ -67,10 +66,6 @@ type Authorizer struct {
 
 // Params specifify the configuration parameters for a new Authroizer.
 type Params struct {
-	// AdminUsername is the username of the admin user in the
-	// identity server.
-	AdminUsername string
-
 	// AdminPassword is the password of the admin user in the
 	// identity server.
 	AdminPassword string
@@ -97,7 +92,6 @@ type Params struct {
 // operations.
 func New(params Params) *Authorizer {
 	a := &Authorizer{
-		adminUsername: params.AdminUsername,
 		adminPassword: params.AdminPassword,
 		location:      params.Location,
 		store:         params.Store,
@@ -271,7 +265,11 @@ func (c identityClient) IdentityFromContext(ctx context.Context) (_ident identch
 		return id, nil, nil
 	}
 	if username, password, ok := userCredentialsFromContext(ctx); ok {
-		if username == c.authorizer.adminUsername && password == c.authorizer.adminPassword {
+		// TODO the mismatch between the username in the basic auth
+		// credentials and the admin username is unfortunate but we'll
+		// leave it for now. We should probably remove basic-auth authentication
+		// entirely.
+		if username+"@idm" == AdminUsername && c.authorizer.adminPassword != "" && password == c.authorizer.adminPassword {
 			return &Identity{
 				id: store.Identity{
 					Username: AdminUsername,

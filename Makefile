@@ -102,16 +102,24 @@ snap:
 	$(MAKE) -C snap/candidsrv
 	$(MAKE) -C snap/candid
 
+RELEASE_BINARY_PACKAGES=$(PROJECT)/cmd/candidsrv
+
 # Build a release tarball
 candid-$(GIT_VERSION).tar.xz: version/init.go
-	mkdir -p candid-$(GIT_VERSION)/bin
-	GOBIN=$(CURDIR)/candid-$(GIT_VERSION)/bin go install $(INSTALL_FLAGS) -v $(PROJECT)/...
-	mv candid-$(GIT_VERSION)/bin/candidsrv candid-$(GIT_VERSION)/bin/candidsrv
-	cp -r $(CURDIR)/templates candid-$(GIT_VERSION)
-	cp -r $(CURDIR)/static candid-$(GIT_VERSION)
-	tar cv candid-$(GIT_VERSION) | xz > $@
-	-rm -r candid-$(GIT_VERSION)
+	rm -rf candid-release
+	mkdir -p candid-release
+	GOBIN=$(CURDIR)/candid-release/bin go install $(INSTALL_FLAGS) -v $(RELEASE_BINARY_PACKAGES)
+	cp -r $(CURDIR)/templates candid-release
+	cp -r $(CURDIR)/static candid-release
+	@# Note: we need to redirect the "cd" below because
+	@# it can print things and hence corrupt the tar archive.
+	(cd candid-release >/dev/null 2>&1;  tar c *) | xz > $@
+	-rm -r candid-release
 
+.PHONY: deploy
+deploy: release
+	$(MAKE) -C charm build
+	juju deploy -v ./charm --resource service=candid-$(GIT_VERSION).tar.xz
 
 # Install packages required to develop the candid service and run tests.
 APT_BASED := $(shell command -v apt-get >/dev/null; echo $$?)

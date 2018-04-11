@@ -1,0 +1,85 @@
+options:
+  admin-password:
+    type: string
+    default: ""
+    description: Password for authenticating administration commands to identity.
+        If this is empty (the default) then a password will be randomly generated.
+  private-key:
+    type: string
+    default: XBXSV9nI8AWd71GGVyTzH/UpKDl+3dW7/m5flcgKKiw=
+    description: Base64 encoded 256-bit Ed25519 private key of the server.
+  public-key:
+    type: string
+    default: jQoIY9iECyfREE//AxRLPcYr0BLByDOqrADhAu9M41M=
+    description: Base64 encoded 256-bit Ed25519 public key, this should match the private key.
+  admin-agent-public-key:
+     type: string
+     default: ""
+     description: Base64 encoded 256-bit Ed25519 public key for admin agent.
+  location:
+    type: string
+    default: ""
+    description: Publicly accessable URL of the identity manager (defaults to public address of unit).
+  logging-config:
+    type: string
+    default: INFO
+    description: Loggo logging configuration string.
+  rendezvous-timeout:
+    type: string
+    default: "1m"
+    description: |
+      Amount of time that an interactive authentication request can
+      be active before it is forgotten. The value must be a time duration
+      specified as a decimal number followed by a unit from ns, us,
+      ms, s, m, h for the time units between nanosecond and hour.
+  max-mgo-sessions:
+    type: int
+    default: 500
+    description: |
+      Maximum number of concurrent mongo sessions. If this number is
+      reached then incoming requests will not proceed until the number
+      of sessions has fallen below this value.
+  identity-providers:
+    type: string
+    default: ""
+    description: >
+        The identity providers to use to authenticate users.
+        This is a YAML-formatted object with possible keys type, name, description,
+        domain, and url. Known type values are usso, usso_oauth, agent,
+        keystone, keystone_userpass, keystone_token. Keystone types require
+        a url. Some types, such as agent, require no other values.
+        Example configuration
+        - type: agent
+        - type: keystone_token
+          name: jujugui
+          description: JujuGUI
+          url: "https://keystone.canonistack.canonical.com"
+        Alternately you can use YAML flow format:
+        [{type: agent}, {type: keystone_token, name: jujugui, description: JujuGui, url: "https://www.keystone.canonistack.canonical.com"}]
+  http-proxy:
+    type: string
+    default: ""
+    description:
+      Address of proxy to use for outgoing HTTP connections.
+  no-proxy:
+    type: string
+    default: ""
+    description: |
+      List of addresses that should not use the proxy specified in http-proxy.
+      If specified this should be a comma-separated list of addresses.
+  nagios_context:
+    default: "juju"
+    type: string
+    description: |
+      Used by the nrpe subordinate charms.
+      A string that will be prepended to instance name to set the host name
+      in nagios. So for instance the hostname would be something like:
+         juju-myservice-0
+      If you are running multiple environments with the same services in them
+      this allows you to differentiate between them.
+  nagios_servicegroups:
+    default: ""
+    type: string
+    description: |
+      A comma-separated list of nagios servicegroups.
+      If left empty, the nagios_context will be used as the servicegroup.

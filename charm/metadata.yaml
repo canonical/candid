@@ -1,0 +1,29 @@
+name: candid
+summary: Candid identity server.
+maintainer: JAAS Developers <jaas-dev@lists.launchpad.net>
+description: |
+  Candid macaroon-based authentication service.
+tags:
+  - web_server
+  - authenticator
+  - authentication
+  - identity
+series:
+  - xenial
+provides:
+  website:
+    interface: http
+  nrpe:
+    interface: nrpe-external-master
+    scope: container
+  prometheus:
+    interface: prometheus
+requires:
+  db:
+    interface: mongodb
+  # TODO allow postgres relation too?
+resources:
+  service:
+    type: file
+    filename: candidsrv.tar.xz
+    description: "candid release tarball."

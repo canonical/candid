@@ -55,7 +55,6 @@ func (s *authSuite) SetUpTest(c *gc.C) {
 	})
 	s.context, s.close = s.Store.Context(context.Background())
 	s.authorizer = auth.New(auth.Params{
-		AdminUsername:    "admin",
 		AdminPassword:    "password",
 		Location:         identityLocation,
 		MacaroonVerifier: s.oven,

@@ -38,43 +38,49 @@ import (
 	"github.com/CanonicalLtd/candid/sqlstore"
 )
 
-var (
-	logger        = loggo.GetLogger("candidsrv")
-	loggingConfig = flag.String("logging-config", "", "specify log levels for modules e.g. <root>=TRACE")
-	resourcePath  = flag.String("resource-path", "", "specify the path for resource files")
-)
+var logger = loggo.GetLogger("candidsrv")
 
 func main() {
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "usage: %s [options] <config path>\n", filepath.Base(os.Args[0]))
 		flag.PrintDefaults()
-		os.Exit(2)
+		exit(2)
 	}
 	flag.Parse()
 	if flag.NArg() != 1 {
 		flag.Usage()
 	}
-	if *loggingConfig != "" {
-		if err := loggo.ConfigureLoggers(*loggingConfig); err != nil {
-			fmt.Fprintf(os.Stderr, "cannot configure loggers: %v", err)
-			os.Exit(1)
-		}
-	} else {
-		loggo.GetLogger("").SetLogLevel(loggo.INFO)
+	confPath := flag.Arg(0)
+	conf, err := config.Read(confPath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "STOP cannot read configuration: %v\n", err)
+		exit(2)
 	}
-	if err := serve(flag.Arg(0)); err != nil {
-		fmt.Fprintf(os.Stderr, "%v\n", err)
-		os.Exit(1)
+	if err := loggo.ConfigureLoggers(conf.LoggingConfig); err != nil {
+		fmt.Fprintf(os.Stderr, "STOP cannot configure loggers: %v", err)
+		exit(2)
 	}
+	if err := serve(conf); err != nil {
+		fmt.Fprintf(os.Stderr, "STOP %v\n", err)
+		exit(1)
+	}
+	fmt.Fprintln(os.Stderr, "STOP no error, weirdly")
+	exit(0)
+}
+
+// exit calls os.Exit, first sleeping for a bit to work
+// around an outrageous systemd bug which causes
+// final output lines to be lost if we exit immediately.
+// See https://github.com/systemd/systemd/issues/2913
+//
+// Note: exit status 2 implies we won't restart the service.
+func exit(code int) {
+	time.Sleep(200 * time.Millisecond)
+	os.Exit(code)
 }
 
 // serve starts the identity service.
-func serve(confPath string) error {
-	logger.Infof("reading configuration")
-	conf, err := config.Read(confPath)
-	if err != nil {
-		return errgo.Notef(err, "cannot read config file %q", confPath)
-	}
+func serve(conf *config.Config) error {
 
 	if conf.HTTPProxy != "" {
 		os.Setenv("HTTP_PROXY", conf.HTTPProxy)
@@ -150,34 +156,22 @@ func serveIdentity(conf *config.Config, params identity.ServerParams) error {
 			params.IdentityProviders[i] = idp.IdentityProvider
 		}
 	}
-
-	// If a resource path is specified on the commandline, it takes precedence
-	// over the one in the config.
-	if *resourcePath == "" {
-		if conf.ResourcePath != "" {
-			*resourcePath = conf.ResourcePath
-		} else {
-			*resourcePath = "."
-		}
-	}
-	params.StaticFileSystem = http.Dir(filepath.Join(*resourcePath, "static"))
+	params.StaticFileSystem = http.Dir(filepath.Join(conf.ResourcePath, "static"))
 
 	var err error
-	params.Template, err = template.New("").ParseGlob(filepath.Join(*resourcePath, "templates", "*"))
+	params.Template, err = template.New("").ParseGlob(filepath.Join(conf.ResourcePath, "templates", "*"))
 	if err != nil {
 		return errgo.Notef(err, "cannot parse templates")
 	}
 
-	params.AuthUsername = conf.AuthUsername
-	params.AuthPassword = conf.AuthPassword
+	params.AdminPassword = conf.AdminPassword
 	params.Key = &bakery.KeyPair{
 		Private: *conf.PrivateKey,
 		Public:  *conf.PublicKey,
 	}
-	params.WaitTimeout = conf.WaitTimeout.Duration
+	params.RendezvousTimeout = conf.RendezvousTimeout.Duration
 	params.Location = conf.Location
 	params.PrivateAddr = conf.PrivateAddr
-	params.DebugTeams = conf.DebugTeams
 	params.AdminAgentPublicKey = conf.AdminAgentPublicKey
 	srv, err := identity.NewServer(
 		params,
@@ -211,7 +205,7 @@ func serveIdentity(conf *config.Config, params identity.ServerParams) error {
 		Handler:   server,
 		TLSConfig: conf.TLSConfig(),
 	}
-
+	fmt.Println("START")
 	if conf.TLSConfig() != nil {
 		return httpServer.ListenAndServeTLS("", "")
 	}

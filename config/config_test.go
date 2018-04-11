@@ -34,23 +34,19 @@ postgres-connection-string: host=/var/run/postgresql user=test
 api-addr: 1.2.3.4:5678
 foo: 1
 bar: false
-auth-username: myuser
-auth-password: mypasswd
+admin-password: mypasswd
 private-key: 8PjzjakvIlh3BVFKe8axinRDutF6EDIfjtuf4+JaNow=
 public-key: CIdWcEUN+0OZnKW9KwruRQnQDY/qqzVdD30CijwiWCk=
 admin-agent-public-key: dUnC8p9p3nygtE2h92a47Ooq0rXg0fVSm3YBWou5/UQ=
 location: http://foo.com:1234
 max-mgo-sessions: 10
-wait-timeout: 1m
+rendezvous-timeout: 1m
 identity-providers:
  - type: usso
  - type: keystone
    name: ks1
    url: http://example.com/keystone
 private-addr: localhost
-debug-teams:
- - yellow
- - cloud-green
 tls-cert: |
   -----BEGIN CERTIFICATE-----
   MIIDLDCCAhQCCQDVXrWn1thP6DANBgkqhkiG9w0BAQsFADBYMQswCQYDVQQGEwJH
@@ -139,14 +135,13 @@ func (s *configSuite) TestRead(c *gc.C) {
 		MongoAddr:                "localhost:23456",
 		PostgresConnectionString: "host=/var/run/postgresql user=test",
 		APIAddr:                  "1.2.3.4:5678",
-		AuthUsername:             "myuser",
-		AuthPassword:             "mypasswd",
+		AdminPassword:            "mypasswd",
 		PrivateKey:               &key.Private,
 		PublicKey:                &key.Public,
 		AdminAgentPublicKey:      &adminPubKey,
 		Location:                 "http://foo.com:1234",
 		MaxMgoSessions:           10,
-		WaitTimeout:              config.DurationString{Duration: time.Minute},
+		RendezvousTimeout:        config.DurationString{Duration: time.Minute},
 		IdentityProviders: []config.IdentityProvider{{
 			IdentityProvider: IdentityProvider{
 				Params: map[string]string{
@@ -163,7 +158,6 @@ func (s *configSuite) TestRead(c *gc.C) {
 			},
 		}},
 		PrivateAddr:  "localhost",
-		DebugTeams:   []string{"yellow", "cloud-green"},
 		ResourcePath: "/resources",
 		HTTPProxy:    "http://proxy.example.com:3128",
 		NoProxy:      "localhost,.example.com",
@@ -178,7 +172,7 @@ func (s *configSuite) TestReadErrorNotFound(c *gc.C) {
 
 func (s *configSuite) TestReadErrorEmpty(c *gc.C) {
 	cfg, err := s.readConfig(c, "")
-	c.Assert(err, gc.ErrorMatches, "missing fields mongo-addr or postgres-connection-string, api-addr, auth-username, auth-password, private-key, public-key, location, max-mgo-sessions, private-addr in config file")
+	c.Assert(err, gc.ErrorMatches, "missing fields mongo-addr or postgres-connection-string, api-addr, private-key, public-key, location, max-mgo-sessions, private-addr in config file")
 	c.Assert(cfg, gc.IsNil)
 }
 
