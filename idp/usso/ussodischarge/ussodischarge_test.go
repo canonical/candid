@@ -379,7 +379,7 @@ func (s *ussoMacaroonSuite) TestHandlePostV1(c *gc.C) {
 }
 
 func timeString(d time.Duration) string {
-	return time.Now().Add(d).Format(ussodischarge.TimeFormat)
+	return time.Now().Add(d).UTC().Format(ussodischarge.TimeFormat)
 }
 
 var testKey *rsa.PrivateKey
