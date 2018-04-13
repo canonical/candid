@@ -129,7 +129,7 @@ func (s *loginSuite) TestLoginMethodsIncludesAgent(c *gc.C) {
 	var lm params.LoginMethods
 	err = json.Unmarshal(buf, &lm)
 	c.Assert(err, gc.Equals, nil)
-	c.Assert(lm.Agent, gc.Equals, s.URL+"/login/agent")
+	c.Assert(lm.Agent, gc.Equals, s.URL+"/login/legacy-agent")
 }
 
 func (s *loginSuite) getNoRedirect(c *gc.C, path string) *http.Response {
