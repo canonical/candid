@@ -147,7 +147,7 @@ func (l *visitCompleter) Failure(_ context.Context, _ http.ResponseWriter, _ *ht
 
 type dischargeTokenCreator struct{}
 
-func (d *dischargeTokenCreator) DischargeToken(_ context.Context, _ string, id *store.Identity) (*httpbakery.DischargeToken, error) {
+func (d *dischargeTokenCreator) DischargeToken(_ context.Context, id *store.Identity) (*httpbakery.DischargeToken, error) {
 	return &httpbakery.DischargeToken{
 		Kind:  "test",
 		Value: []byte(id.Username),

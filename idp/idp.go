@@ -20,7 +20,7 @@ import (
 type DischargeTokenCreator interface {
 	// DischargeToken creates a new httpbakery.DischargeToken for the
 	// given identity.
-	DischargeToken(ctx context.Context, dischargeID string, id *store.Identity) (*httpbakery.DischargeToken, error)
+	DischargeToken(ctx context.Context, id *store.Identity) (*httpbakery.DischargeToken, error)
 }
 
 // A VisitCompleter is used by the identity providers to finish login

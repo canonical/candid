@@ -20,7 +20,6 @@ import (
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
 
 	"github.com/CanonicalLtd/candid/idp"
-	"github.com/CanonicalLtd/candid/internal/auth"
 	"github.com/CanonicalLtd/candid/internal/identity"
 	"github.com/CanonicalLtd/candid/store"
 )
@@ -75,18 +74,14 @@ type dischargeTokenCreator struct {
 	params identity.HandlerParams
 }
 
-func (d *dischargeTokenCreator) DischargeToken(ctx context.Context, dischargeID string, id *store.Identity) (*httpbakery.DischargeToken, error) {
-	cavs := []checkers.Caveat{
-		candidclient.UserDeclaration(id.Username),
-	}
-	if dischargeID != "" {
-		cavs = append(cavs, auth.DischargeIDCaveat(dischargeID))
-	}
-	cavs = append(cavs, checkers.TimeBeforeCaveat(time.Now().Add(dischargeTokenDuration)))
+func (d *dischargeTokenCreator) DischargeToken(ctx context.Context, id *store.Identity) (*httpbakery.DischargeToken, error) {
 	m, err := d.params.Oven.NewMacaroon(
 		ctx,
 		bakery.LatestVersion,
-		cavs,
+		[]checkers.Caveat{
+			checkers.TimeBeforeCaveat(time.Now().Add(dischargeTokenDuration)),
+			candidclient.UserDeclaration(id.Username),
+		},
 		identchecker.LoginOp,
 	)
 	if err != nil {
@@ -117,7 +112,7 @@ type visitCompleter struct {
 
 // Success implements idp.VisitCompleter.Success.
 func (c *visitCompleter) Success(ctx context.Context, w http.ResponseWriter, req *http.Request, dischargeID string, id *store.Identity) {
-	dt, err := c.dischargeTokenCreator.DischargeToken(ctx, dischargeID, id)
+	dt, err := c.dischargeTokenCreator.DischargeToken(ctx, id)
 	if err != nil {
 		c.Failure(ctx, w, req, dischargeID, errgo.Mask(err))
 		return

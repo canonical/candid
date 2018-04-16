@@ -16,6 +16,6 @@ func NewVisitCompleter(params identity.HandlerParams) idp.VisitCompleter {
 	return &visitCompleter{
 		params:                params,
 		dischargeTokenCreator: &dischargeTokenCreator{params: params},
-		place:                 &place{params.MeetingPlace},
+		place: &place{params.MeetingPlace},
 	}
 }

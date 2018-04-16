@@ -31,7 +31,7 @@ func NewAPIHandler(params identity.HandlerParams) ([]httprequest.Handler, error)
 	vc := &visitCompleter{
 		params:                params,
 		dischargeTokenCreator: dt,
-		place:                 place,
+		place: place,
 	}
 	if err := initIDPs(context.Background(), params, dt, vc); err != nil {
 		return nil, errgo.Mask(err)

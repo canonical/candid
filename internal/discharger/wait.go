@@ -5,7 +5,9 @@ package discharger
 
 import (
 	"encoding/base64"
+	"net/http"
 
+	"github.com/CanonicalLtd/candid/internal/auth"
 	"golang.org/x/net/context"
 	"gopkg.in/CanonicalLtd/candidclient.v1/params"
 	errgo "gopkg.in/errgo.v1"
@@ -13,6 +15,7 @@ import (
 	"gopkg.in/macaroon-bakery.v2/bakery"
 	"gopkg.in/macaroon-bakery.v2/bakery/checkers"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
+	macaroon "gopkg.in/macaroon.v2"
 )
 
 // waitTokenRequest is the request sent to the server to wait for logins to
@@ -26,7 +29,7 @@ type waitTokenRequest struct {
 // WaitToken waits on the rendezvous place for a discharge token and
 // returns it.
 func (h *handler) WaitToken(p httprequest.Params, req *waitTokenRequest) (*httpbakery.WaitTokenResponse, error) {
-	_, dt, err := h.wait(p.Context, req.DischargeID)
+	_, dt, err := h.waitToken(p, req.DischargeID)
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Any)
 	}
@@ -34,6 +37,21 @@ func (h *handler) WaitToken(p httprequest.Params, req *waitTokenRequest) (*httpb
 		Kind:    dt.Kind,
 		Token64: base64.StdEncoding.EncodeToString(dt.Value),
 	}, nil
+}
+
+func (h *handler) waitToken(p httprequest.Params, dischargeID string) (*dischargeRequestInfo, *httpbakery.DischargeToken, error) {
+	if dischargeID == "" {
+		return nil, nil, errgo.WithCausef(nil, params.ErrBadRequest, "discharge id parameter not found")
+	}
+	// TODO don't wait forever here.
+	reqInfo, login, err := h.params.place.Wait(p.Context, dischargeID)
+	if err != nil {
+		return nil, nil, errgo.Notef(err, "cannot wait")
+	}
+	if login.Error != nil {
+		return nil, nil, errgo.NoteMask(login.Error, "login failed", errgo.Any)
+	}
+	return reqInfo, login.DischargeToken, nil
 }
 
 // waitRequest is the request sent to the server to wait for logins to
@@ -44,15 +62,39 @@ type waitRequest struct {
 	DischargeID       string `httprequest:"did,form"`
 }
 
+// waitResponse is compatible with httpbakery.WaitResponse
+// but adds a DischargeToken field for clients that can't
+// use the identity cookie.
+type waitResponse struct {
+	httpbakery.WaitResponse
+
+	// DischargeToken holds a macaroon that can be attached as
+	// authorization for future discharge requests. This will also
+	// be returned as a cookie.
+	DischargeToken macaroon.Slice
+}
+
 // Wait serves an HTTP endpoint that waits until a macaroon has been
 // discharged, and returns the discharge macaroon.
 // This is part of the legacy visit-wait protocol; newer clients will use WaitToken
 // instead.
-func (h *handler) WaitLegacy(p httprequest.Params, req *waitRequest) (*httpbakery.WaitResponse, error) {
+func (h *handler) WaitLegacy(p httprequest.Params, req *waitRequest) (*waitResponse, error) {
+	ctx := p.Context
 	reqInfo, dt, err := h.wait(p.Context, req.DischargeID)
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Any)
 	}
+
+	// TODO we'd like to add a caveat to the discharge-token macaroon
+	// to prevent it being moved between origins, but it's too late
+	// because if it's an agent macaroon, it's already bound.
+	//
+	// however... why can't we just add the origin caveat when we create
+	// the discharge token? the problem with that is that the callers of
+	// DischargeToken don't neceessarily have access to the original origin
+	// (because they might be creating the token in response to a callback
+	// from an external identity provider, for example).
+
 	m, err := bakery.Discharge(p.Context, bakery.DischargeParams{
 		Id:     reqInfo.CaveatId,
 		Caveat: reqInfo.Caveat,
@@ -69,8 +111,20 @@ func (h *handler) WaitLegacy(p httprequest.Params, req *waitRequest) (*httpbaker
 	if err != nil {
 		return nil, errgo.NoteMask(err, "cannot discharge", errgo.Any)
 	}
-	return &httpbakery.WaitResponse{
-		Macaroon: m,
+	// Turn the discharge token into a macaroon so that
+	// we can set it as a cookie.
+	dtMacaroon, err := macaroonsFromDischargeToken(ctx, dt)
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
+	if err := setIdentityCookie(p.Response, dtMacaroon); err != nil {
+		return nil, errgo.Mask(err)
+	}
+	return &waitResponse{
+		WaitResponse: httpbakery.WaitResponse{
+			Macaroon: m,
+		},
+		DischargeToken: dtMacaroon,
 	}, nil
 }
 
@@ -87,4 +141,25 @@ func (h *handler) wait(ctx context.Context, dischargeID string) (*dischargeReque
 		return nil, nil, errgo.NoteMask(login.Error, "login failed", errgo.Any)
 	}
 	return reqInfo, login.DischargeToken, nil
+}
+
+// setIdentityCookie sets a cookie on the given response that will allow
+// the user to log in without authenticating themselves. Note that when
+// this is done on a wait or a discharge request, this is a security
+// hole that means that any web site can obtain the capability to do
+// arbitrary things as the logged in user. For the command line, though,
+// we do want to return the cookie.
+//
+// TODO distinguish between the two cases by looking at the
+// X-Requested-With header, return the identity cookie only when it's
+// not present (i.e. when /wait is not called from an AJAX request).
+func setIdentityCookie(resp http.ResponseWriter, m macaroon.Slice) error {
+	cookie, err := httpbakery.NewCookie(auth.Namespace, m)
+	if err != nil {
+		return errgo.Notef(err, "cannot make cookie")
+	}
+	cookie.Path = "/"
+	cookie.Name = "macaroon-identity"
+	http.SetCookie(resp, cookie)
+	return nil
 }

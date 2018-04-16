@@ -160,7 +160,7 @@ func (idp *identityProvider) handlePost(ctx context.Context, w http.ResponseWrit
 	default:
 		return nil, errgo.WithCausef(nil, params.ErrNotFound, "path %q not found", req.URL.Path)
 	case "/interact":
-		dt, err := idp.initParams.DischargeTokenCreator.DischargeToken(ctx, idputil.DischargeID(req), &id)
+		dt, err := idp.initParams.DischargeTokenCreator.DischargeToken(ctx, &id)
 		if err != nil {
 			return nil, errgo.Mask(err)
 		}

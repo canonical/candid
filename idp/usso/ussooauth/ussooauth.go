@@ -105,7 +105,7 @@ func (idp *identityProvider) Handle(ctx context.Context, w http.ResponseWriter, 
 		return
 	}
 	if strings.TrimPrefix(req.URL.Path, idp.initParams.URLPrefix) == "/interact" {
-		token, err := idp.initParams.DischargeTokenCreator.DischargeToken(ctx, idputil.DischargeID(req), &identity)
+		token, err := idp.initParams.DischargeTokenCreator.DischargeToken(ctx, &identity)
 		if err != nil {
 			code, body := httpbakery.ErrorToResponse(ctx, err)
 			httprequest.WriteJSON(w, code, body)

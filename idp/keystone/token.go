@@ -67,7 +67,7 @@ func (idp *tokenIdentityProvider) Handle(ctx context.Context, w http.ResponseWri
 		return
 	}
 	if strings.TrimPrefix(req.URL.Path, idp.initParams.URLPrefix) == "/interact" {
-		dt, err := idp.initParams.DischargeTokenCreator.DischargeToken(ctx, idputil.DischargeID(req), user)
+		dt, err := idp.initParams.DischargeTokenCreator.DischargeToken(ctx, user)
 		if err != nil {
 			idp.initParams.VisitCompleter.Failure(ctx, w, req, idputil.DischargeID(req), err)
 			return
