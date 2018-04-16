@@ -185,7 +185,7 @@ func (c *thirdPartyCaveatChecker) interactionRequiredError(ctx context.Context, 
 		return errgo.Notef(err, "cannot make rendezvous")
 	}
 	ierr := httpbakery.NewInteractionRequiredError(why, p.req)
-	agent.SetInteraction(ierr, c.params.Location+"/login/agent?did="+p.dischargeID)
+	agent.SetInteraction(ierr, agentURL(c.params.Location, p.dischargeID))
 	for _, idp := range c.params.IdentityProviders {
 		if p.domain != "" && idp.Domain() != p.domain {
 			// The client has specified a domain and the idp is not in that domain,

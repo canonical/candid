@@ -21,7 +21,7 @@ type legacyLoginRequest struct {
 	DischargeID       string `httprequest:"did,form"`
 }
 
-// LoginLegacy handles the GET /login-legacy endpoint that is used to log in to IdM
+// LoginLegacy handles the GET /login-legacy endpoint that is used to log in to Candid
 // when the legacy visit-wait protocol is used.
 func (h *handler) LoginLegacy(p httprequest.Params, lr *legacyLoginRequest) error {
 	// We should really be parsing the accept header properly here, but
@@ -29,7 +29,7 @@ func (h *handler) LoginLegacy(p httprequest.Params, lr *legacyLoginRequest) erro
 	// perhaps use http://godoc.org/bitbucket.org/ww/goautoneg for this.
 	// Probably not worth it now that it's only part of the legacy protocol.
 	if p.Request.Header.Get("Accept") == "application/json" {
-		methods := map[string]string{"agent": h.legacyAgentURL(lr.DischargeID)}
+		methods := map[string]string{"agent": legacyAgentURL(h.params.Location, lr.DischargeID)}
 		for _, idp := range h.params.IdentityProviders {
 			methods[idp.Name()] = idp.URL(lr.DischargeID)
 		}
@@ -64,7 +64,7 @@ type loginRequest struct {
 	DischargeID       string `httprequest:"did,form"`
 }
 
-// Login handles the GET /v1/login endpoint that is used to log in to IdM
+// Login handles the GET /v1/login endpoint that is used to log in to Candid.
 // when an interactive visit-wait protocol has been chosen by the client.
 func (h *handler) Login(p httprequest.Params, lr *loginRequest) error {
 	return h.login(p, lr.DischargeID, lr.Domain)

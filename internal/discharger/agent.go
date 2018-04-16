@@ -54,6 +54,16 @@ type agentMacaroonResponse struct {
 	Macaroon *bakery.Macaroon `json:"macaroon"`
 }
 
+// agentURL returns the URL path for the agent-login endpoint for the
+// candid service at the given location.
+func agentURL(location string, dischargeID string) string {
+	p := location + "/login/agent"
+	if dischargeID != "" {
+		p += "?did=" + dischargeID
+	}
+	return p
+}
+
 // AgentLogin is the endpoint used to acquire an agent macaroon
 // as part of a discharge request.
 func (h *handler) AgentLogin(p httprequest.Params, req *agentLoginRequest) (*agentMacaroonResponse, error) {
@@ -112,7 +122,7 @@ func (h *handler) LegacyAgentLogin(p httprequest.Params, req *legacyAgentLoginRe
 	return resp, nil
 }
 
-// agentLoginPostRequest is the expected request to the agent-login
+// legacyAgentLoginPostRequest is the expected request to the agent-login
 // endpoint when using the POST protocol.
 type legacyAgentLoginPostRequest struct {
 	httprequest.Route `httprequest:"POST /login/legacy-agent"`
@@ -120,7 +130,7 @@ type legacyAgentLoginPostRequest struct {
 	AgentLogin        params.AgentLogin `httprequest:",body"`
 }
 
-// AgentLoginPost is the endpoint used when performing an agent login
+// LegacyAgentLoginPost is the endpoint used when performing an agent login
 // using the POST protocol.
 func (h *handler) LegacyAgentLoginPost(p httprequest.Params, req *legacyAgentLoginPostRequest) (*agent.LegacyAgentResponse, error) {
 	resp, err := h.legacyAgentLogin(p.Context, p.Request, req.DischargeID, string(req.AgentLogin.Username), req.AgentLogin.PublicKey)
@@ -130,7 +140,7 @@ func (h *handler) LegacyAgentLoginPost(p httprequest.Params, req *legacyAgentLog
 	return resp, nil
 }
 
-// agentLogin handles the common parts of the legacy agent login protocols.
+// legacyAgentLogin handles the common parts of the legacy agent login protocols.
 func (h *handler) legacyAgentLogin(ctx context.Context, req *http.Request, dischargeID string, user string, key *bakery.PublicKey) (*agent.LegacyAgentResponse, error) {
 	loginOp := loginOp(user)
 	vers := httpbakery.RequestVersion(req)
@@ -169,12 +179,12 @@ func (h *handler) legacyAgentLogin(ctx context.Context, req *http.Request, disch
 	})
 }
 
-// legacyAgentURL generates an approptiate URL for use with the
-// legacy agent login protocols.
-func (h *handler) legacyAgentURL(dischargeID string) string {
-	url := h.params.Location + "/login/legacy-agent"
+// legacyAgentURL returns the URL path for the legacy agent login endpoint
+// for the candid service at the given location.
+func legacyAgentURL(location string, dischargeID string) string {
+	p := location + "/login/legacy-agent"
 	if dischargeID != "" {
-		url += "?did=" + dischargeID
+		p += "?did=" + dischargeID
 	}
-	return url
+	return p
 }
