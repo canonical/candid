@@ -73,7 +73,7 @@ func (h *handler) AgentLogin(p httprequest.Params, req *agentLoginRequest) (*age
 	if req.PublicKey == nil {
 		return nil, errgo.WithCausef(nil, params.ErrBadRequest, "public-key not specified")
 	}
-	m, err := h.agentMacaroon(p.Context, httpbakery.RequestVersion(p.Request), identchecker.LoginOp, req.Username, req.PublicKey, req.DischargeID)
+	m, err := h.agentMacaroon(p.Context, httpbakery.RequestVersion(p.Request), identchecker.LoginOp, req.Username, req.PublicKey)
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}
@@ -82,7 +82,7 @@ func (h *handler) AgentLogin(p httprequest.Params, req *agentLoginRequest) (*age
 
 // agentMacaroon creates a new macaroon containing a local third-party
 // caveat addressed to the specified agent.
-func (h *handler) agentMacaroon(ctx context.Context, vers bakery.Version, op bakery.Op, user string, key *bakery.PublicKey, dischargeID string) (*bakery.Macaroon, error) {
+func (h *handler) agentMacaroon(ctx context.Context, vers bakery.Version, op bakery.Op, user string, key *bakery.PublicKey) (*bakery.Macaroon, error) {
 	m, err := h.params.Oven.NewMacaroon(
 		ctx,
 		vers,
@@ -91,7 +91,6 @@ func (h *handler) agentMacaroon(ctx context.Context, vers bakery.Version, op bak
 			candidclient.UserDeclaration(user),
 			bakery.LocalThirdPartyCaveat(key, vers),
 			auth.UserHasPublicKeyCaveat(params.Username(user), key),
-			auth.DischargeIDCaveat(dischargeID),
 		},
 		op,
 	)
@@ -148,7 +147,7 @@ func (h *handler) legacyAgentLogin(ctx context.Context, req *http.Request, disch
 	ctx = auth.ContextWithDischargeID(ctx, dischargeID)
 	_, err := h.params.Authorizer.Auth(ctx, httpbakery.RequestMacaroons(req), loginOp)
 	if err == nil {
-		dt, err := h.params.dischargeTokenCreator.DischargeToken(ctx, dischargeID, &store.Identity{
+		dt, err := h.params.dischargeTokenCreator.DischargeToken(ctx, &store.Identity{
 			Username: user,
 		})
 		if err != nil {
@@ -168,7 +167,7 @@ func (h *handler) legacyAgentLogin(ctx context.Context, req *http.Request, disch
 	// part of the discharge process so we can't do that here.
 	// Instead, mint a very short term macaroon containing
 	// the local third party caveat that will allow access if discharged.
-	m, err := h.agentMacaroon(ctx, vers, loginOp, user, key, dischargeID)
+	m, err := h.agentMacaroon(ctx, vers, loginOp, user, key)
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot create macaroon")
 	}

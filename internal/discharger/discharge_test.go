@@ -197,7 +197,7 @@ func (t *responseBodyRecordingTransport) RoundTrip(req *http.Request) (*http.Res
 }
 
 func (s *dischargeSuite) TestDischargeFromDifferentOriginWhenLoggedIn(c *gc.C) {
-	c.Skip("cookies not yet supported")
+	c.Skip("origin caveats on identity cookies not yet supported")
 	var disabled bool
 	openWebBrowser := func(u *url.URL) error {
 		if disabled {
@@ -548,9 +548,7 @@ func (s *dischargeSuite) TestPublicKey(c *gc.C) {
 	})
 }
 
-// TODO(mhilton): Work out how to deal with identity cookies later.
 func (s *dischargeSuite) TestIdentityCookieParameters(c *gc.C) {
-	c.Skip("cookies not yet supported")
 	client := s.Client(webBrowserInteractor)
 	jar := new(testCookieJar)
 	client.Client.Jar = jar

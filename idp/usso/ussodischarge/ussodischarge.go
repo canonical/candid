@@ -255,7 +255,7 @@ func (idp identityProvider) handleInteract(ctx context.Context, w http.ResponseW
 		if err != nil {
 			return err
 		}
-		token, err := idp.initParams.DischargeTokenCreator.DischargeToken(ctx, idputil.DischargeID(req), user)
+		token, err := idp.initParams.DischargeTokenCreator.DischargeToken(ctx, user)
 		if err != nil {
 			return err
 		}

@@ -107,14 +107,17 @@ func (c *thirdPartyCaveatChecker) checkThirdPartyCaveat(ctx context.Context, p h
 		}
 		ctx = auth.ContextWithUsername(ctx, user)
 	} else if p.Token != nil {
-		mss, err = c.macaroonsFromDischargeToken(ctx, p.Token)
+		tokenMacaroons, err := macaroonsFromDischargeToken(ctx, p.Token)
 		if err != nil {
 			return nil, errgo.Mask(err)
 		}
+		mss = []macaroon.Slice{tokenMacaroons}
+	} else {
+		// If no discharge token has been provided, include macaroons
+		// from the request too, to enable clients to re-use previous discharge tokens that
+		// have been returned as cookies.
+		mss = httpbakery.RequestMacaroons(p.Request)
 	}
-	// Append any macaroons from the request so that we'll take
-	// account of the identity cookie if present.
-	mss = append(mss, httpbakery.RequestMacaroons(p.Request)...)
 
 	authInfo, err := c.params.Authorizer.Auth(ctx, mss, op)
 	if _, ok := errgo.Cause(err).(*bakery.DischargeRequiredError); ok {
@@ -129,13 +132,22 @@ func (c *thirdPartyCaveatChecker) checkThirdPartyCaveat(ctx context.Context, p h
 	if cond == "is-member-of" {
 		return nil, nil
 	}
+	if p.Token != nil && len(mss) > 0 {
+		// As well as discharging the original third party caveat, also
+		// set the discharge token macaroon as a cookie
+		// so that it may be used for future discharges if appropriate
+		// (it will be ignored otherwise).
+		if err := setIdentityCookie(p.Response, mss[0]); err != nil {
+			return nil, errgo.Mask(err)
+		}
+	}
 	return []checkers.Caveat{
 		candidclient.UserDeclaration(authInfo.Identity.Id()),
 		checkers.TimeBeforeCaveat(time.Now().Add(24 * time.Hour)),
 	}, nil
 }
 
-func (c *thirdPartyCaveatChecker) macaroonsFromDischargeToken(ctx context.Context, token *httpbakery.DischargeToken) ([]macaroon.Slice, error) {
+func macaroonsFromDischargeToken(ctx context.Context, token *httpbakery.DischargeToken) (macaroon.Slice, error) {
 	var ms macaroon.Slice
 	var v encoding.BinaryUnmarshaler
 	switch token.Kind {
@@ -144,6 +156,8 @@ func (c *thirdPartyCaveatChecker) macaroonsFromDischargeToken(ctx context.Contex
 	case "agent":
 		v = &ms
 	case "macaroon":
+		// TODO store a slice of macaroons in the token so
+		// the format is the same in both cases.
 		var m macaroon.Macaroon
 		ms = macaroon.Slice{&m}
 		v = &m
@@ -151,7 +165,7 @@ func (c *thirdPartyCaveatChecker) macaroonsFromDischargeToken(ctx context.Contex
 	if err := v.UnmarshalBinary(token.Value); err != nil {
 		return nil, errgo.WithCausef(err, params.ErrBadRequest, "invalid token")
 	}
-	return []macaroon.Slice{ms}, nil
+	return ms, nil
 }
 
 func (c *thirdPartyCaveatChecker) updateDischargeTime(ctx context.Context, username string) {
