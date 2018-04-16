@@ -21,7 +21,7 @@ type legacyLoginRequest struct {
 	DischargeID       string `httprequest:"did,form"`
 }
 
-// LoginLegacy handles the GET /v1/login-legacy endpoint that is used to log in to IdM
+// LoginLegacy handles the GET /login-legacy endpoint that is used to log in to IdM
 // when the legacy visit-wait protocol is used.
 func (h *handler) LoginLegacy(p httprequest.Params, lr *legacyLoginRequest) error {
 	// We should really be parsing the accept header properly here, but
@@ -29,7 +29,7 @@ func (h *handler) LoginLegacy(p httprequest.Params, lr *legacyLoginRequest) erro
 	// perhaps use http://godoc.org/bitbucket.org/ww/goautoneg for this.
 	// Probably not worth it now that it's only part of the legacy protocol.
 	if p.Request.Header.Get("Accept") == "application/json" {
-		methods := map[string]string{"agent": h.agentURL(lr.DischargeID)}
+		methods := map[string]string{"agent": h.legacyAgentURL(lr.DischargeID)}
 		for _, idp := range h.params.IdentityProviders {
 			methods[idp.Name()] = idp.URL(lr.DischargeID)
 		}
@@ -42,7 +42,8 @@ func (h *handler) LoginLegacy(p httprequest.Params, lr *legacyLoginRequest) erro
 
 	_, _, err := agent.LoginCookie(p.Request)
 	if errgo.Cause(err) != agent.ErrNoAgentLoginCookie {
-		resp, err := h.AgentLogin(p, &agentLoginRequest{
+
+		resp, err := h.LegacyAgentLogin(p, &legacyAgentLoginRequest{
 			DischargeID: lr.DischargeID,
 		})
 		if err != nil {

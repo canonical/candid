@@ -53,8 +53,8 @@ func (s *agentSuite) TestGetAgentDischargeNoCookie(c *gc.C) {
 	client := &httprequest.Client{
 		BaseURL: s.URL,
 	}
-	err := client.Get(context.Background(), "/login/agent", nil)
-	c.Assert(err, gc.ErrorMatches, `Get http://.*/login/agent: no agent-login cookie found`)
+	err := client.Get(context.Background(), "/login/legacy-agent", nil)
+	c.Assert(err, gc.ErrorMatches, `Get http://.*/login/legacy-agent: no agent-login cookie found`)
 }
 
 func (s *agentSuite) TestLegacyAgentDischarge(c *gc.C) {
@@ -210,6 +210,7 @@ func (t fakeLegacyServerTransport) RoundTrip(req *http.Request) (*http.Response,
 	if t.t == nil {
 		t.t = http.DefaultTransport
 	}
+
 	resp, err := t.t.RoundTrip(req)
 	if !strings.HasSuffix(req.URL.Path, "/discharge") || err != nil || resp.StatusCode == http.StatusOK {
 		return resp, err
