@@ -99,7 +99,7 @@ func (s *legacySuite) TestLegacySource(c *gc.C) {
 		Username:     "test2@admin@idm",
 		Groups:       []string{"group3", "group4"},
 		PublicKeys:   []bakery.PublicKey{k1.Public},
-		ProviderInfo: map[string][]string{"owner": []string{"idm:admin@idm", "admin@idm"}},
+		ProviderInfo: map[string][]string{"owner": {"idm:admin@idm", "admin@idm"}},
 	})
 
 	identity3 := store.Identity{

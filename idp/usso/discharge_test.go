@@ -37,7 +37,7 @@ func (s *dischargeSuite) TearDownSuite(c *gc.C) {
 func (s *dischargeSuite) SetUpTest(c *gc.C) {
 	s.Suite.SetUpTest(c)
 	s.Params.IdentityProviders = []idp.IdentityProvider{
-		usso.IdentityProvider,
+		usso.NewIdentityProvider(usso.Params{}),
 	}
 	s.DischargeSuite.SetUpTest(c)
 }

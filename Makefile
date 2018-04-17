@@ -1,4 +1,5 @@
 # Copyright 2014 Canonical Ltd.
+# Licensed under the AGPLv3, see LICENCE file for details.
 # Makefile for the candid identity service.
 
 ifndef GOPATH
@@ -30,7 +31,7 @@ endef
 default: build
 
 $(GOPATH)/bin/godeps:
-	go get -v launchpad.net/godeps
+	go get -u github.com/rogpeppe/godeps
 
 # Start of GOPATH-dependent targets. Some targets only make sense -
 # and will only work - when this tree is found on the GOPATH.

@@ -113,9 +113,9 @@ func (s *findSuite) TestFindWithEmail(c *gc.C) {
 	err := json.Unmarshal([]byte(stdout), &usernames)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(usernames, jc.DeepEquals, []map[string]string{
-		map[string]string{"username": "alice", "email": "alice@example.com"},
-		map[string]string{"username": "bob", "email": "bob@example.com"},
-		map[string]string{"username": "charlie", "email": "charlie@example.com"},
+		{"username": "alice", "email": "alice@example.com"},
+		{"username": "bob", "email": "bob@example.com"},
+		{"username": "charlie", "email": "charlie@example.com"},
 	})
 }
 
@@ -137,8 +137,8 @@ func (s *findSuite) TestFindWithEmailAndGravatar(c *gc.C) {
 	err := json.Unmarshal([]byte(stdout), &usernames)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(usernames, jc.DeepEquals, []map[string]string{
-		map[string]string{"username": "alice", "email": "alice@example.com", "gravatar_id": "alice@gravatar"},
-		map[string]string{"username": "bob", "email": "bob@example.com", "gravatar_id": "bob@gravatar"},
-		map[string]string{"username": "charlie", "email": "charlie@example.com", "gravatar_id": "charlie@gravatar"},
+		{"username": "alice", "email": "alice@example.com", "gravatar_id": "alice@gravatar"},
+		{"username": "bob", "email": "bob@example.com", "gravatar_id": "bob@gravatar"},
+		{"username": "charlie", "email": "charlie@example.com", "gravatar_id": "charlie@gravatar"},
 	})
 }
