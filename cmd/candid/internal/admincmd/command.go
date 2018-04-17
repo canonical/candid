@@ -85,22 +85,27 @@ func (c *candidCommand) Client(ctxt *cmd.Context) (*candidclient.Client, error) 
 		return c.client, nil
 	}
 	bClient := httpbakery.NewClient()
-	bClient.AddInteractor(httpbakery.WebBrowserInteractor{})
-	var err error
-	bClient.Client.Jar, err = cookiejar.New(&cookiejar.Options{
-		PublicSuffixList: publicsuffix.List,
-	})
-	if err != nil {
-		return nil, errgo.Mask(err)
-	}
 	candidURL := candidURL(c.url)
 	if c.agentFile != "" {
+		// Agent authentication has been specified, so we probably don't
+		// want to use existing cookies (which might be logged in as a different
+		// user) or to fall back to interactive authentication.
 		v, err := readAgentFile(ctxt.AbsPath(c.agentFile))
 		if err != nil {
 			return nil, errgo.Notef(err, "cannot load agent information")
 		}
 		agent.SetUpAuth(bClient, v)
+	} else {
+		jar, err := cookiejar.New(&cookiejar.Options{
+			PublicSuffixList: publicsuffix.List,
+		})
+		if err != nil {
+			return nil, errgo.Mask(err)
+		}
+		bClient.Client.Jar = jar
+		bClient.AddInteractor(httpbakery.WebBrowserInteractor{})
 	}
+	bClient.AddInteractor(httpbakery.WebBrowserInteractor{})
 
 	client, err := candidclient.New(candidclient.NewParams{
 		BaseURL: candidURL,
