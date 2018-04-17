@@ -253,7 +253,7 @@ type identityClient struct {
 // IdentityFromContext implements
 // identchecker.IdentityClient.IdentityFromContext by looking for admin
 // credentials in the context.
-func (c identityClient) IdentityFromContext(ctx context.Context) (_ident identchecker.Identity, _ []checkers.Caveat, _ error) {
+func (c identityClient) IdentityFromContext(ctx context.Context) (identchecker.Identity, []checkers.Caveat, error) {
 	if username := usernameFromContext(ctx); username != "" {
 		if err := CheckUserDomain(ctx, username); err != nil {
 			return nil, nil, errgo.Mask(err)

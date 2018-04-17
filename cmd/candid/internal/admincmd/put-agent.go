@@ -33,13 +33,17 @@ func newPutAgentCommand() cmd.Command {
 }
 
 var putAgentDoc = `
-The put-agent command creates or updates an agent user.
+The put-agent command creates or updates an agent user on the Candid
+server.
 
 An agent user has an associated public key - the private key pair can
 be used to authenticate as that agent.
 
 The name of the agent is chosen by the identity manager itself
-and is written to the agent file.
+and is written to the agent file, except as a special case, if the
+--admin flag is specified, when the agent information will only
+be written locally (this is so that an admin agent file can be generated
+before bootstrapping the Candid server for the first time).
 
 The agent will be made a member of any of the specified groups as long
 as the currently authenticated user is a member of those groups.
@@ -113,6 +117,9 @@ func (c *putAgentCommand) Run(cmdctx *cmd.Context) error {
 	var username params.Username
 	if c.admin {
 		username = auth.AdminUsername
+		if len(c.groups) > 0 {
+			return errgo.Newf("cannot specify groups when using --admin flag")
+		}
 	} else {
 		resp, err := client.CreateAgent(ctx, &params.CreateAgentRequest{
 			CreateAgentBody: params.CreateAgentBody{
