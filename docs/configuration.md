@@ -1,14 +1,14 @@
-Identity Manager Configuration
+Candid Configuration
 ==============================
 
 Introduction
 ------------
-This document describes the configuration options for an identity
-manager.
+This document describes the configuration options for the Candid
+identity server.
 
 Configuration File
 ------------------
-The identity manager loads its configuration at startup from a yaml
+Candid loads its configuration at startup from a YAML
 file. In a usual installation this file is stored in
 /etc/candid/config.yaml. An example configuration file is:
 
@@ -16,62 +16,45 @@ file. In a usual installation this file is stored in
 api-addr: :8081
 location: 'http://jujucharms.com/identity'
 mongo-addr: localhost:27017
-max-mgo-sessions: 300
-request-timeout: 2s
-auth-username: admin
-auth-password: password
 public-key: OAG9EVDFgXzWQKIk+MTxpLVO1Mp1Ws/pIkzhxv5Jk1M=
 private-key: q2G3A2NjTe7MP9D8iugCH9XfBAyrnV8n8u8ACbNyNOY=
-access-log: access.log
 identity-providers:
 - type: usso
-- type: usso_oauth
-- type: agent
 ```
 
+Here is a description of the most commonly used configuration
+options. Some less useful options are omitted here - the remaining
+ones are all documented [here](https://godoc.org/github.com/CanonicalLtd/candid/config#Config).
+
 ### api-addr
-This is the address that the service will listen on. This consists of
+(Required) This is the address that the service will listen on. This consists of
 an optional host followed by a port. If the host is omitted then the
 server will listen on all interface addresses. The port may be a well
 known service name for example ":http".
 
 ### location
-This is the externally addressable location of the identity provider
-within the system. The identity manager needs to know how to address
-itself in order to address macaroons to itself where needed to access
-API endpoints and to create response addresses for identity providers
-such as OpenID that use browser redirection for communication.
+(Required) This is the externally addressable location of the Candid server API.
+Candid needs to know its own address so that it can add third-party
+caveats addressed to itself and to create response addresses for identity
+providers such as OpenID that use browser redirection for communication.
 
-### mongo-addr
-This is the address of the the MongoDB server containing the identity
-manager's database. Identity manager requires a MongoDB server to run.
-
-### max-mgo-sessions
-To prevent overloading the system identity manager restricts the
-number of concurrent connections to the MongoDB server to this number.
-
-## request-timeout
-If the number of concurrent MongoDB connections has exceeded
-max-mgo-sessions new requests will wait until the request-timeout time
-has been exceeded for a connection to become available. If no
-connection becomes available then the request will fail.
-
-### auth-username & auth-password
-Some operations require privileged access. This is accomplished by
-providing basic authentication credentials with a request. These
-settings specify the the credentials that can be used. Using these
-credentials makes the client all-powerful and as such these should be
-used with care. The use of this mechanism will eventually be phased
-out.
+### mongo-addr, postgres-connection-string, ephemeral-storage
+Exactly one of these values must be specified to tell Candid what to
+use for its storage. The `mongo-addr` value is in the form *host:port*;
+the `postgres-connection-string` is as described [here](https://godoc.org/github.com/lib/pq);
+`ephemeral-storage` is a boolean that specifies that no persistent
+storage will be used.
 
 ### public-key & private-key
-Services wishing to discharge caveats against this identity manager
+(Required) Services wishing to discharge caveats against this identity manager
 encrypt their third party caveats using this public-key. The private
 key is needed for the identity manager to be able to discharge those
-caveats.
+caveats. You can use the `bakery-keygen` command (available
+with `go install gopkg.in/macaroon-bakery.v2/cmd/bakery-keygen` to generate
+a suitable key pair.
 
 ### access-log
-The access-log configures the name of the file used to record all
+The access-log configures the name of a file used to record all
 accesses to the identity manager. If this is not configured then no
 logging will take place.
 
@@ -95,6 +78,13 @@ identity provider in a given identity manager, in most case this does
 not make sense as the identity manager will only use the first one
 that is found.
 
+### Agent
+The agent identity provider is a custom provider that is always configured, and allows non-interactive
+logins to clients using public-key authentication.
+the agent protocol to log in. See
+https://github.com/CanonicalLtd/candid/blob/master/docs/login.txt
+for details on the agent login protocol.
+
 ### UbuntuSSO
 ```yaml
 - type: usso
@@ -108,18 +98,8 @@ that uses OpenID with UbuntuSSO to log in.
 - type: usso_oauth
 ```
 
-The UbuntuSSO identity provider is an custom identity provider that
+The UbuntuSSO OAuth identity provider is an custom identity provider that
 uses a previously obtained UbuntuSSO OAuth token to log in.
-
-### Agent
-```yaml
-- type: agent
-```
-
-The agent identity provider is a custom identity provider that uses
-the agent protocol to log in. See
-https://github.com/CanonicalLtd/candid/blob/master/docs/login.txt
-for details on the agent login protocol.
 
 ### Keystone
 ```yaml

@@ -1,5 +1,7 @@
                       Login Methods
 
+_TODO_ This document is out of date and should be updated to reflect all the
+available login methods.
 
 1. Introduction
 
@@ -34,19 +36,32 @@
 
 3.1 Login Method Discovery
 
-   To log in as an agent the client must first do a form of discovery
-   to determine whether agent log in is possible, and if so how. To do
-   this the client sends a GET request to the visit URL with an
-   Accept header set to application/json. On supported systems this
-   will return an object like the following:
-
+   When a client makes a discharge request and Candid doesn't know
+   about the client, it will return an *interaction-required* error
+   containing information about the available login methods.
+   For example:
+   
    {
-      "interactive": "https://...",
-      "agent": "https://...",
-      "usso_oauth": "https://..."
+       "Code": "interaction required",
+       "Message": "interaction required",
+       "Info": {
+           "InteractionMethods": {
+               "agent": {
+                   "login-url": "https://candid-address/login/agent"
+               },
+               "browser-window": {
+                   "VisitURL": "https://candid-address/login",
+                   "WaitURL": "https://candid-address/wait"
+               }
+           }
+       }
    }
+   
+   For agent login use the `login-url` field. Each entry in the `InteractionMethods`
+   object specifies a different protocol to follow. All the protocols result
+   in the client gaining a *discharge token*. The client can make the original
+   discharge again with that discharge token to obtain the discharge macaroon.
 
-   For agent login use the address specified in agent.
 
 3.2 Agent Login Request
 
