@@ -7,7 +7,6 @@ import (
 	"encoding/base64"
 	"net/http"
 
-	"github.com/CanonicalLtd/candid/internal/auth"
 	"golang.org/x/net/context"
 	"gopkg.in/CanonicalLtd/candidclient.v1/params"
 	errgo "gopkg.in/errgo.v1"
@@ -16,6 +15,8 @@ import (
 	"gopkg.in/macaroon-bakery.v2/bakery/checkers"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
 	macaroon "gopkg.in/macaroon.v2"
+
+	"github.com/CanonicalLtd/candid/internal/auth"
 )
 
 // waitTokenRequest is the request sent to the server to wait for logins to

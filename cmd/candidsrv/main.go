@@ -33,7 +33,6 @@ import (
 	_ "github.com/CanonicalLtd/candid/idp/ldap"
 	"github.com/CanonicalLtd/candid/idp/usso"
 	_ "github.com/CanonicalLtd/candid/idp/usso/ussodischarge"
-	"github.com/CanonicalLtd/candid/idp/usso/ussooauth"
 	"github.com/CanonicalLtd/candid/mgostore"
 	"github.com/CanonicalLtd/candid/sqlstore"
 )
@@ -213,6 +212,5 @@ func serveIdentity(conf *config.Config, params identity.ServerParams) error {
 }
 
 var defaultIDPs = []idp.IdentityProvider{
-	usso.IdentityProvider,
-	ussooauth.IdentityProvider,
+	usso.NewIdentityProvider(usso.Params{}),
 }

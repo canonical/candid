@@ -15,7 +15,7 @@ then run the following:
 The project uses godeps (https://launchpad.net/godeps) to manage Go
 dependencies. To install this, run:
 
-    go get launchpad.net/godeps
+    go get -u github.com/rogpeppe/godeps
 
 After installing it, you can update the dependencies
 to the revision specified in the `dependencies.tsv` file with the following:

@@ -34,34 +34,38 @@ import (
 var logger = loggo.GetLogger("candid.idp.usso")
 
 func init() {
-	config.RegisterIDP("usso", func(func(interface{}) error) (idp.IdentityProvider, error) {
-		return IdentityProvider, nil
+	config.RegisterIDP("usso", func(unmarshal func(interface{}) error) (idp.IdentityProvider, error) {
+		var p Params
+		if err := unmarshal(&p); err != nil {
+			return nil, errgo.Notef(err, "cannot unmarshal usso parameters")
+		}
+		return NewIdentityProvider(p), nil
 	})
 }
 
-// IdentityProvider is an idp.IdentityProvider that provides
-// authentication via Ubuntu SSO.
-var IdentityProvider idp.IdentityProvider = &identityProvider{
-	discoveryCache: openid.NewSimpleDiscoveryCache(),
-	groupCache:     cache.New(10 * time.Minute),
-	groupMonitor: prometheus.NewSummary(prometheus.SummaryOpts{
-		Namespace: "candid",
-		Subsystem: "launchpad",
-		Name:      "get_launchpad_groups",
-		Help:      "The duration of launchpad login, /people, and super_teams_collection_link requests.",
-	}),
+type Params struct {
+	// PrivateTeams contains any private teams that the system needs to know about.
+	LaunchpadTeams []string `yaml:"launchpad-teams"`
+}
+
+// NewIdentityProvider creates a new LDAP identity provider.
+func NewIdentityProvider(p Params) idp.IdentityProvider {
+	return &identityProvider{
+		discoveryCache: openid.NewSimpleDiscoveryCache(),
+		groupCache:     cache.New(10 * time.Minute),
+		groupMonitor: prometheus.NewSummary(prometheus.SummaryOpts{
+			Namespace: "candid",
+			Subsystem: "launchpad",
+			Name:      "get_launchpad_groups",
+			Help:      "The duration of launchpad login, /people, and super_teams_collection_link requests.",
+		}),
+		launchpadTeams: p.LaunchpadTeams,
+	}
 }
 
 const (
 	ussoURL = "https://login.ubuntu.com"
 )
-
-// TODO It should not be necessary to know all the possible
-// groups in advance.
-// TODO move this list into the USSO idp configuration.
-//
-// This list needs to contain any private teams that the system needs to know about.
-const openIdRequestedTeams = "blues-development,charm-beta"
 
 // USSOIdentityProvider allows login using Ubuntu SSO credentials.
 type identityProvider struct {
@@ -70,6 +74,8 @@ type identityProvider struct {
 	initParams     idp.InitParams
 	groupCache     *cache.Cache
 	groupMonitor   prometheus.Summary
+	// openIdRequestedTeams contains any private teams that the system needs to know about.
+	launchpadTeams []string
 }
 
 // Name gives the name of the identity provider (usso).
@@ -137,7 +143,7 @@ func (idp *identityProvider) login(ctx context.Context, w http.ResponseWriter, r
 	ext.Set("openid.ns.sreg", "http://openid.net/extensions/sreg/1.1")
 	ext.Set("openid.sreg.required", "email,fullname,nickname")
 	ext.Set("openid.ns.lp", "http://ns.launchpad.net/2007/openid-teams")
-	ext.Set("openid.lp.query_membership", openIdRequestedTeams)
+	ext.Set("openid.lp.query_membership", strings.Join(idp.launchpadTeams, ","))
 	http.Redirect(w, req, fmt.Sprintf("%s&%s", u, ext.Encode()), http.StatusFound)
 	return nil
 }
