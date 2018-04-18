@@ -127,7 +127,7 @@ func (h *handler) CreateAgent(p httprequest.Params, u *params.CreateAgentRequest
 		return nil, errgo.Mask(err)
 	}
 	identity := &store.Identity{
-		Username:   agentName + "@idm",
+		Username:   agentName + "@candid",
 		ProviderID: store.MakeProviderIdentity("idm", agentName),
 		ProviderInfo: map[string][]string{
 			"owner": {string(owner.ProviderID), owner.Username},

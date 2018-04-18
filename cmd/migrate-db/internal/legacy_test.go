@@ -44,8 +44,8 @@ func (s *legacySuite) TestLegacySource(c *gc.C) {
 
 	k1 := bakery.MustGenerateKey()
 	insert(c, db, &mongodoc.Identity{
-		Username: "test2@admin@idm",
-		Owner:    "admin@idm",
+		Username: "test2@admin@candid",
+		Owner:    "admin@candid",
 		Groups:   []string{"group3", "group4"},
 		PublicKeys: []mongodoc.PublicKey{{
 			Key: k1.Public.Key[:],
@@ -89,17 +89,17 @@ func (s *legacySuite) TestLegacySource(c *gc.C) {
 	})
 
 	identity2 := store.Identity{
-		Username: "test2@admin@idm",
+		Username: "test2@admin@candid",
 	}
 	err = st.Identity(ctx, &identity2)
 	c.Assert(err, gc.Equals, nil)
 	normalize(&identity2)
 	c.Assert(identity2, jc.DeepEquals, store.Identity{
-		ProviderID:   "idm:test2@admin@idm",
-		Username:     "test2@admin@idm",
+		ProviderID:   "idm:test2@admin@candid",
+		Username:     "test2@admin@candid",
 		Groups:       []string{"group3", "group4"},
 		PublicKeys:   []bakery.PublicKey{k1.Public},
-		ProviderInfo: map[string][]string{"owner": {"idm:admin@idm", "admin@idm"}},
+		ProviderInfo: map[string][]string{"owner": {"idm:admin@candid", "admin@candid"}},
 	})
 
 	identity3 := store.Identity{

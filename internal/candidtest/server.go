@@ -171,13 +171,13 @@ func (s *ServerSuite) AdminIdentityClient(c *gc.C) *candidclient.Client {
 // with the given name and groups. The agent's username and key are
 // returned.
 //
-// The agent will be owned by admin@idm.
+// The agent will be owned by admin@candid.
 func (s *ServerSuite) CreateAgent(c *gc.C, username string, groups ...string) *bakery.KeyPair {
 	key, err := bakery.GenerateKey()
 	c.Assert(err, gc.Equals, nil)
-	name := strings.TrimSuffix(username, "@idm")
+	name := strings.TrimSuffix(username, "@candid")
 	if name == username {
-		c.Fatalf("agent username must end in @idm")
+		c.Fatalf("agent username must end in @candid")
 	}
 	err = s.Params.Store.UpdateIdentity(
 		context.Background(),
@@ -223,7 +223,7 @@ func (s *ServerSuite) CreateUser(c *gc.C, name string, groups ...string) string 
 }
 
 // IdentityClient creates a new agent with the given username
-// (which must end in @idm) and groups and then creates an
+// (which must end in @candid) and groups and then creates an
 // candidclient.Client
 // which authenticates using that agent.
 func (s *ServerSuite) IdentityClient(c *gc.C, username string, groups ...string) *candidclient.Client {

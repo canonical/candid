@@ -126,7 +126,7 @@ func (srv *server) adminAgent() *agent.AuthInfo {
 		Key: srv.adminKey,
 		Agents: []agent.Agent{{
 			URL:      srv.Location(),
-			Username: "admin@idm",
+			Username: "admin@candid",
 		}},
 	}
 }
