@@ -132,7 +132,7 @@ func serveIdentity(conf *config.Config, params identity.ServerParams) error {
 		identity.Discharger,
 	)
 	if err != nil {
-		return errgo.Notef(err, "cannot create new server at %q", conf.APIAddr)
+		return errgo.Notef(err, "cannot create new server at %q", conf.ListenAddress)
 	}
 	defer srv.Close()
 
@@ -153,7 +153,7 @@ func serveIdentity(conf *config.Config, params identity.ServerParams) error {
 	logger.Infof("starting the identity server")
 
 	httpServer := &http.Server{
-		Addr:      conf.APIAddr,
+		Addr:      conf.ListenAddress,
 		Handler:   server,
 		TLSConfig: conf.TLSConfig(),
 	}

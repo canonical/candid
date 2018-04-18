@@ -1,5 +1,7 @@
-mongo-addr: localhost:27017
-api-addr: :8081
+storage:
+    type: mongodb
+    address: localhost:27017
+listen-address: :8081
 auth-username: admin
 auth-password: password
 location: 'http://localhost:8081'

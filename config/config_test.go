@@ -31,8 +31,7 @@ type configSuite struct {
 var _ = gc.Suite(&configSuite{})
 
 const testConfig = `
-mongo-addr: localhost:23456
-api-addr: 1.2.3.4:5678
+listen-address: 1.2.3.4:5678
 foo: 1
 bar: false
 admin-password: mypasswd
@@ -159,7 +158,7 @@ func (s *configSuite) TestRead(c *gc.C) {
 				},
 			},
 		}},
-		APIAddr:             "1.2.3.4:5678",
+		ListenAddress:       "1.2.3.4:5678",
 		AdminPassword:       "mypasswd",
 		PrivateKey:          &key.Private,
 		PublicKey:           &key.Public,
@@ -181,7 +180,7 @@ func (s *configSuite) TestReadErrorNotFound(c *gc.C) {
 
 func (s *configSuite) TestReadErrorEmpty(c *gc.C) {
 	cfg, err := s.readConfig(c, "")
-	c.Assert(err, gc.ErrorMatches, "missing fields storage, api-addr, private-key, public-key, location, private-addr in config file")
+	c.Assert(err, gc.ErrorMatches, "missing fields storage, listen-address, private-key, public-key, location, private-addr in config file")
 	c.Assert(cfg, gc.IsNil)
 }
 
