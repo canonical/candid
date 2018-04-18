@@ -91,16 +91,14 @@ func (s *ussoSuite) TestRedirect(c *gc.C) {
 	c.Assert(u.Path, gc.Equals, "/+openid")
 	q := u.Query()
 	c.Assert(q, jc.DeepEquals, url.Values{
-		"openid.ns":                  []string{"http://specs.openid.net/auth/2.0"},
-		"openid.claimed_id":          []string{"http://specs.openid.net/auth/2.0/identifier_select"},
-		"openid.identity":            []string{"http://specs.openid.net/auth/2.0/identifier_select"},
-		"openid.mode":                []string{"checkid_setup"},
-		"openid.realm":               []string{"https://idp.test/callback"},
-		"openid.return_to":           []string{"https://idp.test/callback?id=1"},
-		"openid.ns.lp":               []string{"http://ns.launchpad.net/2007/openid-teams"},
-		"openid.lp.query_membership": []string{""},
-		"openid.ns.sreg":             []string{"http://openid.net/extensions/sreg/1.1"},
-		"openid.sreg.required":       []string{"email,fullname,nickname"},
+		"openid.ns":            []string{"http://specs.openid.net/auth/2.0"},
+		"openid.claimed_id":    []string{"http://specs.openid.net/auth/2.0/identifier_select"},
+		"openid.identity":      []string{"http://specs.openid.net/auth/2.0/identifier_select"},
+		"openid.mode":          []string{"checkid_setup"},
+		"openid.realm":         []string{"https://idp.test/callback"},
+		"openid.return_to":     []string{"https://idp.test/callback?id=1"},
+		"openid.ns.sreg":       []string{"http://openid.net/extensions/sreg/1.1"},
+		"openid.sreg.required": []string{"email,fullname,nickname"},
 	})
 }
 
@@ -219,7 +217,7 @@ func (s *ussoSuite) TestInteractiveLoginFromDifferentProvider(c *gc.C) {
 	resp := s.roundTrip(c, u.String())
 	defer resp.Body.Close()
 	s.get(c, s.Ctx, resp.Header.Get("Location"))
-	s.AssertLoginFailureMatches(c, `.*rejecting login from https://login\.badplace\.com/\+openid`)
+	s.AssertLoginFailureMatches(c, `.*OpenID response from unexpected endpoint "https://login.badplace.com/\+openid"`)
 }
 
 func (s *ussoSuite) TestHandleUpdateUserError(c *gc.C) {
