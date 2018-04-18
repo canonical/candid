@@ -74,9 +74,9 @@ func convert(doc *mongodoc.Identity) (*store.Identity, error) {
 		identity.PublicKeys = append(identity.PublicKeys, bakery.PublicKey{key})
 	}
 	if doc.Owner != "" {
-		if doc.Owner == "admin@idm" {
+		if doc.Owner == "admin@candid" {
 			identity.ProviderInfo = map[string][]string{
-				"owner": {string(store.MakeProviderIdentity("idm", "admin@idm")), "admin@idm"},
+				"owner": {string(store.MakeProviderIdentity("idm", "admin@candid")), "admin@candid"},
 			}
 		} else {
 			return nil, errgo.Newf("unrecognised owner for %s (%q)", doc.Username, doc.Owner)

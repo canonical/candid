@@ -53,7 +53,7 @@ func (s *putAgentSuite) TestPutAgentWithGeneratedKeyAndAgentFileNotSpecified(c *
 		createAgent: func(req *params.CreateAgentRequest) (*params.CreateAgentResponse, error) {
 			calledReq = req
 			return &params.CreateAgentResponse{
-				Username: "a-foo@idm",
+				Username: "a-foo@candid",
 			}, nil
 		},
 	})
@@ -70,7 +70,7 @@ func (s *putAgentSuite) TestPutAgentWithGeneratedKeyAndAgentFileNotSpecified(c *
 	c.Assert(calledReq.PublicKeys, gc.HasLen, 1)
 	c.Assert(&v.Key.Public, gc.DeepEquals, calledReq.PublicKeys[0])
 	c.Assert(agents[0].URL, gc.Matches, "https://.*")
-	c.Assert(agents[0].Username, gc.Matches, "a-.+@idm")
+	c.Assert(agents[0].Username, gc.Matches, "a-.+@candid")
 
 	calledReq.PublicKeys = nil
 	c.Assert(calledReq, jc.DeepEquals, &params.CreateAgentRequest{
@@ -86,14 +86,14 @@ func (s *putAgentSuite) TestPutAgentWithNonExistentAgentsFileSpecified(c *gc.C) 
 		createAgent: func(req *params.CreateAgentRequest) (*params.CreateAgentResponse, error) {
 			calledReq = req
 			return &params.CreateAgentResponse{
-				Username: "a-foo@idm",
+				Username: "a-foo@candid",
 			}, nil
 		},
 	})
 	agentFile := filepath.Join(c.MkDir(), ".agents")
 	out := CheckSuccess(c, runf, "put-agent", "-a", "admin.agent", "-f", agentFile)
 	c.Assert(calledReq, gc.NotNil)
-	c.Assert(out, gc.Matches, `added agent a-foo@idm for https://.* to .+\n`)
+	c.Assert(out, gc.Matches, `added agent a-foo@candid for https://.* to .+\n`)
 
 	v, err := admincmd.ReadAgentFile(agentFile)
 	c.Assert(err, gc.Equals, nil)
@@ -103,7 +103,7 @@ func (s *putAgentSuite) TestPutAgentWithNonExistentAgentsFileSpecified(c *gc.C) 
 	c.Assert(calledReq.PublicKeys, gc.HasLen, 1)
 	c.Assert(&v.Key.Public, gc.DeepEquals, calledReq.PublicKeys[0])
 	c.Assert(agents[0].URL, gc.Matches, "https://.*")
-	c.Assert(agents[0].Username, gc.Equals, "a-foo@idm")
+	c.Assert(agents[0].Username, gc.Equals, "a-foo@candid")
 
 	calledReq.PublicKeys = nil
 	c.Assert(calledReq, jc.DeepEquals, &params.CreateAgentRequest{
@@ -117,13 +117,13 @@ func (s *putAgentSuite) TestPutAgentWithExistingAgentsFile(c *gc.C) {
 		createAgent: func(req *params.CreateAgentRequest) (*params.CreateAgentResponse, error) {
 			calledReq = req
 			return &params.CreateAgentResponse{
-				Username: "a-foo@idm",
+				Username: "a-foo@candid",
 			}, nil
 		},
 	})
 	out := CheckSuccess(c, runf, "put-agent", "-a", "admin.agent", "-f", "admin.agent", "somegroup")
 	c.Assert(calledReq, gc.NotNil)
-	c.Assert(out, gc.Matches, `added agent a-foo@idm for https://.* to .+\n`)
+	c.Assert(out, gc.Matches, `added agent a-foo@candid for https://.* to .+\n`)
 
 	v, err := admincmd.ReadAgentFile(filepath.Join(s.Dir, "admin.agent"))
 	c.Assert(err, gc.Equals, nil)
@@ -133,7 +133,7 @@ func (s *putAgentSuite) TestPutAgentWithExistingAgentsFile(c *gc.C) {
 	c.Assert(calledReq.PublicKeys, gc.HasLen, 1)
 	c.Assert(&v.Key.Public, gc.DeepEquals, calledReq.PublicKeys[0])
 	c.Assert(agents[1].URL, gc.Matches, "https://.*")
-	c.Assert(agents[1].Username, gc.Equals, "a-foo@idm")
+	c.Assert(agents[1].Username, gc.Equals, "a-foo@candid")
 
 	calledReq.PublicKeys = nil
 	c.Assert(calledReq, jc.DeepEquals, &params.CreateAgentRequest{
@@ -151,6 +151,6 @@ func (s *putAgentSuite) TestPutAgentWithAdminFlag(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 	agents := v.Agents
 	c.Assert(agents, gc.HasLen, 1)
-	c.Assert(agents[0].Username, gc.Equals, "admin@idm")
+	c.Assert(agents[0].Username, gc.Equals, "admin@candid")
 	c.Assert(agents[0].URL, gc.Equals, candidclient.Production)
 }

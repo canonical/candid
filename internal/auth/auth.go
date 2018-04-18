@@ -23,9 +23,9 @@ import (
 var logger = loggo.GetLogger("candid.internal.auth")
 
 const (
-	AdminUsername     = "admin@idm"
-	SSHKeyGetterGroup = "sshkeygetter@idm"
-	GroupListGroup    = "grouplist@idm"
+	AdminUsername     = "admin@candid"
+	SSHKeyGetterGroup = "sshkeygetter@candid"
+	GroupListGroup    = "grouplist@candid"
 )
 
 var AdminProviderID = store.MakeProviderIdentity("idm", "admin")
@@ -269,7 +269,7 @@ func (c identityClient) IdentityFromContext(ctx context.Context) (identchecker.I
 		// credentials and the admin username is unfortunate but we'll
 		// leave it for now. We should probably remove basic-auth authentication
 		// entirely.
-		if username+"@idm" == AdminUsername && c.authorizer.adminPassword != "" && password == c.authorizer.adminPassword {
+		if username+"@candid" == AdminUsername && c.authorizer.adminPassword != "" && password == c.authorizer.adminPassword {
 			return &Identity{
 				id: store.Identity{
 					Username: AdminUsername,
@@ -477,7 +477,7 @@ type candidGroupResolver struct {
 // identity.
 func (r candidGroupResolver) resolveGroups(ctx context.Context, identity *store.Identity) ([]string, error) {
 	if len(identity.ProviderInfo["owner"]) == 0 {
-		// No owner - no groups. This applies to admin@idm, but for
+		// No owner - no groups. This applies to admin@candid, but for
 		// other users, it's probably an internal inconsistency error.
 		return nil, nil
 	}

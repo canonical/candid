@@ -265,7 +265,7 @@ func (s *usersSuite) TestCreateAgent(c *gc.C) {
 }
 
 func (s *usersSuite) TestCreateAgentAsAgent(c *gc.C) {
-	client := s.IdentityClient(c, "testagent@idm", "testgroup")
+	client := s.IdentityClient(c, "testagent@candid", "testgroup")
 	_, err := client.CreateAgent(s.Ctx, &params.CreateAgentRequest{
 		CreateAgentBody: params.CreateAgentBody{
 			FullName:   "my agent",
@@ -570,7 +570,7 @@ func (s *usersSuite) TestQueryUsersBadLastDischarge(c *gc.C) {
 }
 
 func (s *usersSuite) TestQueryUsersUnauthorized(c *gc.C) {
-	client := s.IdentityClient(c, "a-bob@idm", "bob")
+	client := s.IdentityClient(c, "a-bob@candid", "bob")
 	_, err := client.QueryUsers(s.Ctx, &params.QueryUsersRequest{})
 	c.Assert(err, gc.ErrorMatches, `Get http://.*/v1/u?.*: permission denied`)
 }
@@ -911,10 +911,10 @@ func (s *usersSuite) TestUserIDPGroups(c *gc.C) {
 }
 
 func (s *usersSuite) TestWhoAmIWithAuthenticatedUser(c *gc.C) {
-	client := s.IdentityClient(c, "bob@idm")
+	client := s.IdentityClient(c, "bob@candid")
 	resp, err := client.WhoAmI(s.Ctx, nil)
 	c.Assert(err, gc.Equals, nil)
-	c.Assert(resp.User, gc.Equals, "bob@idm")
+	c.Assert(resp.User, gc.Equals, "bob@candid")
 }
 
 func (s *usersSuite) TestWhoAmIWithNoUser(c *gc.C) {

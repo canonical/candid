@@ -32,14 +32,14 @@ type agentSuite struct {
 var _ = gc.Suite(&agentSuite{})
 
 func (s *agentSuite) TestHTTPBakeryAgentDischarge(c *gc.C) {
-	key := s.CreateAgent(c, "bob@idm")
+	key := s.CreateAgent(c, "bob@candid")
 	client := s.Client(nil)
 	client.Key = key
 	err := agent.SetUpAuth(client, &agent.AuthInfo{
 		Key: client.Key,
 		Agents: []agent.Agent{{
 			URL:      s.URL,
-			Username: "bob@idm",
+			Username: "bob@candid",
 		}},
 	})
 	c.Assert(err, gc.Equals, nil)
@@ -58,7 +58,7 @@ func (s *agentSuite) TestGetAgentDischargeNoCookie(c *gc.C) {
 }
 
 func (s *agentSuite) TestLegacyAgentDischarge(c *gc.C) {
-	key := s.CreateAgent(c, "bob@idm")
+	key := s.CreateAgent(c, "bob@candid")
 	client := s.Client(nil)
 	client.Key = key
 	// Set up the transport so that it mutates /discharge responses
@@ -69,7 +69,7 @@ func (s *agentSuite) TestLegacyAgentDischarge(c *gc.C) {
 		Key: client.Key,
 		Agents: []agent.Agent{{
 			URL:      s.URL,
-			Username: "bob@idm",
+			Username: "bob@candid",
 		}},
 	})
 	c.Assert(err, gc.Equals, nil)
@@ -100,7 +100,7 @@ func (s *agentSuite) TestLegacyCookieAgentDischarge(c *gc.C) {
 	// Note that we don't need the agent interactor in this
 	// scenario.
 
-	key := s.CreateAgent(c, "bob@idm")
+	key := s.CreateAgent(c, "bob@candid")
 	var visit func(u *url.URL) error
 	client := s.Client(httpbakery.WebBrowserInteractor{
 		OpenWebBrowser: func(u *url.URL) error {
@@ -125,7 +125,7 @@ func (s *agentSuite) TestLegacyCookieAgentDischarge(c *gc.C) {
 	// Set up a cookie so that the /discharge endpoint will see
 	// it and respond with a self-dischargable interaction-required
 	// error.
-	s.setAgentCookie(client.Jar, "bob@idm", &key.Public)
+	s.setAgentCookie(client.Jar, "bob@candid", &key.Public)
 	ms, err := s.Discharge(c, "is-authenticated-user", client)
 	c.Assert(err, gc.Equals, nil)
 	_, err = s.Bakery.Checker.Auth(ms).Allow(context.Background(), identchecker.LoginOp)
