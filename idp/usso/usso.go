@@ -44,7 +44,7 @@ func init() {
 }
 
 type Params struct {
-	// PrivateTeams contains any private teams that the system needs to know about.
+	// LaunchpadTeams contains any private teams that the system needs to know about.
 	LaunchpadTeams []string `yaml:"launchpad-teams"`
 }
 
