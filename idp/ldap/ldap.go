@@ -22,14 +22,13 @@ import (
 	"gopkg.in/ldap.v2"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
 
-	"github.com/CanonicalLtd/candid/config"
 	"github.com/CanonicalLtd/candid/idp"
 	"github.com/CanonicalLtd/candid/idp/idputil"
 	"github.com/CanonicalLtd/candid/store"
 )
 
 func init() {
-	config.RegisterIDP("ldap", func(unmarshal func(interface{}) error) (idp.IdentityProvider, error) {
+	idp.Register("ldap", func(unmarshal func(interface{}) error) (idp.IdentityProvider, error) {
 		var p Params
 		if err := unmarshal(&p); err != nil {
 			return nil, errgo.Notef(err, "cannot unmarshal ldap parameters")

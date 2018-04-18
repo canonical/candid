@@ -4,6 +4,8 @@
 package mgostore
 
 import (
+	"time"
+
 	"github.com/juju/utils/debugstatus"
 	"golang.org/x/net/context"
 	errgo "gopkg.in/errgo.v1"
@@ -15,18 +17,18 @@ import (
 	"github.com/CanonicalLtd/candid/store"
 )
 
-// A Database provides a wrapper around a single mongodb database that
+// backend provides a wrapper around a single mongodb database that
 // can be used as the persistent storage for the various types of store
 // required by the identity service.
-type Database struct {
+type backend struct {
 	db       *mgo.Database
 	rootKeys *mgorootkeystore.RootKeys
 }
 
-// NewDatabase creates a new Database using the given *mgo.Database. The
-// given Database's underlying session will be copied. The Database must
-// be closed when finished with.
-func NewDatabase(db *mgo.Database) (*Database, error) {
+// NewBackend creates a new Backend instance using the given
+// *mgo.Database. The given Database's underlying session will be
+// copied. The Backend must be closed when finished with.
+func NewBackend(db *mgo.Database) (store.Backend, error) {
 	if err := ensureIdentityIndexes(db); err != nil {
 		return nil, errgo.Mask(err)
 	}
@@ -37,15 +39,15 @@ func NewDatabase(db *mgo.Database) (*Database, error) {
 	if err := ensureBakeryIndexes(rk, db); err != nil {
 		return nil, errgo.Mask(err)
 	}
-	return &Database{
+	return &backend{
 		db:       db.With(db.Session.Copy()),
 		rootKeys: rk,
 	}, nil
 }
 
 // Close cleans up resources associated with the database.
-func (d *Database) Close() {
-	d.db.Session.Close()
+func (b *backend) Close() {
+	b.db.Session.Close()
 }
 
 // context returns a context with session information attached such that
@@ -53,12 +55,12 @@ func (d *Database) Close() {
 // function may return the context it was passed if suitable session
 // information is already available. The return close function should
 // always be called once the context is not longer needed.
-func (d *Database) context(ctx context.Context) (_ context.Context, close func()) {
+func (b *backend) context(ctx context.Context) (_ context.Context, close func()) {
 	if s, _ := ctx.Value(sessionKey{}).(*mgo.Session); s != nil {
 		return ctx, func() {}
 	}
 	// TODO (mhilton) add some more advanced session pooling.
-	s := d.db.Session.Copy()
+	s := b.db.Session.Copy()
 	return context.WithValue(ctx, sessionKey{}, s), s.Close
 }
 
@@ -66,54 +68,50 @@ type sessionKey struct{}
 
 // s returns a *mgo.Session for use in subsequent queries. The returned
 // session must be closed once finished with.
-func (d *Database) s(ctx context.Context) *mgo.Session {
+func (b *backend) s(ctx context.Context) *mgo.Session {
 	if s, _ := ctx.Value(sessionKey{}).(*mgo.Session); s != nil {
 		return s.Clone()
 	}
-	return d.db.Session.Copy()
+	return b.db.Session.Copy()
 }
 
 // c returns a *mgo.Collection with the given name in the current
 // database. The collection's underlying session must be closed when the
 // query is complete.
-func (d *Database) c(ctx context.Context, name string) *mgo.Collection {
-	return d.db.C(name).With(d.s(ctx))
+func (b *backend) c(ctx context.Context, name string) *mgo.Collection {
+	return b.db.C(name).With(b.s(ctx))
 }
 
-// Store returns a new store.Store implementation using this database for
-// persistent storage.
-func (d *Database) Store() store.Store {
-	return &identityStore{d}
+// Store implements store.Backend.Store.
+func (b *backend) Store() store.Store {
+	return &identityStore{b}
 }
 
-// MeetingStore returns a new meeting.Store implementation using this
-// database for persistent storage.
-func (d *Database) MeetingStore() meeting.Store {
-	return &meetingStore{d}
+// MeetingStore implements store.Backend.MeetingStore.
+func (b *backend) MeetingStore() meeting.Store {
+	return &meetingStore{b}
 }
 
-// BakeryRootKeyStore returns a new bakery.RootKeyStore implementation
-// using this database for persistent storage.
-func (d *Database) BakeryRootKeyStore(policy mgorootkeystore.Policy) bakery.RootKeyStore {
+// BakeryRootKeyStore implements store.Backend.BakeryRootKeyStore.
+func (b *backend) BakeryRootKeyStore() bakery.RootKeyStore {
 	return &rootKeyStore{
-		db:     d,
-		policy: policy,
+		b: b,
+		policy: mgorootkeystore.Policy{
+			ExpiryDuration: 365 * 24 * time.Hour,
+		},
 	}
 }
 
-// ProviderDataStore returns a new store.ProviderDataStore implementation
-// using this database for persistent storage.
-func (d *Database) ProviderDataStore() store.ProviderDataStore {
-	return &providerDataStore{d}
+// ProviderDataStore implements store.Backend.ProviderDataStore.
+func (b *backend) ProviderDataStore() store.ProviderDataStore {
+	return &providerDataStore{b}
 }
 
-// DebugStatusCheckerFuncs returns a set of debugstatus.CheckerFuncs that
-// can be used to provide a status of the database in the /debug/status
-// endpoint.
-func (d *Database) DebugStatusCheckerFuncs() []debugstatus.CheckerFunc {
+// DebugStatusCheckerFuncs implements store.Backend.DebugStatusCheckerFuncs.
+func (b *backend) DebugStatusCheckerFuncs() []debugstatus.CheckerFunc {
 	return []debugstatus.CheckerFunc{
-		debugstatus.MongoCollections(collector{d.db}),
-		d.meetingStatus,
+		debugstatus.MongoCollections(collector{b.db}),
+		b.meetingStatus,
 	}
 }
 

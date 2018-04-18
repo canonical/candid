@@ -15,19 +15,19 @@ import (
 
 // A providerDataStore implements store.ProviderDataStore.
 type providerDataStore struct {
-	db *Database
+	b *backend
 }
 
 func (s *providerDataStore) KeyValueStore(_ context.Context, idp string) (store.KeyValueStore, error) {
 	return &keyValueStore{
-		Database: s.db,
-		idp:      idp,
+		backend: s.b,
+		idp:     idp,
 	}, nil
 }
 
 // A keyValueStore implements store.KeyValueStore.
 type keyValueStore struct {
-	*Database
+	*backend
 	idp string
 }
 

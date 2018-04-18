@@ -13,25 +13,25 @@ import (
 const macaroonCollection = "macaroons"
 
 type rootKeyStore struct {
-	db     *Database
+	b      *backend
 	policy mgorootkeystore.Policy
 }
 
 // Get implements bakery.RootKeyStore.Get by wrapping mgorootkeystore
 // implementation with code to determine the collection.
 func (s rootKeyStore) Get(ctx context.Context, id []byte) ([]byte, error) {
-	coll := s.db.c(ctx, macaroonCollection)
+	coll := s.b.c(ctx, macaroonCollection)
 	defer coll.Database.Session.Close()
-	store := s.db.rootKeys.NewStore(coll, s.policy)
+	store := s.b.rootKeys.NewStore(coll, s.policy)
 	return store.Get(ctx, id)
 }
 
 // RootKey implements bakery.RootKeyStore.RootKey by wrapping
 // mgorootkeystore implementation with code to determine the collection.
 func (s rootKeyStore) RootKey(ctx context.Context) ([]byte, []byte, error) {
-	coll := s.db.c(ctx, macaroonCollection)
+	coll := s.b.c(ctx, macaroonCollection)
 	defer coll.Database.Session.Close()
-	store := s.db.rootKeys.NewStore(coll, s.policy)
+	store := s.b.rootKeys.NewStore(coll, s.policy)
 	return store.RootKey(ctx)
 }
 

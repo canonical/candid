@@ -14,7 +14,7 @@ import (
 // meetingStore is an implementation of meeting.Store that uses an sql
 // table.
 type meetingStore struct {
-	*Database
+	*backend
 }
 
 // Context implements meeting.Store.Context.

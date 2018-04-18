@@ -7,14 +7,15 @@ import (
 	"github.com/juju/testing"
 	gc "gopkg.in/check.v1"
 
-	"github.com/CanonicalLtd/candid/mgostore"
+	"github.com/CanonicalLtd/candid/store"
+	"github.com/CanonicalLtd/candid/store/mgostore"
 	storetesting "github.com/CanonicalLtd/candid/store/testing"
 )
 
 type meetingSuite struct {
 	testing.IsolatedMgoSuite
 	storetesting.MeetingSuite
-	db *mgostore.Database
+	backend store.Backend
 }
 
 var _ = gc.Suite(&meetingSuite{})
@@ -32,15 +33,15 @@ func (s *meetingSuite) TearDownSuite(c *gc.C) {
 func (s *meetingSuite) SetUpTest(c *gc.C) {
 	s.IsolatedMgoSuite.SetUpTest(c)
 	var err error
-	s.db, err = mgostore.NewDatabase(s.Session.DB("candid-test"))
+	s.backend, err = mgostore.NewBackend(s.Session.DB("candid-test"))
 	c.Assert(err, gc.Equals, nil)
-	s.Store = s.db.MeetingStore()
+	s.Store = s.backend.MeetingStore()
 	s.PutAtTimeFunc = mgostore.PutAtTime
 	s.MeetingSuite.SetUpTest(c)
 }
 
 func (s *meetingSuite) TearDownTest(c *gc.C) {
 	s.MeetingSuite.TearDownTest(c)
-	s.db.Close()
+	s.backend.Close()
 	s.IsolatedMgoSuite.TearDownTest(c)
 }

@@ -11,7 +11,6 @@ import (
 	errgo "gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
 
-	"github.com/CanonicalLtd/candid/config"
 	"github.com/CanonicalLtd/candid/idp"
 	"github.com/CanonicalLtd/candid/store"
 )
@@ -24,7 +23,7 @@ import (
 var IdentityProvider idp.IdentityProvider = (*identityProvider)(nil)
 
 func init() {
-	config.RegisterIDP("agent", func(func(interface{}) error) (idp.IdentityProvider, error) {
+	idp.Register("agent", func(func(interface{}) error) (idp.IdentityProvider, error) {
 		return IdentityProvider, nil
 	})
 }

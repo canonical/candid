@@ -16,14 +16,13 @@ import (
 	"gopkg.in/httprequest.v1"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
 
-	"github.com/CanonicalLtd/candid/config"
 	"github.com/CanonicalLtd/candid/idp"
 	"github.com/CanonicalLtd/candid/idp/idputil"
 	"github.com/CanonicalLtd/candid/store"
 )
 
 func init() {
-	config.RegisterIDP("test", func(unmarshal func(interface{}) error) (idp.IdentityProvider, error) {
+	idp.Register("test", func(unmarshal func(interface{}) error) (idp.IdentityProvider, error) {
 		var p Params
 		if err := unmarshal(&p); err != nil {
 			return nil, errgo.Mask(err)

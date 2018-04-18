@@ -18,7 +18,6 @@ import (
 	"gopkg.in/juju/names.v2"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
 
-	"github.com/CanonicalLtd/candid/config"
 	"github.com/CanonicalLtd/candid/idp"
 	"github.com/CanonicalLtd/candid/idp/idputil"
 	"github.com/CanonicalLtd/candid/idp/idputil/secret"
@@ -26,7 +25,7 @@ import (
 )
 
 func init() {
-	config.RegisterIDP("openid-connect", func(unmarshal func(interface{}) error) (idp.IdentityProvider, error) {
+	idp.Register("openid-connect", func(unmarshal func(interface{}) error) (idp.IdentityProvider, error) {
 		var p OpenIDConnectParams
 		if err := unmarshal(&p); err != nil {
 			return nil, errgo.Notef(err, "cannot unmarshal openid-connect parameters")

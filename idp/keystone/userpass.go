@@ -17,14 +17,13 @@ import (
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
 	"gopkg.in/macaroon-bakery.v2/httpbakery/form"
 
-	"github.com/CanonicalLtd/candid/config"
 	"github.com/CanonicalLtd/candid/idp"
 	"github.com/CanonicalLtd/candid/idp/idputil"
 	"github.com/CanonicalLtd/candid/idp/keystone/internal/keystone"
 )
 
 func init() {
-	config.RegisterIDP("keystone_userpass", constructor(NewUserpassIdentityProvider))
+	idp.Register("keystone_userpass", constructor(NewUserpassIdentityProvider))
 }
 
 // NewTokenIdentityProvider creates a idp.IdentityProvider which will

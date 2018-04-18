@@ -12,14 +12,13 @@ import (
 	"gopkg.in/errgo.v1"
 	"gopkg.in/httprequest.v1"
 
-	"github.com/CanonicalLtd/candid/config"
 	"github.com/CanonicalLtd/candid/idp"
 	"github.com/CanonicalLtd/candid/idp/idputil"
 	"github.com/CanonicalLtd/candid/idp/keystone/internal/keystone"
 )
 
 func init() {
-	config.RegisterIDP("keystonev3_token", constructor(NewV3TokenIdentityProvider))
+	idp.Register("keystonev3_token", constructor(NewV3TokenIdentityProvider))
 }
 
 // NewV3TokenIdentityProvider creates a idp.IdentityProvider which will

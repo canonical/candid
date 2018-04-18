@@ -4,7 +4,6 @@
 package main
 
 import (
-	"database/sql"
 	"flag"
 	"fmt"
 	"html/template"
@@ -18,9 +17,6 @@ import (
 	_ "github.com/lib/pq"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery"
-	"gopkg.in/macaroon-bakery.v2/bakery/mgorootkeystore"
-	"gopkg.in/macaroon-bakery.v2/bakery/postgresrootkeystore"
-	"gopkg.in/mgo.v2"
 	"gopkg.in/natefinch/lumberjack.v2"
 
 	"github.com/CanonicalLtd/candid"
@@ -31,12 +27,13 @@ import (
 	_ "github.com/CanonicalLtd/candid/idp/google"
 	_ "github.com/CanonicalLtd/candid/idp/keystone"
 	_ "github.com/CanonicalLtd/candid/idp/ldap"
+	_ "github.com/CanonicalLtd/candid/store/memstore"
+	_ "github.com/CanonicalLtd/candid/store/mgostore"
+	_ "github.com/CanonicalLtd/candid/store/sqlstore"
+
 	"github.com/CanonicalLtd/candid/idp/usso"
 	_ "github.com/CanonicalLtd/candid/idp/usso/ussodischarge"
 	_ "github.com/CanonicalLtd/candid/idp/usso/ussooauth"
-	"github.com/CanonicalLtd/candid/memstore"
-	"github.com/CanonicalLtd/candid/mgostore"
-	"github.com/CanonicalLtd/candid/sqlstore"
 )
 
 var logger = loggo.GetLogger("candidsrv")
@@ -88,73 +85,17 @@ func serve(conf *config.Config) error {
 	if conf.NoProxy != "" {
 		os.Setenv("NO_PROXY", conf.NoProxy)
 	}
-
-	switch conf.StorageKind {
-	case config.MongoStorage:
-		return serveMgoServer(conf)
-	case config.PostgresStorage:
-		return servePostgresServer(conf)
-	case config.MemStorage:
-		return serveMemServer(conf)
-	default:
-		// This should be detected when reading the config earlier
-		return errgo.Newf("no database configured")
-	}
-}
-
-func serveMgoServer(conf *config.Config) error {
-	logger.Infof("connecting to mongo")
-	session, err := mgo.Dial(conf.MongoAddr)
+	backend, err := conf.Storage.NewBackend()
 	if err != nil {
-		return errgo.Notef(err, "cannot dial mongo at %q", conf.MongoAddr)
+		return errgo.Mask(err)
 	}
-	defer session.Close()
-	db := session.DB("identity")
-	database, err := mgostore.NewDatabase(db)
-	if err != nil {
-		return errgo.Notef(err, "cannot initialise database")
-	}
-	defer database.Close()
+	defer backend.Close()
 	return serveIdentity(conf, identity.ServerParams{
-		Store:             database.Store(),
-		ProviderDataStore: database.ProviderDataStore(),
-		MeetingStore:      database.MeetingStore(),
-		RootKeyStore: database.BakeryRootKeyStore(mgorootkeystore.Policy{
-			ExpiryDuration: 365 * 24 * time.Hour,
-		}),
-		DebugStatusCheckerFuncs: database.DebugStatusCheckerFuncs(),
-	})
-}
-
-func servePostgresServer(conf *config.Config) error {
-	logger.Infof("connecting to postgresql")
-	db, err := sql.Open("postgres", conf.PostgresConnectionString)
-	if err != nil {
-		return errgo.Notef(err, "cannot connect to database")
-	}
-	database, err := sqlstore.NewDatabase("postgres", db)
-	if err != nil {
-		return errgo.Notef(err, "cannot initialise database")
-	}
-	defer database.Close()
-	rootkeys := postgresrootkeystore.NewRootKeys(db, "rootkeys", 1000)
-	defer rootkeys.Close()
-	return serveIdentity(conf, identity.ServerParams{
-		Store:             database.Store(),
-		ProviderDataStore: database.ProviderDataStore(),
-		MeetingStore:      database.MeetingStore(),
-		RootKeyStore: rootkeys.NewStore(postgresrootkeystore.Policy{
-			ExpiryDuration: 365 * 24 * time.Hour,
-		}),
-	})
-}
-
-func serveMemServer(conf *config.Config) error {
-	return serveIdentity(conf, identity.ServerParams{
-		Store:             memstore.NewStore(),
-		ProviderDataStore: memstore.NewProviderDataStore(),
-		MeetingStore:      memstore.NewMeetingStore(),
-		RootKeyStore:      bakery.NewMemRootKeyStore(),
+		Store:                   backend.Store(),
+		ProviderDataStore:       backend.ProviderDataStore(),
+		MeetingStore:            backend.MeetingStore(),
+		RootKeyStore:            backend.BakeryRootKeyStore(),
+		DebugStatusCheckerFuncs: backend.DebugStatusCheckerFuncs(),
 	})
 }
 

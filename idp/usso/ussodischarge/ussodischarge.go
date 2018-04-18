@@ -30,7 +30,6 @@ import (
 	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
 
-	"github.com/CanonicalLtd/candid/config"
 	"github.com/CanonicalLtd/candid/idp"
 	"github.com/CanonicalLtd/candid/idp/idputil"
 	"github.com/CanonicalLtd/candid/store"
@@ -50,7 +49,7 @@ var ussoLoginOp = bakery.Op{
 }
 
 func init() {
-	config.RegisterIDP("usso_macaroon", func(unmarshal func(interface{}) error) (idp.IdentityProvider, error) {
+	idp.Register("usso_macaroon", func(unmarshal func(interface{}) error) (idp.IdentityProvider, error) {
 		var p Params
 		if err := unmarshal(&p); err != nil {
 			return nil, err

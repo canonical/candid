@@ -26,7 +26,7 @@ var identityColumns = [store.NumFields]string{
 }
 
 type identityStore struct {
-	*Database
+	*backend
 }
 
 // Context implements store.Context, it returns the given context unmodified.

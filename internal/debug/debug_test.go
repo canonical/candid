@@ -13,12 +13,12 @@ import (
 	"github.com/juju/testing/httptesting"
 	"github.com/juju/utils/debugstatus"
 	gc "gopkg.in/check.v1"
-	"gopkg.in/macaroon-bakery.v2/bakery/mgorootkeystore"
 
 	"github.com/CanonicalLtd/candid/internal/candidtest"
 	"github.com/CanonicalLtd/candid/internal/debug"
 	"github.com/CanonicalLtd/candid/internal/identity"
-	"github.com/CanonicalLtd/candid/mgostore"
+	"github.com/CanonicalLtd/candid/store"
+	"github.com/CanonicalLtd/candid/store/mgostore"
 	buildver "github.com/CanonicalLtd/candid/version"
 )
 
@@ -30,7 +30,7 @@ type debugSuite struct {
 	testing.IsolatedMgoSuite
 	candidtest.ServerSuite
 
-	db *mgostore.Database
+	backend store.Backend
 }
 
 var _ = gc.Suite(&debugSuite{})
@@ -38,13 +38,13 @@ var _ = gc.Suite(&debugSuite{})
 func (s *debugSuite) SetUpTest(c *gc.C) {
 	s.IsolatedMgoSuite.SetUpTest(c)
 	var err error
-	s.db, err = mgostore.NewDatabase(s.Session.DB("candid-test"))
+	s.backend, err = mgostore.NewBackend(s.Session.DB("candid-test"))
 	c.Assert(err, gc.Equals, nil)
 
-	s.Params.MeetingStore = s.db.MeetingStore()
-	s.Params.RootKeyStore = s.db.BakeryRootKeyStore(mgorootkeystore.Policy{ExpiryDuration: time.Minute})
-	s.Params.Store = s.db.Store()
-	s.Params.DebugStatusCheckerFuncs = s.db.DebugStatusCheckerFuncs()
+	s.Params.MeetingStore = s.backend.MeetingStore()
+	s.Params.RootKeyStore = s.backend.BakeryRootKeyStore()
+	s.Params.Store = s.backend.Store()
+	s.Params.DebugStatusCheckerFuncs = s.backend.DebugStatusCheckerFuncs()
 	s.Versions = map[string]identity.NewAPIHandlerFunc{
 		version: debug.NewAPIHandler,
 	}
@@ -53,7 +53,7 @@ func (s *debugSuite) SetUpTest(c *gc.C) {
 
 func (s *debugSuite) TearDownTest(c *gc.C) {
 	s.ServerSuite.TearDownTest(c)
-	s.db.Close()
+	s.backend.Close()
 	s.IsolatedMgoSuite.TearDownTest(c)
 }
 

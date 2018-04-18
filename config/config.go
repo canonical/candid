@@ -17,38 +17,19 @@ import (
 	"gopkg.in/yaml.v2"
 
 	"github.com/CanonicalLtd/candid/idp"
-)
-
-type StorageKind int
-
-const (
-	MongoStorage StorageKind = iota
-	PostgresStorage
-	MemStorage
+	"github.com/CanonicalLtd/candid/store"
 )
 
 var logger = loggo.GetLogger("candid.config")
 
 // Config holds the configuration parameters for the identity service.
 type Config struct {
-	// The following three fields are mutually exclusive. Exactly one
-	// of them must be non-zero to specify the storage backend to use.
+	// Storage holds the storage backend to use.
+	Storage *store.Config `yaml:"storage"`
 
-	// MongoAddr holds the MongoDB server address.
-	MongoAddr string `yaml:"mongo-addr"`
-
-	// PostgresConnectionString holds the string to use to make a database connection
-	// to Postgres. Environment variables are also consulted.
-	PostgresConnectionString string `yaml:"postgres-connection-string"`
-
-	// EphemeralStorage specifies that in-memory storage should be used.
-	// This is generally only useful for tests.
-	EphemeralStorage bool `yaml:"ephemeral-storage"`
-
-	// StorageKind specifies the kind of storage to use.
-	// This is inferred from the above three fields when parsing the
-	// configuration.
-	StorageKind StorageKind `yaml:"-"`
+	// IdentityProviders holds all the configured identity providers.
+	// If this is empty, the default Ubuntu SSO (usso) provider will be used.
+	IdentityProviders []idp.Config `yaml:"identity-providers"`
 
 	// LoggingConfig holds the loggo configuration to use.
 	LoggingConfig string `yaml:"logging-config"`
@@ -64,18 +45,9 @@ type Config struct {
 	// AccessLog holds the name of a file to use to write logs of API accesses.
 	AccessLog string `yaml:"access-log"`
 
-	// MaxMgoSessions holds the maximum number of Mongo sessions
-	// to use when the MongoDB storage backend is used.
-	// TODO this is currently ignored.
-	MaxMgoSessions int `yaml:"max-mgo-sessions"`
-
 	// RendezvousTimeout holds length of time that an interactive authentication
 	// request can be active before it is forgotten.
 	RendezvousTimeout DurationString `yaml:"rendezvous-timeout"`
-
-	// IdentityProviders holds all the configured identity providers.
-	// If this is empty, the default Ubuntu SSO (USSO) provider will be used.
-	IdentityProviders []IdentityProvider `yaml:"identity-providers"`
 
 	// PrivateAddr holds the hostname where this instance of the Candid server
 	// can be contacted. This is used by instances of the Candid server
@@ -142,6 +114,10 @@ func (c *Config) TLSConfig() *tls.Config {
 
 func (c *Config) validate() error {
 	var missing []string
+	if c.Storage == nil {
+		// TODO default to in-memory storage?
+		missing = append(missing, "storage")
+	}
 	if c.APIAddr == "" {
 		missing = append(missing, "api-addr")
 	}
@@ -158,31 +134,8 @@ func (c *Config) validate() error {
 	if c.PrivateAddr == "" {
 		missing = append(missing, "private-addr")
 	}
-	storageFieldNames := []string{
-		MongoStorage:    "mongo-addr",
-		PostgresStorage: "postgres-connection-string",
-		MemStorage:      "ephemeral-storage",
-	}
-	storageMethods := []bool{
-		MongoStorage:    c.MongoAddr != "",
-		PostgresStorage: c.PostgresConnectionString != "",
-		MemStorage:      c.EphemeralStorage,
-	}
-	storageCount := 0
-	for i, isSet := range storageMethods {
-		if isSet {
-			c.StorageKind = StorageKind(i)
-			storageCount++
-		}
-	}
-	if storageCount == 0 {
-		missing = append(missing, strings.Join(storageFieldNames, " or "))
-	}
 	if len(missing) != 0 {
 		return errgo.Newf("missing fields %s in config file", strings.Join(missing, ", "))
-	}
-	if storageCount > 1 {
-		return errgo.Newf("more than one of %s specified", strings.Join(storageFieldNames, " or "))
 	}
 	return nil
 }
@@ -222,40 +175,4 @@ func (dp *DurationString) UnmarshalText(data []byte) error {
 	}
 	dp.Duration = d
 	return nil
-}
-
-// IdentityProvider represents a configured idp.IdentityProvider
-type IdentityProvider struct {
-	idp.IdentityProvider
-}
-
-var idps = make(map[string]func(func(interface{}) error) (idp.IdentityProvider, error))
-
-func (idp *IdentityProvider) UnmarshalYAML(unmarshal func(interface{}) error) error {
-	var t struct {
-		Type string
-	}
-	if err := unmarshal(&t); err != nil {
-		return errgo.Notef(err, "cannot unmarshal identity provider type")
-	}
-	if idpf, ok := idps[t.Type]; ok {
-		var err error
-		idp.IdentityProvider, err = idpf(unmarshal)
-		if err != nil {
-			err = errgo.Notef(err, "cannot unmarshal %s configuration", t.Type)
-		}
-		return err
-	}
-	return errgo.Newf("unrecognised identity provider type %q", t.Type)
-}
-
-// RegisterIDP is used by identity providers to register a function that
-// can be used to unmarshal an identity provider type. When the identity
-// provider with the given name is used, the given function will be
-// called to unmarshal its parameters from YAML. Its argument will be an
-// unmarshalYAML function that can be used to unmarshal the configuration
-// parameters into its argument according to the rules specified in
-// gopkg.in/yaml.v2.
-func RegisterIDP(idpType string, f func(func(interface{}) error) (idp.IdentityProvider, error)) {
-	idps[idpType] = f
 }

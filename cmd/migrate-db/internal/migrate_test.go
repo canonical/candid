@@ -14,8 +14,8 @@ import (
 	"gopkg.in/macaroon-bakery.v2/bakery"
 
 	"github.com/CanonicalLtd/candid/cmd/migrate-db/internal"
-	"github.com/CanonicalLtd/candid/memstore"
 	"github.com/CanonicalLtd/candid/store"
+	"github.com/CanonicalLtd/candid/store/memstore"
 )
 
 type migrateSuite struct {

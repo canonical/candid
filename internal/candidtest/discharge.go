@@ -19,7 +19,6 @@ import (
 
 	"github.com/CanonicalLtd/candid/internal/discharger"
 	"github.com/CanonicalLtd/candid/internal/identity"
-	"github.com/CanonicalLtd/candid/mgostore"
 )
 
 // A DischargeSuite is a test suite useful for testing discharges.
@@ -29,7 +28,6 @@ type DischargeSuite struct {
 	Bakery *identchecker.Bakery
 
 	bakeryKey *bakery.KeyPair
-	db        *mgostore.Database
 }
 
 // SetUpTest creates a new identity server ready to perform discharges

@@ -25,12 +25,12 @@ const meetingCollection = "meeting"
 // meetingStore is an implementation of meeting.Store that uses a mongodb
 // collection for the persistent data store.
 type meetingStore struct {
-	db *Database
+	b *backend
 }
 
 // Context implements meeting.Store.Context.
 func (s *meetingStore) Context(ctx context.Context) (_ context.Context, cancel func()) {
-	return s.db.context(ctx)
+	return s.b.context(ctx)
 }
 
 // Put implements meeting.Store.Put.
@@ -41,7 +41,7 @@ func (s *meetingStore) Put(ctx context.Context, id, address string) error {
 // put is the internal version of Put which takes a time
 // for testing purposes.
 func (s *meetingStore) put(ctx context.Context, id, address string, now time.Time) error {
-	coll := s.db.c(ctx, meetingCollection)
+	coll := s.b.c(ctx, meetingCollection)
 	defer coll.Database.Session.Close()
 
 	err := coll.Insert(&doc{
@@ -57,7 +57,7 @@ func (s *meetingStore) put(ctx context.Context, id, address string, now time.Tim
 
 // Get implements meeting.Store.Get.
 func (s *meetingStore) Get(ctx context.Context, id string) (address string, err error) {
-	coll := s.db.c(ctx, meetingCollection)
+	coll := s.b.c(ctx, meetingCollection)
 	defer coll.Database.Session.Close()
 
 	var entry doc
@@ -73,7 +73,7 @@ func (s *meetingStore) Get(ctx context.Context, id string) (address string, err 
 
 // Remove implements meeting.Store.Remove.
 func (s *meetingStore) Remove(ctx context.Context, id string) (time.Time, error) {
-	coll := s.db.c(ctx, meetingCollection)
+	coll := s.b.c(ctx, meetingCollection)
 	defer coll.Database.Session.Close()
 
 	var entry doc
@@ -92,7 +92,7 @@ func (s *meetingStore) Remove(ctx context.Context, id string) (time.Time, error)
 
 // RemoveOld implements meeting.Store.RemoveOld.
 func (s *meetingStore) RemoveOld(ctx context.Context, addr string, olderThan time.Time) (ids []string, err error) {
-	coll := s.db.c(ctx, meetingCollection)
+	coll := s.b.c(ctx, meetingCollection)
 	defer coll.Database.Session.Close()
 
 	query := bson.D{{"created", bson.D{{"$lt", olderThan}}}}
@@ -130,10 +130,10 @@ func ensureMeetingIndexes(db *mgo.Database) error {
 	return nil
 }
 
-func (d *Database) meetingStatus() (key string, result debugstatus.CheckResult) {
+func (b *backend) meetingStatus() (key string, result debugstatus.CheckResult) {
 	result.Name = "count of meeting collection"
 	result.Passed = true
-	coll := d.c(context.Background(), meetingCollection)
+	coll := b.c(context.Background(), meetingCollection)
 	defer coll.Database.Session.Close()
 	c, err := coll.Count()
 	result.Value = strconv.Itoa(c)

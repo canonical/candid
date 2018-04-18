@@ -11,8 +11,8 @@ import (
 	"gopkg.in/macaroon-bakery.v2/bakery"
 
 	"github.com/CanonicalLtd/candid/meeting"
-	"github.com/CanonicalLtd/candid/memstore"
 	"github.com/CanonicalLtd/candid/store"
+	"github.com/CanonicalLtd/candid/store/memstore"
 )
 
 // A StoreSuite is a test suite that initializes a store.Store,

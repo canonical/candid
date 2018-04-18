@@ -8,13 +8,12 @@ import (
 	oidc "github.com/coreos/go-oidc"
 	"gopkg.in/errgo.v1"
 
-	"github.com/CanonicalLtd/candid/config"
 	"github.com/CanonicalLtd/candid/idp"
 	"github.com/CanonicalLtd/candid/idp/openid"
 )
 
 func init() {
-	config.RegisterIDP("google", func(unmarshal func(interface{}) error) (idp.IdentityProvider, error) {
+	idp.Register("google", func(unmarshal func(interface{}) error) (idp.IdentityProvider, error) {
 		var p Params
 		if err := unmarshal(&p); err != nil {
 			return nil, errgo.Notef(err, "cannot unmarshal google parameters")

@@ -14,7 +14,6 @@ import (
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
 
-	"github.com/CanonicalLtd/candid/config"
 	"github.com/CanonicalLtd/candid/idp"
 	"github.com/CanonicalLtd/candid/idp/idputil"
 	"github.com/CanonicalLtd/candid/idp/keystone/internal/keystone"
@@ -22,7 +21,7 @@ import (
 )
 
 func init() {
-	config.RegisterIDP("keystone", constructor(NewIdentityProvider))
+	idp.Register("keystone", constructor(NewIdentityProvider))
 }
 
 // constructor returns a function that is suitable for passing to
