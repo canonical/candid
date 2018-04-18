@@ -20,18 +20,18 @@ const identitiesCollection = "identities"
 // identityStore is a store.Store implementation that uses a mongodb database to
 // store the data.
 type identityStore struct {
-	db *Database
+	b *backend
 }
 
 func (s *identityStore) Context(ctx context.Context) (_ context.Context, cancel func()) {
-	return s.db.context(ctx)
+	return s.b.context(ctx)
 }
 
 // Identity implements store.Store.Identity by retrieving the specified
 // identity from the mongodb database. The given context must have a
 // mgo.Session added using ContextWithSession.
 func (s *identityStore) Identity(ctx context.Context, identity *store.Identity) error {
-	coll := s.db.c(ctx, identitiesCollection)
+	coll := s.b.c(ctx, identitiesCollection)
 	defer coll.Database.Session.Close()
 
 	var doc identityDocument
@@ -77,7 +77,7 @@ func identityQuery(identity *store.Identity) bson.D {
 // mongodb database. The given context must have a mgo.Session added
 // using ContextWithSession.
 func (s *identityStore) FindIdentities(ctx context.Context, ref *store.Identity, filter store.Filter, sort []store.Sort, skip, limit int) ([]store.Identity, error) {
-	coll := s.db.c(ctx, identitiesCollection)
+	coll := s.b.c(ctx, identitiesCollection)
 	defer coll.Database.Session.Close()
 
 	q := coll.Find(makeQuery(ref, filter))
@@ -158,7 +158,7 @@ var comparisonOps = []string{
 // identity update to the mongodb database. The given context must have a
 // mgo.Session added using ContextWithSession.
 func (s *identityStore) UpdateIdentity(ctx context.Context, identity *store.Identity, update store.Update) error {
-	coll := s.db.c(ctx, identitiesCollection)
+	coll := s.b.c(ctx, identitiesCollection)
 	defer coll.Database.Session.Close()
 
 	if identity.ID == "" && identity.ProviderID != "" && identity.Username != "" && update[store.Username] == store.Set {

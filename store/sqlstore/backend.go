@@ -5,25 +5,32 @@ import (
 	"database/sql"
 	"strings"
 	"text/template"
+	"time"
 
+	"github.com/juju/utils/debugstatus"
 	errgo "gopkg.in/errgo.v1"
+	"gopkg.in/macaroon-bakery.v2/bakery"
+	"gopkg.in/macaroon-bakery.v2/bakery/postgresrootkeystore"
 
 	"github.com/CanonicalLtd/candid/meeting"
 	"github.com/CanonicalLtd/candid/store"
 )
 
-// A Database provides a wrapper around an SQL database that can be used
+// backend provides a wrapper around an SQL database that can be used
 // as the persistent storage for the various types of store required by
 // the identity service.
-type Database struct {
-	db     *sql.DB
-	driver *driver
+type backend struct {
+	db       *sql.DB
+	driver   *driver
+	rootKeys *postgresrootkeystore.RootKeys
 }
 
-// NewDatabase creates a new Database using the given driverName and
-// *sql.DB. The driverName must match the value used to open the
-// database.
-func NewDatabase(driverName string, db *sql.DB) (*Database, error) {
+// NewBackend creates a new store.Backend implementation using the
+// given driverName and *sql.DB. The driverName must match the value
+// used to open the database.
+//
+// Closing the returned Backend will also close db.
+func NewBackend(driverName string, db *sql.DB) (store.Backend, error) {
 	if driverName != "postgres" {
 		return nil, errgo.Newf("unsupported database driver %q", driverName)
 	}
@@ -31,38 +38,53 @@ func NewDatabase(driverName string, db *sql.DB) (*Database, error) {
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot initialise database")
 	}
-	return &Database{
-		db:     db,
-		driver: driver,
+	rootkeys := postgresrootkeystore.NewRootKeys(db, "rootkeys", 1000)
+	defer rootkeys.Close()
+	return &backend{
+		db:       db,
+		driver:   driver,
+		rootKeys: postgresrootkeystore.NewRootKeys(db, "rootkeys", 1000),
 	}, nil
 }
 
-func (d *Database) Close() error {
-	return nil
+func (b *backend) Close() {
+	b.rootKeys.Close()
+	b.db.Close()
 }
 
 // Store returns a new store.Store implementation using this database for
 // persistent storage.
-func (d *Database) Store() store.Store {
-	return &identityStore{d}
+func (b *backend) Store() store.Store {
+	return &identityStore{b}
+}
+
+func (b *backend) BakeryRootKeyStore() bakery.RootKeyStore {
+	return b.rootKeys.NewStore(postgresrootkeystore.Policy{
+		ExpiryDuration: 365 * 24 * time.Hour,
+	})
 }
 
 // ProviderDataStore returns a new store.ProviderDataStore implementation
 // using this database for persistent storage.
-func (d *Database) ProviderDataStore() store.ProviderDataStore {
-	return &providerDataStore{d}
+func (b *backend) ProviderDataStore() store.ProviderDataStore {
+	return &providerDataStore{b}
 }
 
 // MeetingStore returns a new meeting.Stor implementation using this
 // database for persistent storage.
-func (d *Database) MeetingStore() meeting.Store {
-	return &meetingStore{d}
+func (b *backend) MeetingStore() meeting.Store {
+	return &meetingStore{b}
+}
+
+// DebugStatusCheckerFuncs implements store.Backend.DebugStatusCheckerFuncs.
+func (b *backend) DebugStatusCheckerFuncs() []debugstatus.CheckerFunc {
+	return nil
 }
 
 // withTx runs f in a new transaction. any error returned by f will not
 // have it's cause masked.
-func (d *Database) withTx(f func(*sql.Tx) error) error {
-	tx, err := d.db.Begin()
+func (b *backend) withTx(f func(*sql.Tx) error) error {
+	tx, err := b.db.Begin()
 	if err != nil {
 		return errgo.Mask(err)
 	}

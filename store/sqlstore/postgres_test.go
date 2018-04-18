@@ -6,15 +6,15 @@ import (
 	gc "gopkg.in/check.v1"
 	errgo "gopkg.in/errgo.v1"
 
-	"github.com/CanonicalLtd/candid/sqlstore"
 	"github.com/CanonicalLtd/candid/store"
+	"github.com/CanonicalLtd/candid/store/sqlstore"
 	storetesting "github.com/CanonicalLtd/candid/store/testing"
 )
 
 type postgresSuite struct {
 	storetesting.StoreSuite
-	db *sqlstore.Database
-	pg *postgrestest.DB
+	backend store.Backend
+	pg      *postgrestest.DB
 }
 
 var _ = gc.Suite(&postgresSuite{})
@@ -27,9 +27,9 @@ func (s *postgresSuite) SetUpTest(c *gc.C) {
 		return
 	}
 	c.Assert(err, gc.Equals, nil)
-	s.db, err = sqlstore.NewDatabase("postgres", s.pg.DB)
+	s.backend, err = sqlstore.NewBackend("postgres", s.pg.DB)
 	c.Assert(err, gc.Equals, nil)
-	s.Store = s.db.Store()
+	s.Store = s.backend.Store()
 	s.StoreSuite.SetUpTest(c)
 }
 
@@ -37,8 +37,8 @@ func (s *postgresSuite) TearDownTest(c *gc.C) {
 	if s.Store != nil {
 		s.StoreSuite.TearDownTest(c)
 	}
-	if s.db != nil {
-		s.db.Close()
+	if s.backend != nil {
+		s.backend.Close()
 	}
 	if s.pg != nil {
 		s.pg.Close()
@@ -98,8 +98,8 @@ func (s *postgresSuite) TestUpdateProviderIDEmptyNotFound(c *gc.C) {
 
 type postgresKeyValueSuite struct {
 	storetesting.KeyValueSuite
-	db *sqlstore.Database
-	pg *postgrestest.DB
+	backend store.Backend
+	pg      *postgrestest.DB
 }
 
 var _ = gc.Suite(&postgresKeyValueSuite{})
@@ -112,9 +112,9 @@ func (s *postgresKeyValueSuite) SetUpTest(c *gc.C) {
 		return
 	}
 	c.Assert(err, gc.Equals, nil)
-	s.db, err = sqlstore.NewDatabase("postgres", s.pg.DB)
+	s.backend, err = sqlstore.NewBackend("postgres", s.pg.DB)
 	c.Assert(err, gc.Equals, nil)
-	s.Store = s.db.ProviderDataStore()
+	s.Store = s.backend.ProviderDataStore()
 	s.KeyValueSuite.SetUpTest(c)
 }
 
@@ -122,8 +122,8 @@ func (s *postgresKeyValueSuite) TearDownTest(c *gc.C) {
 	if s.Store != nil {
 		s.KeyValueSuite.TearDownTest(c)
 	}
-	if s.db != nil {
-		s.db.Close()
+	if s.backend != nil {
+		s.backend.Close()
 	}
 	if s.pg != nil {
 		s.pg.Close()
@@ -132,8 +132,8 @@ func (s *postgresKeyValueSuite) TearDownTest(c *gc.C) {
 
 type postgresMeetingSuite struct {
 	storetesting.MeetingSuite
-	db *sqlstore.Database
-	pg *postgrestest.DB
+	backend store.Backend
+	pg      *postgrestest.DB
 }
 
 var _ = gc.Suite(&postgresMeetingSuite{})
@@ -146,9 +146,9 @@ func (s *postgresMeetingSuite) SetUpTest(c *gc.C) {
 		return
 	}
 	c.Assert(err, gc.Equals, nil)
-	s.db, err = sqlstore.NewDatabase("postgres", s.pg.DB)
+	s.backend, err = sqlstore.NewBackend("postgres", s.pg.DB)
 	c.Assert(err, gc.Equals, nil)
-	s.Store = s.db.MeetingStore()
+	s.Store = s.backend.MeetingStore()
 	s.PutAtTimeFunc = sqlstore.PutAtTime
 	s.MeetingSuite.SetUpTest(c)
 }
@@ -157,8 +157,8 @@ func (s *postgresMeetingSuite) TearDownTest(c *gc.C) {
 	if s.Store != nil {
 		s.MeetingSuite.TearDownTest(c)
 	}
-	if s.db != nil {
-		s.db.Close()
+	if s.backend != nil {
+		s.backend.Close()
 	}
 	if s.pg != nil {
 		s.pg.Close()

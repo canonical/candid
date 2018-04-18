@@ -6,7 +6,7 @@ package memstore_test
 import (
 	gc "gopkg.in/check.v1"
 
-	"github.com/CanonicalLtd/candid/memstore"
+	"github.com/CanonicalLtd/candid/store/memstore"
 	"github.com/CanonicalLtd/candid/store/testing"
 )
 

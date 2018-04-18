@@ -4,15 +4,12 @@
 package mgostore_test
 
 import (
-	"time"
-
 	"github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"
 	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
-	"gopkg.in/macaroon-bakery.v2/bakery/mgorootkeystore"
 
-	"github.com/CanonicalLtd/candid/mgostore"
+	"github.com/CanonicalLtd/candid/store/mgostore"
 )
 
 type bakerySuite struct {
@@ -22,13 +19,11 @@ type bakerySuite struct {
 var _ = gc.Suite(&bakerySuite{})
 
 func (s *bakerySuite) TestRootKeyStore(c *gc.C) {
-	db, err := mgostore.NewDatabase(s.Session.DB("bakery-test"))
+	backend, err := mgostore.NewBackend(s.Session.DB("bakery-test"))
 	c.Assert(err, gc.Equals, nil)
-	defer db.Close()
+	defer backend.Close()
 	ctx := context.Background()
-	rks := db.BakeryRootKeyStore(mgorootkeystore.Policy{
-		ExpiryDuration: time.Minute,
-	})
+	rks := backend.BakeryRootKeyStore()
 
 	key, id, err := rks.RootKey(ctx)
 	c.Assert(err, gc.Equals, nil)

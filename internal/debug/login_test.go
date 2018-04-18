@@ -18,19 +18,19 @@ import (
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery"
-	"gopkg.in/macaroon-bakery.v2/bakery/mgorootkeystore"
 
 	"github.com/CanonicalLtd/candid/internal/candidtest"
 	"github.com/CanonicalLtd/candid/internal/debug"
 	"github.com/CanonicalLtd/candid/internal/identity"
-	"github.com/CanonicalLtd/candid/mgostore"
+	"github.com/CanonicalLtd/candid/store"
+	"github.com/CanonicalLtd/candid/store/mgostore"
 )
 
 type loginSuite struct {
 	testing.IsolatedMgoSuite
 	candidtest.ServerSuite
 
-	db *mgostore.Database
+	backend store.Backend
 }
 
 var _ = gc.Suite(&loginSuite{})
@@ -38,13 +38,13 @@ var _ = gc.Suite(&loginSuite{})
 func (s *loginSuite) SetUpTest(c *gc.C) {
 	s.IsolatedMgoSuite.SetUpTest(c)
 	var err error
-	s.db, err = mgostore.NewDatabase(s.Session.DB("candid-test"))
+	s.backend, err = mgostore.NewBackend(s.Session.DB("candid-test"))
 	c.Assert(err, gc.Equals, nil)
 
-	s.Params.MeetingStore = s.db.MeetingStore()
-	s.Params.RootKeyStore = s.db.BakeryRootKeyStore(mgorootkeystore.Policy{ExpiryDuration: time.Minute})
-	s.Params.Store = s.db.Store()
-	s.Params.DebugStatusCheckerFuncs = s.db.DebugStatusCheckerFuncs()
+	s.Params.MeetingStore = s.backend.MeetingStore()
+	s.Params.RootKeyStore = s.backend.BakeryRootKeyStore()
+	s.Params.Store = s.backend.Store()
+	s.Params.DebugStatusCheckerFuncs = s.backend.DebugStatusCheckerFuncs()
 	s.Params.Key, err = bakery.GenerateKey()
 	c.Assert(err, gc.Equals, nil)
 	s.Params.DebugTeams = []string{"debuggers"}
@@ -57,7 +57,7 @@ func (s *loginSuite) SetUpTest(c *gc.C) {
 
 func (s *loginSuite) TearDownTest(c *gc.C) {
 	s.ServerSuite.TearDownTest(c)
-	s.db.Close()
+	s.backend.Close()
 	s.IsolatedMgoSuite.TearDownTest(c)
 }
 func (s *loginSuite) TestCookieEncodeDecode(c *gc.C) {

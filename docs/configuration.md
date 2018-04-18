@@ -38,12 +38,9 @@ Candid needs to know its own address so that it can add third-party
 caveats addressed to itself and to create response addresses for identity
 providers such as OpenID that use browser redirection for communication.
 
-### mongo-addr, postgres-connection-string, ephemeral-storage
-Exactly one of these values must be specified to tell Candid what to
-use for its storage. The `mongo-addr` value is in the form *host:port*;
-the `postgres-connection-string` is as described [here](https://godoc.org/github.com/lib/pq);
-`ephemeral-storage` is a boolean that specifies that no persistent
-storage will be used.
+### storage
+Storage holds configuration for the storage backend used by the
+server. See below for documentation on the supported storage backends.
 
 ### public-key & private-key
 (Required) Services wishing to discharge caveats against this identity manager
@@ -62,7 +59,45 @@ logging will take place.
 This is a list of the configured identity providers with their
 configuration. See below for the supported identity providers. If this
 is not configured then a default set of providers will be used
-containing UbuntuSSO, UbuntuSSO OAuth and Agent identity providers.
+containing the Ubuntu SSO and Agent identity providers.
+
+Storage Backends
+-----------
+
+The `storage` field holds an object containing a `type` field
+which names the storage backend to use.
+
+For example:
+
+	storage:
+	    type: mongodb
+	    address: localhost:1234
+
+Currently supported backends are:
+
+### memory
+
+The memory provider has no extra parameters. It stores
+all data ephemerally in RAM.
+
+### mongodb
+
+This uses MongoDB for the backend. It has two parameters:
+
+`address` (required) is the address of the mongoDB server to connect to,
+in `host:port` form.
+
+`database` holds the database name to use. If not specified, this will default to `candid`.
+
+### postgres
+
+This uses PostgresQL for the backend. It takes one parameter:
+
+`connection-string` is the connection string to use when connecting to the database.
+This is added to connection string parameters already present
+as environment variables when making a connection.
+See [here](https://godoc.org/github.com/lib/pq#hdr-Connection_String_Parameters)
+for details.
 
 Identity Providers
 ------------------

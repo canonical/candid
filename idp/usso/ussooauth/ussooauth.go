@@ -21,14 +21,13 @@ import (
 	"gopkg.in/httprequest.v1"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
 
-	"github.com/CanonicalLtd/candid/config"
 	"github.com/CanonicalLtd/candid/idp"
 	"github.com/CanonicalLtd/candid/idp/idputil"
 	"github.com/CanonicalLtd/candid/store"
 )
 
 func init() {
-	config.RegisterIDP("usso_oauth", func(func(interface{}) error) (idp.IdentityProvider, error) {
+	idp.Register("usso_oauth", func(func(interface{}) error) (idp.IdentityProvider, error) {
 		return IdentityProvider, nil
 	})
 }

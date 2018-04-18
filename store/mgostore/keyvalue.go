@@ -15,12 +15,12 @@ import (
 
 // an providerDataStore implements store.ProviderDataStore.
 type providerDataStore struct {
-	db *Database
+	b *backend
 }
 
 func (s *providerDataStore) KeyValueStore(ctx context.Context, idp string) (store.KeyValueStore, error) {
 	collection := "kv-idp-" + idp
-	coll := s.db.c(ctx, collection)
+	coll := s.b.c(ctx, collection)
 	defer coll.Database.Session.Close()
 
 	if err := coll.EnsureIndex(mgo.Index{Key: []string{"expire"}, ExpireAfter: time.Nanosecond}); err != nil {
@@ -28,20 +28,20 @@ func (s *providerDataStore) KeyValueStore(ctx context.Context, idp string) (stor
 	}
 
 	return &keyValueStore{
-		db:         s.db,
+		b:          s.b,
 		collection: collection,
 	}, nil
 }
 
 // a keyValueStore implements store.KeyValueStore.
 type keyValueStore struct {
-	db         *Database
+	b          *backend
 	collection string
 }
 
 // Context implements idp.KeyValueStore.Context.
 func (s *keyValueStore) Context(ctx context.Context) (context.Context, func()) {
-	return s.db.context(ctx)
+	return s.b.context(ctx)
 }
 
 type kvDoc struct {
@@ -53,7 +53,7 @@ type kvDoc struct {
 // Get implements store.KeyValueStore.Get by retrieving the document with
 // the given key from the store's collection.
 func (s *keyValueStore) Get(ctx context.Context, key string) ([]byte, error) {
-	coll := s.db.c(ctx, s.collection)
+	coll := s.b.c(ctx, s.collection)
 	defer coll.Database.Session.Close()
 
 	var doc kvDoc
@@ -69,7 +69,7 @@ func (s *keyValueStore) Get(ctx context.Context, key string) ([]byte, error) {
 // Set implements store.KeyValueStore.Set by upserting the document with
 // the given key, value and expire time into the store's collection.
 func (s *keyValueStore) Set(ctx context.Context, key string, value []byte, expire time.Time) error {
-	coll := s.db.c(ctx, s.collection)
+	coll := s.b.c(ctx, s.collection)
 	defer coll.Database.Session.Close()
 
 	_, err := coll.UpsertId(key, kvDoc{
@@ -83,7 +83,7 @@ func (s *keyValueStore) Set(ctx context.Context, key string, value []byte, expir
 // Add implements store.KeyValueStore.Add by inserting a document with
 // the given key, value and expire time into the store's collection.
 func (s *keyValueStore) Add(ctx context.Context, key string, value []byte, expire time.Time) error {
-	coll := s.db.c(ctx, s.collection)
+	coll := s.b.c(ctx, s.collection)
 	defer coll.Database.Session.Close()
 
 	doc := kvDoc{

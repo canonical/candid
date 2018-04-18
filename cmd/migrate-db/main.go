@@ -16,9 +16,9 @@ import (
 	mgo "gopkg.in/mgo.v2"
 
 	"github.com/CanonicalLtd/candid/cmd/migrate-db/internal"
-	"github.com/CanonicalLtd/candid/mgostore"
-	"github.com/CanonicalLtd/candid/sqlstore"
 	"github.com/CanonicalLtd/candid/store"
+	"github.com/CanonicalLtd/candid/store/mgostore"
+	"github.com/CanonicalLtd/candid/store/sqlstore"
 )
 
 var (
@@ -75,24 +75,24 @@ func migrate(ctx context.Context) error {
 			return errgo.Notef(err, "cannot connnect to mongodb server")
 		}
 		defer s.Close()
-		db, err := mgostore.NewDatabase(s.DB(""))
+		backend, err := mgostore.NewBackend(s.DB(""))
 		if err != nil {
 			return errgo.Notef(err, "cannot initialize mgo store")
 		}
-		defer db.Close()
-		source = internal.NewStoreSource(ctx, db.Store())
+		defer backend.Close()
+		source = internal.NewStoreSource(ctx, backend.Store())
 	case "postgres":
 		sqldb, err := sql.Open("postgres", addr)
 		if err != nil {
 			return errgo.Notef(err, "cannot connect to postgresql server")
 		}
 		defer sqldb.Close()
-		db, err := sqlstore.NewDatabase("postgres", sqldb)
+		backend, err := sqlstore.NewBackend("postgres", sqldb)
 		if err != nil {
 			return errgo.Notef(err, "cannot initialize postgresql database")
 		}
-		defer db.Close()
-		source = internal.NewStoreSource(ctx, db.Store())
+		defer backend.Close()
+		source = internal.NewStoreSource(ctx, backend.Store())
 	default:
 		return errgo.Newf("invalid source type %q", type_)
 	}
@@ -106,24 +106,24 @@ func migrate(ctx context.Context) error {
 			return errgo.Notef(err, "cannot connnect to mongodb server")
 		}
 		defer s.Close()
-		db, err := mgostore.NewDatabase(s.DB(""))
+		backend, err := mgostore.NewBackend(s.DB(""))
 		if err != nil {
 			return errgo.Notef(err, "cannot initialize mgo store")
 		}
-		defer db.Close()
-		store = db.Store()
+		defer backend.Close()
+		store = backend.Store()
 	case "postgres":
 		sqldb, err := sql.Open("postgres", addr)
 		if err != nil {
 			return errgo.Notef(err, "cannot connect to postgresql server")
 		}
 		defer sqldb.Close()
-		db, err := sqlstore.NewDatabase("postgres", sqldb)
+		backend, err := sqlstore.NewBackend("postgres", sqldb)
 		if err != nil {
 			return errgo.Notef(err, "cannot initialize postgresql database")
 		}
-		defer db.Close()
-		store = db.Store()
+		defer backend.Close()
+		store = backend.Store()
 	default:
 		return errgo.Newf("invalid destination type %q", type_)
 	}

@@ -16,6 +16,8 @@ import (
 
 	"github.com/CanonicalLtd/candid/config"
 	"github.com/CanonicalLtd/candid/idp"
+	"github.com/CanonicalLtd/candid/store"
+	_ "github.com/CanonicalLtd/candid/store/memstore"
 )
 
 func TestPackage(t *testing.T) {
@@ -38,7 +40,9 @@ private-key: 8PjzjakvIlh3BVFKe8axinRDutF6EDIfjtuf4+JaNow=
 public-key: CIdWcEUN+0OZnKW9KwruRQnQDY/qqzVdD30CijwiWCk=
 admin-agent-public-key: dUnC8p9p3nygtE2h92a47Ooq0rXg0fVSm3YBWou5/UQ=
 location: http://foo.com:1234
-max-mgo-sessions: 10
+storage:
+  type: test
+  attribute: hello
 rendezvous-timeout: 1m
 identity-providers:
  - type: usso
@@ -110,8 +114,9 @@ func (s *configSuite) readConfig(c *gc.C, content string) (*config.Config, error
 }
 
 func (s *configSuite) TestRead(c *gc.C) {
-	config.RegisterIDP("usso", testIdentityProvider)
-	config.RegisterIDP("keystone", testIdentityProvider)
+	idp.Register("usso", testIdentityProvider)
+	idp.Register("keystone", testIdentityProvider)
+	store.Register("test", testStorageBackend)
 	conf, err := s.readConfig(c, testConfig)
 	c.Assert(err, gc.IsNil)
 	// Check that the TLS configuration creates a valid *tls.Config
@@ -131,24 +136,22 @@ func (s *configSuite) TestRead(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 
 	c.Assert(conf, jc.DeepEquals, &config.Config{
-		MongoAddr:           "localhost:23456",
-		StorageKind:         config.MongoStorage,
-		APIAddr:             "1.2.3.4:5678",
-		AdminPassword:       "mypasswd",
-		PrivateKey:          &key.Private,
-		PublicKey:           &key.Public,
-		AdminAgentPublicKey: &adminPubKey,
-		Location:            "http://foo.com:1234",
-		MaxMgoSessions:      10,
-		RendezvousTimeout:   config.DurationString{Duration: time.Minute},
-		IdentityProviders: []config.IdentityProvider{{
-			IdentityProvider: IdentityProvider{
+		Storage: &store.Config{
+			BackendFactory: storageBackend{
+				Params: map[string]string{
+					"type":      "test",
+					"attribute": "hello",
+				},
+			},
+		},
+		IdentityProviders: []idp.Config{{
+			IdentityProvider: identityProvider{
 				Params: map[string]string{
 					"type": "usso",
 				},
 			},
 		}, {
-			IdentityProvider: IdentityProvider{
+			IdentityProvider: identityProvider{
 				Params: map[string]string{
 					"type": "keystone",
 					"name": "ks1",
@@ -156,54 +159,18 @@ func (s *configSuite) TestRead(c *gc.C) {
 				},
 			},
 		}},
-		PrivateAddr:  "localhost",
-		ResourcePath: "/resources",
-		HTTPProxy:    "http://proxy.example.com:3128",
-		NoProxy:      "localhost,.example.com",
+		APIAddr:             "1.2.3.4:5678",
+		AdminPassword:       "mypasswd",
+		PrivateKey:          &key.Private,
+		PublicKey:           &key.Public,
+		AdminAgentPublicKey: &adminPubKey,
+		Location:            "http://foo.com:1234",
+		RendezvousTimeout:   config.DurationString{Duration: time.Minute},
+		PrivateAddr:         "localhost",
+		ResourcePath:        "/resources",
+		HTTPProxy:           "http://proxy.example.com:3128",
+		NoProxy:             "localhost,.example.com",
 	})
-}
-
-func (s *configSuite) TestReadWithPostgresStorage(c *gc.C) {
-	const testConfig = `
-postgres-connection-string: 'something'
-api-addr: 1.2.3.4:5678
-private-key: 8PjzjakvIlh3BVFKe8axinRDutF6EDIfjtuf4+JaNow=
-public-key: CIdWcEUN+0OZnKW9KwruRQnQDY/qqzVdD30CijwiWCk=
-location: http://foo.com:1234
-private-addr: localhost
-`
-	conf, err := s.readConfig(c, testConfig)
-	c.Assert(err, gc.IsNil)
-	c.Assert(conf.StorageKind, gc.Equals, config.PostgresStorage)
-	c.Assert(conf.PostgresConnectionString, gc.Equals, "something")
-}
-
-func (s *configSuite) TestWithMemStorage(c *gc.C) {
-	const testConfig = `
-ephemeral-storage: true
-api-addr: 1.2.3.4:5678
-private-key: 8PjzjakvIlh3BVFKe8axinRDutF6EDIfjtuf4+JaNow=
-public-key: CIdWcEUN+0OZnKW9KwruRQnQDY/qqzVdD30CijwiWCk=
-location: http://foo.com:1234
-private-addr: localhost
-`
-	conf, err := s.readConfig(c, testConfig)
-	c.Assert(err, gc.IsNil)
-	c.Assert(conf.StorageKind, gc.Equals, config.MemStorage)
-}
-
-func (s *configSuite) TestWithMultipleStorage(c *gc.C) {
-	const testConfig = `
-ephemeral-storage: true
-postgres-connection-string: foo
-api-addr: 1.2.3.4:5678
-private-key: 8PjzjakvIlh3BVFKe8axinRDutF6EDIfjtuf4+JaNow=
-public-key: CIdWcEUN+0OZnKW9KwruRQnQDY/qqzVdD30CijwiWCk=
-location: http://foo.com:1234
-private-addr: localhost
-`
-	_, err := s.readConfig(c, testConfig)
-	c.Assert(err, gc.ErrorMatches, `more than one of mongo-addr or postgres-connection-string or ephemeral-storage specified`)
 }
 
 func (s *configSuite) TestReadErrorNotFound(c *gc.C) {
@@ -214,7 +181,7 @@ func (s *configSuite) TestReadErrorNotFound(c *gc.C) {
 
 func (s *configSuite) TestReadErrorEmpty(c *gc.C) {
 	cfg, err := s.readConfig(c, "")
-	c.Assert(err, gc.ErrorMatches, "missing fields api-addr, private-key, public-key, location, private-addr, mongo-addr or postgres-connection-string or ephemeral-storage in config file")
+	c.Assert(err, gc.ErrorMatches, "missing fields storage, api-addr, private-key, public-key, location, private-addr in config file")
 	c.Assert(cfg, gc.IsNil)
 }
 
@@ -233,18 +200,32 @@ identity-providers:
 	c.Assert(cfg, gc.IsNil)
 }
 
-type IdentityProvider struct {
+type identityProvider struct {
 	idp.IdentityProvider
 	Params map[string]string
 }
 
 func testIdentityProvider(unmarshal func(interface{}) error) (idp.IdentityProvider, error) {
-	idp := IdentityProvider{
-		IdentityProvider: nil,
-		Params:           make(map[string]string),
+	idp := identityProvider{
+		Params: make(map[string]string),
 	}
 	if err := unmarshal(&idp.Params); err != nil {
 		return nil, err
 	}
 	return idp, nil
+}
+
+type storageBackend struct {
+	store.BackendFactory
+	Params map[string]string
+}
+
+func testStorageBackend(unmarshal func(interface{}) error) (store.BackendFactory, error) {
+	backend := storageBackend{
+		Params: make(map[string]string),
+	}
+	if err := unmarshal(&backend.Params); err != nil {
+		return nil, err
+	}
+	return backend, nil
 }
