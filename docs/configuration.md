@@ -13,9 +13,11 @@ file. In a usual installation this file is stored in
 /etc/candid/config.yaml. An example configuration file is:
 
 ```yaml
-api-addr: :8081
+listen-address: :8081
 location: 'http://jujucharms.com/identity'
-mongo-addr: localhost:27017
+storage:
+    type: mongodb
+    address: localhost:27017
 public-key: OAG9EVDFgXzWQKIk+MTxpLVO1Mp1Ws/pIkzhxv5Jk1M=
 private-key: q2G3A2NjTe7MP9D8iugCH9XfBAyrnV8n8u8ACbNyNOY=
 identity-providers:
@@ -26,7 +28,7 @@ Here is a description of the most commonly used configuration
 options. Some less useful options are omitted here - the remaining
 ones are all documented [here](https://godoc.org/github.com/CanonicalLtd/candid/config#Config).
 
-### api-addr
+### listen-address
 (Required) This is the address that the service will listen on. This consists of
 an optional host followed by a port. If the host is omitted then the
 server will listen on all interface addresses. The port may be a well

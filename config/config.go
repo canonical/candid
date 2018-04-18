@@ -34,9 +34,9 @@ type Config struct {
 	// LoggingConfig holds the loggo configuration to use.
 	LoggingConfig string `yaml:"logging-config"`
 
-	// APIAddr holds the address to listen on for HTTP connections to the Candid API
+	// ListenAddress holds the address to listen on for HTTP connections to the Candid API
 	// formatted as hostname:port.
-	APIAddr string `yaml:"api-addr"`
+	ListenAddress string `yaml:"listen-address"`
 
 	// Location holds the external address to use when the API
 	// returns references to itself (for example in third party caveat locations).
@@ -118,8 +118,8 @@ func (c *Config) validate() error {
 		// TODO default to in-memory storage?
 		missing = append(missing, "storage")
 	}
-	if c.APIAddr == "" {
-		missing = append(missing, "api-addr")
+	if c.ListenAddress == "" {
+		missing = append(missing, "listen-address")
 	}
 	if c.PrivateKey == nil {
 		missing = append(missing, "private-key")
