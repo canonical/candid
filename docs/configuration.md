@@ -98,10 +98,15 @@ that is found.
 ### UbuntuSSO
 ```yaml
 - type: usso
+  launchpad-teams:
+    - group1
+    - group2
 ```
 
 The UbuntuSSO identity provider is an interactive identity provider
 that uses OpenID with UbuntuSSO to log in.
+
+The launchpad-teams contains any private launchpad teams that candid needs to know about.
 
 ### UbuntuSSO OAuth
 ```yaml
