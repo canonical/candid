@@ -226,6 +226,115 @@ will be used.
 The url is the location of the keystone server that will be used to
 authenticate the user.
 
+### Azure OpenID Connect
+```yaml
+- type: azure
+  client-id: 43444f68-3666-4f95-bd34-6fc24b108019
+  client-secret: tXV2SRFflAGT9sUdxkdIi7mwfmQ=
+```
+
+The Azure identity provider uses OpenID Connect to log in using Microsoft
+credentials via https://login.live.com. When a user first logs in with
+this IDP they will be prompted to create a new identity. The new identity
+must have a unique username and will be in the domain "@azure".
+
+The `client-id` and `client-secret` parameters must be specified and
+are created by registering the candid instance as an application at
+https://apps.dev.microsoft.com. When registering the application the
+redirect URLs should include `$CANDID_URL/login/azure/callback`.
+
+### Google OpenID Connect
+```yaml
+- type: google
+  client-id: 483156874216-rh0j89ltslhuqirk7deh70d3mp49kdvq.apps.googleusercontent.com
+  client-secret: 8aENrwCL/+PU87ROkXwMB+09xe0=
+```
+
+The Google identity provider uses OpenID Connect to log in using Google
+credentials. When a user first logs in with this IDP they will be prompted
+to create a new identity. The new identity must have a unique username
+and will be in the domain "@google".
+
+The `client-id` and `client-secret` parameters must be specified and
+are created by registering the candid instance as an application
+at https://console.developers.google.com/apis/credentials. When
+registering the application the authorized redirect URLs should include
+`$CANDID_URL/login/google/callback`.
+
+### LDAP
+```yaml
+- type: ldap
+  name: ldap
+  description: LDAP Login
+  domain: example
+  url: ldap://ldap.example.com/dc=example,dc=com
+  ca-cert: |
+    -----BEGIN CERTIFICATE-----
+    MIIBWTCCAQOgAwIBAgIBADANBgkqhkiG9w0BAQsFADAbMRkwFwYDVQQDExBsZGFw
+    LmV4YW1wbGUuY29tMB4XDTE4MDQxODEwMDUzMVoXDTI4MDQyMDEwMDUzMVowGzEZ
+    MBcGA1UEAxMQbGRhcC5leGFtcGxlLmNvbTBcMA0GCSqGSIb3DQEBAQUAA0sAMEgC
+    QQDN2tltcVwW0bs80ABocjSZrqBDnpuxnzq2DlrLL+hldwDxVZ0sqU+o768GB6bP
+    8k3WVf81yYBRbfq7pD/MX0BhAgMBAAGjMjAwMA8GA1UdEwEB/wQFMAMBAf8wHQYD
+    VR0OBBYEFEMAeAXsITzTXHDfJSzrezBkaSvwMA0GCSqGSIb3DQEBCwUAA0EAw6Rh
+    RlR4L5mvvDaN4NP/aNOaWGe+x1Oa7V3L75MmD3DbwcUgDCn45EaUGofbOTrbYuzm
+    mrVoMF002dpQoqc38w==
+    -----END CERTIFICATE-----
+  dn: cn=candid,dc=example,dc=com
+  password: 6IaWWtW/aTN0CIVYwLgeOayyZW8o
+  user-query-filter: (objectClass=account)
+  user-query-attrs:
+    id: uid
+    email: mail
+    display-name: displayName
+  group-query-filter: (&(objectClass=groupOfNames)(member={{.User}}))
+```
+
+The LDAP identity provider allows a user to login using an LDAP server.
+Candid will prompt for a username and password and attempt to use those
+to authenticate with the LDAP server.
+
+`name` is the name to use for the LDAP IDP instance. It is possible
+to configure more than one LDAP IDP on a given candid server and this
+allows them to be identified. The name will be used in the login URL.
+
+`description` (optional) provides a human readable description of the
+identity provider. If it is not set it will default to the value of
+`name`.
+
+`domain` (optional) is the domain in which all identities will be
+created. If this is not set then no domain is used.
+
+`url` contains the URL of the LDAP server being authenticated against. The
+path component of the URL is used as the base DN for the connection.
+
+`ca-cert` (optional) contains the CA certificate that signed the LDAPs
+server certificate. If this is not set then the connection either has
+to be unauthenticated or the CA certificate has to be in the system's
+certificate pool.
+
+`dn` (optional) contains the distinguished name that candid uses to bind
+to the LDAP server to perform searches. If this is not configured then
+candid binds anonymously and `password` is ignored.
+
+`password` (optional) contains the password used when candid binds to
+the LDAP server.
+
+`user-query-filter` contains the filter that candid uses when attempting
+to find the user that is authenticating.
+
+`user-query-attrs` contains the attributes candid uses when searching
+for authenticating users.  When authenticating a user candid will
+perform a search like `($id=$username)` where the value of `$id` is
+specified in the `id` parameter and $username is the value entered by
+the authenticating user. `email` and `display-name` are used to populate
+the created identity.
+
+`group-query-filter` contains the filter candid uses when finding
+group memberships for a user.  The filter is specified as a template
+(see https://golang.org/pkg/text/template) where the value of `.User`
+will be replaced with the DN of the user for whom candid is attempting
+to find group memberships.
+
 Charm Configuration
 -------------------
 If the candid charm is being used then most of the parameters
