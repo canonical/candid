@@ -30,7 +30,6 @@ var _ = gc.Suite(&configSuite{})
 
 const testConfig = `
 mongo-addr: localhost:23456
-postgres-connection-string: host=/var/run/postgresql user=test
 api-addr: 1.2.3.4:5678
 foo: 1
 bar: false
@@ -132,16 +131,16 @@ func (s *configSuite) TestRead(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 
 	c.Assert(conf, jc.DeepEquals, &config.Config{
-		MongoAddr:                "localhost:23456",
-		PostgresConnectionString: "host=/var/run/postgresql user=test",
-		APIAddr:                  "1.2.3.4:5678",
-		AdminPassword:            "mypasswd",
-		PrivateKey:               &key.Private,
-		PublicKey:                &key.Public,
-		AdminAgentPublicKey:      &adminPubKey,
-		Location:                 "http://foo.com:1234",
-		MaxMgoSessions:           10,
-		RendezvousTimeout:        config.DurationString{Duration: time.Minute},
+		MongoAddr:           "localhost:23456",
+		StorageKind:         config.MongoStorage,
+		APIAddr:             "1.2.3.4:5678",
+		AdminPassword:       "mypasswd",
+		PrivateKey:          &key.Private,
+		PublicKey:           &key.Public,
+		AdminAgentPublicKey: &adminPubKey,
+		Location:            "http://foo.com:1234",
+		MaxMgoSessions:      10,
+		RendezvousTimeout:   config.DurationString{Duration: time.Minute},
 		IdentityProviders: []config.IdentityProvider{{
 			IdentityProvider: IdentityProvider{
 				Params: map[string]string{
@@ -164,6 +163,49 @@ func (s *configSuite) TestRead(c *gc.C) {
 	})
 }
 
+func (s *configSuite) TestReadWithPostgresStorage(c *gc.C) {
+	const testConfig = `
+postgres-connection-string: 'something'
+api-addr: 1.2.3.4:5678
+private-key: 8PjzjakvIlh3BVFKe8axinRDutF6EDIfjtuf4+JaNow=
+public-key: CIdWcEUN+0OZnKW9KwruRQnQDY/qqzVdD30CijwiWCk=
+location: http://foo.com:1234
+private-addr: localhost
+`
+	conf, err := s.readConfig(c, testConfig)
+	c.Assert(err, gc.IsNil)
+	c.Assert(conf.StorageKind, gc.Equals, config.PostgresStorage)
+	c.Assert(conf.PostgresConnectionString, gc.Equals, "something")
+}
+
+func (s *configSuite) TestWithMemStorage(c *gc.C) {
+	const testConfig = `
+ephemeral-storage: true
+api-addr: 1.2.3.4:5678
+private-key: 8PjzjakvIlh3BVFKe8axinRDutF6EDIfjtuf4+JaNow=
+public-key: CIdWcEUN+0OZnKW9KwruRQnQDY/qqzVdD30CijwiWCk=
+location: http://foo.com:1234
+private-addr: localhost
+`
+	conf, err := s.readConfig(c, testConfig)
+	c.Assert(err, gc.IsNil)
+	c.Assert(conf.StorageKind, gc.Equals, config.MemStorage)
+}
+
+func (s *configSuite) TestWithMultipleStorage(c *gc.C) {
+	const testConfig = `
+ephemeral-storage: true
+postgres-connection-string: foo
+api-addr: 1.2.3.4:5678
+private-key: 8PjzjakvIlh3BVFKe8axinRDutF6EDIfjtuf4+JaNow=
+public-key: CIdWcEUN+0OZnKW9KwruRQnQDY/qqzVdD30CijwiWCk=
+location: http://foo.com:1234
+private-addr: localhost
+`
+	_, err := s.readConfig(c, testConfig)
+	c.Assert(err, gc.ErrorMatches, `more than one of mongo-addr or postgres-connection-string or ephemeral-storage specified`)
+}
+
 func (s *configSuite) TestReadErrorNotFound(c *gc.C) {
 	cfg, err := config.Read(path.Join(c.MkDir(), "no-such-file.yaml"))
 	c.Assert(err, gc.ErrorMatches, ".* no such file or directory")
@@ -172,7 +214,7 @@ func (s *configSuite) TestReadErrorNotFound(c *gc.C) {
 
 func (s *configSuite) TestReadErrorEmpty(c *gc.C) {
 	cfg, err := s.readConfig(c, "")
-	c.Assert(err, gc.ErrorMatches, "missing fields mongo-addr or postgres-connection-string, api-addr, private-key, public-key, location, max-mgo-sessions, private-addr in config file")
+	c.Assert(err, gc.ErrorMatches, "missing fields api-addr, private-key, public-key, location, private-addr, mongo-addr or postgres-connection-string or ephemeral-storage in config file")
 	c.Assert(cfg, gc.IsNil)
 }
 

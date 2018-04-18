@@ -33,6 +33,8 @@ import (
 	_ "github.com/CanonicalLtd/candid/idp/ldap"
 	"github.com/CanonicalLtd/candid/idp/usso"
 	_ "github.com/CanonicalLtd/candid/idp/usso/ussodischarge"
+	_ "github.com/CanonicalLtd/candid/idp/usso/ussooauth"
+	"github.com/CanonicalLtd/candid/memstore"
 	"github.com/CanonicalLtd/candid/mgostore"
 	"github.com/CanonicalLtd/candid/sqlstore"
 )
@@ -80,7 +82,6 @@ func exit(code int) {
 
 // serve starts the identity service.
 func serve(conf *config.Config) error {
-
 	if conf.HTTPProxy != "" {
 		os.Setenv("HTTP_PROXY", conf.HTTPProxy)
 	}
@@ -88,11 +89,13 @@ func serve(conf *config.Config) error {
 		os.Setenv("NO_PROXY", conf.NoProxy)
 	}
 
-	switch {
-	case conf.MongoAddr != "":
+	switch conf.StorageKind {
+	case config.MongoStorage:
 		return serveMgoServer(conf)
-	case conf.PostgresConnectionString != "":
+	case config.PostgresStorage:
 		return servePostgresServer(conf)
+	case config.MemStorage:
+		return serveMemServer(conf)
 	default:
 		// This should be detected when reading the config earlier
 		return errgo.Newf("no database configured")
@@ -143,6 +146,15 @@ func servePostgresServer(conf *config.Config) error {
 		RootKeyStore: rootkeys.NewStore(postgresrootkeystore.Policy{
 			ExpiryDuration: 365 * 24 * time.Hour,
 		}),
+	})
+}
+
+func serveMemServer(conf *config.Config) error {
+	return serveIdentity(conf, identity.ServerParams{
+		Store:             memstore.NewStore(),
+		ProviderDataStore: memstore.NewProviderDataStore(),
+		MeetingStore:      memstore.NewMeetingStore(),
+		RootKeyStore:      bakery.NewMemRootKeyStore(),
 	})
 }
 

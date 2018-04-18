@@ -44,7 +44,6 @@ def config_changed():
         'admin-password',
         'http-proxy',
         'logging-config',
-        'max-mgo-sessions',
         'no-proxy',
         'private-key',
         'public-key',

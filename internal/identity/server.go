@@ -227,15 +227,15 @@ type HandlerParams struct {
 	MeetingPlace *meeting.Place
 }
 
-//notFound is the handler that is called when a handler cannot be found
-//for the requested endpoint.
+// notFound is the handler that is called when a handler cannot be found
+// for the requested endpoint.
 func notFound(w http.ResponseWriter, req *http.Request) {
 	WriteError(context.TODO(), w, errgo.WithCausef(nil, params.ErrNotFound, "not found: %s", req.URL.Path))
 }
 
-//methodNotAllowed is the handler that is called when a handler cannot
-//be found for the requested endpoint with the request method, but
-//there is a handler avaiable using a different method.
+// methodNotAllowed is the handler that is called when a handler cannot
+// be found for the requested endpoint with the request method, but
+// there is a handler avaiable using a different method.
 func (s *Server) methodNotAllowed(w http.ResponseWriter, req *http.Request) {
 	// Check that the match method is not OPTIONS
 	for _, method := range []string{"GET", "POST", "PUT", "DELETE", "HEAD", "PATCH"} {
