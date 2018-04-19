@@ -29,14 +29,17 @@ def config_changed():
 
         # Keys that don't map one-to-one with the
         # charm configuration keys.
-        'api-addr': ':{}'.format(HTTP_LISTEN_PORT),
+        'listen-address': ':{}'.format(HTTP_LISTEN_PORT),
         'identity-providers': idps,
     }
     # Location defaults to the public IP address (best we can do)
     # unless explicitly set.
     if config['location'] == '':
-        app_config['location'] = '{}:{}'.format(hookenv.unit_public_ip(), HTTP_LISTEN_PORT)
-    else
+        app_config['location'] = 'http://{}:{}'.format(
+            hookenv.unit_public_ip(),
+            HTTP_LISTEN_PORT,
+        )
+    else:
         app_config['location'] = config['location']
 
     for key in [

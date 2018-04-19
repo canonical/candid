@@ -12,7 +12,10 @@ def relation_changed():
         hookenv.status_set('waiting', 'waiting for db relation')
         return
     config = {
-        'mongo-addr': '{}:{}'.format(hostname, port),
+        'storage': {
+            'type': 'mongodb',
+            'address': '{}:{}'.format(hostname, port),
+        },
     }
     jaascharm.update_config_and_restart(config)
 

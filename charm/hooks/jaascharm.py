@@ -151,7 +151,7 @@ def update_config_and_restart(config):
         hookenv.status_set('maintenance',
                            'starting {} service'.format(service))
         host.service_start(service)
-    
+
 
 def update_nrpe_config():
     """Update the NRPE configuration for the given service."""
