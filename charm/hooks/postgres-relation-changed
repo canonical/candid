@@ -6,15 +6,14 @@ from status import charm_status
 
 
 def relation_changed():
-    hostname = hookenv.relation_get('hostname')
-    port = hookenv.relation_get('port')
-    if not hostname or not port:
-        hookenv.status_set('waiting', 'waiting for db relation')
+    connection_str = hookenv.relation_get('master')
+    if not connection_str:
+        hookenv.status_set('waiting', 'waiting for postgres relation')
         return
     config = {
         'storage': {
-            'type': 'mongodb',
-            'address': '{}:{}'.format(hostname, port),
+            'type': 'postgres',
+            'connection-string': connection_str,
         },
     }
     jaascharm.update_config_and_restart(config)

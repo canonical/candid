@@ -19,9 +19,10 @@ provides:
   prometheus:
     interface: prometheus
 requires:
-  db:
+  mongodb:
     interface: mongodb
-  # TODO allow postgres relation too?
+  postgres:
+    interface: pgsql
 resources:
   service:
     type: file
