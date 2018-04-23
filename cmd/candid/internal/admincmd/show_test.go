@@ -4,6 +4,7 @@
 package admincmd_test
 
 import (
+	"path/filepath"
 	"time"
 
 	"gopkg.in/CanonicalLtd/candidclient.v1/params"
@@ -18,6 +19,30 @@ type showSuite struct {
 }
 
 var _ = gc.Suite(&showSuite{})
+
+func (s *showSuite) TestShowUserWithAgentEnv(c *gc.C) {
+	// This test acts as a proxy agent-env functionality in all the
+	// other command that use NewClient.
+	runf := s.RunServer(c, &handler{
+		user: func(req *params.UserRequest) (*params.User, error) {
+			if req.Username == "bob" {
+				return &params.User{
+					Username: "bob",
+				}, nil
+			}
+			return nil, errgo.New("unknown user")
+		},
+	})
+	s.PatchEnvironment("BAKERY_AGENT_FILE", filepath.Join(s.Dir, "admin.agent"))
+	stdout := CheckSuccess(c, runf, "show", "-u", "bob")
+	c.Assert(stdout, gc.Equals, `
+username: bob
+groups: []
+ssh-keys: []
+last-login: never
+last-discharge: never
+`[1:])
+}
 
 func (s *showSuite) TestShowUser(c *gc.C) {
 	t := time.Date(2016, 12, 25, 0, 0, 0, 0, time.UTC)
