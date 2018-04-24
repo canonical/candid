@@ -16,13 +16,13 @@ import (
 	"github.com/CanonicalLtd/candid/cmd/candid/internal/admincmd"
 )
 
-type putAgentSuite struct {
+type createAgentSuite struct {
 	commandSuite
 }
 
-var _ = gc.Suite(&putAgentSuite{})
+var _ = gc.Suite(&createAgentSuite{})
 
-var putAgentUsageTests = []struct {
+var createAgentUsageTests = []struct {
 	about       string
 	args        []string
 	expectError string
@@ -40,14 +40,14 @@ var putAgentUsageTests = []struct {
 	expectError: `invalid value "xxx" for flag -k: wrong length for key, got 2 want 32`,
 }}
 
-func (s *putAgentSuite) TestUsage(c *gc.C) {
-	for i, test := range putAgentUsageTests {
+func (s *createAgentSuite) TestUsage(c *gc.C) {
+	for i, test := range createAgentUsageTests {
 		c.Logf("test %d: %v", i, test.about)
-		CheckError(c, 2, test.expectError, s.Run, append([]string{"put-agent"}, test.args...)...)
+		CheckError(c, 2, test.expectError, s.Run, append([]string{"create-agent"}, test.args...)...)
 	}
 }
 
-func (s *putAgentSuite) TestPutAgentWithGeneratedKeyAndAgentFileNotSpecified(c *gc.C) {
+func (s *createAgentSuite) TestCreateAgentWithGeneratedKeyAndAgentFileNotSpecified(c *gc.C) {
 	var calledReq *params.CreateAgentRequest
 	runf := s.RunServer(c, &handler{
 		createAgent: func(req *params.CreateAgentRequest) (*params.CreateAgentResponse, error) {
@@ -57,7 +57,7 @@ func (s *putAgentSuite) TestPutAgentWithGeneratedKeyAndAgentFileNotSpecified(c *
 			}, nil
 		},
 	})
-	out := CheckSuccess(c, runf, "put-agent", "--name", "agentname", "-a", "admin.agent")
+	out := CheckSuccess(c, runf, "create-agent", "--name", "agentname", "-a", "admin.agent")
 	c.Assert(calledReq, gc.NotNil)
 	// The output should be valid input to an agent.Visitor unmarshal.
 	var v agent.AuthInfo
@@ -80,7 +80,7 @@ func (s *putAgentSuite) TestPutAgentWithGeneratedKeyAndAgentFileNotSpecified(c *
 	})
 }
 
-func (s *putAgentSuite) TestPutAgentWithNonExistentAgentsFileSpecified(c *gc.C) {
+func (s *createAgentSuite) TestCreateAgentWithNonExistentAgentsFileSpecified(c *gc.C) {
 	var calledReq *params.CreateAgentRequest
 	runf := s.RunServer(c, &handler{
 		createAgent: func(req *params.CreateAgentRequest) (*params.CreateAgentResponse, error) {
@@ -91,7 +91,7 @@ func (s *putAgentSuite) TestPutAgentWithNonExistentAgentsFileSpecified(c *gc.C) 
 		},
 	})
 	agentFile := filepath.Join(c.MkDir(), ".agents")
-	out := CheckSuccess(c, runf, "put-agent", "-a", "admin.agent", "-f", agentFile)
+	out := CheckSuccess(c, runf, "create-agent", "-a", "admin.agent", "-f", agentFile)
 	c.Assert(calledReq, gc.NotNil)
 	c.Assert(out, gc.Matches, `added agent a-foo@candid for https://.* to .+\n`)
 
@@ -111,7 +111,7 @@ func (s *putAgentSuite) TestPutAgentWithNonExistentAgentsFileSpecified(c *gc.C) 
 	})
 }
 
-func (s *putAgentSuite) TestPutAgentWithExistingAgentsFile(c *gc.C) {
+func (s *createAgentSuite) TestCreateAgentWithExistingAgentsFile(c *gc.C) {
 	var calledReq *params.CreateAgentRequest
 	runf := s.RunServer(c, &handler{
 		createAgent: func(req *params.CreateAgentRequest) (*params.CreateAgentResponse, error) {
@@ -121,7 +121,7 @@ func (s *putAgentSuite) TestPutAgentWithExistingAgentsFile(c *gc.C) {
 			}, nil
 		},
 	})
-	out := CheckSuccess(c, runf, "put-agent", "-a", "admin.agent", "-f", "admin.agent", "somegroup")
+	out := CheckSuccess(c, runf, "create-agent", "-a", "admin.agent", "-f", "admin.agent", "somegroup")
 	c.Assert(calledReq, gc.NotNil)
 	c.Assert(out, gc.Matches, `added agent a-foo@candid for https://.* to .+\n`)
 
@@ -143,9 +143,9 @@ func (s *putAgentSuite) TestPutAgentWithExistingAgentsFile(c *gc.C) {
 	})
 }
 
-func (s *putAgentSuite) TestPutAgentWithAdminFlag(c *gc.C) {
+func (s *createAgentSuite) TestCreateAgentWithAdminFlag(c *gc.C) {
 	// With the -n flag, it doesn't contact the candid server at all.
-	out := CheckSuccess(c, s.Run, "put-agent", "--admin")
+	out := CheckSuccess(c, s.Run, "create-agent", "--admin")
 	var v agent.AuthInfo
 	err := json.Unmarshal([]byte(out), &v)
 	c.Assert(err, gc.Equals, nil)

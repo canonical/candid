@@ -19,7 +19,7 @@ import (
 	"github.com/CanonicalLtd/candid/internal/auth"
 )
 
-type putAgentCommand struct {
+type createAgentCommand struct {
 	candidCommand
 	groups        []string
 	agentFile     string
@@ -28,12 +28,12 @@ type putAgentCommand struct {
 	publicKey     *bakery.PublicKey
 }
 
-func newPutAgentCommand() cmd.Command {
-	return &putAgentCommand{}
+func newCreateAgentCommand() cmd.Command {
+	return &createAgentCommand{}
 }
 
-var putAgentDoc = `
-The put-agent command creates or updates an agent user on the Candid
+var createAgentDoc = `
+The create-agent command creates an agent user on the Candid
 server.
 
 An agent user has an associated public key - the private key pair can
@@ -57,16 +57,16 @@ printed to the standard output. Note when the -k flag is specified,
 this information will be missing the private key.
 `
 
-func (c *putAgentCommand) Info() *cmd.Info {
+func (c *createAgentCommand) Info() *cmd.Info {
 	return &cmd.Info{
-		Name:    "put-agent",
+		Name:    "create-agent",
 		Args:    "[group...]",
 		Purpose: "create or update an agent user",
-		Doc:     putAgentDoc,
+		Doc:     createAgentDoc,
 	}
 }
 
-func (c *putAgentCommand) SetFlags(f *gnuflag.FlagSet) {
+func (c *createAgentCommand) SetFlags(f *gnuflag.FlagSet) {
 	c.candidCommand.SetFlags(f)
 	publicKeyVar(f, &c.publicKey, "k", "public key of agent")
 	publicKeyVar(f, &c.publicKey, "public-key", "")
@@ -76,7 +76,7 @@ func (c *putAgentCommand) SetFlags(f *gnuflag.FlagSet) {
 	f.StringVar(&c.agentFullName, "name", "", "name of agent")
 }
 
-func (c *putAgentCommand) Init(args []string) error {
+func (c *createAgentCommand) Init(args []string) error {
 	c.groups = args
 	if c.agentFile != "" && c.publicKey != nil {
 		return errgo.Newf("cannot specify public key and an agent file")
@@ -84,7 +84,7 @@ func (c *putAgentCommand) Init(args []string) error {
 	return errgo.Mask(c.candidCommand.Init(nil))
 }
 
-func (c *putAgentCommand) Run(cmdctx *cmd.Context) error {
+func (c *createAgentCommand) Run(cmdctx *cmd.Context) error {
 	ctx := context.Background()
 	client, err := c.Client(cmdctx)
 	if err != nil {

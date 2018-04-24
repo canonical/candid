@@ -48,7 +48,7 @@ func New() cmd.Command {
 		Version: version.VersionInfo.Version,
 	})
 	supercmd.Register(newAddGroupCommand())
-	supercmd.Register(newPutAgentCommand())
+	supercmd.Register(newCreateAgentCommand())
 	supercmd.Register(newFindCommand())
 	supercmd.Register(newRemoveGroupCommand())
 	supercmd.Register(newShowCommand())
@@ -86,15 +86,24 @@ func (c *candidCommand) Client(ctxt *cmd.Context) (*candidclient.Client, error) 
 	}
 	bClient := httpbakery.NewClient()
 	candidURL := candidURL(c.url)
+	var authInfo *agent.AuthInfo
+
 	if c.agentFile != "" {
-		// Agent authentication has been specified, so we probably don't
-		// want to use existing cookies (which might be logged in as a different
-		// user) or to fall back to interactive authentication.
-		v, err := readAgentFile(ctxt.AbsPath(c.agentFile))
+		ai, err := readAgentFile(ctxt.AbsPath(c.agentFile))
 		if err != nil {
 			return nil, errgo.Notef(err, "cannot load agent information")
 		}
-		agent.SetUpAuth(bClient, v)
+		authInfo = ai
+	} else if ai, err := agent.AuthInfoFromEnvironment(); err == nil {
+		authInfo = ai
+	} else if errgo.Cause(err) != agent.ErrNoAuthInfo {
+		return nil, errgo.Mask(err)
+	}
+	if authInfo != nil {
+		// Agent authentication has been specified, so we probably don't
+		// want to use existing cookies (which might be logged in as a different
+		// user) or to fall back to interactive authentication.
+		agent.SetUpAuth(bClient, authInfo)
 	} else {
 		jar, err := cookiejar.New(&cookiejar.Options{
 			PublicSuffixList: publicsuffix.List,
@@ -105,7 +114,6 @@ func (c *candidCommand) Client(ctxt *cmd.Context) (*candidclient.Client, error) 
 		bClient.Client.Jar = jar
 		bClient.AddInteractor(httpbakery.WebBrowserInteractor{})
 	}
-	bClient.AddInteractor(httpbakery.WebBrowserInteractor{})
 
 	client, err := candidclient.New(candidclient.NewParams{
 		BaseURL: candidURL,
