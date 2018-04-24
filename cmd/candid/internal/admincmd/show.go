@@ -20,8 +20,10 @@ type showCommand struct {
 	out cmd.Output
 }
 
-func newShowCommand() cmd.Command {
-	return &showCommand{}
+func newShowCommand(cc *candidCommand) cmd.Command {
+	c := &showCommand{}
+	c.candidCommand = cc
+	return c
 }
 
 var showDoc = `
@@ -45,6 +47,7 @@ func (c *showCommand) SetFlags(f *gnuflag.FlagSet) {
 }
 
 func (c *showCommand) Run(ctxt *cmd.Context) error {
+	defer c.Close(ctxt)
 	ctx := context.Background()
 	username, err := c.lookupUser(ctxt)
 	if err != nil {

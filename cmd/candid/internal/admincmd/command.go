@@ -35,9 +35,15 @@ Manage the users on an identity server. By default the identity server
 at https://api.jujucharms.com/identity will be modified. This can be
 overridden either by setting the CANDID_URL environment variable, or by
 setting the --candid-url command line parameter.
+
+To use agent credentials for Candid operations, use the --agent flag
+or specify the BAKERY_AGENT_FILE environment variable, both of which
+hold the path to a file containing agent credentials in JSON format
+(see the create-agent subcommand for details).
 `
 
 func New() cmd.Command {
+	c := new(candidCommand)
 	supercmd := cmd.NewSuperCommand(cmd.SuperCommandParams{
 		Name:    "candid",
 		Doc:     cmdDoc,
@@ -45,13 +51,14 @@ func New() cmd.Command {
 		Log: &cmd.Log{
 			DefaultConfig: os.Getenv(jujuLoggingConfigEnvKey),
 		},
-		Version: version.VersionInfo.Version,
+		GlobalFlags: c,
+		Version:     version.VersionInfo.Version,
 	})
-	supercmd.Register(newAddGroupCommand())
-	supercmd.Register(newCreateAgentCommand())
-	supercmd.Register(newFindCommand())
-	supercmd.Register(newRemoveGroupCommand())
-	supercmd.Register(newShowCommand())
+	supercmd.Register(newAddGroupCommand(c))
+	supercmd.Register(newCreateAgentCommand(c))
+	supercmd.Register(newFindCommand(c))
+	supercmd.Register(newRemoveGroupCommand(c))
+	supercmd.Register(newShowCommand(c))
 	return supercmd
 }
 
@@ -67,10 +74,26 @@ type candidCommand struct {
 	// mu protects the fields below it.
 	mu     sync.Mutex
 	client *candidclient.Client
+	jar    *cookiejar.Jar
 }
 
-func (c *candidCommand) SetFlags(f *gnuflag.FlagSet) {
-	c.CommandBase.SetFlags(f)
+// Close must be called at the end of a command's Run to ensure that
+// cookies are saved.
+func (c *candidCommand) Close(ctxt *cmd.Context) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.jar == nil {
+		return
+	}
+	if err := c.jar.Save(); err != nil {
+		fmt.Fprintf(ctxt.Stderr, "cannot save cookies: %v", err)
+	}
+	c.jar = nil
+}
+
+// AddFlags implements cmd.FlagAdder to add global flags
+// to the flag set.
+func (c *candidCommand) AddFlags(f *gnuflag.FlagSet) {
 	f.StringVar(&c.url, "candid-url", "", "URL of the identity server (defaults to $CANDID_URL)")
 	f.StringVar(&c.agentFile, "a", "", "name of file containing agent login details")
 	f.StringVar(&c.agentFile, "agent", "", "")
@@ -86,8 +109,8 @@ func (c *candidCommand) Client(ctxt *cmd.Context) (*candidclient.Client, error) 
 	}
 	bClient := httpbakery.NewClient()
 	candidURL := candidURL(c.url)
-	var authInfo *agent.AuthInfo
 
+	var authInfo *agent.AuthInfo
 	if c.agentFile != "" {
 		ai, err := readAgentFile(ctxt.AbsPath(c.agentFile))
 		if err != nil {
@@ -111,6 +134,7 @@ func (c *candidCommand) Client(ctxt *cmd.Context) (*candidclient.Client, error) 
 		if err != nil {
 			return nil, errgo.Mask(err)
 		}
+		c.jar = jar
 		bClient.Client.Jar = jar
 		bClient.AddInteractor(httpbakery.WebBrowserInteractor{})
 	}
@@ -142,7 +166,7 @@ func candidURL(url string) string {
 // on a particular user should embed this type and use lookupUser to find
 // the username to use in the subsequent requests.
 type userCommand struct {
-	candidCommand
+	*candidCommand
 
 	username string
 	email    string

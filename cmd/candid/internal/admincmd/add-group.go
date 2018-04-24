@@ -16,8 +16,10 @@ type addGroupCommand struct {
 	groups []string
 }
 
-func newAddGroupCommand() cmd.Command {
-	return &addGroupCommand{}
+func newAddGroupCommand(cc *candidCommand) cmd.Command {
+	c := &addGroupCommand{}
+	c.candidCommand = cc
+	return c
 }
 
 var addGroupDoc = `
@@ -47,6 +49,7 @@ func (c *addGroupCommand) Init(args []string) error {
 }
 
 func (c *addGroupCommand) Run(ctxt *cmd.Context) error {
+	defer c.Close(ctxt)
 	ctx := context.Background()
 	username, err := c.lookupUser(ctxt)
 	if err != nil {

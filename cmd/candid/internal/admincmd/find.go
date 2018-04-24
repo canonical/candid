@@ -17,7 +17,7 @@ import (
 )
 
 type findCommand struct {
-	candidCommand
+	*candidCommand
 
 	out cmd.Output
 
@@ -27,8 +27,10 @@ type findCommand struct {
 	lastDischargeDays uint
 }
 
-func newFindCommand() cmd.Command {
-	return &findCommand{}
+func newFindCommand(c *candidCommand) cmd.Command {
+	return &findCommand{
+		candidCommand: c,
+	}
 }
 
 var findDoc = `
@@ -68,6 +70,7 @@ func (c *findCommand) Init(args []string) error {
 }
 
 func (c *findCommand) Run(ctxt *cmd.Context) error {
+	defer c.Close(ctxt)
 	client, err := c.candidCommand.Client(ctxt)
 	if err != nil {
 		return errgo.Mask(err)

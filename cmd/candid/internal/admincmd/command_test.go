@@ -34,6 +34,9 @@ type commandSuite struct {
 func (s *commandSuite) SetUpTest(c *gc.C) {
 	s.IsolationSuite.SetUpTest(c)
 	s.Dir = c.MkDir()
+	// If the cookiejar gets saved, it gets saved to $HOME/.go-cookiejar, so make
+	// sure that's not in the current directory.
+	s.PatchEnvironment("HOME", s.Dir)
 	s.command = admincmd.New()
 }
 
