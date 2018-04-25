@@ -16,8 +16,10 @@ type removeGroupCommand struct {
 	groups []string
 }
 
-func newRemoveGroupCommand() cmd.Command {
-	return &removeGroupCommand{}
+func newRemoveGroupCommand(cc *candidCommand) cmd.Command {
+	c := &removeGroupCommand{}
+	c.candidCommand = cc
+	return c
 }
 
 var removeGroupDoc = `
@@ -47,6 +49,7 @@ func (c *removeGroupCommand) Init(args []string) error {
 }
 
 func (c *removeGroupCommand) Run(ctxt *cmd.Context) error {
+	defer c.Close(ctxt)
 	username, err := c.lookupUser(ctxt)
 	if err != nil {
 		return errgo.Mask(err)

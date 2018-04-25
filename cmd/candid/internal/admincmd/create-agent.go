@@ -20,7 +20,7 @@ import (
 )
 
 type createAgentCommand struct {
-	candidCommand
+	*candidCommand
 	groups        []string
 	agentFile     string
 	agentFullName string
@@ -28,8 +28,10 @@ type createAgentCommand struct {
 	publicKey     *bakery.PublicKey
 }
 
-func newCreateAgentCommand() cmd.Command {
-	return &createAgentCommand{}
+func newCreateAgentCommand(c *candidCommand) cmd.Command {
+	return &createAgentCommand{
+		candidCommand: c,
+	}
 }
 
 var createAgentDoc = `
@@ -85,6 +87,7 @@ func (c *createAgentCommand) Init(args []string) error {
 }
 
 func (c *createAgentCommand) Run(cmdctx *cmd.Context) error {
+	defer c.Close(cmdctx)
 	ctx := context.Background()
 	client, err := c.Client(cmdctx)
 	if err != nil {
