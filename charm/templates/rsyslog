@@ -1,0 +1,2 @@
+:programname, isequal, "{{bin_name}}" {{log_path}}
+& stop

@@ -1,0 +1,13 @@
+{{log_path}}
+{
+        rotate 30
+        daily
+        missingok
+        notifempty
+        compress
+        delaycompress
+        sharedscripts
+        postrotate
+                invoke-rc.d rsyslog rotate >/dev/null 2>&1 || true
+        endscript
+}

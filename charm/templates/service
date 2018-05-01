@@ -1,12 +1,12 @@
 [Unit]
-Description=Candid identity service
+Description={{description}}
 Requires=network-online.target
 After=network-online.target
 
 [Service]
 Type=simple
-User=candid
-Group=candid
+User={{service}}
+Group={{service}}
 WorkingDirectory={{resource_path}}
 ExecStart={{bin_path}} {{config_path}}
 Restart=on-failure
