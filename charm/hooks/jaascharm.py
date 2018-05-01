@@ -38,6 +38,32 @@ def install(binary=None):
     host.adduser(service)
     host.mkdir(root, perms=0o755)
 
+    log_path = os.path.join('/var/log', service, service + '.log')
+    if not os.path.exists(log_path):
+        host.mkdir(os.path.dirname(log_path), owner='root', group=service,
+                   perms=0o775)
+        host.write_file(log_path, '', owner='syslog', group='adm', perms=0o640)
+
+    rsyslog_path = os.path.join('/etc/rsyslog.d', '10-{}.conf'.format(service))
+    templating.render(
+        'rsyslog',
+        rsyslog_path,
+        {
+            'log_path': log_path,
+            'bin_name': os.path.basename(binary),
+        },
+    )
+    host.service_restart('rsyslog')
+
+    logrotate_path = os.path.join('/etc/logrotate.d', service)
+    templating.render(
+        'logrotate',
+        logrotate_path,
+        {
+            'log_path': log_path,
+        },
+    )
+
     new_resource_path = resource_path + '.new'
     old_resource_path = resource_path + '.old'
     # Remove possible remnants of a failed install and
@@ -72,9 +98,11 @@ def install(binary=None):
 
     service_path = os.path.join(root, '{}.service'.format(service))
     context = {
-        'resource_path': resource_path,
         'bin_path': os.path.join(resource_path, binary),
         'config_path': _config_path(),
+        'description': hookenv.metadata().get('summary'),
+        'resource_path': resource_path,
+        'service': service,
     }
     templating.render(
         'service',
