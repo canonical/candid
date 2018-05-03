@@ -58,10 +58,25 @@ func Copy(ctx context.Context, dst store.Store, src Source) error {
 		identity := src.Identity()
 		// The ID field is store specific, so cannot be copied between them.
 		identity.ID = ""
-		err := dst.UpdateIdentity(ctx, identity, update)
-		if err != nil {
-			log.Printf("cannot update user %s: %s", identity.Username, err)
-			failed = true
+		destIdentity := store.Identity{
+			ProviderID: identity.ProviderID,
+		}
+		if err := dst.Identity(ctx, &destIdentity); err != nil {
+			if errgo.Cause(err) != store.ErrNotFound {
+				log.Printf("error checking destination store: %s", err)
+				failed = true
+				continue
+			}
+		}
+		// Only migrate the entry if it is newer than the entry
+		// stored in the destination. This is to make migrations
+		// on running systems safer.
+		if destIdentity.Username == "" || identity.LastLogin.After(destIdentity.LastLogin) {
+			err := dst.UpdateIdentity(ctx, identity, update)
+			if err != nil {
+				log.Printf("cannot update user %s: %s", identity.Username, err)
+				failed = true
+			}
 		}
 	}
 	if failed {
