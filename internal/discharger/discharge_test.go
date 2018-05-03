@@ -59,6 +59,43 @@ func (s *dischargeSuite) TestNonInteractiveDischarge(c *gc.C) {
 	s.AssertDischarge(c, interactor)
 }
 
+func (s *dischargeSuite) TestTwoDischargesOfSameCaveat(c *gc.C) {
+	// First make start an interaction-required discharge, but don't
+	// allow it to complete immediately.
+	interacting := make(chan struct{})
+	done := make(chan struct{})
+
+	// Create a macaroon that we'll try to discharge twice concurrently.
+	m := s.NewMacaroon(c, "is-authenticated-user", identchecker.LoginOp)
+	go func() {
+		client := s.Client(httpbakery.WebBrowserInteractor{
+			OpenWebBrowser: func(u *url.URL) error {
+				interacting <- struct{}{}
+				<-interacting
+				return interactor.OpenWebBrowser(u)
+			},
+		})
+		ms, err := client.DischargeAll(s.Ctx, m)
+		c.Check(err, gc.Equals, nil)
+		_, err = s.Bakery.Checker.Auth(ms).Allow(context.Background(), identchecker.LoginOp)
+		c.Check(err, gc.Equals, nil)
+		close(done)
+	}()
+	<-interacting
+	// The first discharge is now stuck in OpenWebBrowser until we
+	// tell it to go ahead, so try to discharge the same macaroon that
+	// we just tried.
+	client := s.Client(webBrowserInteractor)
+	ms, err := client.DischargeAll(s.Ctx, m)
+	c.Check(err, gc.Equals, nil)
+	_, err = s.Bakery.Checker.Auth(ms).Allow(context.Background(), identchecker.LoginOp)
+	c.Check(err, gc.Equals, nil)
+
+	// Let the other one proceed - it should succeed too.
+	interacting <- struct{}{}
+	<-done
+}
+
 func (s *dischargeSuite) TestDischargeWhenLoggedIn(c *gc.C) {
 	client := s.Client(webBrowserInteractor)
 	ms, err := s.Discharge(c, "is-authenticated-user", client)

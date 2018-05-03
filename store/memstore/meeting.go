@@ -46,6 +46,9 @@ func (s *meetingStore) Put(ctx context.Context, id, address string) error {
 func (s *meetingStore) put(_ context.Context, id, address string, now time.Time) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if _, ok := s.data[id]; ok {
+		return errgo.Newf("duplicate id %q in meeting store", id)
+	}
 	s.data[id] = meetingStoreEntry{
 		address: address,
 		time:    now,
