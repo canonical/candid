@@ -12,7 +12,14 @@ import (
 	mgo "gopkg.in/mgo.v2"
 
 	"github.com/CanonicalLtd/candid/cmd/migrate-db/internal/mongodoc"
+	"github.com/CanonicalLtd/candid/internal/auth"
 	"github.com/CanonicalLtd/candid/store"
+)
+
+const (
+	legacyAdminGroup        = "admin@idm"
+	legacyGroupListGroup    = "grouplist@idm"
+	legacySSHKeyGetterGroup = "sshkeygetter@idm"
 )
 
 // A LegacySource is a Source from a legacy mgo store.
@@ -41,6 +48,9 @@ func (s *LegacySource) Next() bool {
 			return false
 		}
 		var err error
+		if doc.Username == legacyAdminGroup {
+			continue
+		}
 		s.identity, err = convert(&doc)
 		if err != nil {
 			log.Printf("cannot convert identity (skipping): %s", err)
@@ -74,9 +84,9 @@ func convert(doc *mongodoc.Identity) (*store.Identity, error) {
 		identity.PublicKeys = append(identity.PublicKeys, bakery.PublicKey{key})
 	}
 	if doc.Owner != "" {
-		if doc.Owner == "admin@candid" {
+		if doc.Owner == legacyAdminGroup {
 			identity.ProviderInfo = map[string][]string{
-				"owner": {string(store.MakeProviderIdentity("idm", "admin@candid")), "admin@candid"},
+				"owner": {string(store.MakeProviderIdentity("idm", auth.AdminUsername)), auth.AdminUsername},
 			}
 		} else {
 			return nil, errgo.Newf("unrecognised owner for %s (%q)", doc.Username, doc.Owner)
@@ -85,6 +95,16 @@ func convert(doc *mongodoc.Identity) (*store.Identity, error) {
 	if len(doc.SSHKeys) > 0 {
 		identity.ExtraInfo = map[string][]string{
 			"sshkeys": doc.SSHKeys,
+		}
+	}
+	for i, g := range doc.Groups {
+		switch g {
+		case legacyAdminGroup:
+			doc.Groups[i] = auth.AdminUsername
+		case legacyGroupListGroup:
+			doc.Groups[i] = auth.GroupListGroup
+		case legacySSHKeyGetterGroup:
+			doc.Groups[i] = auth.SSHKeyGetterGroup
 		}
 	}
 	return identity, nil
