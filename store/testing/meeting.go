@@ -130,6 +130,16 @@ func (s *MeetingSuite) TestRemoveOld(c *gc.C) {
 	}
 }
 
+func (s *MeetingSuite) TestPutSameIDTwice(c *gc.C) {
+	err := s.Store.Put(s.ctx, "x", "addr1")
+	c.Assert(err, gc.Equals, nil)
+	// Putting the same id should result in an error.
+	err = s.Store.Put(s.ctx, "x", "addr2")
+	if err == nil {
+		c.Errorf("expected error from putting same id twice; got no error")
+	}
+}
+
 func (s *MeetingSuite) TestContext(c *gc.C) {
 	ctx, close := s.Store.Context(s.ctx)
 	defer close()

@@ -4,7 +4,7 @@
 package discharger
 
 import (
-	"crypto/sha256"
+	"crypto/rand"
 	"encoding"
 	"fmt"
 	"net/http"
@@ -55,18 +55,6 @@ func (c *thirdPartyCaveatChecker) CheckThirdPartyCaveat(ctx context.Context, p h
 // This is implemented as a separate method so that it can be called from
 // WaitLegacy without nesting the trace context.
 func (c *thirdPartyCaveatChecker) checkThirdPartyCaveat(ctx context.Context, p httpbakery.ThirdPartyCaveatCheckerParams) ([]checkers.Caveat, error) {
-	dischargeID := dischargeID(p.Caveat)
-	ctx = auth.ContextWithDischargeID(ctx, dischargeID)
-	interactionRequiredParams := interactionRequiredParams{
-		req: p.Request,
-		info: &dischargeRequestInfo{
-			Caveat:    p.Caveat.Caveat,
-			CaveatId:  p.Caveat.Id,
-			Condition: string(p.Caveat.Condition),
-			Origin:    p.Request.Header.Get("Origin"),
-		},
-		dischargeID: dischargeID,
-	}
 
 	domain := ""
 	if c, err := p.Request.Cookie("domain"); err == nil && names.IsValidUserDomain(c.Value) {
@@ -96,8 +84,6 @@ func (c *thirdPartyCaveatChecker) checkThirdPartyCaveat(ctx context.Context, p h
 	default:
 		return nil, checkers.ErrCaveatNotRecognized
 	}
-	interactionRequiredParams.domain = domain
-	// TODO add discharge id to context
 
 	var mss []macaroon.Slice
 	if user := p.Request.Form.Get("discharge-for-user"); user != "" {
@@ -121,7 +107,17 @@ func (c *thirdPartyCaveatChecker) checkThirdPartyCaveat(ctx context.Context, p h
 
 	authInfo, err := c.params.Authorizer.Auth(ctx, mss, op)
 	if _, ok := errgo.Cause(err).(*bakery.DischargeRequiredError); ok {
-		return nil, c.interactionRequiredError(ctx, interactionRequiredParams, err)
+		return nil, c.interactionRequiredError(ctx, interactionRequiredParams{
+			why: err,
+			req: p.Request,
+			info: &dischargeRequestInfo{
+				Caveat:    p.Caveat.Caveat,
+				CaveatId:  p.Caveat.Id,
+				Condition: string(p.Caveat.Condition),
+				Origin:    p.Request.Header.Get("Origin"),
+			},
+			domain: domain,
+		})
 	}
 	if err != nil {
 		// TODO return appropriate error code when permission denied.
@@ -184,6 +180,7 @@ func (c *thirdPartyCaveatChecker) updateDischargeTime(ctx context.Context, usern
 }
 
 type interactionRequiredParams struct {
+	why         error
 	req         *http.Request
 	info        *dischargeRequestInfo
 	dischargeID string
@@ -192,33 +189,37 @@ type interactionRequiredParams struct {
 
 // interactionRequiredError returns an error suitable for returning from
 // a discharge request that can only be satisfied if the user logs in.
-func (c *thirdPartyCaveatChecker) interactionRequiredError(ctx context.Context, p interactionRequiredParams, why error) error {
+func (c *thirdPartyCaveatChecker) interactionRequiredError(ctx context.Context, p interactionRequiredParams) error {
+	dischargeID, err := newDischargeID()
+	if err != nil {
+		return errgo.Mask(err)
+	}
 	// TODO(rog) If the user is already logged in (username != ""),
 	// we should perhaps just return an error here.
-	if err := c.place.NewRendezvous(ctx, p.dischargeID, p.info); err != nil {
+	if err := c.place.NewRendezvous(ctx, dischargeID, p.info); err != nil {
 		return errgo.Notef(err, "cannot make rendezvous")
 	}
-	ierr := httpbakery.NewInteractionRequiredError(why, p.req)
-	agent.SetInteraction(ierr, agentURL(c.params.Location, p.dischargeID))
+	ierr := httpbakery.NewInteractionRequiredError(p.why, p.req)
+	agent.SetInteraction(ierr, agentURL(c.params.Location, dischargeID))
 	for _, idp := range c.params.IdentityProviders {
 		if p.domain != "" && idp.Domain() != p.domain {
 			// The client has specified a domain and the idp is not in that domain,
 			// so omit it.
 			continue
 		}
-		idp.SetInteraction(ierr, p.dischargeID)
+		idp.SetInteraction(ierr, dischargeID)
 	}
-	visitParams := "?did=" + p.dischargeID
+	visitParams := "?did=" + dischargeID
 	if p.domain != "" {
 		visitParams += "&domain=" + url.QueryEscape(p.domain)
 	}
 	visitURL := c.params.Location + "/login" + visitParams
-	waitTokenURL := c.params.Location + "/wait-token?did=" + p.dischargeID
+	waitTokenURL := c.params.Location + "/wait-token?did=" + dischargeID
 	httpbakery.SetWebBrowserInteraction(ierr, visitURL, waitTokenURL)
 
 	// Set the URLs used by old clients for backward compatibility.
 	legacyVisitURL := c.params.Location + "/login-legacy" + visitParams
-	legacyWaitURL := c.params.Location + "/wait-legacy?did=" + p.dischargeID
+	legacyWaitURL := c.params.Location + "/wait-legacy?did=" + dischargeID
 	httpbakery.SetLegacyInteraction(ierr, legacyVisitURL, legacyWaitURL)
 	return ierr
 }
@@ -228,7 +229,10 @@ func isDischargeRequiredError(err error) bool {
 	return ok && cause.Code == httpbakery.ErrDischargeRequired
 }
 
-func dischargeID(ci *bakery.ThirdPartyCaveatInfo) string {
-	sum := sha256.Sum256(ci.Caveat)
-	return fmt.Sprintf("%x", sum[:8])
+func newDischargeID() (string, error) {
+	var b [32]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		return "", errgo.Notef(err, "cannot read random bytes for discharge id")
+	}
+	return fmt.Sprintf("%x", b[:]), nil
 }

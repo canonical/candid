@@ -20,7 +20,6 @@ import (
 const (
 	checkersNamespace         = "jujucharms.com/identity"
 	userHasPublicKeyCondition = "user-has-public-key"
-	dischargeIDCondition      = "for-discharge-id"
 )
 
 // Namespace contains the checkers.Namespace supported by the identity
@@ -35,7 +34,6 @@ func NewChecker(a *Authorizer) *checkers.Checker {
 	checker := httpbakery.NewChecker()
 	checker.Namespace().Register(checkersNamespace, "")
 	checker.Register(userHasPublicKeyCondition, checkersNamespace, a.checkUserHasPublicKey)
-	checker.Register(dischargeIDCondition, checkersNamespace, checkDischargeID)
 	return checker
 }
 
@@ -73,20 +71,4 @@ func (a *Authorizer) checkUserHasPublicKey(ctx context.Context, cond, arg string
 		}
 	}
 	return errgo.Newf("public key not valid for user")
-}
-
-// DischargeIDCaveat creates a first-party caveat that ensures that a
-// specific discharge is being performed.
-func DischargeIDCaveat(dischargeID string) checkers.Caveat {
-	return checkers.Caveat{
-		Namespace: checkersNamespace,
-		Condition: checkers.Condition(dischargeIDCondition, dischargeID),
-	}
-}
-
-func checkDischargeID(ctx context.Context, cond, arg string) error {
-	if dischargeIDFromContext(ctx) == arg {
-		return nil
-	}
-	return errgo.Newf("invalid discharge ID")
 }

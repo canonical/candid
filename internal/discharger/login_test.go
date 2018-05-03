@@ -38,7 +38,7 @@ func (s *loginSuite) SetUpTest(c *gc.C) {
 	s.apiSuite.SetUpTest(c)
 }
 
-func (s *loginSuite) TestInteractiveLogin(c *gc.C) {
+func (s *loginSuite) TestLegacyInteractiveLogin(c *gc.C) {
 	jar := &testCookieJar{}
 	client := httpbakery.NewClient()
 	visitor := test.Interactor{
@@ -90,7 +90,7 @@ func (s *loginSuite) TestNonInteractiveLogin(c *gc.C) {
 	c.Assert(id.LastLogin.After(time.Now().Add(-1*time.Second)), gc.Equals, true)
 }
 
-func (s *loginSuite) TestLoginFailure(c *gc.C) {
+func (s *loginSuite) TestLegacyLoginFailure(c *gc.C) {
 	jar := &testCookieJar{}
 	client := httpbakery.NewClient()
 	visitor := test.Interactor{
