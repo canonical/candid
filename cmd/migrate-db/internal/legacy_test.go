@@ -15,6 +15,7 @@ import (
 
 	"github.com/CanonicalLtd/candid/cmd/migrate-db/internal"
 	"github.com/CanonicalLtd/candid/cmd/migrate-db/internal/mongodoc"
+	"github.com/CanonicalLtd/candid/internal/auth"
 	"github.com/CanonicalLtd/candid/store"
 	"github.com/CanonicalLtd/candid/store/memstore"
 )
@@ -99,7 +100,7 @@ func (s *legacySuite) TestLegacySource(c *gc.C) {
 		Username:     "test2@admin@idm",
 		Groups:       []string{"admin@candid", "grouplist@candid", "sshkeygetter@candid"},
 		PublicKeys:   []bakery.PublicKey{k1.Public},
-		ProviderInfo: map[string][]string{"owner": {"idm:admin@candid", "admin@candid"}},
+		ProviderInfo: map[string][]string{"owner": {string(auth.AdminProviderID), auth.AdminUsername}},
 	})
 
 	identity3 := store.Identity{
