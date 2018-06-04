@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"golang.org/x/net/context"
+	errgo "gopkg.in/errgo.v1"
 
 	"github.com/CanonicalLtd/candid/store"
 )
@@ -63,18 +64,24 @@ func (s keyValueStore) Get(_ context.Context, key string) ([]byte, error) {
 func (s keyValueStore) Set(_ context.Context, key string, value []byte, _ time.Time) error {
 	s.store.mu.Lock()
 	defer s.store.mu.Unlock()
+	if value == nil {
+		value = []byte{}
+	}
 	s.store.data[s.idp][key] = value
 	return nil
 }
 
-// Add implements store.KeyValueStore.Add.
-func (s keyValueStore) Add(_ context.Context, key string, value []byte, _ time.Time) error {
+func (s keyValueStore) Update(ctx context.Context, key string, expire time.Time, getVal func(old []byte) ([]byte, error)) error {
 	s.store.mu.Lock()
 	defer s.store.mu.Unlock()
-	_, ok := s.store.data[s.idp][key]
-	if ok {
-		return store.DuplicateKeyError(key)
+	data := s.store.data[s.idp]
+	newVal, err := getVal(data[key])
+	if err != nil {
+		return errgo.Mask(err, errgo.Any)
 	}
-	s.store.data[s.idp][key] = value
+	if newVal == nil {
+		newVal = []byte{}
+	}
+	data[key] = newVal
 	return nil
 }
