@@ -10,6 +10,7 @@ tags:
   - identity
 series:
   - xenial
+  - bionic
 provides:
   website:
     interface: http
