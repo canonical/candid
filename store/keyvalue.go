@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"golang.org/x/net/context"
+	errgo "gopkg.in/errgo.v1"
 )
 
 // A KeyValueStore is a store that associates a value with a specified
@@ -35,14 +36,35 @@ type KeyValueStore interface {
 	// rely on the value being removed at the given time.
 	Set(ctx context.Context, key string, value []byte, expire time.Time) error
 
-	// Add is like Set except that if the key already has a value
-	// associated with it it returns an error with the cause of
-	// ErrDuplicateKey.
+	// Update updates the value for the given key. The getVal
+	// function is called with the old value of the key and should
+	// return the new value, which will be updated atomically;
+	// getVal may be called several times, so should not have
+	// side-effects.
+	//
+	// If an entry for the given key did not previously exist, old
+	// will be nil.
+	//
+	// If getVal returns an error, it will be returned by Update with
+	// its cause unchanged.
 	//
 	// If the expire time is non-zero then the entry may be garbage
 	// collected at some point after that time. Clients should not
 	// rely on the value being removed at the given time.
-	Add(ctx context.Context, key string, value []byte, expire time.Time) error
+	Update(ctx context.Context, key string, expire time.Time, getVal func(old []byte) ([]byte, error)) error
+}
+
+// SetKeyOnce is like KeyValueStore.Set except that if the key already
+// has a value associated with it it returns an error with the cause of
+// ErrDuplicateKey.
+func SetKeyOnce(ctx context.Context, kv KeyValueStore, key string, value []byte, expire time.Time) error {
+	err := kv.Update(ctx, key, expire, func(old []byte) ([]byte, error) {
+		if old != nil {
+			return nil, DuplicateKeyError(key)
+		}
+		return value, nil
+	})
+	return errgo.Mask(err, errgo.Any)
 }
 
 // An ProviderDataStore is a data store that supports identity provider

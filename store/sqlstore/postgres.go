@@ -118,6 +118,10 @@ var postgresTmpls = [numTmpl]string{
 	tmplGetProviderData: `
 		SELECT value FROM provider_data
 		WHERE provider={{.Provider | .Arg}} AND key={{.Key | .Arg}} AND (expire IS NULL OR expire > now())`,
+	tmplGetProviderDataForUpdate: `
+		SELECT value FROM provider_data
+		WHERE provider={{.Provider | .Arg}} AND key={{.Key | .Arg}} AND (expire IS NULL OR expire > now())
+		FOR UPDATE`,
 	tmplInsertProviderData: `
 		INSERT INTO provider_data (provider, key, value, expire)
 		VALUES ({{.Provider | .Arg}}, {{.Key | .Arg}}, {{.Value | .Arg}}, {{.Expire | .Arg}})

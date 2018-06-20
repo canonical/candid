@@ -69,7 +69,7 @@ func (s *Store) accept(endpoint, nonce string, now time.Time) error {
 		return errgo.Newf("%q too old", nonce)
 	}
 	key := fmt.Sprintf("nonce#%s#%s", endpoint, nonce)
-	err = s.store.Add(context.Background(), key, nil, t.Add(s.maxAge))
+	err = store.SetKeyOnce(context.Background(), s.store, key, nil, t.Add(s.maxAge))
 	if errgo.Cause(err) == store.ErrDuplicateKey {
 		return errgo.Newf("%q already seen for %q", nonce, endpoint)
 	}

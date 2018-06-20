@@ -110,6 +110,7 @@ const (
 	tmplPushIdentitySet
 	tmplPullIdentitySet
 	tmplGetProviderData
+	tmplGetProviderDataForUpdate
 	tmplInsertProviderData
 	tmplGetMeeting
 	tmplPutMeeting
