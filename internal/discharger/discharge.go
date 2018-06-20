@@ -17,6 +17,7 @@ import (
 	"gopkg.in/CanonicalLtd/candidclient.v1"
 	"gopkg.in/CanonicalLtd/candidclient.v1/params"
 	"gopkg.in/errgo.v1"
+	"gopkg.in/httprequest.v1"
 	"gopkg.in/juju/names.v2"
 	"gopkg.in/macaroon-bakery.v2/bakery"
 	"gopkg.in/macaroon-bakery.v2/bakery/checkers"
@@ -235,4 +236,30 @@ func newDischargeID() (string, error) {
 		return "", errgo.Notef(err, "cannot read random bytes for discharge id")
 	}
 	return fmt.Sprintf("%x", b[:]), nil
+}
+
+type dischargeTokenRequest struct {
+	httprequest.Route `httprequest:"POST /discharge-token"`
+	Body              dischargeTokenRequestBody `httprequest:",body"`
+}
+
+type dischargeTokenRequestBody struct {
+	Code string `json:"code"`
+}
+
+type dischargeTokenResponse struct {
+	DischargeToken *httpbakery.DischargeToken `json:"token,omitempty"`
+}
+
+// DischargeToken is used to collect a DischargeToken when redirect based
+// login is being used.
+func (h *handler) DischargeToken(p httprequest.Params, req *dischargeTokenRequest) (*dischargeTokenResponse, error) {
+	dt, err := h.params.dischargeTokenStore.Get(p.Context, req.Body.Code)
+	if err != nil {
+		if errgo.Cause(err) == store.ErrNotFound {
+			return nil, errgo.WithCausef(err, params.ErrNotFound, "")
+		}
+		return nil, errgo.Mask(err)
+	}
+	return &dischargeTokenResponse{DischargeToken: dt}, nil
 }

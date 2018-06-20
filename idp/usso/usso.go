@@ -24,6 +24,7 @@ import (
 
 	"github.com/CanonicalLtd/candid/idp"
 	"github.com/CanonicalLtd/candid/idp/idputil"
+	"github.com/CanonicalLtd/candid/idp/idputil/secret"
 	"github.com/CanonicalLtd/candid/idp/usso/internal/kvnoncestore"
 	"github.com/CanonicalLtd/candid/store"
 )
@@ -63,6 +64,7 @@ func NewIdentityProvider(p Params) idp.IdentityProvider {
 type identityProvider struct {
 	client       *openid.Client
 	initParams   idp.InitParams
+	codec        *secret.Codec
 	groupCache   *cache.Cache
 	groupMonitor prometheus.Summary
 	// openIdRequestedTeams contains any private teams that the system needs to know about.
@@ -97,6 +99,7 @@ func (idp *identityProvider) Init(_ context.Context, params idp.InitParams) erro
 		kvnoncestore.New(params.KeyValueStore, time.Minute),
 		nil,
 	)
+	idp.codec = secret.NewCodec(params.Key)
 	return nil
 }
 
@@ -114,22 +117,29 @@ func (idp *identityProvider) Handle(ctx context.Context, w http.ResponseWriter, 
 	logger.Debugf("handling %s", req.URL.Path)
 	switch req.URL.Path {
 	case "/callback":
-		if err := idp.callback(ctx, w, req); err != nil {
-			idp.initParams.VisitCompleter.Failure(ctx, w, req, idputil.DischargeID(req), err)
-		}
+		idp.callback(ctx, w, req)
 	default:
-		if err := idp.login(ctx, w, req); err != nil {
-			idp.initParams.VisitCompleter.Failure(ctx, w, req, idputil.DischargeID(req), err)
-		}
+		idp.login(ctx, w, req)
 	}
 }
 
-func (idp *identityProvider) login(ctx context.Context, w http.ResponseWriter, req *http.Request) error {
-	realm := idp.initParams.URLPrefix + "/callback"
-	callback := realm
-	if dischargeID := idputil.DischargeID(req); dischargeID != "" {
-		callback += "?id=" + dischargeID
+func (idp *identityProvider) login(ctx context.Context, w http.ResponseWriter, req *http.Request) {
+	query := ""
+	if returnTo, state := idputil.RedirectParams(req); returnTo != "" {
+		verification, err := idp.codec.SetCookie(w, idputil.RedirectCookieName, idputil.RedirectState{
+			ReturnTo: returnTo,
+			State:    state,
+		})
+		if err != nil {
+			idp.initParams.VisitCompleter.RedirectFailure(ctx, w, req, returnTo, state, errgo.Mask(err))
+			return
+		}
+		query = "?state=" + verification
+	} else if dischargeID := idputil.DischargeID(req); dischargeID != "" {
+		query = "?id=" + dischargeID
 	}
+	realm := idp.initParams.URLPrefix + "/callback"
+	callback := realm + query
 	url := idp.client.RedirectURL(&openid.Request{
 		ReturnTo:     callback,
 		Realm:        realm,
@@ -137,13 +147,33 @@ func (idp *identityProvider) login(ctx context.Context, w http.ResponseWriter, r
 		SRegRequired: []string{openid.SRegEmail, openid.SRegFullName, openid.SRegNickname},
 	})
 	http.Redirect(w, req, url, http.StatusFound)
-	return nil
 }
 
-func (idp *identityProvider) callback(ctx context.Context, w http.ResponseWriter, req *http.Request) error {
+func (idp *identityProvider) callback(ctx context.Context, w http.ResponseWriter, req *http.Request) {
+	successf := func(id *store.Identity) {
+		idp.initParams.VisitCompleter.Success(ctx, w, req, idputil.DischargeID(req), id)
+	}
+	errorf := func(err error) {
+		idp.initParams.VisitCompleter.Failure(ctx, w, req, idputil.DischargeID(req), err)
+	}
+	if verification := req.Form.Get("state"); verification != "" {
+		var rs idputil.RedirectState
+		if err := idp.codec.Cookie(req, idputil.RedirectCookieName, verification, &rs); err != nil {
+			errorf(err)
+			return
+		}
+		successf = func(id *store.Identity) {
+			idp.initParams.VisitCompleter.RedirectSuccess(ctx, w, req, rs.ReturnTo, rs.State, id)
+		}
+		errorf = func(err error) {
+			idp.initParams.VisitCompleter.RedirectFailure(ctx, w, req, rs.ReturnTo, rs.State, err)
+		}
+	}
+
 	resp, err := idp.client.Verify(idp.initParams.URLPrefix + req.URL.String())
 	if err != nil {
-		return errgo.Mask(err)
+		errorf(err)
+		return
 	}
 	identity := store.Identity{
 		ProviderID: store.MakeProviderIdentity("usso", resp.ID),
@@ -173,13 +203,14 @@ func (idp *identityProvider) callback(ctx context.Context, w http.ResponseWriter
 	if err != nil {
 		serr := idp.initParams.Store.Identity(ctx, &identity)
 		if serr == nil {
-			idp.initParams.VisitCompleter.Success(ctx, w, req, idputil.DischargeID(req), &identity)
-			return nil
+			successf(&identity)
+			return
 		}
-		if errgo.Cause(serr) != store.ErrNotFound {
-			return errgo.Mask(serr)
+		if errgo.Cause(serr) == store.ErrNotFound {
+			serr = errgo.WithCausef(err, params.ErrForbidden, "invalid user")
 		}
-		return errgo.WithCausef(err, params.ErrForbidden, "invalid user")
+		errorf(serr)
+		return
 	}
 
 	if err := idp.initParams.Store.UpdateIdentity(ctx, &identity, store.Update{
@@ -188,10 +219,10 @@ func (idp *identityProvider) callback(ctx context.Context, w http.ResponseWriter
 		store.Email:        store.Set,
 		store.ProviderInfo: store.Set,
 	}); err != nil {
-		return errgo.Mask(err)
+		errorf(err)
+		return
 	}
-	idp.initParams.VisitCompleter.Success(ctx, w, req, idputil.DischargeID(req), &identity)
-	return nil
+	successf(&identity)
 }
 
 // GetGroups implements idp.IdentityProvider.GetGroups by fetching group

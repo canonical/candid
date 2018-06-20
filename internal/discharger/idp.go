@@ -6,13 +6,15 @@ package discharger
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
 	"github.com/julienschmidt/httprouter"
 	"golang.org/x/net/context"
 	"golang.org/x/net/trace"
-	"gopkg.in/CanonicalLtd/candidclient.v1"
+	candidclient "gopkg.in/CanonicalLtd/candidclient.v1"
+	"gopkg.in/CanonicalLtd/candidclient.v1/params"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery"
 	"gopkg.in/macaroon-bakery.v2/bakery/checkers"
@@ -20,6 +22,7 @@ import (
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
 
 	"github.com/CanonicalLtd/candid/idp"
+	"github.com/CanonicalLtd/candid/internal/discharger/internal"
 	"github.com/CanonicalLtd/candid/internal/identity"
 	"github.com/CanonicalLtd/candid/store"
 )
@@ -107,6 +110,7 @@ func (d *dischargeTokenCreator) DischargeToken(ctx context.Context, id *store.Id
 type visitCompleter struct {
 	params                identity.HandlerParams
 	dischargeTokenCreator *dischargeTokenCreator
+	dischargeTokenStore   *internal.DischargeTokenStore
 	place                 *place
 }
 
@@ -143,4 +147,63 @@ func (c *visitCompleter) Failure(ctx context.Context, w http.ResponseWriter, req
 		})
 	}
 	identity.WriteError(ctx, w, err)
+}
+
+// RedirectSuccess implements idp.VisitCompleter.RedirectSuccess.
+func (c *visitCompleter) RedirectSuccess(ctx context.Context, w http.ResponseWriter, req *http.Request, returnTo, state string, id *store.Identity) {
+	dt, err := c.dischargeTokenCreator.DischargeToken(ctx, id)
+	if err != nil {
+		c.RedirectFailure(ctx, w, req, returnTo, state, errgo.Mask(err))
+		return
+	}
+	code, err := c.dischargeTokenStore.Put(ctx, dt, time.Now().Add(10*time.Minute))
+	if err != nil {
+		c.RedirectFailure(ctx, w, req, returnTo, state, errgo.Mask(err))
+		return
+	}
+	v := url.Values{
+		"code": {code},
+	}
+	if state != "" {
+		v.Set("state", state)
+	}
+	if err := redirect(w, req, returnTo, v); err != nil {
+		identity.WriteError(ctx, w, err)
+	}
+	return
+}
+
+// RedirectFailure implements idp.VisitCompleter.RedirectFailure.
+func (c *visitCompleter) RedirectFailure(ctx context.Context, w http.ResponseWriter, req *http.Request, returnTo, state string, err error) {
+	v := url.Values{
+		"error": {err.Error()},
+	}
+	if state != "" {
+		v.Set("state", state)
+	}
+	if ec, ok := errgo.Cause(err).(params.ErrorCode); ok {
+		v.Set("error_code", string(ec))
+	}
+	if rerr := redirect(w, req, returnTo, v); rerr == nil {
+		return
+	}
+	identity.WriteError(ctx, w, err)
+}
+
+// redirect writes a redirect response addressed the the given returnTo
+// address with the given query parameters. If an error is returned it
+// will be because the returnTo address is invalid and therefore it will
+// not be possible to redirect to it.
+func redirect(w http.ResponseWriter, req *http.Request, returnTo string, query url.Values) error {
+	u, err := url.Parse(returnTo)
+	if returnTo == "" || err != nil {
+		return errgo.WithCausef(err, params.ErrBadRequest, "invalid return_to")
+	}
+	q := u.Query()
+	for k, v := range query {
+		q[k] = append(q[k], v...)
+	}
+	u.RawQuery = q.Encode()
+	http.Redirect(w, req, u.String(), http.StatusTemporaryRedirect)
+	return nil
 }

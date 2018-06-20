@@ -15,6 +15,7 @@ import (
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
 
 	"github.com/CanonicalLtd/candid/internal/auth/httpauth"
+	"github.com/CanonicalLtd/candid/internal/discharger/internal"
 	"github.com/CanonicalLtd/candid/internal/identity"
 	"github.com/CanonicalLtd/candid/internal/monitoring"
 )
@@ -28,9 +29,15 @@ func NewAPIHandler(params identity.HandlerParams) ([]httprequest.Handler, error)
 	dt := &dischargeTokenCreator{
 		params: params,
 	}
+	dtks, err := params.ProviderDataStore.KeyValueStore(context.Background(), "_discharge_tokens")
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
+	dts := internal.NewDischargeTokenStore(dtks)
 	vc := &visitCompleter{
 		params:                params,
 		dischargeTokenCreator: dt,
+		dischargeTokenStore:   dts,
 		place:                 place,
 	}
 	if err := initIDPs(context.Background(), params, dt, vc); err != nil {
@@ -45,6 +52,7 @@ func NewAPIHandler(params identity.HandlerParams) ([]httprequest.Handler, error)
 		HandlerParams:         params,
 		checker:               checker,
 		dischargeTokenCreator: dt,
+		dischargeTokenStore:   dts,
 		visitCompleter:        vc,
 		place:                 place,
 		reqAuth:               reqAuth,
@@ -72,6 +80,7 @@ type handlerParams struct {
 	identity.HandlerParams
 	checker               *thirdPartyCaveatChecker
 	dischargeTokenCreator *dischargeTokenCreator
+	dischargeTokenStore   *internal.DischargeTokenStore
 	visitCompleter        *visitCompleter
 	place                 *place
 	reqAuth               *httpauth.Authorizer
