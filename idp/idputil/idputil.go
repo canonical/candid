@@ -46,9 +46,16 @@ func RequestParams(ctx context.Context, w http.ResponseWriter, req *http.Request
 	}
 }
 
-// WaitID gets the wait ID from the given request using the standard form value.
+// DischargeID gets the discharge ID from the given request using the
+// standard form value.
 func DischargeID(req *http.Request) string {
 	return req.Form.Get("id")
+}
+
+// RedirectParams gets the return_to and state parameters from the
+// request.
+func RedirectParams(req *http.Request) (returnTo, state string) {
+	return req.Form.Get("return_to"), req.Form.Get("state")
 }
 
 // URL creates a URL addressed to the given path within the IDP handler
@@ -112,4 +119,16 @@ func NameWithDomain(name, domain string) string {
 		return name
 	}
 	return name + "@" + domain
+}
+
+// RedirectCookieName is the name of the cookie used to store
+// RedirectState whilst a login is being processed by a third-party
+// server.
+const RedirectCookieName = "candid-redirect"
+
+// RedirectState holds the incoming return address and state in a
+// redirect based login.
+type RedirectState struct {
+	ReturnTo string
+	State    string
 }

@@ -33,6 +33,14 @@ type VisitCompleter interface {
 	// Failure is used by an identity provider to indicate that a
 	// login attempt has failed with the specified error.
 	Failure(ctx context.Context, w http.ResponseWriter, req *http.Request, dischargeID string, err error)
+
+	// RedirectFailure redirects to the given returnTo address with the given error.
+	RedirectFailure(ctx context.Context, w http.ResponseWriter, req *http.Request, returnTo, state string, err error)
+
+	// RedirectSuccess redirects to the given returnTo address
+	// providing a code which can be used by the client to obtain a
+	// disharge token for the given id.
+	RedirectSuccess(ctx context.Context, w http.ResponseWriter, req *http.Request, returnTo, state string, id *store.Identity)
 }
 
 // InitParams are passed to the identity provider to initialise it.
@@ -57,7 +65,7 @@ type InitParams struct {
 	// will contain only the part after this prefix.
 	URLPrefix string
 
-	// DischargeTokener is the DischargeTokener that the identity
+	// DischargeTokenCreator is the DischargeTokenCreator that the identity
 	// provider should use to create discharge tokens.
 	DischargeTokenCreator DischargeTokenCreator
 

@@ -19,6 +19,7 @@ import (
 	"github.com/CanonicalLtd/candid/config"
 	"github.com/CanonicalLtd/candid/idp"
 	"github.com/CanonicalLtd/candid/idp/idptest"
+	"github.com/CanonicalLtd/candid/idp/idputil"
 	"github.com/CanonicalLtd/candid/idp/usso"
 	"github.com/CanonicalLtd/candid/idp/usso/internal/mockusso"
 	"github.com/CanonicalLtd/candid/store"
@@ -234,6 +235,89 @@ func (s *ussoSuite) TestHandleUpdateUserError(c *gc.C) {
 	s.AssertLoginFailureMatches(c, `invalid user: invalid username "test-"`)
 }
 
+func (s *ussoSuite) TestRedirectFlowLogin(c *gc.C) {
+	s.mockUSSOSuite.MockUSSO.AddUser(&mockusso.User{
+		ID:       "test",
+		NickName: "test",
+		FullName: "Test User",
+		Email:    "test@example.com",
+	})
+	s.mockUSSOSuite.MockUSSO.SetLoginUser("test")
+	resp := s.get(c, context.Background(), "/?return_to=http://example.com/callback&state=1234")
+	defer resp.Body.Close()
+	cookies := resp.Cookies()
+	c.Assert(cookies, gc.HasLen, 1)
+	c.Assert(cookies[0].Name, gc.Equals, idputil.RedirectCookieName)
+	loc, err := resp.Location()
+	c.Assert(err, gc.Equals, nil)
+	resp = s.roundTrip(c, loc.String())
+	defer resp.Body.Close()
+	loc, err = resp.Location()
+	c.Assert(err, gc.Equals, nil)
+	loc.Scheme = ""
+	loc.Host = ""
+	req, err := http.NewRequest("GET", loc.String(), nil)
+	c.Assert(err, gc.Equals, nil)
+	req.AddCookie(cookies[0])
+	s.do(context.Background(), req)
+	s.AssertLoginSuccess(c, "test")
+}
+
+func (s *ussoSuite) TestRedirectFlowLoginInvalidCookie(c *gc.C) {
+	s.mockUSSOSuite.MockUSSO.AddUser(&mockusso.User{
+		ID:       "test",
+		NickName: "test",
+		FullName: "Test User",
+		Email:    "test@example.com",
+	})
+	s.mockUSSOSuite.MockUSSO.SetLoginUser("test")
+	resp := s.get(c, context.Background(), "/?return_to=http://example.com/callback&state=1234")
+	defer resp.Body.Close()
+	cookies := resp.Cookies()
+	c.Assert(cookies, gc.HasLen, 1)
+	c.Assert(cookies[0].Name, gc.Equals, idputil.RedirectCookieName)
+	loc, err := resp.Location()
+	c.Assert(err, gc.Equals, nil)
+	resp = s.roundTrip(c, loc.String())
+	defer resp.Body.Close()
+	loc, err = resp.Location()
+	c.Assert(err, gc.Equals, nil)
+	loc.Scheme = ""
+	loc.Host = ""
+	req, err := http.NewRequest("GET", loc.String(), nil)
+	c.Assert(err, gc.Equals, nil)
+	s.do(context.Background(), req)
+	s.AssertLoginFailureMatches(c, "invalid cookie: http: named cookie not present")
+}
+
+func (s *ussoSuite) TestRedirectFlowLoginUserError(c *gc.C) {
+	s.mockUSSOSuite.MockUSSO.AddUser(&mockusso.User{
+		ID:       "test",
+		NickName: "test-",
+		FullName: "Test User",
+		Email:    "test@example.com",
+	})
+	s.mockUSSOSuite.MockUSSO.SetLoginUser("test")
+	resp := s.get(c, context.Background(), "/?return_to=http://example.com/callback&state=1234")
+	defer resp.Body.Close()
+	cookies := resp.Cookies()
+	c.Assert(cookies, gc.HasLen, 1)
+	c.Assert(cookies[0].Name, gc.Equals, idputil.RedirectCookieName)
+	loc, err := resp.Location()
+	c.Assert(err, gc.Equals, nil)
+	resp = s.roundTrip(c, loc.String())
+	defer resp.Body.Close()
+	loc, err = resp.Location()
+	c.Assert(err, gc.Equals, nil)
+	loc.Scheme = ""
+	loc.Host = ""
+	req, err := http.NewRequest("GET", loc.String(), nil)
+	c.Assert(err, gc.Equals, nil)
+	req.AddCookie(cookies[0])
+	s.do(context.Background(), req)
+	s.AssertLoginFailureMatches(c, `invalid user: invalid username "test-"`)
+}
+
 func (s *ussoSuite) TestGetGroups(c *gc.C) {
 	var lp *httptest.Server
 	lp = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -272,21 +356,27 @@ func (s *ussoSuite) TestGetGroups(c *gc.C) {
 
 // ussoURL gets a request addressed to the MockUSSO server with the given wait ID.
 func (s *ussoSuite) ussoURL(c *gc.C, ctx context.Context, dischargeID string) string {
-	rr := s.get(c, ctx, "/?id="+dischargeID)
-	c.Assert(rr.Code, gc.Equals, http.StatusFound)
-	return rr.Header().Get("Location")
+	resp := s.get(c, ctx, "/?id="+dischargeID)
+	c.Assert(resp.StatusCode, gc.Equals, http.StatusFound)
+	loc, err := resp.Location()
+	c.Assert(err, gc.Equals, nil)
+	return loc.String()
 }
 
 // get performs a "GET" requests on the idp's Handle method with the
 // given path.
-func (s *ussoSuite) get(c *gc.C, ctx context.Context, path string) *httptest.ResponseRecorder {
+func (s *ussoSuite) get(c *gc.C, ctx context.Context, path string) *http.Response {
 	path = strings.TrimPrefix(path, "https://idp.test")
 	req, err := http.NewRequest("GET", path, nil)
 	c.Assert(err, gc.Equals, nil)
-	req.ParseForm()
+	return s.do(ctx, req)
+}
+
+func (s *ussoSuite) do(ctx context.Context, req *http.Request) *http.Response {
 	rr := httptest.NewRecorder()
+	req.ParseForm()
 	s.idp.Handle(ctx, rr, req)
-	return rr
+	return rr.Result()
 }
 
 // roundTrip uses http.DefaultTransport to perform a GET request as a

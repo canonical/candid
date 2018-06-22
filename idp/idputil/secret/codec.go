@@ -5,15 +5,20 @@ package secret
 
 import (
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
+	"net/http"
 
 	"golang.org/x/crypto/nacl/box"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery"
 )
 
-var ErrDecryption = errgo.New("decryption error")
+var (
+	ErrDecryption    = errgo.New("decryption error")
+	ErrInvalidCookie = errgo.New("invalid cookie")
+)
 
 // Codec is used to create an encrypted messages that will be decrypted
 // by the same service. This should be used for cookies and other data
@@ -37,16 +42,24 @@ func NewCodec(key *bakery.KeyPair) *Codec {
 // unmarshaled by a Codec using the same key. The encoded output will be
 // in the base64 url safe alphabet.
 func (c *Codec) Encode(v interface{}) (string, error) {
-	msg, err := json.Marshal(v)
-	if err != nil {
-		return "", errgo.Mask(err)
-	}
-	out := make([]byte, 0, bakery.KeyLen+bakery.NonceLen+len(msg)+box.Overhead)
-	out, err = c.encrypt(out, msg)
+	out, err := c.encode(v)
 	if err != nil {
 		return "", errgo.Mask(err)
 	}
 	return base64.URLEncoding.EncodeToString(out), nil
+}
+
+func (c *Codec) encode(v interface{}) ([]byte, error) {
+	msg, err := json.Marshal(v)
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
+	out := make([]byte, 0, bakery.KeyLen+bakery.NonceLen+len(msg)+box.Overhead)
+	out, err = c.encrypt(out, msg)
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
+	return out, nil
 }
 
 // encrypt encrypts the given message.
@@ -69,11 +82,15 @@ func (c *Codec) Decode(s string, v interface{}) error {
 	if err != nil {
 		return errgo.Mask(err)
 	}
-	if len(buf) < bakery.KeyLen+bakery.NonceLen+box.Overhead {
+	return errgo.Mask(c.decode(buf, v), errgo.Is(ErrDecryption))
+}
+
+func (c *Codec) decode(b []byte, v interface{}) error {
+	if len(b) < bakery.KeyLen+bakery.NonceLen+box.Overhead {
 		return errgo.New("buffer too short to decode")
 	}
-	out := make([]byte, 0, len(buf)-bakery.KeyLen-bakery.NonceLen-box.Overhead)
-	out, err = c.decrypt(out, buf)
+	out := make([]byte, 0, len(b)-bakery.KeyLen-bakery.NonceLen-box.Overhead)
+	out, err := c.decrypt(out, b)
 	if err != nil {
 		return errgo.Mask(err, errgo.Is(ErrDecryption))
 	}
@@ -96,4 +113,39 @@ func (c *Codec) decrypt(out, in []byte) ([]byte, error) {
 		return nil, ErrDecryption
 	}
 	return out, nil
+}
+
+// SetCookie encodes the given value as a session cookie with the given
+// name. The returned value is used the verify the cookie later - it
+// should be passed to Cookie when the cookie is retrieved.
+func (c *Codec) SetCookie(w http.ResponseWriter, name string, v interface{}) (string, error) {
+	out, err := c.encode(v)
+	if err != nil {
+		return "", errgo.Mask(err)
+	}
+	hash := sha256.Sum256(out)
+	http.SetCookie(w, &http.Cookie{
+		Name:  name,
+		Value: base64.URLEncoding.EncodeToString(out),
+	})
+	return base64.RawURLEncoding.EncodeToString(hash[:]), nil
+}
+
+// Cookie decodes the cookie with the given name from the given request
+// into v. The given verification string is used to ensure the cookie is
+// valid.
+func (c *Codec) Cookie(req *http.Request, name, verification string, v interface{}) error {
+	cookie, err := req.Cookie(name)
+	if err != nil {
+		return errgo.WithCausef(err, ErrInvalidCookie, "invalid cookie")
+	}
+	buf, err := base64.URLEncoding.DecodeString(cookie.Value)
+	if err != nil {
+		return errgo.WithCausef(err, ErrInvalidCookie, "invalid cookie")
+	}
+	hash := sha256.Sum256(buf)
+	if base64.RawURLEncoding.EncodeToString(hash[:]) != verification {
+		return errgo.WithCausef(nil, ErrInvalidCookie, "invalid cookie")
+	}
+	return errgo.Mask(c.decode(buf, v), errgo.Is(ErrDecryption))
 }

@@ -121,6 +121,8 @@ type visitCompleter struct {
 	c           *gc.C
 	called      bool
 	dischargeID string
+	returnTo    string
+	state       string
 	id          *store.Identity
 	err         error
 }
@@ -142,6 +144,28 @@ func (l *visitCompleter) Failure(_ context.Context, _ http.ResponseWriter, _ *ht
 	}
 	l.called = true
 	l.dischargeID = dischargeID
+	l.err = err
+}
+
+func (l *visitCompleter) RedirectSuccess(_ context.Context, _ http.ResponseWriter, _ *http.Request, returnTo, state string, id *store.Identity) {
+	if l.called {
+		l.c.Error("login completion method called more that once")
+		return
+	}
+	l.called = true
+	l.returnTo = returnTo
+	l.state = state
+	l.id = id
+}
+
+func (l *visitCompleter) RedirectFailure(_ context.Context, _ http.ResponseWriter, _ *http.Request, returnTo, state string, err error) {
+	if l.called {
+		l.c.Error("login completion method called more that once")
+		return
+	}
+	l.called = true
+	l.returnTo = returnTo
+	l.state = state
 	l.err = err
 }
 

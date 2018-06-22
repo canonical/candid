@@ -62,7 +62,8 @@ func (s *idpSuite) SetUpTest(c *gc.C) {
 		ListenAddr: "localhost",
 	})
 	c.Assert(err, gc.Equals, nil)
-
+	kvs, err := s.ProviderDataStore.KeyValueStore(context.Background(), "test-discharge-tokens")
+	c.Assert(err, gc.Equals, nil)
 	s.vc = discharger.NewVisitCompleter(identity.HandlerParams{
 		ServerParams: identity.ServerParams{
 			Store:        s.Store,
@@ -72,7 +73,7 @@ func (s *idpSuite) SetUpTest(c *gc.C) {
 		},
 		MeetingPlace: s.meetingPlace,
 		Oven:         oven,
-	})
+	}, kvs)
 }
 
 func (s *idpSuite) TearDownTest(c *gc.C) {
@@ -147,4 +148,54 @@ func (s *idpSuite) TestLoginSuccessWithTemplate(c *gc.C) {
 	c.Assert(rr.Code, gc.Equals, http.StatusOK)
 	c.Assert(rr.HeaderMap.Get("Content-Type"), gc.Equals, "text/html;charset=utf-8")
 	c.Assert(rr.Body.String(), gc.Equals, "<h1>Login successful as test-user</h1>")
+}
+
+func (s *idpSuite) TestLoginRedirectSuccess(c *gc.C) {
+	req, err := http.NewRequest("GET", "", nil)
+	c.Assert(err, gc.Equals, nil)
+	rr := httptest.NewRecorder()
+	s.vc.RedirectSuccess(context.Background(), rr, req, "http://example.com/callback", "1234", &store.Identity{
+		Username: "test-user",
+	})
+	resp := rr.Result()
+	c.Assert(resp.StatusCode, gc.Equals, http.StatusTemporaryRedirect)
+	loc, err := resp.Location()
+	c.Assert(err, gc.Equals, nil)
+	v := loc.Query()
+	loc.RawQuery = ""
+	c.Assert(loc.String(), gc.Equals, "http://example.com/callback")
+	c.Assert(v.Get("state"), gc.Equals, "1234")
+	c.Assert(v.Get("code"), gc.Not(gc.Equals), "")
+}
+
+func (s *idpSuite) TestLoginRedirectSuccessInvalidReturnTo(c *gc.C) {
+	req, err := http.NewRequest("GET", "", nil)
+	c.Assert(err, gc.Equals, nil)
+	rr := httptest.NewRecorder()
+	s.vc.RedirectSuccess(context.Background(), rr, req, "::", "1234", &store.Identity{
+		Username: "test-user",
+	})
+	c.Assert(rr.Code, gc.Equals, http.StatusBadRequest)
+	var perr params.Error
+	err = json.Unmarshal(rr.Body.Bytes(), &perr)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(perr, jc.DeepEquals, params.Error{
+		Code:    params.ErrBadRequest,
+		Message: `invalid return_to: parse ::: missing protocol scheme`,
+	})
+}
+
+func (s *idpSuite) TestLoginRedirectFailureInvalidReturnTo(c *gc.C) {
+	req, err := http.NewRequest("GET", "", nil)
+	c.Assert(err, gc.Equals, nil)
+	rr := httptest.NewRecorder()
+	s.vc.RedirectFailure(context.Background(), rr, req, "::", "1234", errgo.WithCausef(nil, params.ErrForbidden, "test error"))
+	c.Assert(rr.Code, gc.Equals, http.StatusForbidden)
+	var perr params.Error
+	err = json.Unmarshal(rr.Body.Bytes(), &perr)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(perr, jc.DeepEquals, params.Error{
+		Code:    params.ErrForbidden,
+		Message: `test error`,
+	})
 }
