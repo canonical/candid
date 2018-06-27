@@ -116,6 +116,7 @@ const (
 	tmplPutMeeting
 	tmplFindMeetings
 	tmplRemoveMeetings
+	tmplIdentityCounts
 	numTmpl
 )
 
@@ -129,7 +130,7 @@ type queryer interface {
 // to record the arguments needed to be supplied with SQL queries.
 type argBuilder interface {
 	// Arg is a method that is called in templates with the value of
-	// the next argument to be used in the query. Arg should remmebre
+	// the next argument to be used in the query. Arg should remember
 	// the value and return a valid placeholder to access that
 	// argument when executing the query.
 	Arg(interface{}) string

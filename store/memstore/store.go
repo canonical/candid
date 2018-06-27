@@ -435,3 +435,14 @@ func copyIdentity(dst, src *store.Identity) {
 	dst.ProviderInfo = updateMap(make(map[string][]string), src.ProviderInfo, store.Set)
 	dst.ExtraInfo = updateMap(make(map[string][]string), src.ExtraInfo, store.Set)
 }
+
+// IdentityCounts implements store.Store.IdentityCounts.
+func (s *memStore) IdentityCounts(_ context.Context) (map[string]int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	counts := make(map[string]int)
+	for _, id := range s.identities {
+		counts[id.ProviderID.Provider()]++
+	}
+	return counts, nil
+}

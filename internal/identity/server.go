@@ -87,10 +87,14 @@ func New(sp ServerParams, versions map[string]NewAPIHandlerFunc) (*Server, error
 		return nil, errgo.Notef(err, "cannot create meeting place")
 	}
 
+	storeCollector := monitoring.StoreCollector{Store: sp.Store}
+	prometheus.Register(storeCollector)
+
 	// Create the HTTP server.
 	srv := &Server{
-		router:       httprouter.New(),
-		meetingPlace: place,
+		router:         httprouter.New(),
+		meetingPlace:   place,
+		storeCollector: storeCollector,
 	}
 	// Disable the automatic rerouting in order to maintain
 	// compatibility. It might be worthwhile relaxing this in the
@@ -122,8 +126,9 @@ func New(sp ServerParams, versions map[string]NewAPIHandlerFunc) (*Server, error
 
 // Server serves the identity endpoints.
 type Server struct {
-	router       *httprouter.Router
-	meetingPlace *meeting.Place
+	router         *httprouter.Router
+	meetingPlace   *meeting.Place
+	storeCollector monitoring.StoreCollector
 }
 
 // ServeHTTP implements http.Handler.
@@ -147,6 +152,7 @@ func (srv *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 func (s *Server) Close() {
 	logger.Debugf("Closing Server")
 	s.meetingPlace.Close()
+	prometheus.Unregister(s.storeCollector)
 }
 
 // ServerParams contains configuration parameters for a server.
