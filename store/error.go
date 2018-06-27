@@ -17,10 +17,6 @@ var (
 	// ErrDuplicateUsername is the error cause used when an update
 	// attempts to set a username that is already in use.
 	ErrDuplicateUsername = errgo.New("duplicate username")
-
-	// ErrDuplicateKey is the error cause used when trying to set a
-	// new key in a KeyValueStore where the key already exists.
-	ErrDuplicateKey = errgo.New("duplicate key")
 )
 
 // NotFoundError creates a new error with a cause of ErrNotFound and an
@@ -52,14 +48,6 @@ func DuplicateUsernameError(username string) error {
 // an appropriate message.
 func KeyNotFoundError(key string) error {
 	err := errgo.WithCausef(nil, ErrNotFound, "key %s not found", key)
-	err.(*errgo.Err).SetLocation(1)
-	return err
-}
-
-// DuplicateKeyError creates a new error with a cause of ErrDuplicateKey
-// and an appropriate message.
-func DuplicateKeyError(key string) error {
-	err := errgo.WithCausef(nil, ErrDuplicateKey, "key %s already exists", key)
 	err.(*errgo.Err).SetLocation(1)
 	return err
 }

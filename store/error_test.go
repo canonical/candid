@@ -34,9 +34,3 @@ func (*errorSuite) TestDuplicateUsernameError(c *gc.C) {
 	c.Assert(errgo.Cause(err), gc.Equals, store.ErrDuplicateUsername)
 	c.Assert(err, gc.ErrorMatches, `username test-user already in use`)
 }
-
-func (*errorSuite) TestDuplicateKeyError(c *gc.C) {
-	err := store.DuplicateKeyError("test-key")
-	c.Assert(errgo.Cause(err), gc.Equals, store.ErrDuplicateKey)
-	c.Assert(err, gc.ErrorMatches, `key test-key already exists`)
-}

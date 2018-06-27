@@ -11,6 +11,7 @@ import (
 	errgo "gopkg.in/errgo.v1"
 
 	"github.com/CanonicalLtd/candid/store"
+	"github.com/juju/simplekv"
 )
 
 // KeyValueSuite contains a set of tests for KeyValueStore implementations. The
@@ -58,7 +59,7 @@ func (s *KeyValueSuite) TestGetNotFound(c *gc.C) {
 	defer close()
 
 	_, err = kv.Get(ctx, "test-not-there-key")
-	c.Assert(errgo.Cause(err), gc.Equals, store.ErrNotFound)
+	c.Assert(errgo.Cause(err), gc.Equals, simplekv.ErrNotFound)
 	c.Assert(err, gc.ErrorMatches, "key test-not-there-key not found")
 }
 
@@ -69,7 +70,7 @@ func (s *KeyValueSuite) TestSetKeyOnce(c *gc.C) {
 	ctx, close := kv.Context(ctx)
 	defer close()
 
-	err = store.SetKeyOnce(ctx, kv, "test-key", []byte("test-value"), time.Time{})
+	err = simplekv.SetKeyOnce(ctx, kv, "test-key", []byte("test-value"), time.Time{})
 	c.Assert(err, gc.Equals, nil)
 
 	result, err := kv.Get(ctx, "test-key")
@@ -84,11 +85,11 @@ func (s *KeyValueSuite) TestSetKeyOnceDuplicate(c *gc.C) {
 	ctx, close := kv.Context(ctx)
 	defer close()
 
-	err = store.SetKeyOnce(ctx, kv, "test-key", []byte("test-value"), time.Time{})
+	err = simplekv.SetKeyOnce(ctx, kv, "test-key", []byte("test-value"), time.Time{})
 	c.Assert(err, gc.Equals, nil)
 
-	err = store.SetKeyOnce(ctx, kv, "test-key", []byte("test-value"), time.Time{})
-	c.Assert(errgo.Cause(err), gc.Equals, store.ErrDuplicateKey)
+	err = simplekv.SetKeyOnce(ctx, kv, "test-key", []byte("test-value"), time.Time{})
+	c.Assert(errgo.Cause(err), gc.Equals, simplekv.ErrDuplicateKey)
 	c.Assert(err, gc.ErrorMatches, "key test-key already exists")
 }
 
@@ -122,10 +123,10 @@ func (s *KeyValueSuite) TestTwoStoresForDifferentIDPsAreIndependent(c *gc.C) {
 	ctx2, close := kv2.Context(ctx)
 	defer close()
 
-	err = store.SetKeyOnce(ctx1, kv1, "test-key", []byte("test-value"), time.Time{})
+	err = simplekv.SetKeyOnce(ctx1, kv1, "test-key", []byte("test-value"), time.Time{})
 	c.Assert(err, gc.Equals, nil)
 
-	err = store.SetKeyOnce(ctx2, kv2, "test-key", []byte("test-value-2"), time.Time{})
+	err = simplekv.SetKeyOnce(ctx2, kv2, "test-key", []byte("test-value-2"), time.Time{})
 	c.Assert(err, gc.Equals, nil)
 
 	v, err := kv1.Get(ctx1, "test-key")

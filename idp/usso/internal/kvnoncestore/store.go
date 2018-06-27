@@ -9,22 +9,21 @@ import (
 	"time"
 
 	"github.com/juju/loggo"
+	"github.com/juju/simplekv"
 	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
-
-	"github.com/CanonicalLtd/candid/store"
 )
 
 var logger = loggo.GetLogger("idp.usso.internal.kvnoncestore")
 
 // Store is an openid.NonceStore that is backed by a store.KeyValueStore.
 type Store struct {
-	store  store.KeyValueStore
+	store  simplekv.Store
 	maxAge time.Duration
 }
 
 // New creates a new Store.
-func New(store store.KeyValueStore, maxAge time.Duration) *Store {
+func New(store simplekv.Store, maxAge time.Duration) *Store {
 	return &Store{
 		store:  store,
 		maxAge: maxAge,
@@ -69,8 +68,8 @@ func (s *Store) accept(endpoint, nonce string, now time.Time) error {
 		return errgo.Newf("%q too old", nonce)
 	}
 	key := fmt.Sprintf("nonce#%s#%s", endpoint, nonce)
-	err = store.SetKeyOnce(context.Background(), s.store, key, nil, t.Add(s.maxAge))
-	if errgo.Cause(err) == store.ErrDuplicateKey {
+	err = simplekv.SetKeyOnce(context.Background(), s.store, key, nil, t.Add(s.maxAge))
+	if errgo.Cause(err) == simplekv.ErrDuplicateKey {
 		return errgo.Newf("%q already seen for %q", nonce, endpoint)
 	}
 	return errgo.Mask(err)

@@ -6,8 +6,10 @@ package internal_test
 import (
 	"time"
 
+	"context"
+
+	"github.com/juju/simplekv"
 	jc "github.com/juju/testing/checkers"
-	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
 	errgo "gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
@@ -76,7 +78,7 @@ func (s *storeSuite) TestGetNotFound(c *gc.C) {
 	kv, err := s.ProviderDataStore.KeyValueStore(ctx, "test")
 	c.Assert(err, gc.Equals, nil)
 	st := internal.NewDischargeTokenStore(withGet(kv, func(context.Context, string) ([]byte, error) {
-		return nil, store.ErrNotFound
+		return nil, simplekv.ErrNotFound
 	}))
 	_, err = st.Get(ctx, "")
 	c.Assert(err, gc.ErrorMatches, "not found")
@@ -135,7 +137,7 @@ func (s *storeSuite) TestExpiredEntry(c *gc.C) {
 }
 
 type testGetStore struct {
-	store.KeyValueStore
+	simplekv.Store
 	f func(context.Context, string) ([]byte, error)
 }
 
@@ -143,15 +145,15 @@ func (s testGetStore) Get(ctx context.Context, key string) ([]byte, error) {
 	return s.f(ctx, key)
 }
 
-func withGet(store store.KeyValueStore, get func(context.Context, string) ([]byte, error)) store.KeyValueStore {
+func withGet(store simplekv.Store, get func(context.Context, string) ([]byte, error)) simplekv.Store {
 	return testGetStore{
-		KeyValueStore: store,
-		f:             get,
+		Store: store,
+		f:     get,
 	}
 }
 
 type testSetStore struct {
-	store.KeyValueStore
+	simplekv.Store
 	f func(context.Context, string, []byte, time.Time) error
 }
 
@@ -159,9 +161,9 @@ func (s testSetStore) Set(ctx context.Context, key string, value []byte, expire 
 	return s.f(ctx, key, value, expire)
 }
 
-func withSet(store store.KeyValueStore, set func(context.Context, string, []byte, time.Time) error) store.KeyValueStore {
+func withSet(store simplekv.Store, set func(context.Context, string, []byte, time.Time) error) simplekv.Store {
 	return testSetStore{
-		KeyValueStore: store,
-		f:             set,
+		Store: store,
+		f:     set,
 	}
 }
