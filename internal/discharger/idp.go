@@ -34,7 +34,7 @@ const (
 
 	// dischargeTokenDuration is the length of time for which a
 	// discharge token is valid.
-	dischargeTokenDuration = 24 * time.Hour
+	dischargeTokenDuration = identityMacaroonDuration
 )
 
 func initIDPs(ctx context.Context, params identity.HandlerParams, dt *dischargeTokenCreator, vc *visitCompleter) error {
