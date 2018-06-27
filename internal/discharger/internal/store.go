@@ -14,17 +14,18 @@ import (
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
 
 	"github.com/CanonicalLtd/candid/store"
+	"github.com/juju/simplekv"
 )
 
 // DischargeTokenStore is a store for discharge tokens. It wraps a
 // KeyValueStore.
 type DischargeTokenStore struct {
-	store store.KeyValueStore
+	store simplekv.Store
 }
 
 // NewDischargeTokenStore creates a new DischargeTokenStore using the
 // given KeyValueStore for backing storage.
-func NewDischargeTokenStore(store store.KeyValueStore) *DischargeTokenStore {
+func NewDischargeTokenStore(store simplekv.Store) *DischargeTokenStore {
 	return &DischargeTokenStore{store: store}
 }
 
@@ -55,7 +56,10 @@ func (s *DischargeTokenStore) Put(ctx context.Context, dt *httpbakery.DischargeT
 func (s *DischargeTokenStore) Get(ctx context.Context, key string) (*httpbakery.DischargeToken, error) {
 	b, err := s.store.Get(ctx, key)
 	if err != nil {
-		return nil, errgo.Mask(err, errgo.Is(store.ErrNotFound), errgo.Is(context.Canceled), errgo.Is(context.DeadlineExceeded))
+		if errgo.Cause(err) == simplekv.ErrNotFound {
+			return nil, errgo.WithCausef(err, store.ErrNotFound, "")
+		}
+		return nil, errgo.Mask(err, errgo.Is(context.Canceled), errgo.Is(context.DeadlineExceeded))
 	}
 	var entry dischargeTokenEntry
 	if err := json.Unmarshal(b, &entry); err != nil {

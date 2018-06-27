@@ -148,6 +148,7 @@ func newPostgresDriver(db *sql.DB) (*driver, error) {
 		return nil, errgo.Mask(err)
 	}
 	d := &driver{
+		name: "postgres",
 		argBuilderFunc: func() argBuilder {
 			return &postgresArgBuilder{}
 		},

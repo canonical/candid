@@ -7,14 +7,14 @@ import (
 	"github.com/CanonicalLtd/candid/idp"
 	"github.com/CanonicalLtd/candid/internal/discharger/internal"
 	"github.com/CanonicalLtd/candid/internal/identity"
-	"github.com/CanonicalLtd/candid/store"
+	"github.com/juju/simplekv"
 )
 
 var NewIDPHandler = newIDPHandler
 
 type LoginInfo loginInfo
 
-func NewVisitCompleter(params identity.HandlerParams, store store.KeyValueStore) idp.VisitCompleter {
+func NewVisitCompleter(params identity.HandlerParams, store simplekv.Store) idp.VisitCompleter {
 	return &visitCompleter{
 		params:                params,
 		dischargeTokenCreator: &dischargeTokenCreator{params: params},

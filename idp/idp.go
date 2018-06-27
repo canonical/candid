@@ -13,6 +13,7 @@ import (
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
 
 	"github.com/CanonicalLtd/candid/store"
+	"github.com/juju/simplekv"
 )
 
 // A DischargeTokenCreator is used by the identity providers to create a
@@ -51,7 +52,7 @@ type InitParams struct {
 
 	// KeyValueStore contains a store that the provider may use to
 	// store additional data that is not related to identities.
-	KeyValueStore store.KeyValueStore
+	KeyValueStore simplekv.Store
 
 	// Oven contains an oven that may be used in the identity
 	// provider to mint new macaroons.

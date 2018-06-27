@@ -140,6 +140,7 @@ type argBuilder interface {
 }
 
 type driver struct {
+	name            string
 	tmpls           [numTmpl]*template.Template
 	argBuilderFunc  func() argBuilder
 	isDuplicateFunc func(error) bool
