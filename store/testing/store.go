@@ -1388,3 +1388,24 @@ func (s *StoreSuite) TestFindIdentities(c *gc.C) {
 		}
 	}
 }
+
+func (s *StoreSuite) TestIdentityCounts(c *gc.C) {
+	idps := []string{"a", "b", "c", "a", "b", "a"}
+	for i, idp := range idps {
+		username := fmt.Sprintf("user%d", i)
+		err := s.Store.UpdateIdentity(s.ctx, &store.Identity{
+			ProviderID: store.MakeProviderIdentity(idp, username),
+			Username:   username,
+		}, store.Update{
+			store.Username: store.Set,
+		})
+		c.Assert(err, gc.Equals, nil)
+	}
+	counts, err := s.Store.IdentityCounts(s.ctx)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(counts, jc.DeepEquals, map[string]int{
+		"a": 3,
+		"b": 2,
+		"c": 1,
+	})
+}

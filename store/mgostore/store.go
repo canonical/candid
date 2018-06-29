@@ -244,3 +244,27 @@ func ensureIdentityIndexes(db *mgo.Database) error {
 	}
 	return nil
 }
+
+var identityCountMapReduce = mgo.MapReduce{
+	Map:    `function() {p = this.providerid.split(':', 1); emit(p[0], p[1])}`,
+	Reduce: `function(key, values){ return values.length }`,
+}
+
+// IdentityCounts implements store.Store.IdentityCounts.
+func (s *identityStore) IdentityCounts(ctx context.Context) (map[string]int, error) {
+	coll := s.b.c(ctx, identitiesCollection)
+	defer coll.Database.Session.Close()
+
+	counts := make(map[string]int)
+	var result []struct {
+		ID    string `bson:"_id"`
+		Value int
+	}
+	if _, err := coll.Find(nil).MapReduce(&identityCountMapReduce, &result); err != nil {
+		return nil, errgo.Mask(err)
+	}
+	for _, res := range result {
+		counts[res.ID] = res.Value
+	}
+	return counts, nil
+}

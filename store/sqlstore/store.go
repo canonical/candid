@@ -478,6 +478,25 @@ func (s *identityStore) updateExtraInfo(tx *sql.Tx, id, key string, op store.Ope
 	return errgo.Mask(s.updateSet(tx, "identity_extrainfo", id, key, op, vals))
 }
 
+// IdentityCounts implements store.IdentityCounts.
+func (s *identityStore) IdentityCounts(ctx context.Context) (map[string]int, error) {
+	counts := make(map[string]int)
+	rows, err := s.driver.query(s.db, tmplIdentityCounts, s.driver.argBuilderFunc())
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var idp string
+		var count int
+		if err := rows.Scan(&idp, &count); err != nil {
+			return nil, errgo.Mask(err)
+		}
+		counts[idp] = count
+	}
+	return counts, errgo.Mask(rows.Err())
+}
+
 type nullTime struct {
 	Time  time.Time
 	Valid bool

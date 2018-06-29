@@ -141,6 +141,10 @@ type Store interface {
 	// being used then an error with the cause ErrDuplicateUsername
 	// will be returned.
 	UpdateIdentity(ctx context.Context, identity *Identity, update Update) error
+
+	// IdentityCounts returns the number of identities stored in the
+	// store split by provider ID.
+	IdentityCounts(ctx context.Context) (map[string]int, error)
 }
 
 // A ProviderIdentity is a provider-specific unique identity.

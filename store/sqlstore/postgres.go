@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/lib/pq"
+	"github.com/prometheus/client_golang/prometheus"
 	errgo "gopkg.in/errgo.v1"
 )
 
@@ -139,6 +140,9 @@ var postgresTmpls = [numTmpl]string{
 	tmplRemoveMeetings: `
 		DELETE FROM meetings
 		WHERE id IN({{range $i, $id := .IDs}}{{if gt $i 0}}, {{end}}{{$id | $.Arg}}{{end}})`,
+	tmplIdentityCounts: `
+		SELECT substring(providerid, '^[^:]*') as idp, COUNT(1) 
+		FROM identities GROUP BY idp`,
 }
 
 // newPostgresDriver creates a postgres driver using the given DB.
@@ -184,4 +188,15 @@ func (b *postgresArgBuilder) Arg(a interface{}) string {
 // args implements argbuilder.args.
 func (b *postgresArgBuilder) args() []interface{} {
 	return b.args_
+}
+
+const (
+	descPostgresIdentityCount = iota
+	descPostgresMeetingCount
+	numPostgresDescs
+)
+
+var postgresDescs = [numPostgresDescs]*prometheus.Desc{
+	descPostgresIdentityCount: prometheus.NewDesc("candid_store_postgres_identity_count", "Count of identites in the store", []string{"idp"}, nil),
+	descPostgresMeetingCount:  prometheus.NewDesc("candid_store_postgres_meeting_count", "Count of meeting in the store", nil, nil),
 }

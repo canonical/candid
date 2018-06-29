@@ -122,6 +122,10 @@ func (s errorStore) UpdateIdentity(_ context.Context, _ *store.Identity, _ store
 	return s.err
 }
 
+func (s errorStore) IdentityCounts(_ context.Context) (map[string]int, error) {
+	return nil, s.err
+}
+
 func (s *migrateSuite) TestCopy(c *gc.C) {
 	store1 := memstore.NewStore()
 	ctx := context.Background()
