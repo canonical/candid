@@ -624,6 +624,10 @@ textarea {
   padding: 10px;
 }
 
+.login .button-row {
+  padding: 10px 20px;
+}
+
 .button--neutral,
 .button--inline-neutral,
 .entity-content .btn__see--more,
