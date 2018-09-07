@@ -46,11 +46,12 @@ func initIDPs(ctx context.Context, params identity.HandlerParams, dt *dischargeT
 		if err := ip.Init(ctx, idp.InitParams{
 			Store:                 params.Store,
 			KeyValueStore:         kvStore,
+			Oven:                  params.Oven,
+			Key:                   params.Key,
 			URLPrefix:             params.Location + "/login/" + ip.Name(),
 			DischargeTokenCreator: dt,
 			VisitCompleter:        vc,
 			Template:              params.Template,
-			Key:                   params.Key,
 		}); err != nil {
 			return errgo.Mask(err)
 		}
