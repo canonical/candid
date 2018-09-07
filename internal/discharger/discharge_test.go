@@ -59,6 +59,13 @@ func (s *dischargeSuite) TestNonInteractiveDischarge(c *gc.C) {
 	s.AssertDischarge(c, interactor)
 }
 
+func (s *dischargeSuite) TestInteractiveDischargeWithOldClientCaveat(c *gc.C) {
+	ms, err := s.Discharge(c, "<is-authenticated-user", s.Client(webBrowserInteractor))
+	c.Assert(err, gc.Equals, nil)
+	_, err = s.Bakery.Checker.Auth(ms).Allow(context.Background(), identchecker.LoginOp)
+	c.Assert(err, gc.Equals, nil)
+}
+
 func (s *dischargeSuite) TestTwoDischargesOfSameCaveat(c *gc.C) {
 	// First make start an interaction-required discharge, but don't
 	// allow it to complete immediately.
