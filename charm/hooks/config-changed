@@ -42,12 +42,20 @@ def config_changed():
     else:
         app_config['location'] = config['location']
 
+    if config.get('http-proxy', None):
+        no_proxy = config.get('no-proxy', '')
+        for rel in hookenv.relations_of_type('candid'):
+            if rel.get('private-address'):
+                if len(no_proxy) > 0:
+                    no_proxy += ','
+                no_proxy += rel.get('private-address')
+        app_config['no-proxy'] = no_proxy
+
     for key in [
         'admin-agent-public-key',
         'admin-password',
         'http-proxy',
         'logging-config',
-        'no-proxy',
         'private-key',
         'public-key',
         'rendezvous-timeout',
