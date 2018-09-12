@@ -27,6 +27,7 @@ import (
 	_ "github.com/CanonicalLtd/candid/idp/google"
 	_ "github.com/CanonicalLtd/candid/idp/keystone"
 	_ "github.com/CanonicalLtd/candid/idp/ldap"
+	_ "github.com/CanonicalLtd/candid/idp/local"
 	_ "github.com/CanonicalLtd/candid/store/memstore"
 	_ "github.com/CanonicalLtd/candid/store/mgostore"
 	_ "github.com/CanonicalLtd/candid/store/sqlstore"
