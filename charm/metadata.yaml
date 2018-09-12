@@ -11,6 +11,9 @@ tags:
 series:
   - xenial
   - bionic
+peers:
+  candid:
+    interface: candid
 provides:
   website:
     interface: http
