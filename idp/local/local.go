@@ -46,11 +46,11 @@ type Params struct {
 	Domain string `yaml:"domain"`
 
 	// Users is the set of users that are allowed to authenticate, with their
-	// passwords and list of groups
-	Users map[string]User `yaml:"users"`
+	// passwords and list of groups.
+	Users map[string]UserInfo `yaml:"users"`
 }
 
-type User struct {
+type UserInfo struct {
 	// Password is the password for the user.
 	Password string `yaml:"password"`
 
