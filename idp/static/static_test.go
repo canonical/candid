@@ -1,7 +1,7 @@
 // Copyright 2018 Canonical Ltd.
 // Licensed under the AGPLv3, see LICENCE file for details.
 
-package local_test
+package static_test
 
 import (
 	"net/http"
@@ -14,28 +14,28 @@ import (
 
 	"github.com/CanonicalLtd/candid/idp"
 	"github.com/CanonicalLtd/candid/idp/idptest"
-	"github.com/CanonicalLtd/candid/idp/local"
+	"github.com/CanonicalLtd/candid/idp/static"
 	"github.com/CanonicalLtd/candid/store"
 )
 
-type localSuite struct {
+type staticSuite struct {
 	idptest.Suite
 }
 
-var _ = gc.Suite(&localSuite{})
+var _ = gc.Suite(&staticSuite{})
 
-func (s *localSuite) setupIdp(c *gc.C, params local.Params) idp.IdentityProvider {
-	i, err := local.NewIdentityProvider(params)
+func (s *staticSuite) setupIdp(c *gc.C, params static.Params) idp.IdentityProvider {
+	i, err := static.NewIdentityProvider(params)
 	c.Assert(err, gc.IsNil)
 	i.Init(context.TODO(), s.InitParams(c, "https://example.com/test"))
 	return i
 }
 
-func (s *localSuite) getSampleParams() local.Params {
-	return local.Params{
+func (s *staticSuite) getSampleParams() static.Params {
+	return static.Params{
 		Name: "test",
-		Users: map[string]local.UserInfo{
-			"user1": local.UserInfo{
+		Users: map[string]static.UserInfo{
+			"user1": static.UserInfo{
 				Password: "pass1",
 				Groups:   []string{"group1", "group2"},
 			},
@@ -43,7 +43,7 @@ func (s *localSuite) getSampleParams() local.Params {
 	}
 }
 
-func (s *localSuite) makeLoginRequest(c *gc.C, i idp.IdentityProvider, username, password string) *httptest.ResponseRecorder {
+func (s *staticSuite) makeLoginRequest(c *gc.C, i idp.IdentityProvider, username, password string) *httptest.ResponseRecorder {
 	req, err := http.NewRequest("POST", "/login",
 		strings.NewReader(
 			url.Values{
@@ -60,35 +60,35 @@ func (s *localSuite) makeLoginRequest(c *gc.C, i idp.IdentityProvider, username,
 	return rr
 }
 
-func (s *localSuite) TestName(c *gc.C) {
-	idp, err := local.NewIdentityProvider(s.getSampleParams())
+func (s *staticSuite) TestName(c *gc.C) {
+	idp, err := static.NewIdentityProvider(s.getSampleParams())
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(idp.Name(), gc.Equals, "test")
 }
 
-func (s *localSuite) TestDomain(c *gc.C) {
+func (s *staticSuite) TestDomain(c *gc.C) {
 	params := s.getSampleParams()
 	params.Domain = "domain"
-	idp, err := local.NewIdentityProvider(params)
+	idp, err := static.NewIdentityProvider(params)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(idp.Domain(), gc.Equals, "domain")
 }
 
-func (s *localSuite) TestMissingUsers(c *gc.C) {
+func (s *staticSuite) TestMissingUsers(c *gc.C) {
 	params := s.getSampleParams()
-	params.Users = map[string]local.UserInfo{}
-	idp, err := local.NewIdentityProvider(params)
+	params.Users = map[string]static.UserInfo{}
+	idp, err := static.NewIdentityProvider(params)
 	c.Assert(err, gc.ErrorMatches, "no 'users' defined")
 	c.Assert(idp, gc.IsNil)
 }
 
-func (s *localSuite) TestInteractive(c *gc.C) {
-	idp, err := local.NewIdentityProvider(s.getSampleParams())
+func (s *staticSuite) TestInteractive(c *gc.C) {
+	idp, err := static.NewIdentityProvider(s.getSampleParams())
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(idp.Interactive(), gc.Equals, true)
 }
 
-func (s *localSuite) TestHandle(c *gc.C) {
+func (s *staticSuite) TestHandle(c *gc.C) {
 	i := s.setupIdp(c, s.getSampleParams())
 	s.makeLoginRequest(c, i, "user1", "pass1")
 	s.AssertLoginSuccess(c, "user1")
@@ -100,7 +100,7 @@ func (s *localSuite) TestHandle(c *gc.C) {
 	})
 }
 
-func (s *localSuite) TestHandleWithDomain(c *gc.C) {
+func (s *staticSuite) TestHandleWithDomain(c *gc.C) {
 	params := s.getSampleParams()
 	params.Domain = "domain"
 	i := s.setupIdp(c, params)
@@ -114,7 +114,7 @@ func (s *localSuite) TestHandleWithDomain(c *gc.C) {
 	})
 }
 
-func (s *localSuite) TestGetGroups(c *gc.C) {
+func (s *staticSuite) TestGetGroups(c *gc.C) {
 	params := s.getSampleParams()
 	i := s.setupIdp(c, params)
 	s.makeLoginRequest(c, i, "user1", "pass1")
@@ -130,7 +130,7 @@ func (s *localSuite) TestGetGroups(c *gc.C) {
 	c.Assert(groups, gc.DeepEquals, []string{"group1", "group2"})
 }
 
-func (s *localSuite) TestGetGroupsWithDomain(c *gc.C) {
+func (s *staticSuite) TestGetGroupsWithDomain(c *gc.C) {
 	params := s.getSampleParams()
 	params.Domain = "domain"
 	i := s.setupIdp(c, params)
@@ -147,13 +147,13 @@ func (s *localSuite) TestGetGroupsWithDomain(c *gc.C) {
 	c.Assert(groups, gc.DeepEquals, []string{"group1", "group2"})
 }
 
-func (s *localSuite) TestHandleFailedLoginWrongPassword(c *gc.C) {
+func (s *staticSuite) TestHandleFailedLoginWrongPassword(c *gc.C) {
 	i := s.setupIdp(c, s.getSampleParams())
 	s.makeLoginRequest(c, i, "user1", "wrong-pass")
 	s.AssertLoginFailureMatches(c, `authentication failed for user "user1"`)
 }
 
-func (s *localSuite) TestHandleFailedLoginUnknownUser(c *gc.C) {
+func (s *staticSuite) TestHandleFailedLoginUnknownUser(c *gc.C) {
 	i := s.setupIdp(c, s.getSampleParams())
 	s.makeLoginRequest(c, i, "unknown", "pass")
 	s.AssertLoginFailureMatches(c, `authentication failed for user "unknown"`)

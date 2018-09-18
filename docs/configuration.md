@@ -357,10 +357,10 @@ group memberships for a user.  The filter is specified as a template
 will be replaced with the DN of the user for whom candid is attempting
 to find group memberships.
 
-### Local identity provider
+### Static identity provider
 ```yaml
-- type: local
-  name: local
+- type: static
+  name: static
   domain: mydomain
   users:
     user1:
@@ -371,7 +371,7 @@ to find group memberships.
       groups: [group3, group4]
 ```
 
-The `local` identity provider is meant for testing and allows defining a set of
+The `static` identity provider is meant for testing and allows defining a set of
 users that can authenticate, along with their passwords and a list of groups
 they are part of.
 

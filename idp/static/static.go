@@ -1,9 +1,9 @@
 // Copyright 2018 Canonical Ltd.
 // Licensed under the AGPLv3, see LICENCE file for details.
 
-// Package local contains identity providers that validate against a builtin list of users.
-// This provider is only intended for testing.
-package local
+// Package static contains identity providers that validate against a static list of users.
+// This provider is only intended for testing purposes.
+package static
 
 import (
 	"net/http"
@@ -20,13 +20,13 @@ import (
 )
 
 func init() {
-	idp.Register("local", func(unmarshal func(interface{}) error) (idp.IdentityProvider, error) {
+	idp.Register("static", func(unmarshal func(interface{}) error) (idp.IdentityProvider, error) {
 		var p Params
 		if err := unmarshal(&p); err != nil {
-			return nil, errgo.Notef(err, "cannot unmarshal local parameters")
+			return nil, errgo.Notef(err, "cannot unmarshal static parameters")
 		}
 		if p.Name == "" {
-			p.Name = "local"
+			p.Name = "static"
 		}
 
 		idp, err := NewIdentityProvider(p)
@@ -58,7 +58,7 @@ type UserInfo struct {
 	Groups []string `yaml:"groups"`
 }
 
-// NewIdentityProvider creates a new local identity provider.
+// NewIdentityProvider creates a new static identity provider.
 func NewIdentityProvider(p Params) (idp.IdentityProvider, error) {
 	if len(p.Users) == 0 {
 		return nil, errgo.Newf("no 'users' defined")
@@ -84,7 +84,7 @@ func (idp *identityProvider) Domain() string {
 
 // Description implements idp.IdentityProvider.Description.
 func (idp *identityProvider) Description() string {
-	return "Local identity provider"
+	return "Static identity provider"
 }
 
 // Interactive implements idp.IdentityProvider.Interactive.
