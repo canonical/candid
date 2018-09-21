@@ -103,7 +103,7 @@ func (idp *identityProvider) URL(dischargeID string) string {
 	return idputil.URL(idp.initParams.URLPrefix, "/login", dischargeID)
 }
 
-// URL implements idp.IdentityProvider.SetInteraction.
+// SetInteraction implements idp.IdentityProvider.SetInteraction.
 func (idp *identityProvider) SetInteraction(ierr *httpbakery.Error, dischargeID string) {
 }
 
