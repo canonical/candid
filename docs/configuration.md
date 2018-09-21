@@ -357,6 +357,27 @@ group memberships for a user.  The filter is specified as a template
 will be replaced with the DN of the user for whom candid is attempting
 to find group memberships.
 
+### Static identity provider
+```yaml
+- type: static
+  name: static
+  domain: mydomain
+  users:
+    user1:
+      password: foo
+      groups: [group1, group2]
+    user2:
+      password: bar
+      groups: [group3, group4]
+```
+
+The `static` identity provider is meant for testing and allows defining a set of
+users that can authenticate, along with their passwords and a list of groups
+they are part of.
+
+Note that this provide is *not meant for production use* as it's insecure.
+
+
 Charm Configuration
 -------------------
 If the candid charm is being used then most of the parameters
