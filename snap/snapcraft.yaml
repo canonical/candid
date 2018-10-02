@@ -1,0 +1,70 @@
+name: candid
+version: git
+summary: Candid Identity Manager
+description: Candid Identity Manager
+grade: stable
+confinement: strict
+
+apps:
+  candidsrv:
+    command: wrappers/candidsrv
+    daemon: simple
+    plugs:
+     - network
+     - network-bind
+  candid:
+    command: wrappers/candid
+    plugs:
+     - home
+     - network
+
+parts:
+  # Dependencies
+  go:
+    source-tag: go1.11
+
+  # Candid
+  candid:
+    after:
+     - go
+    plugin: godeps
+    source: .
+    source-type: git
+    go-importpath: github.com/CanonicalLtd/candid
+    build-packages:
+     - bzr
+    stage-packages:
+     - jq
+    organize:
+      usr/bin/: bin/
+      usr/lib/: lib/
+    prime:
+     - bin/bakery-keygen
+     - bin/candid
+     - bin/candidsrv
+     - bin/jq
+     - lib/*/libonig.so*
+    override-build: |
+      snapcraftctl build
+
+      set -ex
+
+      # Build bakery-keygen
+      GOPATH=$(readlink --canonicalize ../go/) go get gopkg.in/macaroon-bakery.v2/cmd/bakery-keygen
+      cp ../go/bin/bakery-keygen ${SNAPCRAFT_PART_INSTALL}/bin/
+
+  snapcraft:
+    plugin: dump
+    source: snap/
+    prime:
+     - config
+     - wrappers
+
+  www:
+    plugin: dump
+    source: .
+    organize:
+      static: www/static/
+      templates: www/templates/
+    prime:
+     - www

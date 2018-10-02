@@ -1,0 +1,43 @@
+## Documentation can be found here: https://github.com/CanonicalLtd/candid/blob/master/docs/configuration.md
+
+## Server URLs and ports
+listen-address: :8081
+private-addr: 127.0.0.1
+location: 'http://example.net:8081'
+
+## Persistent storage
+# Defaults to non-persistent memory storage, install PostgreSQL or MongoDB
+# and configure them below before using this service in production
+storage:
+  type: memory
+
+#storage:
+#  type: mongodb
+#  address: 127.0.0.1:27017
+
+#storage:
+#  type: postgres
+#  connection-string: postgres://user:pass@localhost/candid
+
+## Identity providers
+# Configure this with whatever authentication system you're using
+identity-providers:
+- type: static
+  name: static
+  domain: example.net
+  users:
+    user1:
+      password: password1
+      groups:
+       - group1
+
+## Logging
+logging-config: INFO
+
+## Authentication keys
+public-key: PUBLIC-KEY
+private-key: PRIVATE-KEY
+
+# Don't change, snap-specific paths
+access-log: /var/snap/candid/common/logs/candid.access.log
+resource-path: /snap/candid/current/www/

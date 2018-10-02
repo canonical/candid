@@ -1,0 +1,18 @@
+#!/bin/sh -eu
+if [ ! -e "${SNAP_COMMON}/config.yaml" ]; then
+    cp "${SNAP}/config/config.yaml" "${SNAP_COMMON}/config.yaml"
+
+    # Default URL
+    if [ -n "$(hostname -f)" ]; then
+        sed -i "s#example.net#$(hostname -f)#g" "${SNAP_COMMON}/config.yaml"
+    fi
+
+    # Key setup
+    key=$(bakery-keygen)
+    private=$(echo "$key" | jq -r .private)
+    public=$(echo "$key" | jq -r .public)
+    sed -i "s#PRIVATE-KEY#${private}#g" "${SNAP_COMMON}/config.yaml"
+    sed -i "s#PUBLIC-KEY#${public}#g" "${SNAP_COMMON}/config.yaml"
+fi
+
+exec candidsrv "${SNAP_COMMON}/config.yaml"
