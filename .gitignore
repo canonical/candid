@@ -2,7 +2,7 @@ access.log
 cmd/idserver/idserver
 version/init.go
 candid-*.tar.xz
-
+candid_source.tar.bz2
 parts/
 prime/
 stage/
