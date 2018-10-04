@@ -49,10 +49,9 @@ install: version/init.go
 	go install $(INSTALL_FLAGS) -v $(PROJECT)/...
 
 clean:
-	$(MAKE) -C snap/candidsrv clean
-	$(MAKE) -C snap/candid clean
 	go clean $(PROJECT)/...
 	-$(RM) version/init.go
+	-snapcraft clean
 
 else
 
@@ -100,8 +99,7 @@ version/init.go: version/init.go.tmpl FORCE
 
 # Generate snaps
 snap:
-	$(MAKE) -C snap/candidsrv
-	$(MAKE) -C snap/candid
+	snapcraft
 
 RELEASE_BINARY_PACKAGES=$(PROJECT)/cmd/candidsrv
 
