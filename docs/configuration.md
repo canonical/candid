@@ -364,10 +364,14 @@ to find group memberships.
   domain: mydomain
   users:
     user1:
-      password: foo
+      name: User One
+      email: user1@example.com
+      password: password1
       groups: [group1, group2]
     user2:
-      password: bar
+      name: User Two
+      email: user2@example.com
+      password: password2
       groups: [group3, group4]
 ```
 
