@@ -53,9 +53,9 @@ parts:
       GOPATH=$(readlink --canonicalize ../go/) go get gopkg.in/macaroon-bakery.v2/cmd/bakery-keygen
       cp ../go/bin/bakery-keygen ${SNAPCRAFT_PART_INSTALL}/bin/
 
-  snapcraft:
+  local:
     plugin: dump
-    source: snap/
+    source: snap/local/
     prime:
      - config
      - wrappers
