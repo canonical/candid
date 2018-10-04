@@ -37,6 +37,8 @@ func (s *staticSuite) getSampleParams() static.Params {
 		Users: map[string]static.UserInfo{
 			"user1": static.UserInfo{
 				Password: "pass1",
+				Name: "User One",
+				Email: "user1@example.com",
 				Groups:   []string{"group1", "group2"},
 			},
 		},
@@ -95,8 +97,8 @@ func (s *staticSuite) TestHandle(c *gc.C) {
 	s.AssertUser(c, &store.Identity{
 		ProviderID: store.MakeProviderIdentity("test", "user1"),
 		Username:   "user1",
-		Name:       "user1",
-		Email:      "user1",
+		Name:       "User One",
+		Email:      "user1@example.com",
 	})
 }
 
@@ -109,8 +111,8 @@ func (s *staticSuite) TestHandleWithDomain(c *gc.C) {
 	s.AssertUser(c, &store.Identity{
 		ProviderID: store.MakeProviderIdentity("test", "user1@domain"),
 		Username:   "user1@domain",
-		Name:       "user1@domain",
-		Email:      "user1@domain",
+		Name:       "User One",
+		Email:      "user1@example.com",
 	})
 }
 
@@ -122,8 +124,8 @@ func (s *staticSuite) TestGetGroups(c *gc.C) {
 	identity := s.AssertUser(c, &store.Identity{
 		ProviderID: store.MakeProviderIdentity("test", "user1"),
 		Username:   "user1",
-		Name:       "user1",
-		Email:      "user1",
+		Name:       "User One",
+		Email:      "user1@example.com",
 	})
 	groups, err := i.GetGroups(s.Ctx, identity)
 	c.Assert(err, gc.Equals, nil)
@@ -139,8 +141,8 @@ func (s *staticSuite) TestGetGroupsWithDomain(c *gc.C) {
 	identity := s.AssertUser(c, &store.Identity{
 		ProviderID: store.MakeProviderIdentity("test", "user1@domain"),
 		Username:   "user1@domain",
-		Name:       "user1@domain",
-		Email:      "user1@domain",
+		Name:       "User One",
+		Email:      "user1@example.com",
 	})
 	groups, err := i.GetGroups(s.Ctx, identity)
 	c.Assert(err, gc.Equals, nil)

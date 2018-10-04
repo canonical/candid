@@ -53,7 +53,10 @@ type Params struct {
 type UserInfo struct {
 	// Password is the password for the user.
 	Password string `yaml:"password"`
-
+	// Name is the full name of the user.
+	Name string `yaml:"name"`
+	// Email is the user e-mail.
+	Email string `yaml:"email"`
 	// Groups is the list of groups the user belongs to.
 	Groups []string `yaml:"groups"`
 }
@@ -150,8 +153,8 @@ func (idp *identityProvider) loginUser(ctx context.Context, user, password strin
 			id := &store.Identity{
 				ProviderID: store.MakeProviderIdentity(idp.params.Name, username),
 				Username:   username,
-				Name:       username,
-				Email:      username,
+				Name:       userData.Name,
+				Email:      userData.Email,
 			}
 			err := idp.initParams.Store.UpdateIdentity(ctx, id, store.Update{
 				store.Username: store.Set,
