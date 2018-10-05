@@ -3,7 +3,7 @@
 ## Server URLs and ports
 listen-address: :8081
 private-addr: 127.0.0.1
-location: 'http://example.net:8081'
+location: 'http://LOCATION:8081'
 
 ## Persistent storage
 # Defaults to non-persistent memory storage, install PostgreSQL or MongoDB
@@ -24,7 +24,6 @@ storage:
 identity-providers:
 - type: static
   name: static
-  domain: example.net
   users:
     user1:
       name: User One
