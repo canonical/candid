@@ -4,7 +4,7 @@ if [ ! -e "${SNAP_COMMON}/config.yaml" ]; then
 
     # Default URL
     if [ -n "$(hostname -f)" ]; then
-        sed -i "s#example.net#$(hostname -f)#g" "${SNAP_COMMON}/config.yaml"
+        sed -i "s#LOCATION#$(hostname -f)#g" "${SNAP_COMMON}/config.yaml"
     fi
 
     # Key setup
