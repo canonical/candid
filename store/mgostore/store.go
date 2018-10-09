@@ -52,6 +52,7 @@ func (s *identityStore) Identity(ctx context.Context, identity *store.Identity) 
 	identity.LastDischarge = doc.LastDischarge
 	identity.ProviderInfo = doc.ProviderInfo
 	identity.ExtraInfo = doc.ExtraInfo
+	identity.Owner = store.ProviderIdentity(doc.Owner)
 	return nil
 }
 
@@ -114,6 +115,7 @@ func (s *identityStore) FindIdentities(ctx context.Context, ref *store.Identity,
 			LastDischarge: doc.LastDischarge,
 			ProviderInfo:  doc.ProviderInfo,
 			ExtraInfo:     doc.ExtraInfo,
+			Owner:         store.ProviderIdentity(doc.Owner),
 		})
 	}
 	if err := it.Err(); err != nil {
@@ -130,6 +132,7 @@ func makeQuery(ref *store.Identity, filter store.Filter) bson.D {
 	query = appendComparison(query, fieldNames[store.Email], filter[store.Email], ref.Email)
 	query = appendComparison(query, fieldNames[store.LastLogin], filter[store.LastLogin], ref.LastLogin)
 	query = appendComparison(query, fieldNames[store.LastDischarge], filter[store.LastDischarge], ref.LastDischarge)
+	query = appendComparison(query, fieldNames[store.Owner], filter[store.Owner], ref.Owner)
 	return query
 }
 
@@ -216,6 +219,7 @@ func identityUpdate(identity *store.Identity, update store.Update) updateDocumen
 	for k, v := range identity.ExtraInfo {
 		doc.addUpdate(update[store.ExtraInfo], fieldNames[store.ExtraInfo]+"."+k, v)
 	}
+	doc.addUpdate(update[store.Owner], fieldNames[store.Owner], identity.Owner)
 	return doc
 }
 
@@ -246,8 +250,8 @@ func ensureIdentityIndexes(db *mgo.Database) error {
 }
 
 var identityCountMapReduce = mgo.MapReduce{
-	Map:    `function() {p = this.providerid.split(':', 1); emit(p[0], p[1])}`,
-	Reduce: `function(key, values){ return values.length }`,
+	Map:    `function() {p = this.providerid.split(':', 1); emit(p[0], 1)}`,
+	Reduce: `function(key, values){ return Array.sum(values) }`,
 }
 
 // IdentityCounts implements store.Store.IdentityCounts.

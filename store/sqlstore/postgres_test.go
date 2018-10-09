@@ -2,9 +2,11 @@ package sqlstore_test
 
 import (
 	"github.com/juju/postgrestest"
+	jc "github.com/juju/testing/checkers"
 	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
 	errgo "gopkg.in/errgo.v1"
+	"gopkg.in/macaroon-bakery.v2/bakery"
 
 	"github.com/CanonicalLtd/candid/store"
 	"github.com/CanonicalLtd/candid/store/sqlstore"
@@ -94,6 +96,46 @@ func (s *postgresSuite) TestUpdateProviderIDEmptyNotFound(c *gc.C) {
 	)
 	c.Assert(err, gc.ErrorMatches, `identity "test:no-user" not found`)
 	c.Assert(errgo.Cause(err), gc.Equals, store.ErrNotFound)
+}
+
+func (s *postgresSuite) TestInitIdempotent(c *gc.C) {
+	var pk1 bakery.PublicKey
+	id1 := store.Identity{
+		ProviderID: store.MakeProviderIdentity("test", "test-1"),
+		Username:   "test-1",
+		Name:       "Test User",
+		Email:      "test-1@example.com",
+		PublicKeys: []bakery.PublicKey{pk1},
+		ProviderInfo: map[string][]string{
+			"pk1": {"pk1v1", "pk1v2"},
+		},
+		ExtraInfo: map[string][]string{
+			"ek1": {"ek1v1", "ek1v2"},
+		},
+		Owner: store.MakeProviderIdentity("test", "test-0"),
+	}
+	err := s.Store.UpdateIdentity(
+		context.Background(),
+		&id1,
+		store.Update{
+			store.Username:     store.Set,
+			store.Name:         store.Set,
+			store.Email:        store.Set,
+			store.PublicKeys:   store.Set,
+			store.ProviderInfo: store.Set,
+			store.ExtraInfo:    store.Set,
+			store.Owner:        store.Set,
+		},
+	)
+	c.Assert(err, gc.Equals, nil)
+	backend, err := sqlstore.NewBackend("postgres", s.pg.DB)
+	c.Assert(err, gc.Equals, nil)
+	id2 := store.Identity{
+		ProviderID: store.MakeProviderIdentity("test", "test-1"),
+	}
+	err = backend.Store().Identity(context.Background(), &id2)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(id2, jc.DeepEquals, id1)
 }
 
 type postgresKeyValueSuite struct {

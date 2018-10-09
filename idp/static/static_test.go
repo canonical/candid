@@ -37,8 +37,8 @@ func (s *staticSuite) getSampleParams() static.Params {
 		Users: map[string]static.UserInfo{
 			"user1": static.UserInfo{
 				Password: "pass1",
-				Name: "User One",
-				Email: "user1@example.com",
+				Name:     "User One",
+				Email:    "user1@example.com",
 				Groups:   []string{"group1", "group2"},
 			},
 		},

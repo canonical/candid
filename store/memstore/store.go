@@ -154,6 +154,8 @@ func matchIdentity(a, b *store.Identity, filter store.Filter) bool {
 			r = cmpTime(a.LastLogin, b.LastLogin)
 		case store.LastDischarge:
 			r = cmpTime(a.LastDischarge, b.LastDischarge)
+		case store.Owner:
+			r = strings.Compare(string(a.Owner), string(b.Owner))
 		default:
 			panic("unsupported filter field")
 		}
@@ -313,6 +315,7 @@ func (s *memStore) updateIdentity(dst, src *store.Identity, update store.Update)
 	dst.LastLogin = updateTime(dst.LastLogin, src.LastLogin, update[store.LastLogin])
 	dst.ProviderInfo = updateMap(dst.ProviderInfo, src.ProviderInfo, update[store.ProviderInfo])
 	dst.ExtraInfo = updateMap(dst.ExtraInfo, src.ExtraInfo, update[store.ExtraInfo])
+	dst.Owner = updateProviderIdentity(dst.Owner, src.Owner, update[store.Owner])
 	return nil
 }
 
@@ -326,6 +329,19 @@ func updateString(dst, src string, op store.Operation) string {
 		return ""
 	default:
 		panic("unsupported operation requested on string field")
+	}
+}
+
+func updateProviderIdentity(dst, src store.ProviderIdentity, op store.Operation) store.ProviderIdentity {
+	switch op {
+	case store.NoUpdate:
+		return dst
+	case store.Set:
+		return src
+	case store.Clear:
+		return ""
+	default:
+		panic("unsupported operation requested on store.ProviderIdentity field")
 	}
 }
 

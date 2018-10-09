@@ -28,6 +28,7 @@ var fieldNames = []string{
 	store.LastDischarge: "lastdischarge",
 	store.ProviderInfo:  "providerinfo",
 	store.ExtraInfo:     "extrainfo",
+	store.Owner:         "owner",
 }
 
 // identityDocument holds the in-database representation of a user in the identities
@@ -68,6 +69,9 @@ type identityDocument struct {
 	// ExtraInfo holds additional information about the user that is
 	// required by other parts of the system.
 	ExtraInfo map[string][]string
+
+	// Owner holds the provider id of the owner.
+	Owner string
 }
 
 // PublicKeys converts the stored public keys into the format used by the

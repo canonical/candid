@@ -23,6 +23,7 @@ var identityColumns = [store.NumFields]string{
 	store.Email:         "email",
 	store.LastLogin:     "lastlogin",
 	store.LastDischarge: "lastdischarge",
+	store.Owner:         "owner",
 }
 
 type identityStore struct {
@@ -179,6 +180,8 @@ func fieldValue(f store.Field, id *store.Identity) interface{} {
 		return nullTime{id.LastLogin, !id.LastLogin.IsZero()}
 	case store.LastDischarge:
 		return nullTime{id.LastDischarge, !id.LastDischarge.IsZero()}
+	case store.Owner:
+		return sql.NullString{string(id.Owner), id.Owner != ""}
 	}
 	return nil
 }
@@ -540,7 +543,7 @@ type scanner interface {
 }
 
 func scanIdentity(s scanner, identity *store.Identity) error {
-	var name, email sql.NullString
+	var name, email, owner sql.NullString
 	var lastLogin, lastDischarge nullTime
 	err := s.Scan(
 		&identity.ID,
@@ -550,6 +553,7 @@ func scanIdentity(s scanner, identity *store.Identity) error {
 		&email,
 		&lastLogin,
 		&lastDischarge,
+		&owner,
 	)
 	if err != nil {
 		return errgo.Mask(err, errgo.Any)
@@ -558,5 +562,6 @@ func scanIdentity(s scanner, identity *store.Identity) error {
 	identity.Email = email.String
 	identity.LastLogin = lastLogin.Time
 	identity.LastDischarge = lastDischarge.Time
+	identity.Owner = store.ProviderIdentity(owner.String)
 	return nil
 }
