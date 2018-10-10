@@ -44,7 +44,7 @@ golang.org/x/crypto	git	7c1a557ab941a71c619514f229f0b27ccb0c27cf	2018-10-09T21:3
 golang.org/x/net	git	3673e40ba22529d22c3fd7c93e97b0ce50fa7bdd	2018-07-24T23:48:03Z
 golang.org/x/oauth2	git	314dd2c0bf3ebd592ec0d20847d27e79d0dbe8dd	2016-12-19T19:29:54Z
 golang.org/x/sys	git	37707fdb30a5b38865cfb95e5aab41707daec7fd	2018-02-02T13:58:01Z
-gopkg.in/CanonicalLtd/candidclient.v1	git	4aba4ec2f6635e898f957fc8eb48e20eca368c4f	2018-04-05T17:59:00Z
+gopkg.in/CanonicalLtd/candidclient.v1	git	4bc1e18d38ce89a333e9ea07825ed1778e54278d	2018-10-10T17:18:38Z
 gopkg.in/asn1-ber.v1	git	379148ca0225df7a432012b8df0355c2a2063ac0	2017-05-11T16:59:59Z
 gopkg.in/check.v1	git	788fd78401277ebd861206a03c884797c6ec5541	2018-06-28T17:31:08Z
 gopkg.in/errgo.v1	git	442357a80af5c6bf9b6d51ae791a39c3421004f3	2016-12-22T12:58:16Z

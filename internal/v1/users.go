@@ -61,6 +61,21 @@ func (h *handler) QueryUsers(p httprequest.Params, r *params.QueryUsersRequest) 
 		identity.LastDischarge = t
 		filter[store.LastDischarge] = store.GreaterThanOrEqual
 	}
+	if r.Owner != "" {
+		ownerIdentity := store.Identity{
+			Username: r.Owner,
+		}
+		err := h.params.Store.Identity(p.Context, &ownerIdentity)
+		if errgo.Cause(err) == store.ErrNotFound {
+			// If the owner doesn't exist then it has no agents.
+			return []string{}, nil
+		}
+		if err != nil {
+			return nil, errgo.Mask(err)
+		}
+		identity.Owner = ownerIdentity.ProviderID
+		filter[store.Owner] = store.Equal
+	}
 
 	// TODO(mhilton) make sure this endpoint can be queried as a
 	// subset once there are more users.
