@@ -53,6 +53,7 @@ func Copy(ctx context.Context, dst store.Store, src Source) error {
 		store.LastDischarge: store.Set,
 		store.ProviderInfo:  store.Set,
 		store.ExtraInfo:     store.Set,
+		store.Owner:         store.Set,
 	}
 	for src.Next() {
 		identity := src.Identity()

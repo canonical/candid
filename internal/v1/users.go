@@ -112,7 +112,7 @@ func (h *handler) CreateAgent(p httprequest.Params, u *params.CreateAgentRequest
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot find identity for authenticated user")
 	}
-	if owner.ProviderID.Provider() == "idm" && owner.ProviderInfo["owner"] != nil {
+	if owner.ProviderID.Provider() == "idm" && owner.Owner != "" {
 		// The authenticated user is an agent, so we don't allow it to create other agents.
 		// TODO a nicer way to do this check might be to express it as a group
 		// permission - all non-agent users are in the "can create agents" group.
@@ -129,20 +129,18 @@ func (h *handler) CreateAgent(p httprequest.Params, u *params.CreateAgentRequest
 	identity := &store.Identity{
 		Username:   agentName + "@candid",
 		ProviderID: store.MakeProviderIdentity("idm", agentName),
-		ProviderInfo: map[string][]string{
-			"owner": {string(owner.ProviderID), owner.Username},
-		},
 		Name:       u.FullName,
 		Groups:     u.Groups,
 		PublicKeys: pks,
+		Owner:      owner.ProviderID,
 	}
 	// TODO add tags to Identity?
 	if err := h.params.Store.UpdateIdentity(p.Context, identity, store.Update{
-		store.Username:     store.Set,
-		store.PublicKeys:   store.Set,
-		store.Groups:       store.Set,
-		store.Name:         store.Set,
-		store.ProviderInfo: store.Set,
+		store.Username:   store.Set,
+		store.PublicKeys: store.Set,
+		store.Groups:     store.Set,
+		store.Name:       store.Set,
+		store.Owner:      store.Set,
 	}); err != nil {
 		return nil, translateStoreError(err)
 	}
@@ -416,16 +414,15 @@ func (h *handler) userFromIdentity(ctx context.Context, id *store.Identity) (*pa
 	}
 	var owner params.Username
 	var externalID string
-	if p, _ := id.ProviderID.Split(); p == "idm" {
-		// TODO(mhilton) try and avoid having provider specific
-		// behaviour here.
-
-		// The "owner" provider info will contain the owner's
-		// provider id in the first position and their username
-		// in the second.
-		if len(id.ProviderInfo["owner"]) > 1 {
-			owner = params.Username(id.ProviderInfo["owner"][1])
+	if id.Owner != "" {
+		ownerIdentity := store.Identity{
+			ProviderID: id.Owner,
 		}
+		err := h.params.Store.Identity(ctx, &ownerIdentity)
+		if err != nil {
+			return nil, errgo.Mask(err)
+		}
+		owner = params.Username(ownerIdentity.Username)
 	} else {
 		externalID = string(id.ProviderID)
 	}

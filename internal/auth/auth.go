@@ -476,18 +476,17 @@ type candidGroupResolver struct {
 // groups that are in both the identity and the owner of the
 // identity.
 func (r candidGroupResolver) resolveGroups(ctx context.Context, identity *store.Identity) ([]string, error) {
-	if len(identity.ProviderInfo["owner"]) == 0 {
+	if identity.Owner == "" {
 		// No owner - no groups. This applies to admin@candid, but for
 		// other users, it's probably an internal inconsistency error.
 		return nil, nil
 	}
-	ownerID := store.ProviderIdentity(identity.ProviderInfo["owner"][0])
-	if ownerID == AdminProviderID {
+	if identity.Owner == AdminProviderID {
 		// The admin user is a member of all groups by definition.
 		return identity.Groups, nil
 	}
 	ownerIdentity := store.Identity{
-		ProviderID: ownerID,
+		ProviderID: identity.Owner,
 	}
 	if err := r.store.Identity(ctx, &ownerIdentity); err != nil {
 		if errgo.Cause(err) != store.ErrNotFound {
@@ -495,7 +494,7 @@ func (r candidGroupResolver) resolveGroups(ctx context.Context, identity *store.
 		}
 		return nil, nil
 	}
-	resolver := r.resolvers[ownerID.Provider()]
+	resolver := r.resolvers[identity.Owner.Provider()]
 	if resolver == nil {
 		// Owner is somehow in an unknown provider.
 		// TODO log/return an error?
