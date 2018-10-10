@@ -1,6 +1,7 @@
 package store
 
 import (
+	"github.com/juju/aclstore"
 	"github.com/juju/utils/debugstatus"
 	errgo "gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery"
@@ -33,6 +34,10 @@ type Backend interface {
 	// Store returns a new store.Store instance that uses
 	// the backend.
 	Store() Store
+
+	// ACLStore returns a new aclstore.Store that is used to provide
+	// ACLs for system functions.
+	ACLStore() aclstore.ACLStore
 
 	// Close closes the Backend instance.
 	Close()
