@@ -96,11 +96,11 @@ func (s *legacySuite) TestLegacySource(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 	normalize(&identity2)
 	c.Assert(identity2, jc.DeepEquals, store.Identity{
-		ProviderID:   "idm:test2@admin@idm",
-		Username:     "test2@admin@idm",
-		Groups:       []string{"admin@candid", "grouplist@candid", "sshkeygetter@candid"},
-		PublicKeys:   []bakery.PublicKey{k1.Public},
-		ProviderInfo: map[string][]string{"owner": {string(auth.AdminProviderID), auth.AdminUsername}},
+		ProviderID: "idm:test2@admin@idm",
+		Username:   "test2@admin@idm",
+		Groups:     []string{"admin@candid", "grouplist@candid", "sshkeygetter@candid"},
+		PublicKeys: []bakery.PublicKey{k1.Public},
+		Owner:      auth.AdminProviderID,
 	})
 
 	identity3 := store.Identity{

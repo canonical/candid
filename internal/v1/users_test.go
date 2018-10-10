@@ -1055,17 +1055,16 @@ func (s *usersSuite) addUser(c *gc.C, u params.User) {
 		}
 		err := s.Store.Identity(s.Ctx, &owner)
 		c.Assert(err, gc.Equals, nil)
-		identity.ProviderInfo = map[string][]string{
-			"owner": {string(owner.ProviderID), owner.Username},
-		}
+		identity.Owner = owner.ProviderID
 	}
 	err := s.Store.UpdateIdentity(s.Ctx, &identity, store.Update{
 		store.Username:     store.Set,
-		store.ProviderInfo: store.Set,
 		store.Name:         store.Set,
+		store.Email:        store.Set,
 		store.Groups:       store.Set,
 		store.PublicKeys:   store.Set,
-		store.Email:        store.Set,
+		store.ProviderInfo: store.Set,
+		store.Owner:        store.Set,
 	})
 	c.Assert(err, gc.Equals, nil)
 }

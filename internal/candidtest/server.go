@@ -188,15 +188,13 @@ func (s *ServerSuite) CreateAgent(c *gc.C, username string, groups ...string) *b
 			PublicKeys: []bakery.PublicKey{
 				key.Public,
 			},
-			ProviderInfo: map[string][]string{
-				"owner": {string(auth.AdminProviderID), auth.AdminUsername},
-			},
+			Owner: auth.AdminProviderID,
 		},
 		store.Update{
-			store.Username:     store.Set,
-			store.Groups:       store.Set,
-			store.PublicKeys:   store.Set,
-			store.ProviderInfo: store.Set,
+			store.Username:   store.Set,
+			store.Groups:     store.Set,
+			store.PublicKeys: store.Set,
+			store.Owner:      store.Set,
 		},
 	)
 	c.Assert(err, gc.Equals, nil)

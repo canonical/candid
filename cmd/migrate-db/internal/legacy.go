@@ -85,9 +85,7 @@ func convert(doc *mongodoc.Identity) (*store.Identity, error) {
 	}
 	if doc.Owner != "" {
 		if doc.Owner == legacyAdminGroup {
-			identity.ProviderInfo = map[string][]string{
-				"owner": {string(auth.AdminProviderID), auth.AdminUsername},
-			}
+			identity.Owner = auth.AdminProviderID
 		} else {
 			return nil, errgo.Newf("unrecognised owner for %s (%q)", doc.Username, doc.Owner)
 		}
