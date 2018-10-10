@@ -27,6 +27,7 @@ const (
 	LastDischarge
 	ProviderInfo
 	ExtraInfo
+	Owner
 	NumFields
 )
 
@@ -229,4 +230,8 @@ type Identity struct {
 	// stored with the identity, but is not directly required by the
 	// identity manager.
 	ExtraInfo map[string][]string
+
+	// Owner contains the ProviderIdentity of the identity that owns
+	// this one.
+	Owner ProviderIdentity
 }

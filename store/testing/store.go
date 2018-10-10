@@ -15,6 +15,7 @@ import (
 	errgo "gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery"
 
+	"github.com/CanonicalLtd/candid/internal/auth"
 	"github.com/CanonicalLtd/candid/internal/candidtest"
 	"github.com/CanonicalLtd/candid/store"
 )
@@ -665,6 +666,28 @@ var updateIdentityTests = []struct {
 		},
 	},
 }, {
+	about:         "set owner",
+	startIdentity: &store.Identity{},
+	updateIdentity: &store.Identity{
+		Owner: auth.AdminProviderID,
+	},
+	update: store.Update{
+		store.Owner: store.Set,
+	},
+	expectIdentity: &store.Identity{
+		Owner: auth.AdminProviderID,
+	},
+}, {
+	about: "clear owner",
+	startIdentity: &store.Identity{
+		Owner: auth.AdminProviderID,
+	},
+	updateIdentity: &store.Identity{},
+	update: store.Update{
+		store.Owner: store.Clear,
+	},
+	expectIdentity: &store.Identity{},
+}, {
 	about: "username not found",
 	updateIdentity: &store.Identity{
 		Name: "Test User",
@@ -921,6 +944,7 @@ func (s *StoreSuite) TestIdentity(c *gc.C) {
 		ExtraInfo: map[string][]string{
 			"ef1": {"ef1v1", "ef1v2"},
 		},
+		Owner: store.MakeProviderIdentity("test", "test-admin"),
 	}
 	err := s.Store.UpdateIdentity(s.ctx, &identity, store.Update{
 		store.Username:      store.Set,
@@ -932,6 +956,7 @@ func (s *StoreSuite) TestIdentity(c *gc.C) {
 		store.LastDischarge: store.Set,
 		store.ProviderInfo:  store.Set,
 		store.ExtraInfo:     store.Set,
+		store.Owner:         store.Set,
 	})
 	c.Assert(err, gc.Equals, nil)
 
@@ -1032,6 +1057,7 @@ var testIdentities = []store.Identity{{
 	Email:         "test6@example.com",
 	LastLogin:     time.Date(2017, 1, 6, 0, 0, 0, 0, time.UTC),
 	LastDischarge: time.Date(2017, 2, 4, 0, 0, 0, 0, time.UTC),
+	Owner:         "test:test1",
 }, {
 	ProviderID:    store.MakeProviderIdentity("test", "test7"),
 	Username:      "test7",
@@ -1039,6 +1065,7 @@ var testIdentities = []store.Identity{{
 	Email:         "test9@example.com",
 	LastLogin:     time.Date(2017, 1, 7, 0, 0, 0, 0, time.UTC),
 	LastDischarge: time.Date(2017, 2, 3, 0, 0, 0, 0, time.UTC),
+	Owner:         "test:test2",
 }, {
 	ProviderID:    store.MakeProviderIdentity("test", "test8"),
 	Username:      "test8",
@@ -1046,6 +1073,7 @@ var testIdentities = []store.Identity{{
 	Email:         "test8@example.com",
 	LastLogin:     time.Date(2017, 1, 8, 0, 0, 0, 0, time.UTC),
 	LastDischarge: time.Date(2017, 2, 2, 0, 0, 0, 0, time.UTC),
+	Owner:         "test:test3",
 }, {
 	ProviderID:    store.MakeProviderIdentity("test", "test9"),
 	Username:      "test9",
@@ -1053,6 +1081,7 @@ var testIdentities = []store.Identity{{
 	Email:         "test9@example.com",
 	LastLogin:     time.Date(2017, 1, 9, 0, 0, 0, 0, time.UTC),
 	LastDischarge: time.Date(2017, 2, 1, 0, 0, 0, 0, time.UTC),
+	Owner:         "test:test4",
 }}
 
 var findIdentitiesTests = []struct {
@@ -1342,6 +1371,15 @@ var findIdentitiesTests = []struct {
 	skip:   2,
 	limit:  3,
 	expect: []int{6, 5, 4},
+}, {
+	about: "match owner",
+	ref: store.Identity{
+		Owner: "test:test1",
+	},
+	filter: store.Filter{
+		store.Owner: store.Equal,
+	},
+	expect: []int{5},
 }}
 
 func (s *StoreSuite) TestFindIdentities(c *gc.C) {
@@ -1373,6 +1411,9 @@ func (s *StoreSuite) TestFindIdentities(c *gc.C) {
 		}
 		if len(testIdentities[i].ExtraInfo) > 0 {
 			update[store.ExtraInfo] = store.Set
+		}
+		if testIdentities[i].Owner != "" {
+			update[store.Owner] = store.Set
 		}
 		err := s.Store.UpdateIdentity(s.ctx, &testIdentities[i], update)
 		c.Assert(err, gc.Equals, nil)

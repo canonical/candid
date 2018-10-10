@@ -19,6 +19,18 @@ CREATE TABLE IF NOT EXISTS identities (
 	lastdischarge TIMESTAMP WITH TIME ZONE
 );
 
+-- Postgresql versions before 9.6 did not support "ALTER TABLE ... ADD
+-- COLUMN IF NOT EXISTS...". This performs the equivalent function.
+DO $$ 
+    BEGIN
+        BEGIN
+            ALTER TABLE identities ADD COLUMN owner TEXT;
+        EXCEPTION
+            WHEN duplicate_column THEN RETURN;
+        END;
+    END;
+$$;
+
 CREATE TABLE IF NOT EXISTS identity_groups ( 
 	identity INTEGER REFERENCES identities NOT NULL,
 	value TEXT NOT NULL,
@@ -77,14 +89,14 @@ CREATE TABLE IF NOT EXISTS meetings (
 
 var postgresTmpls = [numTmpl]string{
 	tmplIdentityFrom: `
-		SELECT id, providerid, username, name, email, lastlogin, lastdischarge
+		SELECT id, providerid, username, name, email, lastlogin, lastdischarge, owner
 		FROM identities
 		WHERE {{.Column}}={{.Identity | .Arg}}`,
 	tmplSelectIdentitySet: `
 		SELECT {{if .Key}}key, {{end}}value FROM {{.Table}} 
 		WHERE identity={{.Identity | .Arg}}`,
 	tmplFindIdentities: `
-		SELECT id, providerid, username, name, email, lastlogin, lastdischarge FROM identities
+		SELECT id, providerid, username, name, email, lastlogin, lastdischarge, owner FROM identities
 		{{if .Where}}WHERE{{range $i, $w := .Where}}{{if gt $i 0}} AND{{end}} {{$w.Column}}{{$w.Comparison}}{{$w.Value | $.Arg}}{{end}}{{end}}
 		{{if .Sort}}ORDER BY {{join .Sort ", "}}{{end}}
 		{{if gt .Limit 0}}LIMIT {{.Limit}}{{end}}
