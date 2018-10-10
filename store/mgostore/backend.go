@@ -6,6 +6,8 @@ package mgostore
 import (
 	"time"
 
+	"github.com/juju/aclstore"
+	"github.com/juju/simplekv/mgosimplekv"
 	"github.com/juju/utils/debugstatus"
 	"golang.org/x/net/context"
 	errgo "gopkg.in/errgo.v1"
@@ -17,12 +19,15 @@ import (
 	"github.com/CanonicalLtd/candid/store"
 )
 
+const aclsCollection = "acls"
+
 // backend provides a wrapper around a single mongodb database that
 // can be used as the persistent storage for the various types of store
 // required by the identity service.
 type backend struct {
 	db       *mgo.Database
 	rootKeys *mgorootkeystore.RootKeys
+	aclStore aclstore.ACLStore
 }
 
 // NewBackend creates a new Backend instance using the given
@@ -39,9 +44,14 @@ func NewBackend(db *mgo.Database) (store.Backend, error) {
 	if err := ensureBakeryIndexes(rk, db); err != nil {
 		return nil, errgo.Mask(err)
 	}
+	aclStore, err := mgosimplekv.NewStore(db.C(aclsCollection))
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
 	return &backend{
 		db:       db.With(db.Session.Copy()),
 		rootKeys: rk,
+		aclStore: aclstore.NewACLStore(aclStore),
 	}, nil
 }
 
@@ -115,6 +125,11 @@ func (b *backend) DebugStatusCheckerFuncs() []debugstatus.CheckerFunc {
 	}
 }
 
+// ACLStore implements store.Backend.ACLStore.
+func (b *backend) ACLStore() aclstore.ACLStore {
+	return b.aclStore
+}
+
 type collector struct {
 	db *mgo.Database
 }
@@ -125,6 +140,7 @@ func (c collector) Collections() []*mgo.Collection {
 		c.db.C(macaroonCollection),
 		c.db.C(meetingCollection),
 		c.db.C(identitiesCollection),
+		c.db.C(aclsCollection),
 	}
 }
 

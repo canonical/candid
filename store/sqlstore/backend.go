@@ -7,6 +7,8 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/juju/aclstore"
+	"github.com/juju/simplekv/sqlsimplekv"
 	"github.com/juju/utils/debugstatus"
 	errgo "gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery"
@@ -23,6 +25,7 @@ type backend struct {
 	db       *sql.DB
 	driver   *driver
 	rootKeys *postgresrootkeystore.RootKeys
+	aclStore aclstore.ACLStore
 }
 
 // NewBackend creates a new store.Backend implementation using the
@@ -40,10 +43,15 @@ func NewBackend(driverName string, db *sql.DB) (store.Backend, error) {
 	}
 	rootkeys := postgresrootkeystore.NewRootKeys(db, "rootkeys", 1000)
 	defer rootkeys.Close()
+	aclStore, err := sqlsimplekv.NewStore(driverName, db, "acls")
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
 	return &backend{
 		db:       db,
 		driver:   driver,
 		rootKeys: postgresrootkeystore.NewRootKeys(db, "rootkeys", 1000),
+		aclStore: aclstore.NewACLStore(aclStore),
 	}, nil
 }
 
@@ -74,6 +82,10 @@ func (b *backend) ProviderDataStore() store.ProviderDataStore {
 // database for persistent storage.
 func (b *backend) MeetingStore() meeting.Store {
 	return &meetingStore{b}
+}
+
+func (b *backend) ACLStore() aclstore.ACLStore {
+	return b.aclStore
 }
 
 // DebugStatusCheckerFuncs implements store.Backend.DebugStatusCheckerFuncs.

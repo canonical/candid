@@ -4,6 +4,7 @@ github.com/garyburd/go-oauth	git	3131beb69b81ff119923bdefbf029318f1f53794	2015-0
 github.com/golang/protobuf	git	4bd1920723d7b7c925de087aa32e2187708897f7	2016-11-09T07:27:36Z
 github.com/google/go-cmp	git	8099a9787ce5dc5984ed879a3bda47dc730a8e97	2017-08-03T17:35:09Z
 github.com/gorilla/handlers	git	13d73096a474cac93275c679c7b8a2dc17ddba82	2017-02-24T19:39:55Z
+github.com/juju/aclstore	git	7fc1cdaacf019994c37749e6c0d1005c7d2a1197	2018-07-06T07:33:22Z
 github.com/juju/ansiterm	git	b99631de12cf04a906c1d4e4ec54fb86eae5863d	2016-09-07T23:45:32Z
 github.com/juju/cmd	git	9ce53c6f9d0071e2f7789e0d1beb91b490027fc9	2018-04-24T15:15:04Z
 github.com/juju/errors	git	1b5e39b83d1835fa480e0c2ddefb040ee82d58b3	2015-09-16T12:56:42Z
@@ -37,7 +38,7 @@ github.com/prometheus/procfs	git	abf152e5f3e97f2fafac028d2cc06c1feb87ffa5	2016-0
 github.com/rogpeppe/fastuuid	git	6724a57986aff9bff1a1770e9347036def7c89f6	2015-01-06T09:32:20Z
 github.com/yohcop/openid-go	git	f38c0087a377532505cb5b86418b1cc50d385f0d	2016-03-04T16:44:25Z
 golang.org/x/crypto	git	650f4a345ab4e5b245a3034b110ebc7299e68186	2018-02-14T00:00:28Z
-golang.org/x/net	git	a337091b0525af65de94df2eb7e98bd9962dcbe2	2017-11-07T18:48:41Z
+golang.org/x/net	git	d25186b37f34ebdbbea8f488ef055638dfab272d	2018-03-06T06:01:52Z
 golang.org/x/oauth2	git	314dd2c0bf3ebd592ec0d20847d27e79d0dbe8dd	2016-12-19T19:29:54Z
 golang.org/x/sys	git	37707fdb30a5b38865cfb95e5aab41707daec7fd	2018-02-02T13:58:01Z
 gopkg.in/CanonicalLtd/candidclient.v1	git	4aba4ec2f6635e898f957fc8eb48e20eca368c4f	2018-04-05T17:59:00Z
@@ -45,7 +46,7 @@ gopkg.in/asn1-ber.v1	git	379148ca0225df7a432012b8df0355c2a2063ac0	2017-05-11T16:
 gopkg.in/check.v1	git	4f90aeace3a26ad7021961c297b22c42160c7b25	2016-01-05T16:49:36Z
 gopkg.in/errgo.v1	git	442357a80af5c6bf9b6d51ae791a39c3421004f3	2016-12-22T12:58:16Z
 gopkg.in/goose.v1	git	8f055ce635d660f9b7827a1ff398c360715df261	2016-11-30T14:51:16Z
-gopkg.in/httprequest.v1	git	3531529dedf047a744dd77f5262515aefff8cd48	2018-03-19T12:54:57Z
+gopkg.in/httprequest.v1	git	a1015531595ff2ed1a0c126b55da352e6923eaac	2018-06-25T11:31:07Z
 gopkg.in/juju/environschema.v1	git	7359fc7857abe2b11b5b3e23811a9c64cb6b01e0	2015-11-04T11:58:10Z
 gopkg.in/juju/names.v2	git	54f00845ae470a362430a966fe17f35f8784ac92	2017-11-13T11:20:47Z
 gopkg.in/ldap.v2	git	8168ee085ee43257585e50c6441aadf54ecb2c9f	2016-12-01T20:47:33Z

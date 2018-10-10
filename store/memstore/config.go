@@ -1,6 +1,8 @@
 package memstore
 
 import (
+	"github.com/juju/aclstore"
+	"github.com/juju/simplekv/memsimplekv"
 	"github.com/juju/utils/debugstatus"
 	"gopkg.in/macaroon-bakery.v2/bakery"
 
@@ -15,6 +17,7 @@ func init() {
 			rootKeys:     bakery.NewMemRootKeyStore(),
 			providerData: NewProviderDataStore(),
 			meetingStore: NewMeetingStore(),
+			aclStore:     aclstore.NewACLStore(memsimplekv.NewStore()),
 		}, nil
 	})
 }
@@ -24,6 +27,7 @@ type backend struct {
 	providerData store.ProviderDataStore
 	rootKeys     bakery.RootKeyStore
 	meetingStore meeting.Store
+	aclStore     aclstore.ACLStore
 }
 
 // NewBackend implements store.BackendFactory.NewBackend.
@@ -54,6 +58,10 @@ func (b *backend) DebugStatusCheckerFuncs() []debugstatus.CheckerFunc {
 // MeetingStore implements store.Backend.MeetingStore.
 func (b *backend) MeetingStore() meeting.Store {
 	return b.meetingStore
+}
+
+func (b *backend) ACLStore() aclstore.ACLStore {
+	return b.aclStore
 }
 
 func (b *backend) Close() {
