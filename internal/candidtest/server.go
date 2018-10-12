@@ -21,6 +21,8 @@ import (
 	"github.com/CanonicalLtd/candid/internal/auth"
 	"github.com/CanonicalLtd/candid/internal/identity"
 	"github.com/CanonicalLtd/candid/store"
+	"github.com/juju/aclstore"
+	"github.com/juju/simplekv/memsimplekv"
 )
 
 var DefaultTemplate = template.New("")
@@ -72,6 +74,9 @@ type ServerSuite struct {
 // will be used.
 func (s *ServerSuite) SetUpTest(c *gc.C) {
 	s.params = s.Params
+	if s.params.ACLStore == nil {
+		s.params.ACLStore = aclstore.NewACLStore(memsimplekv.NewStore())
+	}
 	s.server = httptest.NewUnstartedServer(nil)
 	s.params.Location = "http://" + s.server.Listener.Addr().String()
 	if s.params.Key == nil {

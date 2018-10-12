@@ -6,6 +6,7 @@ package auth_test
 import (
 	"sort"
 
+	"github.com/juju/aclstore"
 	jc "github.com/juju/testing/checkers"
 	"golang.org/x/net/context"
 	"gopkg.in/CanonicalLtd/candidclient.v1"
@@ -53,8 +54,13 @@ func (s *authSuite) SetUpTest(c *gc.C) {
 		Locator:  locator,
 		Location: "identity",
 	})
+	aclManager, err := aclstore.NewManager(context.Background(), aclstore.Params{
+		Store:             s.ACLStore,
+		InitialAdminUsers: []string{auth.AdminUsername},
+	})
+	c.Assert(err, gc.Equals, nil)
 	s.context, s.close = s.Store.Context(context.Background())
-	s.authorizer = auth.New(auth.Params{
+	s.authorizer, err = auth.New(auth.Params{
 		AdminPassword:    "password",
 		Location:         identityLocation,
 		MacaroonVerifier: s.oven,
@@ -65,7 +71,9 @@ func (s *authSuite) SetUpTest(c *gc.C) {
 				GetGroups: s.getGroups,
 			}),
 		},
+		ACLManager: aclManager,
 	})
+	c.Assert(err, gc.Equals, nil)
 	s.adminAgentKey, err = bakery.GenerateKey()
 	c.Assert(err, gc.Equals, nil)
 	err = s.authorizer.SetAdminPublicKey(s.context, &s.adminAgentKey.Public)
@@ -207,16 +215,16 @@ var aclForOpTests = []struct {
 	op: op("other", "read"),
 }, {
 	op:           auth.GlobalOp("read"),
-	expect:       auth.AdminACL,
-	expectPublic: true,
+	expect:       []string{auth.AdminUsername},
+	expectPublic: false,
 }, {
 	op:           auth.GlobalOp("verify"),
 	expect:       []string{identchecker.Everyone},
 	expectPublic: true,
 }, {
 	op:           auth.GlobalOp("dischargeFor"),
-	expect:       auth.AdminACL,
-	expectPublic: true,
+	expect:       []string{auth.AdminUsername},
+	expectPublic: false,
 }, {
 	op:           auth.GlobalOp("login"),
 	expect:       []string{identchecker.Everyone},
@@ -234,25 +242,25 @@ var aclForOpTests = []struct {
 	op: auth.UserOp("", "read"),
 }, {
 	op:     auth.UserOp("bob", "read"),
-	expect: append([]string{"bob"}, auth.AdminACL...),
+	expect: []string{"bob", auth.AdminUsername},
 }, {
 	op:     auth.UserOp("bob", "readAdmin"),
-	expect: auth.AdminACL,
+	expect: []string{auth.AdminUsername},
 }, {
 	op:     auth.UserOp("bob", "writeAdmin"),
-	expect: auth.AdminACL,
+	expect: []string{auth.AdminUsername},
 }, {
 	op:     auth.UserOp("bob", "readGroups"),
-	expect: append([]string{"bob", auth.GroupListGroup}, auth.AdminACL...),
+	expect: []string{"bob", auth.AdminUsername, auth.GroupListGroup},
 }, {
 	op:     auth.UserOp("bob", "writeGroups"),
-	expect: auth.AdminACL,
+	expect: []string{auth.AdminUsername},
 }, {
 	op:     auth.UserOp("bob", "readSSHKeys"),
-	expect: append([]string{"bob", auth.SSHKeyGetterGroup}, auth.AdminACL...),
+	expect: []string{"bob", auth.AdminUsername, auth.SSHKeyGetterGroup},
 }, {
 	op:     auth.UserOp("bob", "writeSSHKeys"),
-	expect: append([]string{"bob"}, auth.AdminACL...),
+	expect: []string{"bob", auth.AdminUsername},
 }}
 
 func (s *authSuite) TestACLForOp(c *gc.C) {

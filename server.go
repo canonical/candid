@@ -9,6 +9,7 @@ import (
 	"sort"
 	"time"
 
+	"github.com/juju/aclstore"
 	"github.com/juju/utils/debugstatus"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery"
@@ -106,6 +107,9 @@ type ServerParams struct {
 	// RendezvousTimeout holds the time after which an interactive discharge wait
 	// request will time out.
 	RendezvousTimeout time.Duration
+
+	// ACLStore holds the ACLStore for the identity server.
+	ACLStore aclstore.ACLStore
 }
 
 // NewServer returns a new handler that handles identity service requests and

@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/juju/aclstore"
 	"github.com/juju/loggo"
 	"golang.org/x/net/context"
 	"gopkg.in/CanonicalLtd/candidclient.v1/params"
@@ -52,8 +53,23 @@ const (
 	ActionReadDischargeToken = "read-discharge-token"
 )
 
-// TODO(mhilton) make the admin ACL configurable
-var AdminACL = []string{AdminUsername}
+const (
+	dischargeForUserACL = "discharge-for-user"
+	readUserACL         = "read-user"
+	readUserGroupsACL   = "read-user-groups"
+	readUserSSHKeysACL  = "read-user-ssh-keys"
+	writeUserACL        = "write-user"
+	writeUserSSHKeysACL = "write-user-ssh-keys"
+)
+
+var aclDefaults = map[string][]string{
+	dischargeForUserACL: {AdminUsername},
+	readUserACL:         {AdminUsername},
+	readUserGroupsACL:   {AdminUsername, GroupListGroup},
+	readUserSSHKeysACL:  {AdminUsername, SSHKeyGetterGroup},
+	writeUserACL:        {AdminUsername},
+	writeUserSSHKeysACL: {AdminUsername},
+}
 
 // An Authorizer is used to authorize operations in the identity server.
 type Authorizer struct {
@@ -62,6 +78,7 @@ type Authorizer struct {
 	checker        *identchecker.Checker
 	store          store.Store
 	groupResolvers map[string]groupResolver
+	aclManager     *aclstore.Manager
 }
 
 // Params specifify the configuration parameters for a new Authroizer.
@@ -75,7 +92,7 @@ type Params struct {
 	// identity server.
 	Location string
 
-	// MacaroonOpStore is the store of macaroon operations and root
+	// MacaroonVerifier is the store of macaroon operations and root
 	// keys.
 	MacaroonVerifier bakery.MacaroonVerifier
 
@@ -86,15 +103,24 @@ type Params struct {
 	// are configured for the service. The authenticatore uses these
 	// to get group information for authenticated users.
 	IdentityProviders []idp.IdentityProvider
+
+	// ACLStore is the acl store.
+	ACLManager *aclstore.Manager
 }
 
 // New creates a new Authorizer for authorizing identity server
 // operations.
-func New(params Params) *Authorizer {
+func New(params Params) (*Authorizer, error) {
+	for acl, users := range aclDefaults {
+		if err := params.ACLManager.CreateACL(context.Background(), acl, users...); err != nil {
+			return nil, errgo.Mask(err)
+		}
+	}
 	a := &Authorizer{
 		adminPassword: params.AdminPassword,
 		location:      params.Location,
 		store:         params.Store,
+		aclManager:    params.ACLManager,
 	}
 	resolvers := make(map[string]groupResolver)
 	for _, idp := range params.IdentityProviders {
@@ -118,7 +144,7 @@ func New(params Params) *Authorizer {
 		IdentityClient:   identityClient{a},
 		MacaroonVerifier: params.MacaroonVerifier,
 	})
-	return a
+	return a, nil
 }
 
 func (a *Authorizer) aclForOp(ctx context.Context, op bakery.Op) (acl []string, public bool, _ error) {
@@ -130,11 +156,11 @@ func (a *Authorizer) aclForOp(ctx context.Context, op bakery.Op) (acl []string, 
 		}
 		switch op.Action {
 		case ActionRead:
-			// Only admins are allowed to read global information.
-			return AdminACL, true, nil
+			acl, err := a.aclManager.ACL(ctx, readUserACL)
+			return acl, false, errgo.Mask(err)
 		case ActionDischargeFor:
-			// Only admins are allowed to discharge for other users.
-			return AdminACL, true, nil
+			acl, err := a.aclManager.ACL(ctx, dischargeForUserACL)
+			return acl, false, errgo.Mask(err)
 		case ActionVerify:
 			// Everyone is allowed to verify a macaroon.
 			return []string{identchecker.Everyone}, true, nil
@@ -155,26 +181,28 @@ func (a *Authorizer) aclForOp(ctx context.Context, op bakery.Op) (acl []string, 
 			return nil, false, nil
 		}
 		username := name
-		acl := make([]string, 0, len(AdminACL)+2)
-		acl = append(acl, AdminACL...)
 		switch op.Action {
 		case ActionRead:
-			return append(acl, username), false, nil
+			acl, err := a.aclManager.ACL(ctx, readUserACL)
+			return append(acl, username), false, errgo.Mask(err)
 		case ActionReadAdmin:
-			return acl, false, nil
+			acl, err := a.aclManager.ACL(ctx, readUserACL)
+			return acl, false, errgo.Mask(err)
 		case ActionWriteAdmin:
-			return acl, false, nil
+			acl, err := a.aclManager.ACL(ctx, writeUserACL)
+			return acl, false, errgo.Mask(err)
 		case ActionReadGroups:
-			// Administrators, users with GroupList permissions and the user
-			// themselves can list their groups.
-			return append(acl, username, GroupListGroup), false, nil
+			acl, err := a.aclManager.ACL(ctx, readUserGroupsACL)
+			return append(acl, username), false, errgo.Mask(err)
 		case ActionWriteGroups:
-			// Only administrators can set a user's groups.
-			return acl, false, nil
+			acl, err := a.aclManager.ACL(ctx, writeUserACL)
+			return acl, false, errgo.Mask(err)
 		case ActionReadSSHKeys:
-			return append(acl, username, SSHKeyGetterGroup), false, nil
+			acl, err := a.aclManager.ACL(ctx, readUserSSHKeysACL)
+			return append(acl, username), false, errgo.Mask(err)
 		case ActionWriteSSHKeys:
-			return append(acl, username), false, nil
+			acl, err := a.aclManager.ACL(ctx, writeUserSSHKeysACL)
+			return append(acl, username), false, errgo.Mask(err)
 		}
 	case "groups":
 		switch op.Action {
