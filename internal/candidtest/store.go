@@ -6,6 +6,8 @@ package candidtest
 import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/juju/aclstore"
+	"github.com/juju/simplekv/memsimplekv"
 	"github.com/juju/testing"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery"
@@ -26,6 +28,7 @@ type StoreSuite struct {
 	ProviderDataStore  store.ProviderDataStore
 	MeetingStore       meeting.Store
 	BakeryRootKeyStore bakery.RootKeyStore
+	ACLStore           aclstore.ACLStore
 }
 
 func (s *StoreSuite) SetUpSuite(c *gc.C) {
@@ -42,6 +45,7 @@ func (s *StoreSuite) SetUpTest(c *gc.C) {
 	s.ProviderDataStore = memstore.NewProviderDataStore()
 	s.MeetingStore = memstore.NewMeetingStore()
 	s.BakeryRootKeyStore = bakery.NewMemRootKeyStore()
+	s.ACLStore = aclstore.NewACLStore(memsimplekv.NewStore())
 }
 
 func (s *StoreSuite) TearDownTest(c *gc.C) {

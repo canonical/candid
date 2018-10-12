@@ -10,6 +10,7 @@ import (
 	"runtime/debug"
 	"time"
 
+	"github.com/juju/aclstore"
 	"github.com/juju/loggo"
 	"github.com/juju/utils/debugstatus"
 	"github.com/julienschmidt/httprouter"
@@ -19,9 +20,11 @@ import (
 	"gopkg.in/errgo.v1"
 	"gopkg.in/httprequest.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery"
+	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
 
 	"github.com/CanonicalLtd/candid/idp"
 	"github.com/CanonicalLtd/candid/internal/auth"
+	"github.com/CanonicalLtd/candid/internal/auth/httpauth"
 	"github.com/CanonicalLtd/candid/internal/monitoring"
 	"github.com/CanonicalLtd/candid/meeting"
 	"github.com/CanonicalLtd/candid/store"
@@ -66,13 +69,38 @@ func New(sp ServerParams, versions map[string]NewAPIHandlerFunc) (*Server, error
 		Locator:            locator,
 		Location:           "identity",
 	})
-	auth := auth.New(auth.Params{
+	aclManager, err := aclstore.NewManager(context.Background(), aclstore.Params{
+		Store:             sp.ACLStore,
+		InitialAdminUsers: []string{auth.AdminUsername},
+	})
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
+	auth, err := auth.New(auth.Params{
 		AdminPassword:     sp.AdminPassword,
 		Location:          sp.Location,
 		MacaroonVerifier:  oven,
 		Store:             sp.Store,
 		IdentityProviders: sp.IdentityProviders,
+		ACLManager:        aclManager,
 	})
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
+
+	aclAuthenticator := httpauth.New(oven, auth)
+	aclHandler := aclManager.NewHandler(aclstore.HandlerParams{
+		RootPath: "/acls",
+		Authenticate: func(ctx context.Context, w http.ResponseWriter, req *http.Request) (aclstore.Identity, error) {
+			ai, err := aclAuthenticator.Auth(ctx, req, identchecker.LoginOp)
+			if err != nil {
+				WriteError(ctx, w, err)
+				return nil, errgo.Mask(err)
+			}
+			return ai.Identity.(aclstore.Identity), nil
+		},
+	})
+
 	if err := auth.SetAdminPublicKey(context.Background(), sp.AdminAgentPublicKey); err != nil {
 		return nil, errgo.Mask(err)
 	}
@@ -106,6 +134,9 @@ func New(sp ServerParams, versions map[string]NewAPIHandlerFunc) (*Server, error
 
 	srv.router.Handle("OPTIONS", "/*path", srv.options)
 	srv.router.Handler("GET", "/metrics", prometheus.Handler())
+	srv.router.Handler("GET", "/acls/*path", aclHandler)
+	srv.router.Handler("PUT", "/acls/*path", aclHandler)
+	srv.router.Handler("POST", "/acls/*path", aclHandler)
 	srv.router.Handler("GET", "/static/*path", http.StripPrefix("/static", http.FileServer(sp.StaticFileSystem)))
 	for name, newAPI := range versions {
 		handlers, err := newAPI(HandlerParams{
@@ -215,6 +246,9 @@ type ServerParams struct {
 	// RendezvousTimeout holds the time after which an interactive discharge wait
 	// request will time out.
 	RendezvousTimeout time.Duration
+
+	// ACLStore holds the ACLStore for the identity server.
+	ACLStore aclstore.ACLStore
 }
 
 type HandlerParams struct {

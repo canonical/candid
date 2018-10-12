@@ -69,6 +69,7 @@ func (s *serverSuite) TestNewServerWithVersions(c *gc.C) {
 			MeetingStore: s.MeetingStore,
 			RootKeyStore: s.BakeryRootKeyStore,
 			PrivateAddr:  "localhost",
+			ACLStore:     s.ACLStore,
 		},
 		identity.Debug,
 	)
@@ -101,6 +102,7 @@ func (s *serverSuite) TestNewServerRemovesAgentIDP(c *gc.C) {
 			RootKeyStore:      s.BakeryRootKeyStore,
 			PrivateAddr:       "localhost",
 			IdentityProviders: idps,
+			ACLStore:          s.ACLStore,
 		},
 		identity.V1,
 	)

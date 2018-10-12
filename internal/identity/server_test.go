@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/juju/aclstore/aclclient"
 	"github.com/juju/loggo"
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/testing/httptesting"
@@ -22,6 +23,7 @@ import (
 
 	"github.com/CanonicalLtd/candid/idp"
 	"github.com/CanonicalLtd/candid/idp/test"
+	"github.com/CanonicalLtd/candid/internal/auth"
 	"github.com/CanonicalLtd/candid/internal/candidtest"
 	"github.com/CanonicalLtd/candid/internal/debug"
 	"github.com/CanonicalLtd/candid/internal/discharger"
@@ -73,6 +75,7 @@ func (s *serverSuite) TestNewServerWithVersions(c *gc.C) {
 	h, err := identity.New(identity.ServerParams{
 		Store:        s.Store,
 		MeetingStore: s.MeetingStore,
+		ACLStore:     s.ACLStore,
 	}, map[string]identity.NewAPIHandlerFunc{
 		"version1": serveVersion("version1"),
 	})
@@ -85,6 +88,7 @@ func (s *serverSuite) TestNewServerWithVersions(c *gc.C) {
 	h, err = identity.New(identity.ServerParams{
 		Store:        s.Store,
 		MeetingStore: s.MeetingStore,
+		ACLStore:     s.ACLStore,
 	}, map[string]identity.NewAPIHandlerFunc{
 		"version1": serveVersion("version1"),
 		"version2": serveVersion("version2"),
@@ -98,6 +102,7 @@ func (s *serverSuite) TestNewServerWithVersions(c *gc.C) {
 	h, err = identity.New(identity.ServerParams{
 		Store:        s.Store,
 		MeetingStore: s.MeetingStore,
+		ACLStore:     s.ACLStore,
 	}, map[string]identity.NewAPIHandlerFunc{
 		"version1": serveVersion("version1"),
 		"version2": serveVersion("version2"),
@@ -125,6 +130,7 @@ func (s *serverSuite) TestServerHasAccessControlAllowHeaders(c *gc.C) {
 	h, err := identity.New(identity.ServerParams{
 		Store:        s.Store,
 		MeetingStore: s.MeetingStore,
+		ACLStore:     s.ACLStore,
 	}, impl)
 	c.Assert(err, gc.IsNil)
 	defer h.Close()
@@ -171,6 +177,7 @@ func (s *serverSuite) TestServerPanicRecovery(c *gc.C) {
 	h, err := identity.New(identity.ServerParams{
 		Store:        s.Store,
 		MeetingStore: s.MeetingStore,
+		ACLStore:     s.ACLStore,
 	}, impl)
 	c.Assert(err, gc.IsNil)
 	defer h.Close()
@@ -210,6 +217,7 @@ func (s *serverSuite) TestServerStaticFiles(c *gc.C) {
 		Store:            s.Store,
 		MeetingStore:     s.MeetingStore,
 		StaticFileSystem: http.Dir(path),
+		ACLStore:         s.ACLStore,
 	}, map[string]identity.NewAPIHandlerFunc{
 		"version1": serveVersion("version1"),
 	})
@@ -297,4 +305,24 @@ func (s *fullServerSuite) TestUserGroups(c *gc.C) {
 	})
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(groups, jc.DeepEquals, []string{"g1", "g2", "g3", "g4"})
+}
+
+func (s *fullServerSuite) TestACLs(c *gc.C) {
+	client := aclclient.New(aclclient.NewParams{
+		BaseURL: s.URL + "/acls",
+		Doer:    s.AdminClient(),
+	})
+	acl, err := client.Get(context.Background(), "read-user")
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(acl, jc.DeepEquals, []string{auth.AdminUsername})
+	err = client.Add(context.Background(), "read-user", []string{"test-1"})
+	c.Assert(err, gc.Equals, nil)
+	acl, err = client.Get(context.Background(), "read-user")
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(acl, jc.DeepEquals, []string{auth.AdminUsername, "test-1"})
+	err = client.Set(context.Background(), "read-user", []string{"test-2"})
+	c.Assert(err, gc.Equals, nil)
+	acl, err = client.Get(context.Background(), "read-user")
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(acl, jc.DeepEquals, []string{"test-2"})
 }

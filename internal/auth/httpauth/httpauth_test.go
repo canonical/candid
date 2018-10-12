@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"net/http"
 
+	"github.com/juju/aclstore"
 	"golang.org/x/net/context"
 	"gopkg.in/CanonicalLtd/candidclient.v1/params"
 	gc "gopkg.in/check.v1"
@@ -22,7 +23,8 @@ import (
 
 type authSuite struct {
 	candidtest.StoreSuite
-	oven *bakery.Oven
+	oven       *bakery.Oven
+	aclManager *aclstore.Manager
 }
 
 var _ = gc.Suite(&authSuite{})
@@ -43,6 +45,11 @@ func (s *authSuite) SetUpTest(c *gc.C) {
 		Locator:  locator,
 		Location: "identity",
 	})
+	s.aclManager, err = aclstore.NewManager(context.Background(), aclstore.Params{
+		Store:             s.ACLStore,
+		InitialAdminUsers: []string{auth.AdminUsername},
+	})
+	c.Assert(err, gc.Equals, nil)
 }
 
 func (s *authSuite) TearDownTest(c *gc.C) {
@@ -85,17 +92,19 @@ func (s *authSuite) TestAuthorizeWithAdminCredentials(c *gc.C) {
 	}}
 	for i, test := range tests {
 		c.Logf("test %d. %s", i, test.about)
-		authorizer := httpauth.New(s.oven, auth.New(auth.Params{
+		authorizer, err := auth.New(auth.Params{
 			AdminPassword:    test.adminPassword,
 			Location:         identityLocation,
 			Store:            s.Store,
 			MacaroonVerifier: s.oven,
-		}))
+			ACLManager:       s.aclManager,
+		})
+		httpAuthorizer := httpauth.New(s.oven, authorizer)
 		req, _ := http.NewRequest("GET", "/", nil)
 		for attr, val := range test.header {
 			req.Header[attr] = val
 		}
-		authInfo, err := authorizer.Auth(context.Background(), req, identchecker.LoginOp)
+		authInfo, err := httpAuthorizer.Auth(context.Background(), req, identchecker.LoginOp)
 		if test.expectErrorMessage != "" {
 			c.Assert(err, gc.ErrorMatches, test.expectErrorMessage)
 			c.Assert(errgo.Cause(err), gc.Equals, params.ErrUnauthorized)
@@ -107,15 +116,17 @@ func (s *authSuite) TestAuthorizeWithAdminCredentials(c *gc.C) {
 }
 
 func (s *authSuite) TestAuthorizeMacaroonRequired(c *gc.C) {
-	authorizer := httpauth.New(s.oven, auth.New(auth.Params{
+	authorizer, err := auth.New(auth.Params{
 		AdminPassword:    "open sesame",
 		Location:         identityLocation,
 		Store:            s.Store,
 		MacaroonVerifier: s.oven,
-	}))
+		ACLManager:       s.aclManager,
+	})
+	httpAuthorizer := httpauth.New(s.oven, authorizer)
 	req, err := http.NewRequest("GET", "http://example.com/v1/test", nil)
 	c.Assert(err, gc.IsNil)
-	authInfo, err := authorizer.Auth(context.Background(), req, identchecker.LoginOp)
+	authInfo, err := httpAuthorizer.Auth(context.Background(), req, identchecker.LoginOp)
 	c.Assert(err, gc.ErrorMatches, `macaroon discharge required: authentication required`)
 	c.Assert(authInfo, gc.IsNil)
 	c.Assert(errgo.Cause(err), gc.FitsTypeOf, (*httpbakery.Error)(nil))
