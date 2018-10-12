@@ -25,8 +25,7 @@ type staticSuite struct {
 var _ = gc.Suite(&staticSuite{})
 
 func (s *staticSuite) setupIdp(c *gc.C, params static.Params) idp.IdentityProvider {
-	i, err := static.NewIdentityProvider(params)
-	c.Assert(err, gc.IsNil)
+	i := static.NewIdentityProvider(params)
 	i.Init(context.TODO(), s.InitParams(c, "https://example.com/test"))
 	return i
 }
@@ -63,30 +62,19 @@ func (s *staticSuite) makeLoginRequest(c *gc.C, i idp.IdentityProvider, username
 }
 
 func (s *staticSuite) TestName(c *gc.C) {
-	idp, err := static.NewIdentityProvider(s.getSampleParams())
-	c.Assert(err, gc.Equals, nil)
+	idp := static.NewIdentityProvider(s.getSampleParams())
 	c.Assert(idp.Name(), gc.Equals, "test")
 }
 
 func (s *staticSuite) TestDomain(c *gc.C) {
 	params := s.getSampleParams()
 	params.Domain = "domain"
-	idp, err := static.NewIdentityProvider(params)
-	c.Assert(err, gc.Equals, nil)
+	idp := static.NewIdentityProvider(params)
 	c.Assert(idp.Domain(), gc.Equals, "domain")
 }
 
-func (s *staticSuite) TestMissingUsers(c *gc.C) {
-	params := s.getSampleParams()
-	params.Users = map[string]static.UserInfo{}
-	idp, err := static.NewIdentityProvider(params)
-	c.Assert(err, gc.ErrorMatches, "no 'users' defined")
-	c.Assert(idp, gc.IsNil)
-}
-
 func (s *staticSuite) TestInteractive(c *gc.C) {
-	idp, err := static.NewIdentityProvider(s.getSampleParams())
-	c.Assert(err, gc.Equals, nil)
+	idp := static.NewIdentityProvider(s.getSampleParams())
 	c.Assert(idp.Interactive(), gc.Equals, true)
 }
 

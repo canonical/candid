@@ -4,8 +4,9 @@
 package admincmd_test
 
 import (
+	"github.com/CanonicalLtd/candid/store"
 	jc "github.com/juju/testing/checkers"
-	"gopkg.in/CanonicalLtd/candidclient.v1/params"
+	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
 )
 
@@ -16,102 +17,81 @@ type addGroupSuite struct {
 var _ = gc.Suite(&addGroupSuite{})
 
 func (s *addGroupSuite) TestAddGroup(c *gc.C) {
-	var addGroups []string
-	var removeGroups []string
-	var username string
-	runf := s.RunServer(c, &handler{
-		modifyGroups: func(req *params.ModifyUserGroupsRequest) error {
-			username = string(req.Username)
-			addGroups = req.Groups.Add
-			removeGroups = req.Groups.Remove
-			return nil
-		},
+	ctx := context.Background()
+	s.server.AddIdentity(ctx, &store.Identity{
+		ProviderID: store.MakeProviderIdentity("test", "bob"),
+		Username:   "bob",
 	})
-	CheckNoOutput(c, runf, "add-group", "-a", "admin.agent", "-u", "bob", "test1", "test2")
-	c.Assert(username, gc.Equals, "bob")
-	c.Assert(addGroups, jc.DeepEquals, []string{"test1", "test2"})
-	c.Assert(removeGroups, jc.DeepEquals, []string{})
+	s.CheckNoOutput(c, "add-group", "-a", "admin.agent", "-u", "bob", "test1", "test2")
+	identity := store.Identity{
+		ProviderID: store.MakeProviderIdentity("test", "bob"),
+	}
+	err := s.server.Store.Identity(ctx, &identity)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(identity.Groups, jc.DeepEquals, []string{"test1", "test2"})
 }
 
 func (s *addGroupSuite) TestAddGroupForEmail(c *gc.C) {
-	var addGroups []string
-	var removeGroups []string
-	var username string
-	runf := s.RunServer(c, &handler{
-		modifyGroups: func(req *params.ModifyUserGroupsRequest) error {
-			username = string(req.Username)
-			addGroups = req.Groups.Add
-			removeGroups = req.Groups.Remove
-			return nil
-		},
-		queryUsers: func(req *params.QueryUsersRequest) ([]string, error) {
-			if req.Email == "bob@example.com" {
-				return []string{"bob"}, nil
-			}
-			return []string{}, nil
-		},
+	ctx := context.Background()
+	s.server.AddIdentity(ctx, &store.Identity{
+		ProviderID: store.MakeProviderIdentity("test", "bob"),
+		Username:   "bob",
+		Email:      "bob@example.com",
 	})
-	CheckNoOutput(c, runf, "add-group", "-a", "admin.agent", "-e", "bob@example.com", "test1", "test2")
-	c.Assert(username, gc.Equals, "bob")
-	c.Assert(addGroups, jc.DeepEquals, []string{"test1", "test2"})
-	c.Assert(removeGroups, jc.DeepEquals, []string{})
+	s.CheckNoOutput(c, "add-group", "-a", "admin.agent", "-e", "bob@example.com", "test1", "test2")
+	identity := store.Identity{
+		ProviderID: store.MakeProviderIdentity("test", "bob"),
+	}
+	err := s.server.Store.Identity(ctx, &identity)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(identity.Groups, jc.DeepEquals, []string{"test1", "test2"})
 }
 
 func (s *addGroupSuite) TestAddGroupForEmailNotFound(c *gc.C) {
-	runf := s.RunServer(c, &handler{
-		queryUsers: func(req *params.QueryUsersRequest) ([]string, error) {
-			if req.Email == "bob@example.com" {
-				return []string{"bob"}, nil
-			}
-			return []string{}, nil
-		},
-	})
-	CheckError(
+	s.CheckError(
 		c,
 		1,
 		`no user found for email "alice@example.com"`,
-		runf,
 		"add-group", "-a", "admin.agent", "-e", "alice@example.com", "test1", "test2",
 	)
 }
 
 func (s *addGroupSuite) TestAddGroupForEmailMultipleUsers(c *gc.C) {
-	runf := s.RunServer(c, &handler{
-		queryUsers: func(req *params.QueryUsersRequest) ([]string, error) {
-			if req.Email == "bob@example.com" {
-				return []string{
-					"bob",
-					"alice",
-				}, nil
-			}
-			return []string{}, nil
-		},
-	})
-	CheckError(
+	ctx := context.Background()
+	identities := []store.Identity{{
+		ProviderID: store.MakeProviderIdentity("test", "alice"),
+		Username:   "alice",
+		Email:      "bob@example.com",
+	}, {
+		ProviderID: store.MakeProviderIdentity("test", "bob"),
+		Username:   "bob",
+		Email:      "bob@example.com",
+	}}
+	for _, id := range identities {
+		s.server.AddIdentity(ctx, &id)
+	}
+	s.CheckError(
 		c,
 		1,
-		`more than one user found with email "bob@example.com" \(bob, alice\)`,
-		runf,
+		`more than one user found with email "bob@example.com" \(alice, bob\)`,
 		"add-group", "-a", "admin.agent", "-e", "bob@example.com", "test1", "test2",
 	)
 }
 
 func (s *addGroupSuite) TestAddGroupNoUser(c *gc.C) {
-	CheckError(
+	s.CheckError(
 		c,
 		2,
 		`no user specified, please specify either username or email`,
-		s.Run,
 		"add-group", "-a", "admin.agent", "test1", "test2",
 	)
 }
 
 func (s *addGroupSuite) TestAddGroupUserAndEmail(c *gc.C) {
-	CheckError(
+	s.CheckError(
 		c,
 		2,
 		`both username and email specified, please specify either username or email`,
-		s.Run,
 		"add-group", "-a", "admin.agent", "-u", "bob", "-e", "bob@example.com", "test1", "test2",
 	)
 }

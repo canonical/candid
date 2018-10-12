@@ -91,7 +91,7 @@ func serve(conf *config.Config) error {
 		return errgo.Mask(err)
 	}
 	defer backend.Close()
-	return serveIdentity(conf, identity.ServerParams{
+	return serveIdentity(conf, candid.ServerParams{
 		Store:                   backend.Store(),
 		ProviderDataStore:       backend.ProviderDataStore(),
 		MeetingStore:            backend.MeetingStore(),
@@ -101,7 +101,7 @@ func serve(conf *config.Config) error {
 	})
 }
 
-func serveIdentity(conf *config.Config, params identity.ServerParams) error {
+func serveIdentity(conf *config.Config, params candid.ServerParams) error {
 	logger.Infof("setting up the identity server")
 	params.IdentityProviders = defaultIDPs
 	if len(conf.IdentityProviders) > 0 {
@@ -127,11 +127,11 @@ func serveIdentity(conf *config.Config, params identity.ServerParams) error {
 	params.Location = conf.Location
 	params.PrivateAddr = conf.PrivateAddr
 	params.AdminAgentPublicKey = conf.AdminAgentPublicKey
-	srv, err := identity.NewServer(
+	srv, err := candid.NewServer(
 		params,
-		identity.V1,
-		identity.Debug,
-		identity.Discharger,
+		candid.V1,
+		candid.Debug,
+		candid.Discharger,
 	)
 	if err != nil {
 		return errgo.Notef(err, "cannot create new server at %q", conf.ListenAddress)
