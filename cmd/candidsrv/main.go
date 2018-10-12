@@ -97,6 +97,7 @@ func serve(conf *config.Config) error {
 		MeetingStore:            backend.MeetingStore(),
 		RootKeyStore:            backend.BakeryRootKeyStore(),
 		DebugStatusCheckerFuncs: backend.DebugStatusCheckerFuncs(),
+		ACLStore:                backend.ACLStore(),
 	})
 }
 
