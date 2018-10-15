@@ -65,6 +65,11 @@ func (c *thirdPartyCaveatChecker) checkThirdPartyCaveat(ctx context.Context, p h
 	if err != nil {
 		return nil, errgo.WithCausef(err, params.ErrBadRequest, "cannot parse caveat %q", p.Caveat.Condition)
 	}
+	forceLegacy := false
+	if strings.HasPrefix(cond, "<") {
+		cond = cond[1:]
+		forceLegacy = true
+	}
 	var op bakery.Op
 	switch cond {
 	case "is-authenticated-user":
@@ -109,8 +114,9 @@ func (c *thirdPartyCaveatChecker) checkThirdPartyCaveat(ctx context.Context, p h
 	authInfo, err := c.params.Authorizer.Auth(ctx, mss, op)
 	if _, ok := errgo.Cause(err).(*bakery.DischargeRequiredError); ok {
 		return nil, c.interactionRequiredError(ctx, interactionRequiredParams{
-			why: err,
-			req: p.Request,
+			why:         err,
+			forceLegacy: forceLegacy,
+			req:         p.Request,
 			info: &dischargeRequestInfo{
 				Caveat:    p.Caveat.Caveat,
 				CaveatId:  p.Caveat.Id,
@@ -181,6 +187,7 @@ func (c *thirdPartyCaveatChecker) updateDischargeTime(ctx context.Context, usern
 }
 
 type interactionRequiredParams struct {
+	forceLegacy bool
 	why         error
 	req         *http.Request
 	info        *dischargeRequestInfo
@@ -222,6 +229,13 @@ func (c *thirdPartyCaveatChecker) interactionRequiredError(ctx context.Context, 
 	legacyVisitURL := c.params.Location + "/login-legacy" + visitParams
 	legacyWaitURL := c.params.Location + "/wait-legacy?did=" + dischargeID
 	httpbakery.SetLegacyInteraction(ierr, legacyVisitURL, legacyWaitURL)
+
+	if p.forceLegacy {
+		// Even though the client might purport to support bakery V3,
+		// they can't deal with it, so we force them to use the legacy
+		// interaction methods by deleting all the others.
+		ierr.Info.InteractionMethods = nil
+	}
 	return ierr
 }
 
