@@ -575,6 +575,60 @@ func (s *usersSuite) TestQueryUsersUnauthorized(c *gc.C) {
 	c.Assert(err, gc.ErrorMatches, `Get http://.*/v1/u?.*: permission denied`)
 }
 
+func (s *usersSuite) TestQueryAgentUsers(c *gc.C) {
+	err := s.Params.Store.UpdateIdentity(
+		s.Ctx,
+		&store.Identity{
+			Username:      "jbloggs2",
+			ProviderID:    "test:http://example.com/jbloggs2",
+			Name:          "Joe Bloggs II",
+			Email:         "jbloggs2@example.com",
+			LastLogin:     time.Now().AddDate(0, 0, -29),
+			LastDischarge: time.Now().AddDate(0, 0, -14),
+			Groups: []string{
+				"test",
+			},
+		},
+		store.Update{
+			store.Username:      store.Set,
+			store.Name:          store.Set,
+			store.Groups:        store.Set,
+			store.Email:         store.Set,
+			store.LastLogin:     store.Set,
+			store.LastDischarge: store.Set,
+		},
+	)
+	c.Assert(err, gc.Equals, nil)
+	err = s.Params.Store.UpdateIdentity(
+		s.Ctx,
+		&store.Identity{
+			Username:   "a-agent@candid",
+			ProviderID: "idm:a-agent",
+			Owner:      "test:http://example.com/jbloggs2",
+		},
+		store.Update{
+			store.Username: store.Set,
+			store.Owner:    store.Set,
+		},
+	)
+	c.Assert(err, gc.Equals, nil)
+	client := s.IdentityClient(c, "a-jbloggs2@candid", "jbloggs2")
+	users, err := client.QueryUsers(s.Ctx, &params.QueryUsersRequest{
+		Owner: "jbloggs2",
+	})
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(users, jc.DeepEquals, []string{"a-agent@candid"})
+}
+
+func (s *usersSuite) TestQueryAgentUsersOwnerNotFound(c *gc.C) {
+	client := s.IdentityClient(c, "a-jbloggs2@candid", "test")
+	users, err := client.QueryUsers(s.Ctx, &params.QueryUsersRequest{
+		Owner: "test",
+	})
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(users, jc.DeepEquals, []string{})
+}
+
 func (s *usersSuite) TestSSHKeys(c *gc.C) {
 	s.addUser(c, params.User{
 		Username:   "jbloggs",

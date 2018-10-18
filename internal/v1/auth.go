@@ -18,6 +18,9 @@ import (
 func opForRequest(r interface{}) bakery.Op {
 	switch r := r.(type) {
 	case *params.QueryUsersRequest:
+		if r.Owner != "" {
+			return auth.UserOp(params.Username(r.Owner), auth.ActionRead)
+		}
 		return auth.GlobalOp(auth.ActionRead)
 	case *params.UserRequest:
 		return auth.UserOp(r.Username, auth.ActionRead)
