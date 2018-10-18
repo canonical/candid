@@ -130,10 +130,10 @@ func ensureMeetingIndexes(db *mgo.Database) error {
 	return nil
 }
 
-func (b *backend) meetingStatus() (key string, result debugstatus.CheckResult) {
+func (b *backend) meetingStatus(ctx context.Context) (key string, result debugstatus.CheckResult) {
 	result.Name = "count of meeting collection"
 	result.Passed = true
-	coll := b.c(context.Background(), meetingCollection)
+	coll := b.c(ctx, meetingCollection)
 	defer coll.Database.Session.Close()
 	c, err := coll.Count()
 	result.Value = strconv.Itoa(c)
