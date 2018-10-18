@@ -10,8 +10,9 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/juju/clock"
+	"github.com/juju/clock/testclock"
 	"github.com/juju/testing"
-	"github.com/juju/utils/clock"
 	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
@@ -22,7 +23,7 @@ import (
 type suite struct {
 	testing.IsolationSuite
 	// clock holds the mock clock used by the meeting package.
-	clock *testing.Clock
+	clock *testclock.Clock
 }
 
 var _ = gc.Suite(&suite{})
@@ -32,7 +33,7 @@ var epoch = parseTime("2016-01-01T12:00:00Z")
 func (s *suite) SetUpTest(c *gc.C) {
 	s.IsolationSuite.SetUpTest(c)
 	// Set up the clock mockery.
-	s.clock = testing.NewClock(epoch)
+	s.clock = testclock.NewClock(epoch)
 }
 
 func parseTime(s string) time.Time {

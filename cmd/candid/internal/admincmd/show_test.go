@@ -75,8 +75,8 @@ groups:
 ssh-keys:
 - key1
 - key2
-last-login: 2016-12-25T00:00:00Z
-last-discharge: 2016-12-25T00:00:00Z
+last-login: "2016-12-25T00:00:00Z"
+last-discharge: "2016-12-25T00:00:00Z"
 `[1:])
 }
 
@@ -117,8 +117,8 @@ groups:
 ssh-keys:
 - key1
 - key2
-last-login: 2016-12-25T00:00:00Z
-last-discharge: 2016-12-25T00:00:00Z
+last-login: "2016-12-25T00:00:00Z"
+last-discharge: "2016-12-25T00:00:00Z"
 `[1:])
 }
 
@@ -174,8 +174,8 @@ groups:
 ssh-keys:
 - key1
 - key2
-last-login: 2016-12-25T00:00:00Z
-last-discharge: 2016-12-25T00:00:00Z
+last-login: "2016-12-25T00:00:00Z"
+last-discharge: "2016-12-25T00:00:00Z"
 `[1:])
 }
 

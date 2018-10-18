@@ -47,9 +47,9 @@ func newDebugAPIHandler(params identity.HandlerParams) *debugAPIHandler {
 	}
 	checkerFuncs := append(stdCheckers, params.DebugStatusCheckerFuncs...)
 	h.hnd = debugstatus.Handler{
-		Check: func() map[string]debugstatus.CheckResult {
+		Check: func(ctx context.Context) map[string]debugstatus.CheckResult {
 			// TODO (mhilton) re-instate meeting status checks.
-			return debugstatus.Check(checkerFuncs...)
+			return debugstatus.Check(ctx, checkerFuncs...)
 		},
 		Version:           debugstatus.Version(version.VersionInfo),
 		CheckPprofAllowed: h.checkLogin,
