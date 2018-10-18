@@ -4,8 +4,9 @@
 package admincmd_test
 
 import (
+	"github.com/CanonicalLtd/candid/store"
 	jc "github.com/juju/testing/checkers"
-	"gopkg.in/CanonicalLtd/candidclient.v1/params"
+	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
 )
 
@@ -16,71 +17,52 @@ type removeGroupSuite struct {
 var _ = gc.Suite(&removeGroupSuite{})
 
 func (s *removeGroupSuite) TestRemoveGroup(c *gc.C) {
-	var addGroups []string
-	var removeGroups []string
-	var username string
-	runf := s.RunServer(c, &handler{
-		modifyGroups: func(req *params.ModifyUserGroupsRequest) error {
-			username = string(req.Username)
-			addGroups = req.Groups.Add
-			removeGroups = req.Groups.Remove
-			return nil
-		},
+	ctx := context.Background()
+	s.server.AddIdentity(ctx, &store.Identity{
+		ProviderID: store.MakeProviderIdentity("test", "bob"),
+		Username:   "bob",
+		Groups:     []string{"test1", "test2", "test3"},
 	})
-	CheckNoOutput(c, runf, "remove-group", "-a", "admin.agent", "-u", "bob", "test1", "test2")
-	c.Assert(username, gc.Equals, "bob")
-	c.Assert(removeGroups, jc.DeepEquals, []string{"test1", "test2"})
-	c.Assert(addGroups, jc.DeepEquals, []string{})
+	s.CheckNoOutput(c, "remove-group", "-a", "admin.agent", "-u", "bob", "test1", "test2")
+	identity := store.Identity{
+		ProviderID: store.MakeProviderIdentity("test", "bob"),
+	}
+	err := s.server.Store.Identity(ctx, &identity)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(identity.Groups, jc.DeepEquals, []string{"test3"})
 }
 
 func (s *removeGroupSuite) TestRemoveGroupForEmail(c *gc.C) {
-	var addGroups []string
-	var removeGroups []string
-	var username string
-	runf := s.RunServer(c, &handler{
-		modifyGroups: func(req *params.ModifyUserGroupsRequest) error {
-			username = string(req.Username)
-			addGroups = req.Groups.Add
-			removeGroups = req.Groups.Remove
-			return nil
-		},
-		queryUsers: func(req *params.QueryUsersRequest) ([]string, error) {
-			if req.Email == "bob@example.com" {
-				return []string{"bob"}, nil
-			}
-			return []string{}, nil
-		},
+	ctx := context.Background()
+	s.server.AddIdentity(ctx, &store.Identity{
+		ProviderID: store.MakeProviderIdentity("test", "bob"),
+		Username:   "bob",
+		Email:      "bob@example.com",
+		Groups:     []string{"test1", "test2", "test3"},
 	})
-	CheckNoOutput(c, runf, "remove-group", "-a", "admin.agent", "-e", "bob@example.com", "test1", "test2")
-	c.Assert(username, gc.Equals, "bob")
-	c.Assert(removeGroups, jc.DeepEquals, []string{"test1", "test2"})
-	c.Assert(addGroups, jc.DeepEquals, []string{})
+	s.CheckNoOutput(c, "remove-group", "-a", "admin.agent", "-e", "bob@example.com", "test1", "test2")
+	identity := store.Identity{
+		ProviderID: store.MakeProviderIdentity("test", "bob"),
+	}
+	err := s.server.Store.Identity(ctx, &identity)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(identity.Groups, jc.DeepEquals, []string{"test3"})
 }
 
 func (s *removeGroupSuite) TestRemoveGroupForEmailNotFound(c *gc.C) {
-	runf := s.RunServer(c, &handler{
-		queryUsers: func(req *params.QueryUsersRequest) ([]string, error) {
-			if req.Email == "bob@example.com" {
-				return []string{"bob"}, nil
-			}
-			return []string{}, nil
-		},
-	})
-	CheckError(
+	s.CheckError(
 		c,
 		1,
 		`no user found for email "alice@example.com"`,
-		runf,
 		"remove-group", "-a", "admin.agent", "-e", "alice@example.com", "test1", "test2",
 	)
 }
 
 func (s *removeGroupSuite) TestRemoveGroupNoUser(c *gc.C) {
-	CheckError(
+	s.CheckError(
 		c,
 		2,
 		`no user specified, please specify either username or email`,
-		s.Run,
 		"remove-group", "-a", "admin.agent", "test1", "test2",
 	)
 }

@@ -5,21 +5,14 @@ package admincmd_test
 
 import (
 	"bytes"
-	"net/http"
 	"path/filepath"
 
 	"github.com/juju/cmd"
 	"github.com/juju/testing"
-	"golang.org/x/net/context"
-	"gopkg.in/CanonicalLtd/candidclient.v1/params"
 	gc "gopkg.in/check.v1"
-	errgo "gopkg.in/errgo.v1"
-	"gopkg.in/httprequest.v1"
-	"gopkg.in/macaroon-bakery.v2/bakery"
-	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
-	"gopkg.in/macaroon-bakery.v2/httpbakery"
 	"gopkg.in/macaroon-bakery.v2/httpbakery/agent"
 
+	"github.com/CanonicalLtd/candid/candidtest"
 	"github.com/CanonicalLtd/candid/cmd/candid/internal/admincmd"
 )
 
@@ -29,31 +22,51 @@ type commandSuite struct {
 	Dir string
 
 	command cmd.Command
+	server  *candidtest.Server
 }
 
 func (s *commandSuite) SetUpTest(c *gc.C) {
 	s.IsolationSuite.SetUpTest(c)
+	var err error
+	s.server, err = candidtest.New(nil)
+	c.Assert(err, gc.Equals, nil)
 	s.Dir = c.MkDir()
 	// If the cookiejar gets saved, it gets saved to $HOME/.go-cookiejar, so make
 	// sure that's not in the current directory.
 	s.PatchEnvironment("HOME", s.Dir)
+	s.PatchEnvironment("CANDID_URL", s.server.URL)
+	err = admincmd.WriteAgentFile(filepath.Join(s.Dir, "admin.agent"), &agent.AuthInfo{
+		Key: s.server.AdminAgentKey,
+		Agents: []agent.Agent{{
+			URL:      s.server.URL,
+			Username: "admin@candid",
+		}},
+	})
+	c.Assert(err, gc.Equals, nil)
+
 	s.command = admincmd.New()
 }
 
-func CheckNoOutput(c *gc.C, f func(args ...string) (code int, stdout, stderr string), args ...string) {
-	stdout := CheckSuccess(c, f, args...)
+func (s *commandSuite) TearDownTest(c *gc.C) {
+	if s.server != nil {
+		s.server.Close()
+	}
+}
+
+func (s *commandSuite) CheckNoOutput(c *gc.C, args ...string) {
+	stdout := s.CheckSuccess(c, args...)
 	c.Assert(stdout, gc.Equals, "")
 }
 
-func CheckSuccess(c *gc.C, f func(args ...string) (code int, stdout, stderr string), args ...string) string {
-	code, stdout, stderr := f(args...)
+func (s *commandSuite) CheckSuccess(c *gc.C, args ...string) string {
+	code, stdout, stderr := s.Run(args...)
 	c.Assert(code, gc.Equals, 0, gc.Commentf("error code %d: (%s)", code, stderr))
 	c.Assert(stderr, gc.Equals, "", gc.Commentf("error code %d: (%s)", code, stderr))
 	return stdout
 }
 
-func CheckError(c *gc.C, expectCode int, expectMessage string, f func(args ...string) (code int, stdout, stderr string), args ...string) {
-	code, stdout, stderr := f(args...)
+func (s *commandSuite) CheckError(c *gc.C, expectCode int, expectMessage string, args ...string) {
+	code, stdout, stderr := s.Run(args...)
 	c.Assert(code, gc.Equals, expectCode)
 	c.Assert(stderr, gc.Matches, "(ERROR|error:) "+expectMessage+"\n")
 	c.Assert(stdout, gc.Equals, "")
@@ -74,115 +87,4 @@ func (s *commandSuite) Run(args ...string) (code int, stdout, stderr string) {
 
 func (s *commandSuite) RunContext(ctxt *cmd.Context, args ...string) int {
 	return cmd.Main(s.command, ctxt, args)
-}
-
-// RunServer returns a RunFunc that starts a new server with the
-// given handlers, creates a new 'admin.agent' file in s.Dir, sets the
-// CANDID_URL environment variable to point to the newly created server and
-// then runs the given ocmmand line. The command line is expected to
-// contain the required flags to use the admin.agent file for login.
-func (s *commandSuite) RunServer(c *gc.C, handler *handler) func(args ...string) (code int, stdout, stderr string) {
-	return func(args ...string) (code int, stdout, stderr string) {
-		server := newServer(c, handler)
-		defer server.Close()
-		ag := server.adminAgent()
-		err := admincmd.WriteAgentFile(filepath.Join(s.Dir, "admin.agent"), ag)
-		c.Assert(err, gc.Equals, nil)
-		s.PatchEnvironment("CANDID_URL", server.Location())
-		return s.Run(args...)
-	}
-}
-
-type server struct {
-	*AgentDischarger
-	bakery   *identchecker.Bakery
-	adminKey *bakery.KeyPair
-	handler  *handler
-}
-
-func newServer(c *gc.C, handler *handler) *server {
-	adminKey, err := bakery.GenerateKey()
-	c.Assert(err, gc.Equals, nil)
-	srv := &server{
-		AgentDischarger: NewAgentDischarger(),
-		adminKey:        adminKey,
-		handler:         handler,
-	}
-	reqsrv := httprequest.Server{
-		ErrorMapper: httpbakery.ErrorToResponse,
-	}
-	bakeryKey, err := bakery.GenerateKey()
-	c.Assert(err, gc.Equals, nil)
-	srv.bakery = identchecker.NewBakery(identchecker.BakeryParams{
-		Key:            bakeryKey,
-		Locator:        srv,
-		IdentityClient: IdentityClient(srv.Location()),
-	})
-	srv.AgentDischarger.Discharger.AddHTTPHandlers(reqsrv.Handlers(srv.newHandler))
-	return srv
-}
-
-// adminAgent returns an agent Visitor holding
-// details of the admin agent.
-func (srv *server) adminAgent() *agent.AuthInfo {
-	return &agent.AuthInfo{
-		Key: srv.adminKey,
-		Agents: []agent.Agent{{
-			URL:      srv.Location(),
-			Username: "admin@candid",
-		}},
-	}
-}
-
-func (srv *server) newHandler(p httprequest.Params) (*handler, context.Context, error) {
-	if err := srv.checkLogin(p.Context, p.Request); err != nil {
-		return nil, nil, errgo.Mask(err, errgo.Any)
-	}
-	return srv.handler, p.Context, nil
-}
-
-type handler struct {
-	modifyGroups func(*params.ModifyUserGroupsRequest) error
-	queryUsers   func(*params.QueryUsersRequest) ([]string, error)
-	createAgent  func(*params.CreateAgentRequest) (*params.CreateAgentResponse, error)
-	user         func(*params.UserRequest) (*params.User, error)
-	whoAmI       func(*params.WhoAmIRequest) (*params.WhoAmIResponse, error)
-}
-
-func (h *handler) ModifyGroups(req *params.ModifyUserGroupsRequest) error {
-	return h.modifyGroups(req)
-}
-
-func (h *handler) QueryUsers(req *params.QueryUsersRequest) ([]string, error) {
-	return h.queryUsers(req)
-}
-
-func (h *handler) CreateAgent(req *params.CreateAgentRequest) (*params.CreateAgentResponse, error) {
-	return h.createAgent(req)
-}
-
-func (h *handler) User(req *params.UserRequest) (*params.User, error) {
-	return h.user(req)
-}
-
-func (h *handler) WhoAmI(p *params.WhoAmIRequest) (*params.WhoAmIResponse, error) {
-	return h.whoAmI(p)
-}
-
-func (srv *server) checkLogin(ctx context.Context, req *http.Request) error {
-	_, authErr := srv.bakery.Checker.Auth(httpbakery.RequestMacaroons(req)...).Allow(context.TODO(), identchecker.LoginOp)
-	derr, ok := errgo.Cause(authErr).(*bakery.DischargeRequiredError)
-	if !ok {
-		return errgo.Mask(authErr)
-	}
-	version := httpbakery.RequestVersion(req)
-	m, err := srv.bakery.Oven.NewMacaroon(ctx, version, derr.Caveats, derr.Ops...)
-	if err != nil {
-		return errgo.Notef(err, "cannot create macaroon")
-	}
-	return httpbakery.NewDischargeRequiredError(httpbakery.DischargeRequiredErrorParams{
-		Macaroon:      m,
-		OriginalError: authErr,
-		Request:       req,
-	})
 }

@@ -8,12 +8,12 @@ import (
 	"path/filepath"
 
 	jc "github.com/juju/testing/checkers"
-	"gopkg.in/CanonicalLtd/candidclient.v1"
-	"gopkg.in/CanonicalLtd/candidclient.v1/params"
+	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/macaroon-bakery.v2/httpbakery/agent"
 
 	"github.com/CanonicalLtd/candid/cmd/candid/internal/admincmd"
+	"github.com/CanonicalLtd/candid/store"
 )
 
 type createAgentSuite struct {
@@ -43,23 +43,13 @@ var createAgentUsageTests = []struct {
 func (s *createAgentSuite) TestUsage(c *gc.C) {
 	for i, test := range createAgentUsageTests {
 		c.Logf("test %d: %v", i, test.about)
-		CheckError(c, 2, test.expectError, s.Run, append([]string{"create-agent"}, test.args...)...)
+		s.CheckError(c, 2, test.expectError, append([]string{"create-agent"}, test.args...)...)
 	}
 }
 
 func (s *createAgentSuite) TestCreateAgentWithGeneratedKeyAndAgentFileNotSpecified(c *gc.C) {
-	var calledReq *params.CreateAgentRequest
-	runf := s.RunServer(c, &handler{
-		createAgent: func(req *params.CreateAgentRequest) (*params.CreateAgentResponse, error) {
-			calledReq = req
-			return &params.CreateAgentResponse{
-				Username: "a-foo@candid",
-			}, nil
-		},
-	})
-	out := CheckSuccess(c, runf, "create-agent", "--name", "agentname", "-a", "admin.agent")
-	c.Assert(calledReq, gc.NotNil)
-	// The output should be valid input to an agent.Visitor unmarshal.
+	out := s.CheckSuccess(c, "create-agent", "--name", "agentname", "-a", "admin.agent")
+	// The output should be valid input to an agent.AuthInfo unmarshal.
 	var v agent.AuthInfo
 	err := json.Unmarshal([]byte(out), &v)
 	c.Assert(err, gc.Equals, nil)
@@ -67,90 +57,61 @@ func (s *createAgentSuite) TestCreateAgentWithGeneratedKeyAndAgentFileNotSpecifi
 	// Check that the public key looks right.
 	agents := v.Agents
 	c.Assert(agents, gc.HasLen, 1)
-	c.Assert(calledReq.PublicKeys, gc.HasLen, 1)
-	c.Assert(&v.Key.Public, gc.DeepEquals, calledReq.PublicKeys[0])
-	c.Assert(agents[0].URL, gc.Matches, "https://.*")
-	c.Assert(agents[0].Username, gc.Matches, "a-.+@candid")
-
-	calledReq.PublicKeys = nil
-	c.Assert(calledReq, jc.DeepEquals, &params.CreateAgentRequest{
-		CreateAgentBody: params.CreateAgentBody{
-			FullName: "agentname",
-		},
-	})
+	c.Assert(agents[0].URL, gc.Equals, s.server.URL)
+	identity := store.Identity{
+		Username: agents[0].Username,
+	}
+	c.Assert(s.server.Store.Identity(context.Background(), &identity), gc.Equals, nil)
+	c.Assert(identity.PublicKeys, gc.HasLen, 1)
+	c.Assert(identity.PublicKeys[0], gc.Equals, v.Key.Public)
 }
 
 func (s *createAgentSuite) TestCreateAgentWithNonExistentAgentsFileSpecified(c *gc.C) {
-	var calledReq *params.CreateAgentRequest
-	runf := s.RunServer(c, &handler{
-		createAgent: func(req *params.CreateAgentRequest) (*params.CreateAgentResponse, error) {
-			calledReq = req
-			return &params.CreateAgentResponse{
-				Username: "a-foo@candid",
-			}, nil
-		},
-	})
 	agentFile := filepath.Join(c.MkDir(), ".agents")
-	out := CheckSuccess(c, runf, "create-agent", "-a", "admin.agent", "-f", agentFile)
-	c.Assert(calledReq, gc.NotNil)
-	c.Assert(out, gc.Matches, `added agent a-foo@candid for https://.* to .+\n`)
+	out := s.CheckSuccess(c, "create-agent", "-a", "admin.agent", "-f", agentFile)
+	c.Assert(out, gc.Matches, `added agent a-[0-9a-f]+@candid for http://.* to .+\n`)
 
 	v, err := admincmd.ReadAgentFile(agentFile)
 	c.Assert(err, gc.Equals, nil)
 
 	agents := v.Agents
 	c.Assert(agents, gc.HasLen, 1)
-	c.Assert(calledReq.PublicKeys, gc.HasLen, 1)
-	c.Assert(&v.Key.Public, gc.DeepEquals, calledReq.PublicKeys[0])
-	c.Assert(agents[0].URL, gc.Matches, "https://.*")
-	c.Assert(agents[0].Username, gc.Equals, "a-foo@candid")
-
-	calledReq.PublicKeys = nil
-	c.Assert(calledReq, jc.DeepEquals, &params.CreateAgentRequest{
-		CreateAgentBody: params.CreateAgentBody{},
-	})
+	c.Assert(agents[0].URL, gc.Equals, s.server.URL)
+	identity := store.Identity{
+		Username: agents[0].Username,
+	}
+	c.Assert(s.server.Store.Identity(context.Background(), &identity), gc.Equals, nil)
+	c.Assert(identity.PublicKeys, gc.HasLen, 1)
+	c.Assert(identity.PublicKeys[0], gc.Equals, v.Key.Public)
+	c.Assert(identity.Owner, gc.Equals, store.MakeProviderIdentity("idm", "admin"))
 }
 
 func (s *createAgentSuite) TestCreateAgentWithExistingAgentsFile(c *gc.C) {
-	var calledReq *params.CreateAgentRequest
-	runf := s.RunServer(c, &handler{
-		createAgent: func(req *params.CreateAgentRequest) (*params.CreateAgentResponse, error) {
-			calledReq = req
-			return &params.CreateAgentResponse{
-				Username: "a-foo@candid",
-			}, nil
-		},
-	})
-	out := CheckSuccess(c, runf, "create-agent", "-a", "admin.agent", "-f", "admin.agent", "somegroup")
-	c.Assert(calledReq, gc.NotNil)
-	c.Assert(out, gc.Matches, `added agent a-foo@candid for https://.* to .+\n`)
+	out := s.CheckSuccess(c, "create-agent", "-a", "admin.agent", "-f", "admin.agent", "somegroup")
+	c.Assert(out, gc.Matches, `added agent a-[0-9a-f]+@candid for http://.* to .+\n`)
 
 	v, err := admincmd.ReadAgentFile(filepath.Join(s.Dir, "admin.agent"))
 	c.Assert(err, gc.Equals, nil)
 
 	agents := v.Agents
 	c.Assert(agents, gc.HasLen, 2)
-	c.Assert(calledReq.PublicKeys, gc.HasLen, 1)
-	c.Assert(&v.Key.Public, gc.DeepEquals, calledReq.PublicKeys[0])
-	c.Assert(agents[1].URL, gc.Matches, "https://.*")
-	c.Assert(agents[1].Username, gc.Equals, "a-foo@candid")
-
-	calledReq.PublicKeys = nil
-	c.Assert(calledReq, jc.DeepEquals, &params.CreateAgentRequest{
-		CreateAgentBody: params.CreateAgentBody{
-			Groups: []string{"somegroup"},
-		},
-	})
+	c.Assert(agents[1].URL, gc.Equals, s.server.URL)
+	identity := store.Identity{
+		Username: agents[1].Username,
+	}
+	err = s.server.Store.Identity(context.Background(), &identity)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(identity.Groups, jc.DeepEquals, []string{"somegroup"})
 }
 
 func (s *createAgentSuite) TestCreateAgentWithAdminFlag(c *gc.C) {
 	// With the -n flag, it doesn't contact the candid server at all.
-	out := CheckSuccess(c, s.Run, "create-agent", "--admin")
+	out := s.CheckSuccess(c, "create-agent", "--admin")
 	var v agent.AuthInfo
 	err := json.Unmarshal([]byte(out), &v)
 	c.Assert(err, gc.Equals, nil)
 	agents := v.Agents
 	c.Assert(agents, gc.HasLen, 1)
 	c.Assert(agents[0].Username, gc.Equals, "admin@candid")
-	c.Assert(agents[0].URL, gc.Equals, candidclient.Production)
+	c.Assert(agents[0].URL, gc.Equals, s.server.URL)
 }

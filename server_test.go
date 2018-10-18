@@ -1,7 +1,7 @@
 // Copyright 2014 Canonical Ltd.
 // Licensed under the AGPLv3, see LICENCE file for details.
 
-package identity_test
+package candid_test
 
 import (
 	"net/http"
@@ -32,7 +32,7 @@ type serverSuite struct {
 var _ = gc.Suite(&serverSuite{})
 
 func (s *serverSuite) TestNewServerWithNoVersions(c *gc.C) {
-	h, err := identity.NewServer(identity.ServerParams{
+	h, err := candid.NewServer(candid.ServerParams{
 		PrivateAddr: "localhost",
 	})
 	c.Assert(err, gc.ErrorMatches, `identity server must serve at least one version of the API`)
@@ -40,8 +40,8 @@ func (s *serverSuite) TestNewServerWithNoVersions(c *gc.C) {
 }
 
 func (s *serverSuite) TestNewServerWithUnregisteredVersion(c *gc.C) {
-	h, err := identity.NewServer(
-		identity.ServerParams{
+	h, err := candid.NewServer(
+		candid.ServerParams{
 			Store:        s.Store,
 			MeetingStore: s.MeetingStore,
 			RootKeyStore: s.BakeryRootKeyStore,
@@ -59,19 +59,19 @@ type versionResponse struct {
 }
 
 func (s *serverSuite) TestVersions(c *gc.C) {
-	c.Assert(identity.Versions(), gc.DeepEquals, []string{"debug", "discharger", "v1"})
+	c.Assert(candid.Versions(), gc.DeepEquals, []string{"debug", "discharger", "v1"})
 }
 
 func (s *serverSuite) TestNewServerWithVersions(c *gc.C) {
-	h, err := identity.NewServer(
-		identity.ServerParams{
+	h, err := candid.NewServer(
+		candid.ServerParams{
 			Store:        s.Store,
 			MeetingStore: s.MeetingStore,
 			RootKeyStore: s.BakeryRootKeyStore,
 			PrivateAddr:  "localhost",
 			ACLStore:     s.ACLStore,
 		},
-		identity.Debug,
+		candid.Debug,
 	)
 	c.Assert(err, gc.IsNil)
 	defer h.Close()
@@ -95,8 +95,8 @@ func (s *serverSuite) TestNewServerRemovesAgentIDP(c *gc.C) {
 	}
 	// The agent identity provider will error on initialisation if it
 	// is not removed from the set.
-	h, err := identity.NewServer(
-		identity.ServerParams{
+	h, err := candid.NewServer(
+		candid.ServerParams{
 			Store:             s.Store,
 			MeetingStore:      s.MeetingStore,
 			RootKeyStore:      s.BakeryRootKeyStore,
@@ -104,7 +104,7 @@ func (s *serverSuite) TestNewServerRemovesAgentIDP(c *gc.C) {
 			IdentityProviders: idps,
 			ACLStore:          s.ACLStore,
 		},
-		identity.V1,
+		candid.V1,
 	)
 	c.Assert(err, gc.IsNil)
 	h.Close()

@@ -7,8 +7,9 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/CanonicalLtd/candid/store"
 	jc "github.com/juju/testing/checkers"
-	"gopkg.in/CanonicalLtd/candidclient.v1/params"
+	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
 )
 
@@ -19,100 +20,120 @@ type findSuite struct {
 var _ = gc.Suite(&findSuite{})
 
 func (s *findSuite) TestFindEmail(c *gc.C) {
-	runf := s.RunServer(c, &handler{
-		queryUsers: func(req *params.QueryUsersRequest) ([]string, error) {
-			if req.Email == "bob@example.com" {
-				return []string{"bob"}, nil
-			}
-			return []string{}, nil
-		},
+	ctx := context.Background()
+	s.server.AddIdentity(ctx, &store.Identity{
+		ProviderID: store.MakeProviderIdentity("test", "bob"),
+		Username:   "bob",
+		Email:      "bob@example.com",
 	})
-	stdout := CheckSuccess(c, runf, "find", "-a", "admin.agent", "-e", "bob@example.com")
+	stdout := s.CheckSuccess(c, "find", "-a", "admin.agent", "-e", "bob@example.com")
 	c.Assert(stdout, gc.Equals, "bob\n")
 }
 
 func (s *findSuite) TestFindEmailNotFound(c *gc.C) {
-	runf := s.RunServer(c, &handler{
-		queryUsers: func(req *params.QueryUsersRequest) ([]string, error) {
-			if req.Email == "alice@example.com" {
-				return []string{"alice"}, nil
-			}
-			return []string{}, nil
-		},
-	})
-	stdout := CheckSuccess(c, runf, "find", "-a", "admin.agent", "-e", "bob@example.com")
+	stdout := s.CheckSuccess(c, "find", "-a", "admin.agent", "-e", "bob@example.com")
 	c.Assert(stdout, gc.Equals, "\n")
 }
 
 func (s *findSuite) TestFindNoParameters(c *gc.C) {
-
-	runf := s.RunServer(c, &handler{
-		queryUsers: func(req *params.QueryUsersRequest) ([]string, error) {
-			return []string{"alice", "bob", "charlie"}, nil
-		},
-	})
-	stdout := CheckSuccess(c, runf, "find", "-a", "admin.agent", "--format", "json")
+	ctx := context.Background()
+	identites := []store.Identity{{
+		ProviderID: store.MakeProviderIdentity("test", "bob"),
+		Username:   "bob",
+		Email:      "bob@example.com",
+	}, {
+		ProviderID: store.MakeProviderIdentity("test", "alice"),
+		Username:   "alice",
+	}, {
+		ProviderID: store.MakeProviderIdentity("test", "charlie"),
+		Username:   "charlie",
+	}}
+	for _, id := range identites {
+		s.server.AddIdentity(ctx, &id)
+	}
+	stdout := s.CheckSuccess(c, "find", "-a", "admin.agent", "--format", "json")
 	var usernames []string
 	err := json.Unmarshal([]byte(stdout), &usernames)
 	c.Assert(err, gc.Equals, nil)
-	c.Assert(usernames, jc.DeepEquals, []string{"alice", "bob", "charlie"})
+	c.Assert(usernames, jc.DeepEquals, []string{"admin@candid", "alice", "bob", "charlie"})
 }
 
 func (s *findSuite) TestFindLastLoginTime(c *gc.C) {
-	var gotTime time.Time
-	runf := s.RunServer(c, &handler{
-		queryUsers: func(req *params.QueryUsersRequest) ([]string, error) {
-			if err := gotTime.UnmarshalText([]byte(req.LastLoginSince)); err != nil {
-				return nil, err
-			}
-			return []string{"alice", "bob", "charlie"}, nil
-		},
-	})
-	stdout := CheckSuccess(c, runf, "find", "-a", "admin.agent", "--format", "json", "--last-login", "30")
+	ctx := context.Background()
+	identities := []store.Identity{{
+		ProviderID: store.MakeProviderIdentity("test", "bob"),
+		Username:   "bob",
+		Email:      "bob@example.com",
+		LastLogin:  time.Now().Add(-31 * 24 * time.Hour),
+	}, {
+		ProviderID: store.MakeProviderIdentity("test", "alice"),
+		Username:   "alice",
+		LastLogin:  time.Now().Add(-10 * 24 * time.Hour),
+	}, {
+		ProviderID: store.MakeProviderIdentity("test", "charlie"),
+		Username:   "charlie",
+		LastLogin:  time.Now().Add(-1 * 24 * time.Hour),
+	}}
+	for _, id := range identities {
+		s.server.AddIdentity(ctx, &id)
+	}
+	stdout := s.CheckSuccess(c, "find", "-a", "admin.agent", "--format", "json", "--last-login", "30")
 	var usernames []string
 	err := json.Unmarshal([]byte(stdout), &usernames)
 	c.Assert(err, gc.Equals, nil)
-	c.Assert(usernames, jc.DeepEquals, []string{"alice", "bob", "charlie"})
-	t := time.Now().AddDate(0, 0, -30)
-	c.Assert(t.Sub(gotTime), jc.LessThan, time.Second)
+	c.Assert(usernames, jc.DeepEquals, []string{"alice", "charlie"})
 }
 
 func (s *findSuite) TestFindLastDischargeTime(c *gc.C) {
-	var gotTime time.Time
-	runf := s.RunServer(c, &handler{
-		queryUsers: func(req *params.QueryUsersRequest) ([]string, error) {
-			if err := gotTime.UnmarshalText([]byte(req.LastDischargeSince)); err != nil {
-				return nil, err
-			}
-			return []string{"alice", "bob", "charlie"}, nil
-		},
-	})
-	stdout := CheckSuccess(c, runf, "find", "-a", "admin.agent", "--format", "json", "--last-discharge", "20")
+	ctx := context.Background()
+	identities := []store.Identity{{
+		ProviderID:    store.MakeProviderIdentity("test", "bob"),
+		Username:      "bob",
+		Email:         "bob@example.com",
+		LastDischarge: time.Now().Add(-31 * 24 * time.Hour),
+	}, {
+		ProviderID:    store.MakeProviderIdentity("test", "alice"),
+		Username:      "alice",
+		LastDischarge: time.Now().Add(-10 * 24 * time.Hour),
+	}, {
+		ProviderID:    store.MakeProviderIdentity("test", "charlie"),
+		Username:      "charlie",
+		LastDischarge: time.Now().Add(-1 * 24 * time.Hour),
+	}}
+	for _, id := range identities {
+		s.server.AddIdentity(ctx, &id)
+	}
+	stdout := s.CheckSuccess(c, "find", "-a", "admin.agent", "--format", "json", "--last-discharge", "20")
 	var usernames []string
 	err := json.Unmarshal([]byte(stdout), &usernames)
 	c.Assert(err, gc.Equals, nil)
-	c.Assert(usernames, jc.DeepEquals, []string{"alice", "bob", "charlie"})
-	t := time.Now().AddDate(0, 0, -20)
-	c.Assert(t.Sub(gotTime), jc.LessThan, time.Second)
+	c.Assert(usernames, jc.DeepEquals, []string{"admin@candid", "alice", "charlie"})
 }
 
 func (s *findSuite) TestFindWithEmail(c *gc.C) {
-	runf := s.RunServer(c, &handler{
-		queryUsers: func(req *params.QueryUsersRequest) ([]string, error) {
-			return []string{"alice", "bob", "charlie"}, nil
-		},
-		user: func(req *params.UserRequest) (*params.User, error) {
-			return &params.User{
-				Username: req.Username,
-				Email:    string(req.Username) + "@example.com",
-			}, nil
-		},
-	})
-	stdout := CheckSuccess(c, runf, "find", "-a", "admin.agent", "-d", "email", "--format", "json")
+	ctx := context.Background()
+	identities := []store.Identity{{
+		ProviderID: store.MakeProviderIdentity("test", "bob"),
+		Username:   "bob",
+		Email:      "bob@example.com",
+	}, {
+		ProviderID: store.MakeProviderIdentity("test", "alice"),
+		Username:   "alice",
+		Email:      "alice@example.com",
+	}, {
+		ProviderID: store.MakeProviderIdentity("test", "charlie"),
+		Username:   "charlie",
+		Email:      "charlie@example.com",
+	}}
+	for _, id := range identities {
+		s.server.AddIdentity(ctx, &id)
+	}
+	stdout := s.CheckSuccess(c, "find", "-a", "admin.agent", "-d", "email", "--format", "json")
 	var usernames []map[string]string
 	err := json.Unmarshal([]byte(stdout), &usernames)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(usernames, jc.DeepEquals, []map[string]string{
+		{"username": "admin@candid", "email": ""},
 		{"username": "alice", "email": "alice@example.com"},
 		{"username": "bob", "email": "bob@example.com"},
 		{"username": "charlie", "email": "charlie@example.com"},
@@ -120,25 +141,31 @@ func (s *findSuite) TestFindWithEmail(c *gc.C) {
 }
 
 func (s *findSuite) TestFindWithEmailAndGravatar(c *gc.C) {
-	runf := s.RunServer(c, &handler{
-		queryUsers: func(req *params.QueryUsersRequest) ([]string, error) {
-			return []string{"alice", "bob", "charlie"}, nil
-		},
-		user: func(req *params.UserRequest) (*params.User, error) {
-			return &params.User{
-				Username:   req.Username,
-				Email:      string(req.Username) + "@example.com",
-				GravatarID: string(req.Username) + "@gravatar",
-			}, nil
-		},
-	})
-	stdout := CheckSuccess(c, runf, "find", "-a", "admin.agent", "-d", "email, gravatar_id", "--format", "json")
+	ctx := context.Background()
+	identities := []store.Identity{{
+		ProviderID: store.MakeProviderIdentity("test", "bob"),
+		Username:   "bob",
+		Email:      "bob@example.com",
+	}, {
+		ProviderID: store.MakeProviderIdentity("test", "alice"),
+		Username:   "alice",
+		Email:      "alice@example.com",
+	}, {
+		ProviderID: store.MakeProviderIdentity("test", "charlie"),
+		Username:   "charlie",
+		Email:      "charlie@example.com",
+	}}
+	for _, id := range identities {
+		s.server.AddIdentity(ctx, &id)
+	}
+	stdout := s.CheckSuccess(c, "find", "-a", "admin.agent", "-d", "email, gravatar_id", "--format", "json")
 	var usernames []map[string]string
 	err := json.Unmarshal([]byte(stdout), &usernames)
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(usernames, jc.DeepEquals, []map[string]string{
-		{"username": "alice", "email": "alice@example.com", "gravatar_id": "alice@gravatar"},
-		{"username": "bob", "email": "bob@example.com", "gravatar_id": "bob@gravatar"},
-		{"username": "charlie", "email": "charlie@example.com", "gravatar_id": "charlie@gravatar"},
+		{"username": "admin@candid", "email": "", "gravatar_id": ""},
+		{"username": "alice", "email": "alice@example.com", "gravatar_id": "c160f8cc69a4f0bf2b0362752353d060"},
+		{"username": "bob", "email": "bob@example.com", "gravatar_id": "4b9bb80620f03eb3719e0a061c14283d"},
+		{"username": "charlie", "email": "charlie@example.com", "gravatar_id": "426b189df1e2f359efe6ee90f2d2030f"},
 	})
 }

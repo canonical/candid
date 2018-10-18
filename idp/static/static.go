@@ -29,11 +29,7 @@ func init() {
 			p.Name = "static"
 		}
 
-		idp, err := NewIdentityProvider(p)
-		if err != nil {
-			return nil, errgo.Mask(err)
-		}
-		return idp, nil
+		return NewIdentityProvider(p), nil
 	})
 }
 
@@ -62,11 +58,8 @@ type UserInfo struct {
 }
 
 // NewIdentityProvider creates a new static identity provider.
-func NewIdentityProvider(p Params) (idp.IdentityProvider, error) {
-	if len(p.Users) == 0 {
-		return nil, errgo.Newf("no 'users' defined")
-	}
-	return &identityProvider{params: p}, nil
+func NewIdentityProvider(p Params) idp.IdentityProvider {
+	return &identityProvider{params: p}
 
 }
 
