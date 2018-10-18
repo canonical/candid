@@ -5,7 +5,6 @@ ADMIN_AGENT_FILE="${SNAP_COMMON}/admin.keys"
 
 if [ ! -e "$CONFIG_FILE" ]; then
     cp "${SNAP}/config/config.yaml" "$CONFIG_FILE"
-    chmod 600 "$CONFIG_FILE"
 
     # replace hostname
     hostname="$(hostname -f)"
@@ -24,8 +23,6 @@ if [ ! -e "$CONFIG_FILE" ]; then
     admin_key="$(bakery-keygen)"
     admin_private_key=$(echo "$admin_key" | jq -r .private)
     admin_public_key=$(echo "$admin_key" | jq -r .public)
-    touch "$ADMIN_AGENT_FILE"
-    chmod 600 "$ADMIN_AGENT_FILE"
     cat >"$ADMIN_AGENT_FILE" <<EOF
 {
   "key": {
