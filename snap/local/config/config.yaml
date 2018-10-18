@@ -3,7 +3,7 @@
 ## Server URLs and ports
 listen-address: :8081
 private-addr: 127.0.0.1
-location: 'http://LOCATION:8081'
+location: 'http://%LOCATION%:8081'
 
 ## Persistent storage
 # Defaults to non-persistent memory storage, install PostgreSQL or MongoDB
@@ -44,8 +44,10 @@ identity-providers:
 logging-config: INFO
 
 ## Authentication keys
-public-key: PUBLIC-KEY
-private-key: PRIVATE-KEY
+public-key: %PUBLIC-KEY%
+private-key: %PRIVATE-KEY%
+
+admin-agent-public-key: %ADMIN-PUBLIC-KEY%
 
 # Don't change, snap-specific paths
 access-log: /var/snap/candid/common/logs/candid.access.log

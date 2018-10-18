@@ -44,6 +44,7 @@ parts:
      - bin/candidsrv
      - bin/jq
      - lib/*/libonig.so*
+     - lib/*/libjq.so*
     override-build: |
       snapcraftctl build
 
