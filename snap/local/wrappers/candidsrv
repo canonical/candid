@@ -1,18 +1,45 @@
-#!/bin/sh -eu
-if [ ! -e "${SNAP_COMMON}/config.yaml" ]; then
-    cp "${SNAP}/config/config.yaml" "${SNAP_COMMON}/config.yaml"
+#!/bin/bash -eu
 
-    # Default URL
-    if [ -n "$(hostname -f)" ]; then
-        sed -i "s#LOCATION#$(hostname -f)#g" "${SNAP_COMMON}/config.yaml"
+CONFIG_FILE="${SNAP_COMMON}/config.yaml"
+ADMIN_AGENT_FILE="${SNAP_COMMON}/admin.keys"
+
+if [ ! -e "$CONFIG_FILE" ]; then
+    cp "${SNAP}/config/config.yaml" "$CONFIG_FILE"
+    chmod 600 "$CONFIG_FILE"
+
+    # replace hostname
+    hostname="$(hostname -f)"
+    if [ -n "$hostname" ]; then
+        sed -i "s#%LOCATION%#${hostname}#g" "$CONFIG_FILE"
     fi
 
-    # Key setup
-    key=$(bakery-keygen)
-    private=$(echo "$key" | jq -r .private)
-    public=$(echo "$key" | jq -r .public)
-    sed -i "s#PRIVATE-KEY#${private}#g" "${SNAP_COMMON}/config.yaml"
-    sed -i "s#PUBLIC-KEY#${public}#g" "${SNAP_COMMON}/config.yaml"
+    # setup keys
+    key="$(bakery-keygen)"
+    private_key=$(echo "$key" | jq -r .private)
+    public_key=$(echo "$key" | jq -r .public)
+    sed -i "s#%PRIVATE-KEY%#${private_key}#g" "$CONFIG_FILE"
+    sed -i "s#%PUBLIC-KEY%#${public_key}#g" "$CONFIG_FILE"
+
+    # create admin credentials
+    admin_key="$(bakery-keygen)"
+    admin_private_key=$(echo "$admin_key" | jq -r .private)
+    admin_public_key=$(echo "$admin_key" | jq -r .public)
+    touch "$ADMIN_AGENT_FILE"
+    chmod 600 "$ADMIN_AGENT_FILE"
+    cat >"$ADMIN_AGENT_FILE" <<EOF
+{
+  "key": {
+    "public": "${admin_public_key}",
+    "private": "${admin_private_key}"},
+  "agents": [
+    {
+      "url": "http://${hostname}:8081",
+      "username": "admin@candid"
+    }
+  ]
+}
+EOF
+    sed -i "s#%ADMIN-PUBLIC-KEY%#${admin_public_key}#g" "$CONFIG_FILE"
 fi
 
-exec candidsrv "${SNAP_COMMON}/config.yaml"
+exec candidsrv "$CONFIG_FILE"
