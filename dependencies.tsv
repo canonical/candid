@@ -4,7 +4,7 @@ github.com/garyburd/go-oauth	git	3131beb69b81ff119923bdefbf029318f1f53794	2015-0
 github.com/golang/protobuf	git	aa810b61a9c79d51363740d207bb46cf8e620ed5	2018-08-14T21:14:27Z
 github.com/google/go-cmp	git	8099a9787ce5dc5984ed879a3bda47dc730a8e97	2017-08-03T17:35:09Z
 github.com/gorilla/handlers	git	13d73096a474cac93275c679c7b8a2dc17ddba82	2017-02-24T19:39:55Z
-github.com/juju/aclstore	git	c070e91d246eb7d9dc176fb7e56be7833d9ba666	2018-10-12T09:44:26Z
+github.com/juju/aclstore	git	ba5a59ff0d645c9150ecc323f2141c20c001f05a	2018-10-19T12:01:23Z
 github.com/juju/ansiterm	git	b99631de12cf04a906c1d4e4ec54fb86eae5863d	2016-09-07T23:45:32Z
 github.com/juju/clock	git	bab88fc672997ef02d03f85310182d97a93dee21	2018-08-08T02:13:10Z
 github.com/juju/cmd	git	9ce53c6f9d0071e2f7789e0d1beb91b490027fc9	2018-04-24T15:15:04Z
