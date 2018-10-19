@@ -6,6 +6,7 @@ package identity_test
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -20,6 +21,7 @@ import (
 	"gopkg.in/CanonicalLtd/candidclient.v1/params"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/httprequest.v1"
+	"gopkg.in/macaroon-bakery.v2/httpbakery"
 
 	"github.com/CanonicalLtd/candid/idp"
 	"github.com/CanonicalLtd/candid/idp/test"
@@ -307,7 +309,7 @@ func (s *fullServerSuite) TestUserGroups(c *gc.C) {
 	c.Assert(groups, jc.DeepEquals, []string{"g1", "g2", "g3", "g4"})
 }
 
-func (s *fullServerSuite) TestACLs(c *gc.C) {
+func (s *fullServerSuite) TestACL(c *gc.C) {
 	client := aclclient.New(aclclient.NewParams{
 		BaseURL: s.URL + "/acl",
 		Doer:    s.AdminClient(),
@@ -325,4 +327,18 @@ func (s *fullServerSuite) TestACLs(c *gc.C) {
 	acl, err = client.Get(context.Background(), "read-user")
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(acl, jc.DeepEquals, []string{"test-2"})
+}
+
+func (s *fullServerSuite) TestACLMACARAQResponse(c *gc.C) {
+	resp, err := http.Get(s.URL + "/acl/read-user")
+	c.Assert(err, gc.Equals, nil)
+	defer resp.Body.Close()
+	buf, err := ioutil.ReadAll(resp.Body)
+	c.Assert(err, gc.Equals, nil)
+	var herr httpbakery.Error
+	err = json.Unmarshal(buf, &herr)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(herr.Code, gc.Equals, httpbakery.ErrDischargeRequired)
+	c.Assert(herr.Info, gc.NotNil)
+	c.Assert(herr.Info.MacaroonPath, gc.Equals, "../")
 }
