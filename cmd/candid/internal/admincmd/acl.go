@@ -170,7 +170,7 @@ func aclClient(ctxt *cmd.Context, c *candidCommand) (*aclclient.Client, error) {
 		return nil, errgo.Mask(err)
 	}
 	return aclclient.New(aclclient.NewParams{
-		BaseURL: candidURL(c.url) + "/acls",
+		BaseURL: candidURL(c.url) + "/acl",
 		Doer:    bClient,
 	}), nil
 }

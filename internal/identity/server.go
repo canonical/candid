@@ -90,7 +90,7 @@ func New(sp ServerParams, versions map[string]NewAPIHandlerFunc) (*Server, error
 
 	aclAuthenticator := httpauth.New(oven, auth)
 	aclHandler := aclManager.NewHandler(aclstore.HandlerParams{
-		RootPath: "/acls",
+		RootPath: "/acl",
 		Authenticate: func(ctx context.Context, w http.ResponseWriter, req *http.Request) (aclstore.Identity, error) {
 			ai, err := aclAuthenticator.Auth(ctx, req, identchecker.LoginOp)
 			if err != nil {
@@ -134,9 +134,9 @@ func New(sp ServerParams, versions map[string]NewAPIHandlerFunc) (*Server, error
 
 	srv.router.Handle("OPTIONS", "/*path", srv.options)
 	srv.router.Handler("GET", "/metrics", prometheus.Handler())
-	srv.router.Handler("GET", "/acls/*path", aclHandler)
-	srv.router.Handler("PUT", "/acls/*path", aclHandler)
-	srv.router.Handler("POST", "/acls/*path", aclHandler)
+	srv.router.Handler("GET", "/acl/*path", aclHandler)
+	srv.router.Handler("PUT", "/acl/*path", aclHandler)
+	srv.router.Handler("POST", "/acl/*path", aclHandler)
 	srv.router.Handler("GET", "/static/*path", http.StripPrefix("/static", http.FileServer(sp.StaticFileSystem)))
 	for name, newAPI := range versions {
 		handlers, err := newAPI(HandlerParams{
