@@ -35,7 +35,7 @@ func (s *aclSuite) TestACLShowTwoACLs(c *gc.C) {
 }
 
 func (s *aclSuite) TestACLShowInvalid(c *gc.C) {
-	s.CheckError(c, 1, `Get http://.*/acls/no-such-acl: ACL not found`, "-a", "admin.agent", "acl", "show", "no-such-acl")
+	s.CheckError(c, 1, `Get http://.*/acl/no-such-acl: ACL not found`, "-a", "admin.agent", "acl", "show", "no-such-acl")
 }
 
 func (s *aclSuite) TestACLGrant(c *gc.C) {
@@ -50,7 +50,7 @@ func (s *aclSuite) TestACLGrantNoArguments(c *gc.C) {
 }
 
 func (s *aclSuite) TestACLGrantInvalid(c *gc.C) {
-	s.CheckError(c, 1, `Post http://.*/acls/no-such-acl: ACL not found`, "-a", "admin.agent", "acl", "grant", "no-such-acl", "bob")
+	s.CheckError(c, 1, `Post http://.*/acl/no-such-acl: ACL not found`, "-a", "admin.agent", "acl", "grant", "no-such-acl", "bob")
 }
 
 func (s *aclSuite) TestACLRevoke(c *gc.C) {
@@ -67,5 +67,5 @@ func (s *aclSuite) TestACLRevokeNoArguments(c *gc.C) {
 }
 
 func (s *aclSuite) TestACLRevokeInvalid(c *gc.C) {
-	s.CheckError(c, 1, `Post http://.*/acls/no-such-acl: ACL not found`, "-a", "admin.agent", "acl", "revoke", "no-such-acl", "bob")
+	s.CheckError(c, 1, `Post http://.*/acl/no-such-acl: ACL not found`, "-a", "admin.agent", "acl", "revoke", "no-such-acl", "bob")
 }

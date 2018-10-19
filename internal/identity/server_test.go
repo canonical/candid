@@ -309,7 +309,7 @@ func (s *fullServerSuite) TestUserGroups(c *gc.C) {
 
 func (s *fullServerSuite) TestACLs(c *gc.C) {
 	client := aclclient.New(aclclient.NewParams{
-		BaseURL: s.URL + "/acls",
+		BaseURL: s.URL + "/acl",
 		Doer:    s.AdminClient(),
 	})
 	acl, err := client.Get(context.Background(), "read-user")
