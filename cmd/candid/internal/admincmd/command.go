@@ -54,6 +54,7 @@ func New() cmd.Command {
 		GlobalFlags: c,
 		Version:     version.VersionInfo.Version,
 	})
+	supercmd.Register(newACLCommand(c))
 	supercmd.Register(newAddGroupCommand(c))
 	supercmd.Register(newCreateAgentCommand(c))
 	supercmd.Register(newFindCommand(c))
@@ -72,9 +73,10 @@ type candidCommand struct {
 	agentFile string
 
 	// mu protects the fields below it.
-	mu     sync.Mutex
-	client *candidclient.Client
-	jar    *cookiejar.Jar
+	mu           sync.Mutex
+	bakeryClient *httpbakery.Client
+	client       *candidclient.Client
+	jar          *cookiejar.Jar
 }
 
 // Close must be called at the end of a command's Run to ensure that
@@ -99,17 +101,21 @@ func (c *candidCommand) AddFlags(f *gnuflag.FlagSet) {
 	f.StringVar(&c.agentFile, "agent", "", "")
 }
 
-// Client creates a new candidclient.Client using the parameters specified
+// BakeryClient creates a new httpbakery.Client using the parameters specified
 // in the flags and environment.
-func (c *candidCommand) Client(ctxt *cmd.Context) (*candidclient.Client, error) {
+func (c *candidCommand) BakeryClient(ctxt *cmd.Context) (*httpbakery.Client, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if c.client != nil {
-		return c.client, nil
+	return c.bakeryClientLocked(ctxt)
+}
+
+// bakeryClientLocked creates a new httpbakery.Client using the parameters specified
+// in the flags and environment. bakeryClient must be called with the mutex locked.
+func (c *candidCommand) bakeryClientLocked(ctxt *cmd.Context) (*httpbakery.Client, error) {
+	if c.bakeryClient != nil {
+		return c.bakeryClient, nil
 	}
 	bClient := httpbakery.NewClient()
-	candidURL := candidURL(c.url)
-
 	var authInfo *agent.AuthInfo
 	if c.agentFile != "" {
 		ai, err := readAgentFile(ctxt.AbsPath(c.agentFile))
@@ -138,7 +144,23 @@ func (c *candidCommand) Client(ctxt *cmd.Context) (*candidclient.Client, error) 
 		bClient.Client.Jar = jar
 		bClient.AddInteractor(httpbakery.WebBrowserInteractor{})
 	}
+	c.bakeryClient = bClient
+	return bClient, nil
+}
 
+// Client creates a new candidclient.Client using the parameters specified
+// in the flags and environment.
+func (c *candidCommand) Client(ctxt *cmd.Context) (*candidclient.Client, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.client != nil {
+		return c.client, nil
+	}
+	bClient, err := c.bakeryClientLocked(ctxt)
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
+	candidURL := candidURL(c.url)
 	client, err := candidclient.New(candidclient.NewParams{
 		BaseURL: candidURL,
 		Client:  bClient,
