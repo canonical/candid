@@ -21,7 +21,7 @@ import (
 	"github.com/CanonicalLtd/candid/internal/auth"
 	"github.com/CanonicalLtd/candid/internal/identity"
 	"github.com/CanonicalLtd/candid/store"
-	"github.com/juju/aclstore"
+	"github.com/juju/aclstore/v2"
 	"github.com/juju/simplekv/memsimplekv"
 )
 

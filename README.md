@@ -4,56 +4,50 @@ The Candid server provides a macaroon-based authentication service.
 
 ## Installation
 
-To start using the candid service, first ensure you have a valid Go environment,
-then run the following:
+The easiest way to start using the candid service is with the snap:
 
-    go get github.com/CanonicalLtd/candid
-    cd $GOPATH/github.com/CanonicalLtd/candid
+    snap install candid --edge
 
-## Go dependencies
+The configuration file used by the snap can be found in
+`/var/snap/candid/common/config.yaml`.
 
-The project uses godeps (https://launchpad.net/godeps) to manage Go
-dependencies. To install this, run:
+## Development
 
-    go get -u github.com/rogpeppe/godeps
+### Requirements
 
-After installing it, you can update the dependencies
-to the revision specified in the `dependencies.tsv` file with the following:
+Candid requires go1.11 or later to build. This is available in the go snap:
 
-    make deps
+    snap install go
 
-Use `make create-deps` to update the dependencies file.
+Go will additionally require installing the following packages in order
+that it can fetch and build candid dependencies:
 
-## Development environment
+    apt install build-essential bzr git
 
-A couple of system packages are required in order to set up a development
-environment. To install them, run the following:
+### Source
 
-    make sysdeps
+Get the source from `github.com/CanoniclaLtd/candid`.
 
-At this point, from the root of this branch, run the command::
+    git clone git@github.com:CanonicalLtd/candid
 
-    make install
+It is recommended that you check out the source outside of any `$GOPATH`
+(`$HOME/go` by default). If you do wish to check out into a `$GOPATH`
+then you will need to set the environment variable `GO111MODULE=on`.
 
-The command above builds and installs the identity service binaries, and places
-them in `$GOPATH/bin`. This is the list of the installed commands:
+### Testing
 
-- candidsrv: start the Candid identity server;
+The store/mgostore component additionally requires mongodb to be
+installed, this should be installed from the system packages:
 
-## Candid server
+    apt install mongodb
 
-The server can be started with the following command:
+The store/sqlstore component additionally requires a running
+postgresql, this may be running on a different system. The posgresql
+system to use is specified using the standard postgresql [environment
+variables](https://www.postgresql.org/docs/10/static/libpq-envars.html).
+To skip running postgresql tests set the environment variable
+`PGTESTDISABLE=1`.
 
-    candidsrv -logging-config INFO cmd/candidsrv/config.yaml
-
-The same result can be achieved more easily by running `make server`.
-Note that this configuration *should not* be used when running a production
-server.
-
-At this point the server starts listening on port 8081 (as specified in the
-config YAML file).
-
-## Testing
-
-Run `make check` to test the application.
-Run `make help` to display help about all the available make targets.
+Tests are run by running make check in the root of the source tree. The
+tests for a single package can be run by running `go test` in the
+package directory.

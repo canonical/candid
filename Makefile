@@ -2,76 +2,29 @@
 # Licensed under the AGPLv3, see LICENCE file for details.
 # Makefile for the candid identity service.
 
-ifndef GOPATH
-$(warning You need to set up a GOPATH.)
-endif
-
-PROJECT := github.com/CanonicalLtd/candid
-PROJECT_DIR := $(shell go list -e -f '{{.Dir}}' $(PROJECT))
-
 GIT_COMMIT := $(shell git rev-parse --verify HEAD)
 GIT_VERSION := $(shell git describe --dirty)
 
-ifeq ($(shell uname -p | sed -r 's/.*(x86|armel|armhf).*/golang/'), golang)
-	GO_C := golang
-	INSTALL_FLAGS :=
-else
-	GO_C := gccgo-4.9 gccgo-go
-	INSTALL_FLAGS := -gccgoflags=-static-libgo
-endif
-
-define DEPENDENCIES
-  build-essential
-  bzr
-  juju-mongodb
-  mongodb-server
-  $(GO_C)
-endef
+DEPENDENCIES := build-essential bzr
+SNAP_DEPENDENCIES := go snapcraft
 
 default: build
 
-$(GOPATH)/bin/godeps:
-	go get -u github.com/rogpeppe/godeps
-
-# Start of GOPATH-dependent targets. Some targets only make sense -
-# and will only work - when this tree is found on the GOPATH.
-ifeq ($(CURDIR),$(PROJECT_DIR))
-
 build: version/init.go
-	go build $(PROJECT)/...
+	go build ./...
 
 check: version/init.go
-	go test $(PROJECT)/...
+	go test ./...
 
 release: candid-$(GIT_VERSION).tar.xz
 
 install: version/init.go
-	go install $(INSTALL_FLAGS) -v $(PROJECT)/...
+	go install $(INSTALL_FLAGS) -v ./...
 
 clean:
-	go clean $(PROJECT)/...
+	go clean ./...
 	-$(RM) version/init.go
 	-snapcraft clean
-
-else
-
-build:
-	$(error Cannot $@; $(CURDIR) is not on GOPATH)
-
-check:
-	$(error Cannot $@; $(CURDIR) is not on GOPATH)
-
-install:
-	$(error Cannot $@; $(CURDIR) is not on GOPATH)
-
-release:
-	$(error Cannot $@; $(CURDIR) is not on GOPATH)
-
-clean:
-	$(error Cannot $@; $(CURDIR) is not on GOPATH)
-
-endif
-# End of GOPATH-dependent targets.
 
 # Reformat source files.
 format:
@@ -85,23 +38,15 @@ simplify:
 server: install
 	candidsrv -logging-config INFO cmd/candidsrv/config.yaml
 
-# Update the project Go dependencies to the required revision.
-deps: $(GOPATH)/bin/godeps
-	$(GOPATH)/bin/godeps -u dependencies.tsv
-
-# Generate the dependencies file.
-create-deps: $(GOPATH)/bin/godeps
-	godeps -t $(shell go list $(PROJECT)/...) > dependencies.tsv || true
-
 # Generate version information
 version/init.go: version/init.go.tmpl FORCE
-	gofmt -r "unknownVersion -> Version{GitCommit: \"${GIT_COMMIT}\", Version: \"${GIT_VERSION}\",}" $< > $@
+	gofmt -r "unknownVersion -> Version{GitCommit: \"${GIT_COMMIT}\", Version: \"${GIT_VERSION}\",}" $< >$@
 
 # Generate snaps
 snap:
 	snapcraft
 
-RELEASE_BINARY_PACKAGES=$(PROJECT)/cmd/candidsrv
+RELEASE_BINARY_PACKAGES=./cmd/candidsrv
 
 # Build a release tarball
 candid-$(GIT_VERSION).tar.xz: version/init.go
@@ -124,15 +69,10 @@ deploy: release
 APT_BASED := $(shell command -v apt-get >/dev/null; echo $$?)
 sysdeps:
 ifeq ($(APT_BASED),0)
-ifeq ($(shell lsb_release -cs|sed -r 's/precise|quantal|raring/old/'),old)
-	@echo Adding PPAs for golang and mongodb
-	@sudo apt-add-repository --yes ppa:juju/golang
-	@sudo apt-add-repository --yes ppa:juju/stable
-endif
 	@echo Installing dependencies
-	sudo apt-get update
-	@sudo apt-get -y install $(strip $(DEPENDENCIES)) \
-	$(shell apt-cache madison juju-mongodb mongodb-server snapcraft | head -1 | cut -d '|' -f1)
+	@sudo apt-get update
+	@sudo apt-get -y install $(DEPENDENCIES) 
+	@sudo snap install $(SNAP_DEPENDENCIES)
 else
 	@echo sysdeps runs only on systems with apt-get
 	@echo on OS X with homebrew try: brew install bazaar mongodb
@@ -147,8 +87,6 @@ help:
 	@echo 'make server - Start the candid server.'
 	@echo 'make clean - Remove object files from package source directories.'
 	@echo 'make sysdeps - Install the development environment system packages.'
-	@echo 'make deps - Set up the project Go dependencies.'
-	@echo 'make create-deps - Generate the Go dependencies file.'
 	@echo 'make format - Format the source files.'
 	@echo 'make simplify - Format and simplify the source files.'
 

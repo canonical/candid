@@ -1,7 +1,7 @@
 package memstore
 
 import (
-	"github.com/juju/aclstore"
+	"github.com/juju/aclstore/v2"
 	"github.com/juju/simplekv/memsimplekv"
 	"github.com/juju/utils/debugstatus"
 	"gopkg.in/macaroon-bakery.v2/bakery"

@@ -7,7 +7,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/juju/aclstore"
+	"github.com/juju/aclstore/v2"
 	"github.com/juju/loggo"
 	"golang.org/x/net/context"
 	"gopkg.in/CanonicalLtd/candidclient.v1/params"

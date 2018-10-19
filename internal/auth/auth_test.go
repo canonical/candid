@@ -6,7 +6,7 @@ package auth_test
 import (
 	"sort"
 
-	"github.com/juju/aclstore"
+	"github.com/juju/aclstore/v2"
 	jc "github.com/juju/testing/checkers"
 	"golang.org/x/net/context"
 	"gopkg.in/CanonicalLtd/candidclient.v1"

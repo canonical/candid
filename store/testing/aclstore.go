@@ -4,7 +4,7 @@
 package testing
 
 import (
-	"github.com/juju/aclstore"
+	"github.com/juju/aclstore/v2"
 	jc "github.com/juju/testing/checkers"
 	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
