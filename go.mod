@@ -6,7 +6,7 @@ require (
 	github.com/coreos/go-oidc v0.0.0-20170119174436-2cc7913f9f6f
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/garyburd/go-oauth v0.0.0-20150329160146-3131beb69b81
-	github.com/google/go-cmp v0.1.0
+	github.com/google/go-cmp v0.2.0
 	github.com/gorilla/handlers v0.0.0-20170224193955-13d73096a474
 	github.com/juju/aclstore/v2 v2.0.0-alpha2
 	github.com/juju/ansiterm v0.0.0-20160907234532-b99631de12cf // indirect
@@ -16,6 +16,7 @@ require (
 	github.com/juju/go4 v0.0.0-20160222163258-40d72ab9641a // indirect
 	github.com/juju/httpprof v0.0.0-20141217160036-14bf14c30767 // indirect
 	github.com/juju/loggo v0.0.0-20180524022052-584905176618
+	github.com/juju/mgotest v1.0.1
 	github.com/juju/names v0.0.0-20160330150533-8a0aa0963bba
 	github.com/juju/persistent-cookiejar v0.0.0-20170428161559-d67418f14c93
 	github.com/juju/postgrestest v0.0.0-20180111150307-95c1ddb2775d
@@ -50,7 +51,7 @@ require (
 	gopkg.in/CanonicalLtd/candidclient.v1 v1.0.0-20181010171838-4bc1e18d38ce
 	gopkg.in/asn1-ber.v1 v1.0.0-20170511165959-379148ca0225
 	gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127
-	gopkg.in/errgo.v1 v1.0.0-20161222125816-442357a80af5
+	gopkg.in/errgo.v1 v1.0.0
 	gopkg.in/goose.v1 v1.0.0-20161130145116-8f055ce635d6
 	gopkg.in/httprequest.v1 v1.1.2
 	gopkg.in/juju/environschema.v1 v1.0.0-20151104115810-7359fc7857ab
