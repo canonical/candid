@@ -6,7 +6,7 @@ package candidtest
 import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/juju/aclstore"
+	"github.com/juju/aclstore/v2"
 	"github.com/juju/simplekv/memsimplekv"
 	"github.com/juju/testing"
 	gc "gopkg.in/check.v1"

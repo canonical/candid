@@ -7,7 +7,7 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/juju/aclstore"
+	"github.com/juju/aclstore/v2"
 	"github.com/juju/simplekv/sqlsimplekv"
 	"github.com/juju/utils/debugstatus"
 	errgo "gopkg.in/errgo.v1"

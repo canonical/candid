@@ -9,7 +9,7 @@ import (
 	"net"
 	"net/http"
 
-	"github.com/juju/aclstore"
+	"github.com/juju/aclstore/v2"
 	"github.com/juju/simplekv/memsimplekv"
 	"golang.org/x/net/context"
 	errgo "gopkg.in/errgo.v1"

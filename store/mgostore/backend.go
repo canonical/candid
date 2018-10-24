@@ -6,7 +6,7 @@ package mgostore
 import (
 	"time"
 
-	"github.com/juju/aclstore"
+	"github.com/juju/aclstore/v2"
 	"github.com/juju/simplekv/mgosimplekv"
 	"github.com/juju/utils/debugstatus"
 	"golang.org/x/net/context"

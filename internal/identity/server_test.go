@@ -12,7 +12,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/juju/aclstore/aclclient"
+	"github.com/juju/aclstore/v2/aclclient"
 	"github.com/juju/loggo"
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/testing/httptesting"

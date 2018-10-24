@@ -4,7 +4,7 @@
 package admincmd
 
 import (
-	"github.com/juju/aclstore/aclclient"
+	"github.com/juju/aclstore/v2/aclclient"
 	"github.com/juju/cmd"
 	"github.com/juju/gnuflag"
 	"golang.org/x/net/context"

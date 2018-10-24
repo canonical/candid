@@ -7,7 +7,7 @@ import (
 	"encoding/base64"
 	"net/http"
 
-	"github.com/juju/aclstore"
+	"github.com/juju/aclstore/v2"
 	"golang.org/x/net/context"
 	"gopkg.in/CanonicalLtd/candidclient.v1/params"
 	gc "gopkg.in/check.v1"

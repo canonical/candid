@@ -10,7 +10,7 @@ import (
 	"runtime/debug"
 	"time"
 
-	"github.com/juju/aclstore"
+	"github.com/juju/aclstore/v2"
 	"github.com/juju/loggo"
 	"github.com/juju/utils/debugstatus"
 	"github.com/julienschmidt/httprouter"
