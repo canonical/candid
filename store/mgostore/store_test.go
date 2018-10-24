@@ -4,8 +4,9 @@
 package mgostore_test
 
 import (
-	"github.com/juju/testing"
+	"github.com/juju/mgotest"
 	gc "gopkg.in/check.v1"
+	errgo "gopkg.in/errgo.v1"
 
 	"github.com/CanonicalLtd/candid/store"
 	"github.com/CanonicalLtd/candid/store/mgostore"
@@ -13,27 +14,21 @@ import (
 )
 
 type mgostoreSuite struct {
-	testing.IsolatedMgoSuite
 	storetesting.StoreSuite
+	db      *mgotest.Database
 	backend store.Backend
 }
 
 var _ = gc.Suite(&mgostoreSuite{})
 
-func (s *mgostoreSuite) SetUpSuite(c *gc.C) {
-	s.IsolatedMgoSuite.SetUpSuite(c)
-	s.StoreSuite.SetUpSuite(c)
-}
-
-func (s *mgostoreSuite) TearDownSuite(c *gc.C) {
-	s.StoreSuite.TearDownSuite(c)
-	s.IsolatedMgoSuite.TearDownSuite(c)
-}
-
 func (s *mgostoreSuite) SetUpTest(c *gc.C) {
-	s.IsolatedMgoSuite.SetUpTest(c)
 	var err error
-	s.backend, err = mgostore.NewBackend(s.Session.DB("candid-test"))
+	s.db, err = mgotest.New()
+	if errgo.Cause(err) == mgotest.ErrDisabled {
+		c.Skip("mgotest disabled")
+	}
+	c.Assert(err, gc.Equals, nil)
+	s.backend, err = mgostore.NewBackend(s.db.Database)
 	c.Assert(err, gc.Equals, nil)
 	s.Store = s.backend.Store()
 	s.StoreSuite.SetUpTest(c)
@@ -41,6 +36,10 @@ func (s *mgostoreSuite) SetUpTest(c *gc.C) {
 
 func (s *mgostoreSuite) TearDownTest(c *gc.C) {
 	s.StoreSuite.TearDownTest(c)
-	s.backend.Close()
-	s.IsolatedMgoSuite.TearDownTest(c)
+	if s.backend != nil {
+		s.backend.Close()
+	}
+	if s.db != nil {
+		s.db.Close()
+	}
 }

@@ -34,7 +34,12 @@ func (s *MeetingSuite) SetUpTest(c *gc.C) {
 }
 
 func (s *MeetingSuite) TearDownTest(c *gc.C) {
-	s.close()
+	// As this suite is designed to be embedded in database specific
+	// ones it is possible for TearDownTest to be called when
+	// SetUpTest hasn't.
+	if s.close != nil {
+		s.close()
+	}
 }
 
 func (s *MeetingSuite) TestPutGetRemove(c *gc.C) {

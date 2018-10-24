@@ -1,24 +1,50 @@
 package mgostore_test
 
 import (
-	"github.com/CanonicalLtd/candid/store"
-	storetesting "github.com/CanonicalLtd/candid/store/testing"
-	"github.com/juju/testing"
+	"os"
+
 	gc "gopkg.in/check.v1"
+	errgo "gopkg.in/errgo.v1"
 	"gopkg.in/yaml.v2"
+
+	"github.com/CanonicalLtd/candid/store"
+	"github.com/CanonicalLtd/candid/store/mgostore"
+	storetesting "github.com/CanonicalLtd/candid/store/testing"
+	"github.com/juju/mgotest"
 )
 
 var _ = gc.Suite(&configSuite{})
 
 type configSuite struct {
-	testing.IsolatedMgoSuite
+	db  *mgotest.Database
+	url string
+}
+
+func (s *configSuite) SetUpTest(c *gc.C) {
+	var err error
+	s.db, err = mgotest.New()
+	if errgo.Cause(err) == mgotest.ErrDisabled {
+		c.Skip("mgotest disabled")
+	}
+	c.Assert(err, gc.Equals, nil)
+	s.url = os.Getenv("MGOCONNECTIONSTRING")
+	if s.url == "" {
+		s.url = "localhost"
+	}
+}
+
+func (s *configSuite) TearDownTest(c *gc.C) {
+	if s.db != nil {
+		s.db.Close()
+	}
 }
 
 func (s *configSuite) TestUnmarshal(c *gc.C) {
 	storetesting.TestUnmarshal(c, `
 storage:
     type: mongodb
-    address: `+testing.MgoServer.Addr()+`
+    address: `+s.url+`
+    database: `+s.db.Name+`
 `)
 }
 
@@ -34,29 +60,19 @@ storage:
 	c.Assert(err, gc.ErrorMatches, `cannot unmarshal mongodb configuration: no address field in mongodb storage configuration`)
 }
 
-func (s *configSuite) TestUnmarshalWithExplicitDatabase(c *gc.C) {
-	fooDB := s.Session.DB("foo")
-	names, err := fooDB.CollectionNames()
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(names, gc.HasLen, 0)
-
+func (s *configSuite) TestUnmarshalWithoutDatabase(c *gc.C) {
 	configData := `
 storage:
     type: mongodb
-    address: ` + testing.MgoServer.Addr() + `
-    database: foo
+    address: ` + s.url + `
 `
 	var cfg struct {
 		Storage *store.Config `yaml:"storage"`
 	}
-	err = yaml.Unmarshal([]byte(configData), &cfg)
+	err := yaml.Unmarshal([]byte(configData), &cfg)
 	c.Assert(err, gc.Equals, nil)
 
-	backend, err := cfg.Storage.NewBackend()
-	c.Assert(err, gc.Equals, nil)
-	defer backend.Close()
-
-	names, err = fooDB.CollectionNames()
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(names, gc.Not(gc.HasLen), 0)
+	p, ok := cfg.Storage.BackendFactory.(mgostore.Params)
+	c.Assert(ok, gc.Equals, true)
+	c.Assert(p.Database, gc.Equals, "candid")
 }

@@ -1,0 +1,10 @@
+language: go
+go_import_path: "github.com/CanonicalLtd/candid"
+go: 
+  - "1.11"
+script: GO111MODULE=on go test ./...
+services:
+  - mongodb
+  - postgresql
+addons:
+  postgresql: "9.5"
