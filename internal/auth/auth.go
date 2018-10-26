@@ -499,19 +499,23 @@ type groupResolver interface {
 	resolveGroups(context.Context, *store.Identity) ([]string, error)
 }
 
+// candidGroupResolver is the group resolver used for identities using
+// the "idm" provider type. These are the agent identites.
 type candidGroupResolver struct {
 	store     store.Store
 	resolvers map[string]groupResolver
 }
 
-// resolveGroups implements groupResolver by checking returning
-// groups that are in both the identity and the owner of the
-// identity.
+// resolveGroups implements groupResolver by checking that the groups
+// allocated to the agent are still valid. All groups listed in the
+// agent's identity are checked with the owner and only those where the
+// owner is also still a member are returned. The result is effectively
+// the union between the agent's groups and the owner's groups.
 func (r candidGroupResolver) resolveGroups(ctx context.Context, identity *store.Identity) ([]string, error) {
 	if identity.Owner == "" {
-		// No owner - no groups. This applies to admin@candid, but for
-		// other users, it's probably an internal inconsistency error.
-		return nil, nil
+		// No owner implies a parent agent. These agents are
+		// members of only the specified groups.
+		return identity.Groups, nil
 	}
 	if identity.Owner == AdminProviderID {
 		// The admin user is a member of all groups by definition.
