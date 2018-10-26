@@ -43,6 +43,7 @@ const (
 	ActionDischargeFor       = "dischargeFor"
 	ActionDischarge          = "discharge"
 	ActionCreateAgent        = "createAgent"
+	ActionCreateParentAgent  = "createParentAgent"
 	ActionReadAdmin          = "readAdmin"
 	ActionWriteAdmin         = "writeAdmin"
 	ActionReadGroups         = "readGroups"
@@ -175,6 +176,9 @@ func (a *Authorizer) aclForOp(ctx context.Context, op bakery.Op) (acl []string, 
 			// Anyone can create an agent, as long as they've authenticated
 			// themselves.
 			return []string{identchecker.Everyone}, false, nil
+		case ActionCreateParentAgent:
+			acl, err := a.aclManager.ACL(ctx, writeUserACL)
+			return acl, false, errgo.Mask(err)
 		}
 	case kindUser:
 		if name == "" {

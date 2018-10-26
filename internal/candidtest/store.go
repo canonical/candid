@@ -65,6 +65,7 @@ func (s *StoreServerSuite) SetUpTest(c *gc.C) {
 	s.Params.ProviderDataStore = s.ProviderDataStore
 	s.Params.MeetingStore = s.MeetingStore
 	s.Params.RootKeyStore = s.BakeryRootKeyStore
+	s.Params.ACLStore = s.ACLStore
 	s.ServerSuite.SetUpTest(c)
 }
 

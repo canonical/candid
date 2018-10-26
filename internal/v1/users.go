@@ -127,14 +127,18 @@ func (h *handler) CreateAgent(p httprequest.Params, u *params.CreateAgentRequest
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot find identity for authenticated user")
 	}
-	if owner.ProviderID.Provider() == "idm" && owner.Owner != "" {
-		// The authenticated user is an agent, so we don't allow it to create other agents.
-		// TODO a nicer way to do this check might be to express it as a group
-		// permission - all non-agent users are in the "can create agents" group.
-		// TODO In the future, we might allow agents to create other agents, but
-		// we'll have to work out what to do about hierarchy - if agent A creates
-		// agent B, then A is removed from a group but its owner is still a member
-		// of that group, should B still have access to the group?
+	if owner.ProviderID.Provider() == "idm" && owner.Owner != "" && !u.Parent {
+		// Agent users, that are not parent agents, are not
+		// allowed to create their own agents.
+		// TODO a nicer way to do this check might be to express
+		// it as a group permission - all non-agent users are in
+		// the "can create agents" group.
+		// TODO In the future, we might allow agents to create
+		// other agents, but we'll have to work out what to do
+		// about hierarchy - if agent A creates agent B, then A
+		// is removed from a group but its owner is still a
+		// member of that group, should B still have access to
+		// the group?
 		return nil, errgo.Newf("cannot create an agent using an agent account")
 	}
 	agentName, err := newAgentName()
@@ -147,16 +151,23 @@ func (h *handler) CreateAgent(p httprequest.Params, u *params.CreateAgentRequest
 		Name:       u.FullName,
 		Groups:     u.Groups,
 		PublicKeys: pks,
-		Owner:      owner.ProviderID,
+		ProviderInfo: map[string][]string{
+			"creator": {string(owner.ProviderID)},
+		},
+	}
+	update := store.Update{
+		store.Username:     store.Set,
+		store.PublicKeys:   store.Set,
+		store.Groups:       store.Set,
+		store.Name:         store.Set,
+		store.ProviderInfo: store.Set,
+	}
+	if !u.Parent {
+		identity.Owner = owner.ProviderID
+		update[store.Owner] = store.Set
 	}
 	// TODO add tags to Identity?
-	if err := h.params.Store.UpdateIdentity(p.Context, identity, store.Update{
-		store.Username:   store.Set,
-		store.PublicKeys: store.Set,
-		store.Groups:     store.Set,
-		store.Name:       store.Set,
-		store.Owner:      store.Set,
-	}); err != nil {
+	if err := h.params.Store.UpdateIdentity(p.Context, identity, update); err != nil {
 		return nil, translateStoreError(err)
 	}
 	return &params.CreateAgentResponse{
