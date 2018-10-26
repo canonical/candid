@@ -107,117 +107,6 @@ var (
 	pk2      = privKey2.Public
 )
 
-var setUserTests = []struct {
-	about      string
-	username   params.Username
-	existing   []params.User
-	user       params.User
-	expectUser params.User
-}{{
-	about: "update user",
-	existing: []params.User{{
-		Username:   "jbloggs2",
-		ExternalID: "test:http://example.com/jbloggs2",
-		FullName:   "Joe Bloggs II",
-		Email:      "jbloggs2@example.com",
-		IDPGroups: []string{
-			"test1",
-		},
-	}},
-	username: "jbloggs2",
-	user: params.User{
-		FullName: "Joe Bloggs The Second",
-		Email:    "jbloggsii@example.com",
-		IDPGroups: []string{
-			"test2",
-			"test3",
-		},
-	},
-	expectUser: params.User{
-		Username:   "jbloggs2",
-		ExternalID: "test:http://example.com/jbloggs2",
-		FullName:   "Joe Bloggs The Second",
-		Email:      "jbloggsii@example.com",
-		IDPGroups: []string{
-			"test2",
-			"test3",
-		},
-	},
-}, {
-	about: "create agent",
-	existing: []params.User{{
-		Username:   "jbloggs2",
-		ExternalID: "test:http://example.com/jbloggs2",
-		FullName:   "Joe Bloggs II",
-		Email:      "jbloggs2@example.com",
-		IDPGroups: []string{
-			"test1",
-		},
-	}},
-	username: "agent@jbloggs2",
-	user: params.User{
-		Owner: "jbloggs2",
-		IDPGroups: []string{
-			"test1",
-		},
-		PublicKeys: []*bakery.PublicKey{
-			&pk1,
-		},
-	},
-	expectUser: params.User{
-		Username: "agent@jbloggs2",
-		Owner:    "jbloggs2",
-		IDPGroups: []string{
-			"test1",
-		},
-		PublicKeys: []*bakery.PublicKey{
-			&pk1,
-		},
-	},
-}, {
-	about: "update agent",
-	existing: []params.User{{
-		Username:   "jbloggs2",
-		ExternalID: "test:http://example.com/jbloggs2",
-		FullName:   "Joe Bloggs II",
-		Email:      "jbloggs2@example.com",
-		IDPGroups: []string{
-			"test1",
-			"test3",
-		},
-	}, {
-		Username:   "agent2@jbloggs2",
-		ExternalID: "idm:agent2@jbloggs2",
-		Owner:      "jbloggs2",
-		IDPGroups: []string{
-			"test1",
-		},
-		PublicKeys: []*bakery.PublicKey{
-			&pk1,
-		},
-	}},
-	username: "agent2@jbloggs2",
-	user: params.User{
-		IDPGroups: []string{
-			"test3",
-			"test4", // Note: not present in owner's groups.
-		},
-		PublicKeys: []*bakery.PublicKey{
-			&pk2,
-		},
-	},
-	expectUser: params.User{
-		Username: "agent2@jbloggs2",
-		Owner:    "jbloggs2",
-		IDPGroups: []string{
-			"test3",
-		},
-		PublicKeys: []*bakery.PublicKey{
-			&pk2,
-		},
-	},
-}}
-
 func (s *usersSuite) TestCreateAgent(c *gc.C) {
 	client, err := candidclient.New(candidclient.NewParams{
 		BaseURL: s.URL,
@@ -344,25 +233,143 @@ func (s *usersSuite) TestCreateAgentWithGroups(c *gc.C) {
 	c.Assert(groups, gc.DeepEquals, []string{"g1", "g3"})
 }
 
-func (s *usersSuite) TestSetUser(c *gc.C) {
-	c.Skip("deprecated")
-	for i, test := range setUserTests {
-		c.Logf("\ntest %d. %s", i, test.about)
-		s.clearIdentities(c)
-		for _, u := range test.existing {
-			s.addUser(c, u)
-		}
-		err := s.adminClient.SetUserDeprecated(s.Ctx, &params.SetUserRequest{
-			Username: test.username,
-			User:     test.user,
-		})
-		c.Assert(err, gc.Equals, nil)
-		u, err := s.adminClient.User(s.Ctx, &params.UserRequest{
-			Username: test.username,
-		})
-		c.Assert(err, gc.Equals, nil)
-		s.assertUser(c, *u, test.expectUser)
+func (s *usersSuite) TestCreateParentAgent(c *gc.C) {
+	resp, err := s.adminClient.CreateAgent(s.Ctx, &params.CreateAgentRequest{
+		CreateAgentBody: params.CreateAgentBody{
+			FullName:   "my agent",
+			PublicKeys: []*bakery.PublicKey{&pk1},
+			Groups:     []string{"g1", "g2"},
+			Parent:     true,
+		},
+	})
+	c.Assert(err, gc.Equals, nil)
+	if !strings.HasPrefix(string(resp.Username), "a-") {
+		c.Errorf("unexpected agent username %q", resp.Username)
 	}
+	systemUserClient, err := candidclient.New(candidclient.NewParams{
+		BaseURL: s.URL,
+		Client: &httpbakery.Client{
+			Client: httpbakery.NewHTTPClient(),
+			Key:    privKey1,
+		},
+		AgentUsername: string(resp.Username),
+	})
+	c.Assert(err, gc.Equals, nil)
+
+	whoAmIResp, err := systemUserClient.WhoAmI(s.Ctx, nil)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(whoAmIResp.User, gc.Equals, string(resp.Username))
+
+	groups, err := systemUserClient.UserGroups(s.Ctx, &params.UserGroupsRequest{
+		Username: resp.Username,
+	})
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(groups, gc.HasLen, 0)
+}
+
+func (s *usersSuite) TestCreateParentAgentUnauthorized(c *gc.C) {
+	client, err := candidclient.New(candidclient.NewParams{
+		BaseURL: s.URL,
+		Client: &httpbakery.Client{
+			Client: httpbakery.NewHTTPClient(),
+			InteractionMethods: []httpbakery.Interactor{testidp.Interactor{
+				User: &params.User{
+					Username:   "bob",
+					ExternalID: "test:bob",
+					IDPGroups:  []string{"g1", "g2", "g3"},
+				},
+			}},
+		},
+	})
+	c.Assert(err, gc.Equals, nil)
+
+	_, err = client.CreateAgent(s.Ctx, &params.CreateAgentRequest{
+		CreateAgentBody: params.CreateAgentBody{
+			FullName:   "my agent",
+			PublicKeys: []*bakery.PublicKey{&pk1},
+			Groups:     []string{"g1", "g2"},
+			Parent:     true,
+		},
+	})
+	c.Assert(err, gc.ErrorMatches, `Post http://.*/v1/u: permission denied`)
+}
+
+func (s *usersSuite) TestCreateParentAgentNotInGroups(c *gc.C) {
+	client, err := candidclient.New(candidclient.NewParams{
+		BaseURL: s.URL,
+		Client: &httpbakery.Client{
+			Client: httpbakery.NewHTTPClient(),
+			InteractionMethods: []httpbakery.Interactor{testidp.Interactor{
+				User: &params.User{
+					Username:   "bob",
+					ExternalID: "test:bob",
+					IDPGroups:  []string{"g1", "g2"},
+				},
+			}},
+		},
+	})
+	c.Assert(err, gc.Equals, nil)
+
+	err = s.ACLStore.Add(s.Ctx, "write-user", []string{"bob"})
+	c.Assert(err, gc.Equals, nil)
+
+	_, err = client.CreateAgent(s.Ctx, &params.CreateAgentRequest{
+		CreateAgentBody: params.CreateAgentBody{
+			FullName:   "my agent",
+			PublicKeys: []*bakery.PublicKey{&pk1},
+			Groups:     []string{"g1", "g3"},
+			Parent:     true,
+		},
+	})
+	c.Assert(err, gc.ErrorMatches, `Post http://.*/v1/u: cannot add agent to groups that you are not a member of`)
+}
+
+func (s *usersSuite) TestCreateAgentAsParentAgent(c *gc.C) {
+	resp, err := s.adminClient.CreateAgent(s.Ctx, &params.CreateAgentRequest{
+		CreateAgentBody: params.CreateAgentBody{
+			FullName:   "my agent",
+			PublicKeys: []*bakery.PublicKey{&pk1},
+			Parent:     true,
+		},
+	})
+	c.Assert(err, gc.Equals, nil)
+	if !strings.HasPrefix(string(resp.Username), "a-") {
+		c.Errorf("unexpected agent username %q", resp.Username)
+	}
+	systemUserClient, err := candidclient.New(candidclient.NewParams{
+		BaseURL: s.URL,
+		Client: &httpbakery.Client{
+			Client: httpbakery.NewHTTPClient(),
+			Key:    privKey1,
+		},
+		AgentUsername: string(resp.Username),
+	})
+	c.Assert(err, gc.Equals, nil)
+
+	resp, err = systemUserClient.CreateAgent(s.Ctx, &params.CreateAgentRequest{
+		CreateAgentBody: params.CreateAgentBody{
+			FullName:   "my agent 2",
+			PublicKeys: []*bakery.PublicKey{&pk1},
+		},
+	})
+	c.Assert(err, gc.Equals, nil)
+
+	client, err := candidclient.New(candidclient.NewParams{
+		BaseURL: s.URL,
+		Client: &httpbakery.Client{
+			Client: httpbakery.NewHTTPClient(),
+			Key:    privKey1,
+		},
+		AgentUsername: string(resp.Username),
+	})
+	c.Assert(err, gc.Equals, nil)
+	_, err = client.CreateAgent(s.Ctx, &params.CreateAgentRequest{
+		CreateAgentBody: params.CreateAgentBody{
+			FullName:   "my agent",
+			PublicKeys: []*bakery.PublicKey{&pk1},
+		},
+	})
+	c.Assert(err, gc.ErrorMatches, `Post.*: cannot create an agent using an agent account`)
 }
 
 func (s *usersSuite) clearIdentities(c *gc.C) {
@@ -373,84 +380,6 @@ func (s *usersSuite) clearIdentities(c *gc.C) {
 		c.Fatalf("store type %T does not implement RemoveAll", s.Store)
 	}
 	store.RemoveAll()
-}
-
-var setUserErrorTests = []struct {
-	about       string
-	username    params.Username
-	user        params.User
-	expectError string
-}{{
-	about:       "bad username",
-	username:    "bad-name-",
-	expectError: `Put .*/v1/u/bad-name-: cannot unmarshal parameters: cannot unmarshal into field Username: illegal username "bad-name-"`,
-}, {
-	about:    "username specified",
-	username: "jbloggs",
-	user: params.User{
-		Username: "jbloggs",
-	},
-	expectError: `Put .*/v1/u/jbloggs: username provided but not allowed`,
-}, {
-	about:    "external_id specified",
-	username: "jbloggs",
-	user: params.User{
-		ExternalID: "someid",
-	},
-	expectError: `Put .*/v1/u/jbloggs: external ID provided but not allowed`,
-}, {
-	about:    "reserved name",
-	username: "everyone",
-	user: params.User{
-		Username:   "everyone",
-		ExternalID: "test:http://example.com/jbloggs",
-	},
-	expectError: `Put .*/v1/u/everyone: username "everyone" is reserved`,
-}, {
-	about:    "invalid agent name",
-	username: "agent",
-	user: params.User{
-		Username: "agent",
-		Owner:    "bob",
-	},
-	expectError: `Put .*/v1/u/agent: bob cannot create user "agent" \(suffix must be "@bob"\)`,
-}, {
-	about:    "agent owner doesn't exist",
-	username: "agent@alice",
-	user: params.User{
-		Owner: "alice",
-	},
-	expectError: `Put .*/v1/u/agent@alice: owner "alice" must exist`,
-}, {
-	about:    "nil public key",
-	username: "agent@alice",
-	user: params.User{
-		Owner:      "alice",
-		PublicKeys: []*bakery.PublicKey{nil},
-	},
-	expectError: `Put http://.*/v1/u/agent@alice: null public key provided`,
-}}
-
-func (s *usersSuite) TestSetUserErrors(c *gc.C) {
-	c.Skip("deprecated setuser")
-	s.addUser(c, params.User{
-		Username:   "jbloggs2",
-		ExternalID: "test:http://example.com/jbloggs2",
-		FullName:   "Joe Bloggs II",
-		Email:      "jbloggs2@example.com",
-		IDPGroups: []string{
-			"test1",
-		},
-	})
-
-	for i, test := range setUserErrorTests {
-		c.Logf("test %d. %s", i, test.about)
-		err := s.adminClient.SetUserDeprecated(s.Ctx, &params.SetUserRequest{
-			Username: test.username,
-			User:     test.user,
-		})
-		c.Assert(err, gc.ErrorMatches, test.expectError)
-	}
 }
 
 var queryUserTests = []struct {

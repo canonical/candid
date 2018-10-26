@@ -9,7 +9,7 @@ require (
 	github.com/google/go-cmp v0.2.0
 	github.com/gorilla/handlers v0.0.0-20170224193955-13d73096a474
 	github.com/juju/aclstore/v2 v2.0.0-alpha2
-	github.com/juju/ansiterm v0.0.0-20160907234532-b99631de12cf // indirect
+	github.com/juju/ansiterm v0.0.0-20180109212912-720a0952cc2a // indirect
 	github.com/juju/clock v0.0.0-20180808021310-bab88fc67299
 	github.com/juju/cmd v0.0.0-20180424151504-9ce53c6f9d00
 	github.com/juju/gnuflag v0.0.0-20171113085948-2ce1bb71843d
@@ -20,17 +20,16 @@ require (
 	github.com/juju/names v0.0.0-20160330150533-8a0aa0963bba
 	github.com/juju/persistent-cookiejar v0.0.0-20170428161559-d67418f14c93
 	github.com/juju/postgrestest v0.0.0-20180111150307-95c1ddb2775d
-	github.com/juju/schema v0.0.0-20160420044203-075de04f9b7d
+	github.com/juju/schema v0.0.0-20180109041850-e4f08199aa80
 	github.com/juju/simplekv v0.0.0-20180621131638-ff82918775e5
 	github.com/juju/testing v0.0.0-20180920084828-472a3e8b2073
 	github.com/juju/usso v0.0.0-20160418121039-5b79b358f4bb
 	github.com/juju/utils v0.0.0-20180820210520-bf9cc5bdd62d
-	github.com/juju/webbrowser v0.0.0-20160309143629-54b8c57083b4 // indirect
 	github.com/julienschmidt/httprouter v0.0.0-20151013225520-77a895ad01eb
 	github.com/lib/pq v0.0.0-20171126050459-83612a56d3dd
-	github.com/lunixbochs/vtclean v0.0.0-20160125035106-4fbf7632a2c6 // indirect
-	github.com/mattn/go-colorable v0.0.6 // indirect
-	github.com/mattn/go-isatty v0.0.0-20160806122752-66b8e73f3f5c // indirect
+	github.com/lunixbochs/vtclean v0.0.0-20180621232353-2d01aacdc34a // indirect
+	github.com/mattn/go-colorable v0.0.9 // indirect
+	github.com/mattn/go-isatty v0.0.4 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.1 // indirect
 	github.com/mhilton/openid v0.0.0-20150511103207-7922a4e937d8
 	github.com/pmezard/go-difflib v1.0.0 // indirect
@@ -39,23 +38,20 @@ require (
 	github.com/prometheus/client_model v0.0.0-20150212101744-fa8ad6fec335 // indirect
 	github.com/prometheus/common v0.0.0-20160503220532-dd586c1c5abb // indirect
 	github.com/prometheus/procfs v0.0.0-20160411190841-abf152e5f3e9 // indirect
-	github.com/rogpeppe/fastuuid v0.0.0-20150106093220-6724a57986af // indirect
 	github.com/stretchr/testify v1.2.2 // indirect
 	github.com/yohcop/openid-go v0.0.0-20160304164425-f38c0087a377
 	golang.org/x/crypto v0.0.0-20181009213950-7c1a557ab941
-	golang.org/x/net v0.0.0-20180724234803-3673e40ba225
+	golang.org/x/net v0.0.0-20181017193950-04a2e542c03f
 	golang.org/x/oauth2 v0.0.0-20161219192954-314dd2c0bf3e
-	golang.org/x/sync v0.0.0-20180314180146-1d60e4601c6f // indirect
-	golang.org/x/sys v0.0.0-20180202135801-37707fdb30a5 // indirect
 	google.golang.org/appengine v1.2.0 // indirect
-	gopkg.in/CanonicalLtd/candidclient.v1 v1.0.0-20181010171838-4bc1e18d38ce
+	gopkg.in/CanonicalLtd/candidclient.v1 v1.0.0
 	gopkg.in/asn1-ber.v1 v1.0.0-20170511165959-379148ca0225
 	gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127
 	gopkg.in/errgo.v1 v1.0.0
 	gopkg.in/goose.v1 v1.0.0-20161130145116-8f055ce635d6
 	gopkg.in/httprequest.v1 v1.1.2
 	gopkg.in/juju/environschema.v1 v1.0.0-20151104115810-7359fc7857ab
-	gopkg.in/juju/names.v2 v2.0.0-20171113112047-54f00845ae47
+	gopkg.in/juju/names.v2 v2.0.0-20180621093930-fd59336b4621
 	gopkg.in/ldap.v2 v2.5.0
 	gopkg.in/macaroon-bakery.v2 v2.1.0
 	gopkg.in/macaroon.v2 v2.0.0
