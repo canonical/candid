@@ -264,7 +264,7 @@ func (s *usersSuite) TestCreateParentAgent(c *gc.C) {
 		Username: resp.Username,
 	})
 	c.Assert(err, gc.Equals, nil)
-	c.Assert(groups, gc.HasLen, 0)
+	c.Assert(groups, jc.DeepEquals, []string{"g1", "g2"})
 }
 
 func (s *usersSuite) TestCreateParentAgentUnauthorized(c *gc.C) {
