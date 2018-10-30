@@ -8,9 +8,9 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"testing"
 
 	"golang.org/x/net/context"
-	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/httprequest.v1"
 	envschemaform "gopkg.in/juju/environschema.v1/form"
@@ -20,20 +20,29 @@ import (
 	"github.com/CanonicalLtd/candid/idp"
 	"github.com/CanonicalLtd/candid/idp/keystone"
 	"github.com/CanonicalLtd/candid/idp/keystone/internal/mockkeystone"
-	"github.com/CanonicalLtd/candid/internal/candidtest"
+	"github.com/CanonicalLtd/candid/internal/discharger"
+	"github.com/CanonicalLtd/candid/internal/identity"
+	candidtest "github.com/CanonicalLtd/candid/internal/qtcandidtest"
+	qt "github.com/frankban/quicktest"
+	"github.com/frankban/quicktest/qtsuite"
 )
 
 type dischargeSuite struct {
-	candidtest.DischargeSuite
-	server *mockkeystone.Server
-	params keystone.Params
+	candid           *candidtest.Server
+	dischargeCreator *candidtest.DischargeCreator
+	server           *mockkeystone.Server
+	params           keystone.Params
 }
 
-var _ = gc.Suite(&dischargeSuite{})
+func TestDischarge(t *testing.T) {
+	qtsuite.Run(qt.New(t), &dischargeSuite{})
+}
 
-func (s *dischargeSuite) SetUpSuite(c *gc.C) {
-	s.DischargeSuite.SetUpSuite(c)
+func (s *dischargeSuite) Init(c *qt.C) {
+	candidtest.LogTo(c)
+
 	s.server = mockkeystone.NewServer()
+	c.Defer(s.server.Close)
 	s.params = keystone.Params{
 		Name:        "openstack",
 		Description: "OpenStack",
@@ -42,15 +51,10 @@ func (s *dischargeSuite) SetUpSuite(c *gc.C) {
 	}
 	s.server.TokensFunc = testTokens
 	s.server.TenantsFunc = testTenants
-}
 
-func (s *dischargeSuite) TearDownSuite(c *gc.C) {
-	s.server.Close()
-	s.DischargeSuite.TearDownSuite(c)
-}
-
-func (s *dischargeSuite) SetUpTest(c *gc.C) {
-	s.Params.IdentityProviders = []idp.IdentityProvider{
+	store := candidtest.NewStore()
+	sp := store.ServerParams()
+	sp.IdentityProviders = []idp.IdentityProvider{
 		keystone.NewIdentityProvider(s.params),
 		keystone.NewUserpassIdentityProvider(
 			keystone.Params{
@@ -69,11 +73,15 @@ func (s *dischargeSuite) SetUpTest(c *gc.C) {
 			},
 		),
 	}
-	s.DischargeSuite.SetUpTest(c)
+	s.candid = candidtest.NewServer(c, sp, map[string]identity.NewAPIHandlerFunc{
+		"discharger": discharger.NewAPIHandler,
+	})
+	s.dischargeCreator = candidtest.NewDischargeCreator(s.candid)
+
 }
 
-func (s *dischargeSuite) TestInteractiveDischarge(c *gc.C) {
-	s.AssertDischarge(c, httpbakery.WebBrowserInteractor{
+func (s *dischargeSuite) TestInteractiveDischarge(c *qt.C) {
+	s.dischargeCreator.AssertDischarge(c, httpbakery.WebBrowserInteractor{
 		OpenWebBrowser: s.visitInteractive,
 	})
 }
@@ -108,8 +116,8 @@ func (s *dischargeSuite) visitInteractive(u *url.URL) error {
 	return nil
 }
 
-func (s *dischargeSuite) TestFormDischarge(c *gc.C) {
-	s.AssertDischarge(c, form.Interactor{
+func (s *dischargeSuite) TestFormDischarge(c *qt.C) {
+	s.dischargeCreator.AssertDischarge(c, form.Interactor{
 		Filler: keystoneFormFiller{
 			username: "testuser",
 			password: "testpass",
@@ -134,8 +142,8 @@ func (h keystoneFormFiller) Fill(f envschemaform.Form) (map[string]interface{}, 
 	}, nil
 }
 
-func (s *dischargeSuite) TestTokenDischarge(c *gc.C) {
-	s.AssertDischarge(c, &tokenInteractor{})
+func (s *dischargeSuite) TestTokenDischarge(c *qt.C) {
+	s.dischargeCreator.AssertDischarge(c, &tokenInteractor{})
 }
 
 type tokenLoginRequest struct {
