@@ -8,33 +8,19 @@ import (
 	"fmt"
 	"sync"
 	"sync/atomic"
+	"testing"
 	"time"
 
+	qt "github.com/frankban/quicktest"
 	"github.com/juju/clock"
 	"github.com/juju/clock/testclock"
-	"github.com/juju/testing"
 	"golang.org/x/net/context"
-	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
 
 	"github.com/CanonicalLtd/candid/meeting"
 )
 
-type suite struct {
-	testing.IsolationSuite
-	// clock holds the mock clock used by the meeting package.
-	clock *testclock.Clock
-}
-
-var _ = gc.Suite(&suite{})
-
 var epoch = parseTime("2016-01-01T12:00:00Z")
-
-func (s *suite) SetUpTest(c *gc.C) {
-	s.IsolationSuite.SetUpTest(c)
-	// Set up the clock mockery.
-	s.clock = testclock.NewClock(epoch)
-}
 
 func parseTime(s string) time.Time {
 	t, err := time.Parse(time.RFC3339, s)
@@ -49,38 +35,41 @@ type nilMetrics struct{}
 func (nilMetrics) RequestCompleted(startTime time.Time) {}
 func (nilMetrics) RequestsExpired(count int)            {}
 
-func (s *suite) TestRendezvousWaitBeforeDone(c *gc.C) {
-	s.PatchValue(&meeting.Clock, s.clock)
+func TestRendezvousWaitBeforeDone(t *testing.T) {
+	c := qt.New(t)
+	defer c.Done()
+	clock := testclock.NewClock(epoch)
+	c.Patch(&meeting.Clock, clock)
 	count := int32(0)
-	store := newFakeStore(&count, s.clock)
+	store := newFakeStore(&count, clock)
 	m, err := meeting.NewPlace(meeting.Params{
 		Store:      store,
 		ListenAddr: "localhost",
 		DisableGC:  true,
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.Equals, nil)
 	defer m.Close()
 
 	ctx := context.Background()
 
 	id, err := newId()
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.Equals, nil)
 	err = m.NewRendezvous(ctx, id, []byte("first data"))
-	c.Assert(id, gc.Not(gc.Equals), "")
+	c.Assert(id, qt.Not(qt.Equals), "")
 
 	waitDone := make(chan struct{})
 	go func() {
 		data0, data1, err := m.Wait(ctx, id)
-		c.Check(err, gc.IsNil)
-		c.Check(string(data0), gc.Equals, "first data")
-		c.Check(string(data1), gc.Equals, "second data")
+		c.Check(err, qt.IsNil)
+		c.Check(string(data0), qt.Equals, "first data")
+		c.Check(string(data1), qt.Equals, "second data")
 
 		close(waitDone)
 	}()
 
-	s.clock.Advance(10 * time.Millisecond)
+	clock.Advance(10 * time.Millisecond)
 	err = m.Done(ctx, id, []byte("second data"))
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.Equals, nil)
 	select {
 	case <-waitDone:
 	case <-time.After(2 * time.Second):
@@ -89,99 +78,105 @@ func (s *suite) TestRendezvousWaitBeforeDone(c *gc.C) {
 
 	// Check that item has now been deleted.
 	data0, data1, err := m.Wait(ctx, id)
-	c.Assert(data0, gc.IsNil)
-	c.Assert(data1, gc.IsNil)
-	c.Assert(err, gc.ErrorMatches, `rendezvous ".*" not found`)
+	c.Assert(data0, qt.IsNil)
+	c.Assert(data1, qt.IsNil)
+	c.Assert(err, qt.ErrorMatches, `rendezvous ".*" not found`)
 
-	c.Assert(atomic.LoadInt32(&count), gc.Equals, int32(0))
+	c.Assert(atomic.LoadInt32(&count), qt.Equals, int32(0))
 }
 
-func (s *suite) TestRendezvousDoneBeforeWait(c *gc.C) {
-	s.PatchValue(&meeting.Clock, s.clock)
+func TestRendezvousDoneBeforeWait(t *testing.T) {
+	c := qt.New(t)
+	defer c.Done()
+	clock := testclock.NewClock(epoch)
+	c.Patch(&meeting.Clock, clock)
 	count := int32(0)
-	store := newFakeStore(&count, s.clock)
+	store := newFakeStore(&count, clock)
 	p, err := meeting.NewPlace(meeting.Params{
 		Store:      store,
 		ListenAddr: "localhost",
 		DisableGC:  true,
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.Equals, nil)
 	defer p.Close()
 
 	ctx := context.Background()
 
 	id, err := newId()
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.Equals, nil)
 	err = p.NewRendezvous(ctx, id, []byte("first data"))
-	c.Assert(err, gc.IsNil)
-	c.Assert(id, gc.Not(gc.Equals), "")
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(id, qt.Not(qt.Equals), "")
 
 	err = p.Done(ctx, id, []byte("second data"))
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.Equals, nil)
 
 	err = p.Done(ctx, id, []byte("other second data"))
-	c.Assert(err, gc.ErrorMatches, `.*rendezvous ".*" done twice`)
+	c.Assert(err, qt.ErrorMatches, `.*rendezvous ".*" done twice`)
 
 	data0, data1, err := p.Wait(ctx, id)
-	c.Assert(err, gc.IsNil)
-	c.Assert(string(data0), gc.Equals, "first data")
-	c.Assert(string(data1), gc.Equals, "second data")
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(string(data0), qt.Equals, "first data")
+	c.Assert(string(data1), qt.Equals, "second data")
 
 	// Check that item has now been deleted.
 	data0, data1, err = p.Wait(ctx, id)
-	c.Assert(data0, gc.IsNil)
-	c.Assert(data1, gc.IsNil)
-	c.Assert(err, gc.ErrorMatches, `rendezvous ".*" not found`)
+	c.Assert(data0, qt.IsNil)
+	c.Assert(data1, qt.IsNil)
+	c.Assert(err, qt.ErrorMatches, `rendezvous ".*" not found`)
 
-	c.Assert(atomic.LoadInt32(&count), gc.Equals, int32(0))
+	c.Assert(atomic.LoadInt32(&count), qt.Equals, int32(0))
 }
 
-func (s *suite) TestRendezvousDifferentPlaces(c *gc.C) {
-	s.PatchValue(&meeting.Clock, s.clock)
+func TestRendezvousDifferentPlaces(t *testing.T) {
+	c := qt.New(t)
+	defer c.Done()
+	clock := testclock.NewClock(epoch)
+	c.Patch(&meeting.Clock, clock)
 	count := int32(0)
-	store := newFakeStore(&count, s.clock)
+	store := newFakeStore(&count, clock)
 	m1, err := meeting.NewPlace(meeting.Params{
 		Store:      store,
 		ListenAddr: "localhost",
 		DisableGC:  true,
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.Equals, nil)
 	defer m1.Close()
 	m2, err := meeting.NewPlace(meeting.Params{
 		Store:      store,
 		ListenAddr: "localhost",
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.Equals, nil)
 	defer m2.Close()
 	m3, err := meeting.NewPlace(meeting.Params{
 		Store:      store,
 		ListenAddr: "localhost",
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.Equals, nil)
 	defer m3.Close()
 
 	ctx := context.Background()
 
 	// Create the rendezvous in m1.
 	id, err := newId()
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.Equals, nil)
 	err = m1.NewRendezvous(ctx, id, []byte("first data"))
-	c.Assert(err, gc.IsNil)
-	c.Assert(id, gc.Not(gc.Equals), "")
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(id, qt.Not(qt.Equals), "")
 
 	// Wait for the rendezvous in m2.
 	waitDone := make(chan struct{})
 	go func() {
 		data0, data1, err := m2.Wait(ctx, id)
-		c.Check(err, gc.IsNil)
-		c.Check(string(data0), gc.Equals, "first data")
-		c.Check(string(data1), gc.Equals, "second data")
+		c.Check(err, qt.IsNil)
+		c.Check(string(data0), qt.Equals, "first data")
+		c.Check(string(data1), qt.Equals, "second data")
 
 		close(waitDone)
 	}()
-	s.clock.Advance(10 * time.Millisecond)
+	clock.Advance(10 * time.Millisecond)
 	err = m3.Done(ctx, id, []byte("second data"))
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.Equals, nil)
 
 	select {
 	case <-waitDone:
@@ -191,62 +186,68 @@ func (s *suite) TestRendezvousDifferentPlaces(c *gc.C) {
 
 	// Check that item has now been deleted.
 	data0, data1, err := m3.Wait(ctx, id)
-	c.Assert(data0, gc.IsNil)
-	c.Assert(data1, gc.IsNil)
-	c.Assert(err, gc.ErrorMatches, `rendezvous ".*" not found`)
+	c.Assert(data0, qt.IsNil)
+	c.Assert(data1, qt.IsNil)
+	c.Assert(err, qt.ErrorMatches, `rendezvous ".*" not found`)
 
-	c.Assert(atomic.LoadInt32(&count), gc.Equals, int32(0))
+	c.Assert(atomic.LoadInt32(&count), qt.Equals, int32(0))
 }
 
-func (s *suite) TestEntriesRemovedOnClose(c *gc.C) {
-	s.PatchValue(&meeting.Clock, s.clock)
-	store := newFakeStore(nil, s.clock)
+func TestEntriesRemovedOnClose(t *testing.T) {
+	c := qt.New(t)
+	defer c.Done()
+	clock := testclock.NewClock(epoch)
+	c.Patch(&meeting.Clock, clock)
+	store := newFakeStore(nil, clock)
 	m1, err := meeting.NewPlace(meeting.Params{
 		Store:      store,
 		ListenAddr: "localhost",
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.Equals, nil)
 	m2, err := meeting.NewPlace(meeting.Params{
 		Store:      store,
 		ListenAddr: "localhost",
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.Equals, nil)
 
 	ctx := context.Background()
 
 	for i := 0; i < 3; i++ {
 		err := m1.NewRendezvous(ctx, fmt.Sprintf("1%04x", i), []byte("something"))
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, qt.Equals, nil)
 	}
 	for i := 0; i < 5; i++ {
 		err := m2.NewRendezvous(ctx, fmt.Sprintf("2%04x", i), []byte("something"))
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, qt.Equals, nil)
 	}
 	m1.Close()
-	c.Assert(meeting.ItemCount(m1), gc.Equals, 0)
-	c.Assert(store.itemCount(), gc.Equals, 5)
+	c.Assert(meeting.ItemCount(m1), qt.Equals, 0)
+	c.Assert(store.itemCount(), qt.Equals, 5)
 
 	m2.Close()
-	c.Assert(store.itemCount(), gc.Equals, 0)
+	c.Assert(store.itemCount(), qt.Equals, 0)
 }
 
-func (s *suite) TestRunGCNotDying(c *gc.C) {
+func TestRunGCNotDying(t *testing.T) {
+	c := qt.New(t)
+	defer c.Done()
 	const expiryDuration = time.Hour
-	store := newFakeStore(nil, s.clock)
+	clock := testclock.NewClock(epoch)
+	store := newFakeStore(nil, clock)
 	m1, err := meeting.NewPlace(meeting.Params{
 		Store:          store,
 		ListenAddr:     "localhost",
 		ExpiryDuration: expiryDuration,
 		DisableGC:      true,
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.Equals, nil)
 	m2, err := meeting.NewPlace(meeting.Params{
 		Store:          store,
 		ListenAddr:     "localhost",
 		ExpiryDuration: expiryDuration,
 		DisableGC:      true,
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.Equals, nil)
 
 	ctx := context.Background()
 
@@ -261,58 +262,61 @@ func (s *suite) TestRunGCNotDying(c *gc.C) {
 		expiryDuration / 2,
 	} {
 		id, err := newId()
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, qt.Equals, nil)
 		err = m1.NewRendezvous(ctx, id, []byte("something"))
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, qt.Equals, nil)
 		ids1 = append(ids1, id)
 		store.setCreationTime(id, now.Add(-d))
 
 		id, err = newId()
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, qt.Equals, nil)
 		err = m2.NewRendezvous(ctx, id, []byte("something"))
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, qt.Equals, nil)
 		ids2 = append(ids2, id)
 		store.setCreationTime(id, now.Add(-d))
 	}
 
 	err = meeting.RunGC(m1, ctx, false, now)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.Equals, nil)
 
 	// All the expired ids on the server we ran the GC on should have
 	// been collected.
 	for i, id := range ids1[0:3] {
 		err := m1.Done(ctx, id, nil)
-		c.Assert(err, gc.ErrorMatches, `rendezvous ".*" not found`, gc.Commentf("id %d", i))
+		c.Assert(err, qt.ErrorMatches, `rendezvous ".*" not found`, qt.Commentf("id %d", i))
 	}
 	// The unexpired one should still be around.
 	err = m1.Done(ctx, ids1[3], nil)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.Equals, nil)
 
 	// The really old id on the other server should have been collected.
 	err = m1.Done(ctx, ids2[0], nil)
-	c.Assert(err, gc.ErrorMatches, `rendezvous ".*" not found`)
+	c.Assert(err, qt.ErrorMatches, `rendezvous ".*" not found`)
 
 	// All the others should still be around.
 	for _, id := range ids2[1:] {
 		err = m1.Done(ctx, id, nil)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, qt.Equals, nil)
 	}
 }
 
-func (s *suite) TestPartialRemoveOldFailure(c *gc.C) {
+func TestPartialRemoveOldFailure(t *testing.T) {
+	c := qt.New(t)
+	defer c.Done()
+	clock := testclock.NewClock(epoch)
 	const expiryDuration = time.Hour
 
 	// RemoveOld can fail with ids and an error. If it
 	// does so, the database and the server should remain
 	// consistent.
-	store := partialRemoveStore{newFakeStore(nil, s.clock)}
+	store := partialRemoveStore{newFakeStore(nil, clock)}
 	m, err := meeting.NewPlace(meeting.Params{
 		Store:          store,
 		ListenAddr:     "localhost",
 		ExpiryDuration: expiryDuration,
 		DisableGC:      true,
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.Equals, nil)
 
 	ctx := context.Background()
 
@@ -323,23 +327,23 @@ func (s *suite) TestPartialRemoveOldFailure(c *gc.C) {
 		expiryDuration / 2,
 	} {
 		id, err := newId()
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, qt.Equals, nil)
 		err = m.NewRendezvous(ctx, id, []byte("something"))
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, qt.Equals, nil)
 		store.setCreationTime(id, now.Add(-d))
 	}
 
 	err = meeting.RunGC(m, ctx, false, now)
-	c.Assert(err, gc.ErrorMatches, "cannot remove old entries: partial error")
+	c.Assert(err, qt.ErrorMatches, "cannot remove old entries: partial error")
 
-	c.Assert(meeting.ItemCount(m), gc.Equals, 2)
-	c.Assert(store.itemCount(), gc.Equals, 2)
+	c.Assert(meeting.ItemCount(m), qt.Equals, 2)
+	c.Assert(store.itemCount(), qt.Equals, 2)
 
 	err = meeting.RunGC(m, ctx, false, now)
-	c.Assert(err, gc.ErrorMatches, "cannot remove old entries: partial error")
+	c.Assert(err, qt.ErrorMatches, "cannot remove old entries: partial error")
 
-	c.Assert(meeting.ItemCount(m), gc.Equals, 1)
-	c.Assert(store.itemCount(), gc.Equals, 1)
+	c.Assert(meeting.ItemCount(m), qt.Equals, 1)
+	c.Assert(store.itemCount(), qt.Equals, 1)
 }
 
 type partialRemoveStore struct {
@@ -358,27 +362,31 @@ func (s partialRemoveStore) RemoveOld(ctx context.Context, addr string, olderTha
 	return nil, nil
 }
 
-func (*suite) TestPutFailure(c *gc.C) {
+func TestPutFailure(t *testing.T) {
+	c := qt.New(t)
 	store := putErrorStore{}
 	m, err := meeting.NewPlace(meeting.Params{
 		Store:      store,
 		ListenAddr: "localhost",
 		DisableGC:  true,
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.Equals, nil)
 	defer m.Close()
 	ctx := context.Background()
 	id, err := newId()
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.Equals, nil)
 	err = m.NewRendezvous(ctx, id, []byte("x"))
-	c.Assert(err, gc.ErrorMatches, "cannot create entry for rendezvous: put error")
-	c.Assert(meeting.ItemCount(m), gc.Equals, 0)
+	c.Assert(err, qt.ErrorMatches, "cannot create entry for rendezvous: put error")
+	c.Assert(meeting.ItemCount(m), qt.Equals, 0)
 }
 
-func (s *suite) TestWaitTimeout(c *gc.C) {
+func TestWaitTimeout(t *testing.T) {
+	c := qt.New(t)
+	defer c.Done()
 	ctx := context.Background()
-	store := newFakeStore(nil, s.clock)
-	s.PatchValue(&meeting.Clock, s.clock)
+	clock := testclock.NewClock(epoch)
+	store := newFakeStore(nil, clock)
+	c.Patch(&meeting.Clock, clock)
 	params := meeting.Params{
 		Store:          store,
 		ListenAddr:     "localhost",
@@ -387,23 +395,23 @@ func (s *suite) TestWaitTimeout(c *gc.C) {
 		ExpiryDuration: 5 * time.Second,
 	}
 	m, err := meeting.NewPlace(params)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.Equals, nil)
 
-	t0 := s.clock.Now()
+	t0 := clock.Now()
 
 	id, err := newId()
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.Equals, nil)
 	err = m.NewRendezvous(ctx, id, nil)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 	done := make(chan struct{})
 	go func() {
 		c.Logf("starting wait %q", id)
 		_, _, err := m.Wait(ctx, id)
-		c.Check(err, gc.ErrorMatches, "rendezvous wait timed out")
+		c.Check(err, qt.ErrorMatches, "rendezvous wait timed out")
 		done <- struct{}{}
 	}()
-	err = s.clock.WaitAdvance(params.WaitTimeout+1, time.Second, 1)
-	c.Assert(err, gc.Equals, nil)
+	err = clock.WaitAdvance(params.WaitTimeout+1, time.Second, 1)
+	c.Assert(err, qt.Equals, nil)
 	select {
 	case <-done:
 	case <-time.After(time.Second):
@@ -414,36 +422,36 @@ func (s *suite) TestWaitTimeout(c *gc.C) {
 	// able to repeat the request.
 	go func() {
 		_, _, err := m.Wait(ctx, id)
-		c.Check(err, gc.ErrorMatches, "rendezvous wait timed out")
+		c.Check(err, qt.ErrorMatches, "rendezvous wait timed out")
 		done <- struct{}{}
 	}()
-	err = s.clock.WaitAdvance(params.WaitTimeout+1, time.Second, 1)
-	c.Assert(err, gc.Equals, nil)
+	err = clock.WaitAdvance(params.WaitTimeout+1, time.Second, 1)
+	c.Assert(err, qt.Equals, nil)
 	select {
 	case <-done:
 	case <-time.After(time.Second):
 		c.Fatalf("timed out waiting for Wait to time out")
 	}
 
-	c.Logf("after second wait, now: %v", s.clock.Now())
+	c.Logf("after second wait, now: %v", clock.Now())
 	// When the actual expiry deadline passes while we're waiting,
 	// we should return when that happens.
 	// Advance the clock to just before the expiry duration.
 	expiryDeadline := t0.Add(params.ExpiryDuration)
 	c.Logf("expiry deadline %v", expiryDeadline)
 
-	s.clock.Advance(expiryDeadline.Add(-time.Millisecond).Sub(s.clock.Now()))
+	clock.Advance(expiryDeadline.Add(-time.Millisecond).Sub(clock.Now()))
 
 	go func() {
 		_, _, err := m.Wait(ctx, id)
-		c.Check(err, gc.ErrorMatches, "rendezvous expired after 5s")
+		c.Check(err, qt.ErrorMatches, "rendezvous expired after 5s")
 		done <- struct{}{}
 	}()
-	waitDuration := expiryDeadline.Add(1).Sub(s.clock.Now())
-	c.Logf("final wait from %v: %v", s.clock.Now(), waitDuration)
-	err = s.clock.WaitAdvance(expiryDeadline.Add(1).Sub(s.clock.Now()), time.Second, 1)
-	c.Assert(err, gc.Equals, nil)
-	c.Logf("final time %v", s.clock.Now())
+	waitDuration := expiryDeadline.Add(1).Sub(clock.Now())
+	c.Logf("final wait from %v: %v", clock.Now(), waitDuration)
+	err = clock.WaitAdvance(expiryDeadline.Add(1).Sub(clock.Now()), time.Second, 1)
+	c.Assert(err, qt.Equals, nil)
+	c.Logf("final time %v", clock.Now())
 
 	select {
 	case <-done:
@@ -452,38 +460,41 @@ func (s *suite) TestWaitTimeout(c *gc.C) {
 	}
 }
 
-func (s *suite) TestRequestCompletedCalled(c *gc.C) {
-	s.PatchValue(&meeting.Clock, s.clock)
-	store := newFakeStore(nil, s.clock)
+func TestRequestCompletedCalled(t *testing.T) {
+	c := qt.New(t)
+	defer c.Done()
+	clock := testclock.NewClock(epoch)
+	c.Patch(&meeting.Clock, clock)
+	store := newFakeStore(nil, clock)
 	tm := newTestMetrics()
 	m, err := meeting.NewPlace(meeting.Params{
 		Store:      store,
 		Metrics:    tm,
 		ListenAddr: "localhost",
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.Equals, nil)
 	defer m.Close()
 
 	ctx := context.Background()
 
 	id, err := newId()
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.Equals, nil)
 	err = m.NewRendezvous(ctx, id, nil)
-	c.Assert(err, gc.IsNil)
-	c.Assert(id, gc.Not(gc.Equals), "")
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(id, qt.Not(qt.Equals), "")
 
 	waitDone := make(chan struct{})
 	go func() {
 		_, _, err := m.Wait(ctx, id)
-		c.Check(err, gc.IsNil)
-		c.Check(tm.completedCallCount, gc.Equals, 1)
+		c.Check(err, qt.IsNil)
+		c.Check(tm.completedCallCount, qt.Equals, 1)
 
 		close(waitDone)
 	}()
 
-	s.clock.Advance(10 * time.Millisecond)
+	clock.Advance(10 * time.Millisecond)
 	err = m.Done(ctx, id, nil)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.Equals, nil)
 	select {
 	case <-waitDone:
 	case <-time.After(2 * time.Second):
@@ -492,29 +503,32 @@ func (s *suite) TestRequestCompletedCalled(c *gc.C) {
 
 	// Check that item has now been deleted.
 	_, _, err = m.Wait(ctx, id)
-	c.Assert(err, gc.ErrorMatches, `rendezvous ".*" not found`)
+	c.Assert(err, qt.ErrorMatches, `rendezvous ".*" not found`)
 }
 
-func (s *suite) TestRequestsExpiredCalled(c *gc.C) {
-	s.PatchValue(&meeting.Clock, s.clock)
-	store := newFakeStore(nil, s.clock)
+func TestRequestsExpiredCalled(t *testing.T) {
+	c := qt.New(t)
+	defer c.Done()
+	clock := testclock.NewClock(epoch)
+	c.Patch(&meeting.Clock, clock)
+	store := newFakeStore(nil, clock)
 	tm := newTestMetrics()
 	m, err := meeting.NewPlace(meeting.Params{
 		Store:      store,
 		Metrics:    tm,
 		ListenAddr: "localhost",
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.Equals, nil)
 
 	ctx := context.Background()
 
 	for i := 0; i < 3; i++ {
 		err := m.NewRendezvous(ctx, fmt.Sprintf("%04x", i), nil)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, qt.Equals, nil)
 	}
 	m.Close()
-	c.Assert(tm.expiredCallCount, gc.Equals, 1)
-	c.Assert(tm.expiredCallValues, gc.DeepEquals, []int{3})
+	c.Assert(tm.expiredCallCount, qt.Equals, 1)
+	c.Assert(tm.expiredCallValues, qt.DeepEquals, []int{3})
 }
 
 type testMetrics struct {

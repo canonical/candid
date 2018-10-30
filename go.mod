@@ -5,6 +5,7 @@ require (
 	github.com/beorn7/perks v0.0.0-20160229213445-3ac7bf7a47d1 // indirect
 	github.com/coreos/go-oidc v0.0.0-20170119174436-2cc7913f9f6f
 	github.com/davecgh/go-spew v1.1.1 // indirect
+	github.com/frankban/quicktest v1.1.0
 	github.com/garyburd/go-oauth v0.0.0-20150329160146-3131beb69b81
 	github.com/google/go-cmp v0.2.0
 	github.com/gorilla/handlers v0.0.0-20170224193955-13d73096a474
