@@ -9,10 +9,12 @@ import (
 	"regexp"
 	"time"
 
+	"github.com/juju/mgotest"
 	"github.com/juju/testing"
 	"github.com/juju/testing/httptesting"
 	"github.com/juju/utils/debugstatus"
 	gc "gopkg.in/check.v1"
+	errgo "gopkg.in/errgo.v1"
 
 	"github.com/CanonicalLtd/candid/internal/candidtest"
 	"github.com/CanonicalLtd/candid/internal/debug"
@@ -27,18 +29,24 @@ const (
 )
 
 type debugSuite struct {
-	testing.IsolatedMgoSuite
+	testing.CleanupSuite
 	candidtest.ServerSuite
 
+	db      *mgotest.Database
 	backend store.Backend
 }
 
 var _ = gc.Suite(&debugSuite{})
 
 func (s *debugSuite) SetUpTest(c *gc.C) {
-	s.IsolatedMgoSuite.SetUpTest(c)
+	s.CleanupSuite.SetUpTest(c)
 	var err error
-	s.backend, err = mgostore.NewBackend(s.Session.DB("candid-test"))
+	s.db, err = mgotest.New()
+	if errgo.Cause(err) == mgotest.ErrDisabled {
+		c.Skip("mgotest disabled")
+	}
+	c.Assert(err, gc.Equals, nil)
+	s.backend, err = mgostore.NewBackend(s.db.Database)
 	c.Assert(err, gc.Equals, nil)
 
 	s.Params.MeetingStore = s.backend.MeetingStore()
@@ -53,8 +61,13 @@ func (s *debugSuite) SetUpTest(c *gc.C) {
 
 func (s *debugSuite) TearDownTest(c *gc.C) {
 	s.ServerSuite.TearDownTest(c)
-	s.backend.Close()
-	s.IsolatedMgoSuite.TearDownTest(c)
+	if s.backend != nil {
+		s.backend.Close()
+	}
+	if s.db != nil {
+		s.db.Close()
+	}
+	s.CleanupSuite.TearDownTest(c)
 }
 
 func (s *debugSuite) patchStartTime() time.Time {
