@@ -4,15 +4,13 @@
 package google_test
 
 import (
-	gc "gopkg.in/check.v1"
+	"testing"
+
+	qt "github.com/frankban/quicktest"
 	"gopkg.in/yaml.v2"
 
 	"github.com/CanonicalLtd/candid/config"
 )
-
-type googleSuite struct{}
-
-var _ = gc.Suite(&googleSuite{})
 
 var configTests = []struct {
 	about       string
@@ -44,17 +42,19 @@ identity-providers:
 	expectError: `cannot unmarshal google configuration: client-secret not specified`,
 }}
 
-func (s *googleSuite) TestConfig(c *gc.C) {
-	for i, test := range configTests {
-		c.Logf("test %d. %s", i, test.about)
-		var conf config.Config
-		err := yaml.Unmarshal([]byte(test.yaml), &conf)
-		if test.expectError != "" {
-			c.Assert(err, gc.ErrorMatches, test.expectError)
-			continue
-		}
-		c.Assert(err, gc.Equals, nil)
-		c.Assert(conf.IdentityProviders, gc.HasLen, 1)
-		c.Assert(conf.IdentityProviders[0].Name(), gc.Equals, "google")
+func TestConfig(t *testing.T) {
+	c := qt.New(t)
+	for _, test := range configTests {
+		c.Run(test.about, func(c *qt.C) {
+			var conf config.Config
+			err := yaml.Unmarshal([]byte(test.yaml), &conf)
+			if test.expectError != "" {
+				c.Assert(err, qt.ErrorMatches, test.expectError)
+				return
+			}
+			c.Assert(err, qt.Equals, nil)
+			c.Assert(conf.IdentityProviders, qt.HasLen, 1)
+			c.Assert(conf.IdentityProviders[0].Name(), qt.Equals, "google")
+		})
 	}
 }
