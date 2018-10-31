@@ -8,31 +8,37 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"strings"
+	"testing"
 
-	gc "gopkg.in/check.v1"
+	qt "github.com/frankban/quicktest"
+	"github.com/frankban/quicktest/qtsuite"
 	"gopkg.in/yaml.v2"
 
 	"github.com/CanonicalLtd/candid/config"
 	"github.com/CanonicalLtd/candid/idp"
-	"github.com/CanonicalLtd/candid/idp/idptest"
 	keystoneidp "github.com/CanonicalLtd/candid/idp/keystone"
 	"github.com/CanonicalLtd/candid/idp/keystone/internal/keystone"
 	"github.com/CanonicalLtd/candid/idp/keystone/internal/mockkeystone"
+	idptest "github.com/CanonicalLtd/candid/idp/qtidptest"
+	candidtest "github.com/CanonicalLtd/candid/internal/qtcandidtest"
 	"github.com/CanonicalLtd/candid/store"
 )
 
 type keystoneSuite struct {
-	idptest.Suite
-	server *mockkeystone.Server
-	params keystoneidp.Params
-	idp    idp.IdentityProvider
+	idptest *idptest.Fixture
+	server  *mockkeystone.Server
+	params  keystoneidp.Params
+	idp     idp.IdentityProvider
 }
 
-var _ = gc.Suite(&keystoneSuite{})
+func TestKeystone(t *testing.T) {
+	qtsuite.Run(qt.New(t), &keystoneSuite{})
+}
 
-func (s *keystoneSuite) SetUpSuite(c *gc.C) {
-	s.Suite.SetUpSuite(c)
+func (s *keystoneSuite) Init(c *qt.C) {
+	s.idptest = idptest.NewFixture(c, candidtest.NewStore())
 	s.server = mockkeystone.NewServer()
+	c.Defer(s.server.Close)
 	s.params = keystoneidp.Params{
 		Name:        "openstack",
 		Description: "OpenStack",
@@ -41,58 +47,45 @@ func (s *keystoneSuite) SetUpSuite(c *gc.C) {
 	}
 	s.server.TokensFunc = testTokens
 	s.server.TenantsFunc = testTenants
-}
-
-func (s *keystoneSuite) TearDownSuite(c *gc.C) {
-	s.server.Close()
-	s.Suite.TearDownSuite(c)
-}
-
-func (s *keystoneSuite) SetUpTest(c *gc.C) {
-	s.Suite.SetUpTest(c)
 	s.idp = keystoneidp.NewIdentityProvider(s.params)
-	err := s.idp.Init(s.Ctx, s.InitParams(c, "https://idp.test"))
-	c.Assert(err, gc.Equals, nil)
+	err := s.idp.Init(s.idptest.Ctx, s.idptest.InitParams(c, "https://idp.test"))
+	c.Assert(err, qt.Equals, nil)
 }
 
-func (s *keystoneSuite) TearDownTest(c *gc.C) {
-	s.Suite.TearDownTest(c)
+func (s *keystoneSuite) TestKeystoneIdentityProviderName(c *qt.C) {
+	c.Assert(s.idp.Name(), qt.Equals, "openstack")
 }
 
-func (s *keystoneSuite) TestKeystoneIdentityProviderName(c *gc.C) {
-	c.Assert(s.idp.Name(), gc.Equals, "openstack")
+func (s *keystoneSuite) TestKeystoneIdentityProviderDescription(c *qt.C) {
+	c.Assert(s.idp.Description(), qt.Equals, "OpenStack")
 }
 
-func (s *keystoneSuite) TestKeystoneIdentityProviderDescription(c *gc.C) {
-	c.Assert(s.idp.Description(), gc.Equals, "OpenStack")
+func (s *keystoneSuite) TestKeystoneIdentityProviderInteractive(c *qt.C) {
+	c.Assert(s.idp.Interactive(), qt.Equals, true)
 }
 
-func (s *keystoneSuite) TestKeystoneIdentityProviderInteractive(c *gc.C) {
-	c.Assert(s.idp.Interactive(), gc.Equals, true)
-}
-
-func (s *keystoneSuite) TestKeystoneIdentityProviderUseNameForDescription(c *gc.C) {
+func (s *keystoneSuite) TestKeystoneIdentityProviderUseNameForDescription(c *qt.C) {
 	p := s.params
 	p.Description = ""
 	idp := keystoneidp.NewIdentityProvider(p)
-	c.Assert(idp.Description(), gc.Equals, "openstack")
+	c.Assert(idp.Description(), qt.Equals, "openstack")
 }
 
-func (s *keystoneSuite) TestKeystoneIdentityProviderURL(c *gc.C) {
+func (s *keystoneSuite) TestKeystoneIdentityProviderURL(c *qt.C) {
 	u := s.idp.URL("1")
-	c.Assert(u, gc.Equals, "https://idp.test/login?id=1")
+	c.Assert(u, qt.Equals, "https://idp.test/login?id=1")
 }
 
-func (s *keystoneSuite) TestKeystoneIdentityProviderHandleGet(c *gc.C) {
+func (s *keystoneSuite) TestKeystoneIdentityProviderHandleGet(c *qt.C) {
 	req, err := http.NewRequest("GET", "/login?id=1", nil)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.Equals, nil)
 	req.ParseForm()
 	rr := httptest.NewRecorder()
-	s.idp.Handle(s.Ctx, rr, req)
-	s.AssertLoginNotComplete(c)
-	c.Assert(rr.Code, gc.Equals, http.StatusOK)
-	c.Assert(rr.HeaderMap.Get("Content-Type"), gc.Equals, "text/html;charset=UTF-8")
-	c.Assert(rr.Body.String(), gc.Equals, `<!doctype html>
+	s.idp.Handle(s.idptest.Ctx, rr, req)
+	s.idptest.AssertLoginNotComplete(c)
+	c.Assert(rr.Code, qt.Equals, http.StatusOK)
+	c.Assert(rr.HeaderMap.Get("Content-Type"), qt.Equals, "text/html;charset=UTF-8")
+	c.Assert(rr.Body.String(), qt.Equals, `<!doctype html>
 <html>
 	<head><title>OpenStack Login</title></head>
 	<body>
@@ -106,7 +99,7 @@ func (s *keystoneSuite) TestKeystoneIdentityProviderHandleGet(c *gc.C) {
 `)
 }
 
-func (s *keystoneSuite) TestKeystoneIdentityProviderHandlePost(c *gc.C) {
+func (s *keystoneSuite) TestKeystoneIdentityProviderHandlePost(c *qt.C) {
 	req, err := http.NewRequest("POST", "/login?did=1",
 		strings.NewReader(
 			url.Values{
@@ -115,13 +108,13 @@ func (s *keystoneSuite) TestKeystoneIdentityProviderHandlePost(c *gc.C) {
 			}.Encode(),
 		),
 	)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.Equals, nil)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.ParseForm()
 	rr := httptest.NewRecorder()
-	s.idp.Handle(s.Ctx, rr, req)
-	s.AssertLoginSuccess(c, "testuser@openstack")
-	s.AssertUser(c, &store.Identity{
+	s.idp.Handle(s.idptest.Ctx, rr, req)
+	s.idptest.AssertLoginSuccess(c, "testuser@openstack")
+	s.idptest.Store.AssertUser(c, &store.Identity{
 		ProviderID: store.MakeProviderIdentity("openstack", "abc@openstack"),
 		Username:   "testuser@openstack",
 		ProviderInfo: map[string][]string{
@@ -130,7 +123,7 @@ func (s *keystoneSuite) TestKeystoneIdentityProviderHandlePost(c *gc.C) {
 	})
 }
 
-func (s *keystoneSuite) TestKeystoneIdentityProviderHandlePostBadPassword(c *gc.C) {
+func (s *keystoneSuite) TestKeystoneIdentityProviderHandlePostBadPassword(c *qt.C) {
 	req, err := http.NewRequest("POST", "/login?did=1",
 		strings.NewReader(
 			url.Values{
@@ -139,15 +132,15 @@ func (s *keystoneSuite) TestKeystoneIdentityProviderHandlePostBadPassword(c *gc.
 			}.Encode(),
 		),
 	)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.Equals, nil)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.ParseForm()
 	rr := httptest.NewRecorder()
-	s.idp.Handle(s.Ctx, rr, req)
-	s.AssertLoginFailureMatches(c, `cannot log in: Post http.*: invalid credentials`)
+	s.idp.Handle(s.idptest.Ctx, rr, req)
+	s.idptest.AssertLoginFailureMatches(c, `cannot log in: Post http.*: invalid credentials`)
 }
 
-func (s *keystoneSuite) TestKeystoneIdentityProviderHandlePostNoTenants(c *gc.C) {
+func (s *keystoneSuite) TestKeystoneIdentityProviderHandlePostNoTenants(c *qt.C) {
 	req, err := http.NewRequest("POST", "/login?did=1",
 		strings.NewReader(
 			url.Values{
@@ -156,17 +149,17 @@ func (s *keystoneSuite) TestKeystoneIdentityProviderHandlePostNoTenants(c *gc.C)
 			}.Encode(),
 		),
 	)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.Equals, nil)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.ParseForm()
 	rr := httptest.NewRecorder()
-	s.idp.Handle(s.Ctx, rr, req)
-	s.AssertLoginFailureMatches(c, `cannot get tenants: Get .*: bad token`)
+	s.idp.Handle(s.idptest.Ctx, rr, req)
+	s.idptest.AssertLoginFailureMatches(c, `cannot get tenants: Get .*: bad token`)
 }
 
-func (s *keystoneSuite) TestKeystoneIdentityProviderHandleExistingUser(c *gc.C) {
-	err := s.Store.UpdateIdentity(
-		s.Ctx,
+func (s *keystoneSuite) TestKeystoneIdentityProviderHandleExistingUser(c *qt.C) {
+	err := s.idptest.Store.Store.UpdateIdentity(
+		s.idptest.Ctx,
 		&store.Identity{
 			ProviderID: store.MakeProviderIdentity("keystone2", "testuser@openstack"),
 			Username:   "testuser@openstack",
@@ -175,7 +168,7 @@ func (s *keystoneSuite) TestKeystoneIdentityProviderHandleExistingUser(c *gc.C) 
 			store.Username: store.Set,
 		},
 	)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 	req, err := http.NewRequest("POST", "/login?did=1",
 		strings.NewReader(
 			url.Values{
@@ -184,12 +177,12 @@ func (s *keystoneSuite) TestKeystoneIdentityProviderHandleExistingUser(c *gc.C) 
 			}.Encode(),
 		),
 	)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.ParseForm()
 	rr := httptest.NewRecorder()
-	s.idp.Handle(s.Ctx, rr, req)
-	s.AssertLoginFailureMatches(c, `cannot update identity: username testuser@openstack already in use`)
+	s.idp.Handle(s.idptest.Ctx, rr, req)
+	s.idptest.AssertLoginFailureMatches(c, `cannot update identity: username testuser@openstack already in use`)
 }
 
 var configTests = []struct {
@@ -222,18 +215,19 @@ identity-providers:
 	expectError: `cannot unmarshal keystone configuration: url not specified`,
 }}
 
-func (s *keystoneSuite) TestKeystoneIdentityProviderRegisterConfig(c *gc.C) {
-	for i, test := range configTests {
-		c.Logf("%d. %s", i, test.about)
-		var conf config.Config
-		err := yaml.Unmarshal([]byte(test.yaml), &conf)
-		if test.expectError != "" {
-			c.Assert(err, gc.ErrorMatches, test.expectError)
-			continue
-		}
-		c.Assert(err, gc.IsNil)
-		c.Assert(conf.IdentityProviders, gc.HasLen, 1)
-		c.Assert(conf.IdentityProviders[0].Name(), gc.Equals, "openstack")
+func (s *keystoneSuite) TestKeystoneIdentityProviderRegisterConfig(c *qt.C) {
+	for _, test := range configTests {
+		c.Run(test.about, func(c *qt.C) {
+			var conf config.Config
+			err := yaml.Unmarshal([]byte(test.yaml), &conf)
+			if test.expectError != "" {
+				c.Assert(err, qt.ErrorMatches, test.expectError)
+				return
+			}
+			c.Assert(err, qt.Equals, nil)
+			c.Assert(conf.IdentityProviders, qt.HasLen, 1)
+			c.Assert(conf.IdentityProviders[0].Name(), qt.Equals, "openstack")
+		})
 	}
 }
 

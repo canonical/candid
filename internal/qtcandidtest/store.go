@@ -4,11 +4,12 @@
 package candidtest
 
 import (
+	qt "github.com/frankban/quicktest"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	aclstore "github.com/juju/aclstore/v2"
 	"github.com/juju/simplekv/memsimplekv"
-	gc "gopkg.in/check.v1"
+	"golang.org/x/net/context"
 	"gopkg.in/macaroon-bakery.v2/bakery"
 
 	"github.com/CanonicalLtd/candid/internal/identity"
@@ -50,9 +51,22 @@ func (s *Store) ServerParams() identity.ServerParams {
 	}
 }
 
+// AssertUser asserts that the specified user is stored in the store.
+// It returns the stored identity.
+func (s *Store) AssertUser(c *qt.C, id *store.Identity) *store.Identity {
+	id1 := store.Identity{
+		ProviderID: id.ProviderID,
+		Username:   id.Username,
+	}
+	err := s.Store.Identity(context.Background(), &id1)
+	c.Assert(err, qt.Equals, nil)
+	AssertEqualIdentity(c, &id1, id)
+	return &id1
+}
+
 // AssertEqualIdentity asserts that the two provided identites are
 // semantically equivilent.
-func AssertEqualIdentity(c *gc.C, obtained, expected *store.Identity) {
+func AssertEqualIdentity(c *qt.C, obtained, expected *store.Identity) {
 	if expected.ID == "" {
 		obtained.ID = ""
 	}
