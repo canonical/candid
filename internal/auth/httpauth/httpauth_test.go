@@ -125,7 +125,7 @@ func (s *authSuite) TestAuthorizeMacaroonRequired(c *gc.C) {
 	})
 	httpAuthorizer := httpauth.New(s.oven, authorizer)
 	req, err := http.NewRequest("GET", "http://example.com/v1/test", nil)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	authInfo, err := httpAuthorizer.Auth(context.Background(), req, identchecker.LoginOp)
 	c.Assert(err, gc.ErrorMatches, `macaroon discharge required: authentication required`)
 	c.Assert(authInfo, gc.IsNil)

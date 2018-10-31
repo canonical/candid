@@ -75,9 +75,9 @@ func (s *loginSuite) TestCookieEncodeDecode(c *gc.C) {
 		Teams:      []string{"t1", "t2"},
 	}
 	v, err := debug.EncodeCookie(s.Params.Key, c1)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	c2, err := debug.DecodeCookie(s.Params.Key, v)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(c1.ExpireTime.Equal(c1.ExpireTime), gc.Equals, true, gc.Commentf("expire times not equal expecting: %s, obtained: %s", c1.ExpireTime, c2.ExpireTime))
 	c1.ExpireTime = time.Time{}
 	c2.ExpireTime = time.Time{}
@@ -169,7 +169,7 @@ func (s *loginSuite) TestCheckLogin(c *gc.C) {
 		var cookies []*http.Cookie
 		if test.cookieValue != nil {
 			value, err := test.cookieValue(s.Params.Key)
-			c.Assert(err, gc.IsNil)
+			c.Assert(err, gc.Equals, nil)
 			cookies = append(cookies, &http.Cookie{
 				Name:  "debug-login",
 				Value: value,

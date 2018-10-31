@@ -163,7 +163,7 @@ func (s *authSuite) TestAuthorizeWithAdminCredentials(c *gc.C) {
 
 func (s *authSuite) TestUserHasPublicKeyCaveat(c *gc.C) {
 	key, err := bakery.GenerateKey()
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	cav := auth.UserHasPublicKeyCaveat(params.Username("test"), &key.Public)
 	c.Assert(cav.Namespace, gc.Equals, auth.CheckersNamespace)
 	c.Assert(cav.Condition, gc.Matches, "user-has-public-key test .*")
@@ -172,7 +172,7 @@ func (s *authSuite) TestUserHasPublicKeyCaveat(c *gc.C) {
 
 func (s *authSuite) TestUserHasPublicKeyChecker(c *gc.C) {
 	key, err := bakery.GenerateKey()
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	ctx, close := s.Store.Context(context.Background())
 	defer close()
 	s.createIdentity(c, "test-user", &key.Public)
@@ -185,7 +185,7 @@ func (s *authSuite) TestUserHasPublicKeyChecker(c *gc.C) {
 	}
 
 	err = checkCaveat(auth.UserHasPublicKeyCaveat(params.Username("test-user"), &key.Public))
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	// Unknown username
 	err = checkCaveat(auth.UserHasPublicKeyCaveat("test2", &key.Public))
 	c.Assert(err, gc.ErrorMatches, "caveat.*not satisfied: public key not valid for user")
@@ -268,7 +268,7 @@ func (s *authSuite) TestACLForOp(c *gc.C) {
 		c.Logf("test %d: %v", i, test.op)
 		sort.Strings(test.expect)
 		acl, public, err := auth.AuthorizerACLForOp(s.authorizer, context.Background(), test.op)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		sort.Strings(acl)
 		c.Assert(acl, gc.DeepEquals, test.expect)
 		c.Assert(public, gc.Equals, test.expectPublic)
@@ -278,7 +278,7 @@ func (s *authSuite) TestACLForOp(c *gc.C) {
 func (s *authSuite) TestAdminUserGroups(c *gc.C) {
 	ctx := auth.ContextWithUserCredentials(context.Background(), "admin", "password")
 	authInfo, err := s.authorizer.Auth(ctx, nil, identchecker.LoginOp)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	assertAuthorizedGroups(c, authInfo, nil)
 }
 
@@ -306,7 +306,7 @@ func assertAuthorizedGroups(c *gc.C, authInfo *identchecker.AuthInfo, expectGrou
 	c.Assert(authInfo.Identity, gc.NotNil)
 	ident := authInfo.Identity.(*auth.Identity)
 	groups, err := ident.Groups(context.Background())
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(groups, gc.DeepEquals, expectGroups)
 }
 

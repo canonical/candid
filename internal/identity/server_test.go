@@ -68,7 +68,7 @@ func (s *serverSuite) TestNewServerWithVersions(c *gc.C) {
 					}
 					enc := json.NewEncoder(w)
 					err := enc.Encode(response)
-					c.Assert(err, gc.IsNil)
+					c.Assert(err, gc.Equals, nil)
 				},
 			}}, nil
 		}
@@ -81,7 +81,7 @@ func (s *serverSuite) TestNewServerWithVersions(c *gc.C) {
 	}, map[string]identity.NewAPIHandlerFunc{
 		"version1": serveVersion("version1"),
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	defer h.Close()
 	assertServesVersion(c, h, "version1")
 	assertDoesNotServeVersion(c, h, "version2")
@@ -95,7 +95,7 @@ func (s *serverSuite) TestNewServerWithVersions(c *gc.C) {
 		"version1": serveVersion("version1"),
 		"version2": serveVersion("version2"),
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	defer h.Close()
 	assertServesVersion(c, h, "version1")
 	assertServesVersion(c, h, "version2")
@@ -110,7 +110,7 @@ func (s *serverSuite) TestNewServerWithVersions(c *gc.C) {
 		"version2": serveVersion("version2"),
 		"version3": serveVersion("version3"),
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	defer h.Close()
 	assertServesVersion(c, h, "version1")
 	assertServesVersion(c, h, "version2")
@@ -134,7 +134,7 @@ func (s *serverSuite) TestServerHasAccessControlAllowHeaders(c *gc.C) {
 		MeetingStore: s.MeetingStore,
 		ACLStore:     s.ACLStore,
 	}, impl)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	defer h.Close()
 	rec := httptesting.DoRequest(c, httptesting.DoRequestParams{
 		Handler: h,
@@ -181,7 +181,7 @@ func (s *serverSuite) TestServerPanicRecovery(c *gc.C) {
 		MeetingStore: s.MeetingStore,
 		ACLStore:     s.ACLStore,
 	}, impl)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	defer h.Close()
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		Handler:      h,
@@ -209,7 +209,7 @@ func (s *serverSuite) TestServerStaticFiles(c *gc.C) {
 					}
 					enc := json.NewEncoder(w)
 					err := enc.Encode(response)
-					c.Assert(err, gc.IsNil)
+					c.Assert(err, gc.Equals, nil)
 				},
 			}}, nil
 		}
@@ -223,17 +223,17 @@ func (s *serverSuite) TestServerStaticFiles(c *gc.C) {
 	}, map[string]identity.NewAPIHandlerFunc{
 		"version1": serveVersion("version1"),
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	defer h.Close()
 
 	f, err := os.Create(filepath.Join(path, "file"))
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	fmt.Fprintf(f, "test file")
 	f.Close()
 
 	rr := httptest.NewRecorder()
 	req, err := http.NewRequest("GET", "/static/file", nil)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	h.ServeHTTP(rr, req)
 	c.Assert(rr.Code, gc.Equals, http.StatusOK, gc.Commentf("%d: %s", rr.Code, rr.Body.String()))
 	c.Assert(rr.Body.String(), gc.Equals, "test file")

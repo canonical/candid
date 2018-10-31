@@ -72,9 +72,9 @@ var acceptTests = []struct {
 
 func (s *storeSuite) TestAccept(c *gc.C) {
 	now, err := time.Parse(time.RFC3339, "2014-12-25T00:00:00Z")
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	err = kvnoncestore.Accept(s.store, "https://example.com", "2014-12-25T00:00:00Z0", now)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	for i, test := range acceptTests {
 		c.Logf("%d. %s", i, test.about)
 		err := kvnoncestore.Accept(s.store, test.endpoint, test.nonce, now)
@@ -82,6 +82,6 @@ func (s *storeSuite) TestAccept(c *gc.C) {
 			c.Assert(err, gc.ErrorMatches, test.expectError)
 			continue
 		}
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 	}
 }

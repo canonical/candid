@@ -520,7 +520,7 @@ func (s *dischargeSuite) TestDischargeStatusProxyAuthRequiredResponse(c *gc.C) {
 		}},
 		identchecker.LoginOp,
 	)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	var thirdPartyCaveat macaroon.Caveat
 	for _, cav := range m.M().Caveats() {
@@ -534,7 +534,7 @@ func (s *dischargeSuite) TestDischargeStatusProxyAuthRequiredResponse(c *gc.C) {
 		"id":       {string(thirdPartyCaveat.Id)},
 		"location": {thirdPartyCaveat.Location},
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	defer resp.Body.Close()
 
 	c.Assert(resp.StatusCode, gc.Equals, http.StatusProxyAuthRequired)
@@ -553,7 +553,7 @@ func (s *dischargeSuite) TestDischargeStatusUnauthorizedResponse(c *gc.C) {
 		}},
 		identchecker.LoginOp,
 	)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 
 	var thirdPartyCaveat macaroon.Caveat
 	for _, cav := range m.M().Caveats() {
@@ -569,11 +569,11 @@ func (s *dischargeSuite) TestDischargeStatusUnauthorizedResponse(c *gc.C) {
 	}
 
 	req, err := http.NewRequest("POST", s.URL+"/discharge", strings.NewReader(values.Encode()))
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Bakery-Protocol-Version", "1")
 	resp, err := http.DefaultClient.Do(req)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	defer resp.Body.Close()
 
 	c.Assert(resp.StatusCode, gc.Equals, http.StatusUnauthorized)
@@ -582,7 +582,7 @@ func (s *dischargeSuite) TestDischargeStatusUnauthorizedResponse(c *gc.C) {
 
 func (s *dischargeSuite) TestPublicKey(c *gc.C) {
 	info, err := s.ThirdPartyInfo(testContext, s.URL)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
 		URL:          s.URL + "/publickey",
 		ExpectStatus: http.StatusOK,
@@ -709,7 +709,7 @@ func (s *dischargeSuite) TestDomainInInteractionURLs(c *gc.C) {
 		interactor.Doer = client
 		for k, v := range tst.cookies {
 			u, err := url.Parse(s.URL)
-			c.Assert(err, gc.IsNil)
+			c.Assert(err, gc.Equals, nil)
 			client.Jar.SetCookies(u, []*http.Cookie{{
 				Name:  k,
 				Value: v,
