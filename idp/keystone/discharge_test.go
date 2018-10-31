@@ -10,6 +10,8 @@ import (
 	"regexp"
 	"testing"
 
+	qt "github.com/frankban/quicktest"
+	"github.com/frankban/quicktest/qtsuite"
 	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/httprequest.v1"
@@ -23,8 +25,6 @@ import (
 	"github.com/CanonicalLtd/candid/internal/discharger"
 	"github.com/CanonicalLtd/candid/internal/identity"
 	candidtest "github.com/CanonicalLtd/candid/internal/qtcandidtest"
-	qt "github.com/frankban/quicktest"
-	"github.com/frankban/quicktest/qtsuite"
 )
 
 type dischargeSuite struct {

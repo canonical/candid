@@ -6,11 +6,11 @@ package memstore
 import (
 	"sync"
 
+	"github.com/juju/simplekv"
+	"github.com/juju/simplekv/memsimplekv"
 	"golang.org/x/net/context"
 
 	"github.com/CanonicalLtd/candid/store"
-	"github.com/juju/simplekv"
-	"github.com/juju/simplekv/memsimplekv"
 )
 
 // NewProviderDataStore creates a new in-memory store.ProviderDataStore.

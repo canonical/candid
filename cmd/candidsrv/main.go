@@ -28,13 +28,12 @@ import (
 	_ "github.com/CanonicalLtd/candid/idp/keystone"
 	_ "github.com/CanonicalLtd/candid/idp/ldap"
 	_ "github.com/CanonicalLtd/candid/idp/static"
-	_ "github.com/CanonicalLtd/candid/store/memstore"
-	_ "github.com/CanonicalLtd/candid/store/mgostore"
-	_ "github.com/CanonicalLtd/candid/store/sqlstore"
-
 	"github.com/CanonicalLtd/candid/idp/usso"
 	_ "github.com/CanonicalLtd/candid/idp/usso/ussodischarge"
 	_ "github.com/CanonicalLtd/candid/idp/usso/ussooauth"
+	_ "github.com/CanonicalLtd/candid/store/memstore"
+	_ "github.com/CanonicalLtd/candid/store/mgostore"
+	_ "github.com/CanonicalLtd/candid/store/sqlstore"
 )
 
 var logger = loggo.GetLogger("candidsrv")

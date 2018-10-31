@@ -7,10 +7,11 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/CanonicalLtd/candid/store"
 	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery"
+
+	"github.com/CanonicalLtd/candid/store"
 )
 
 type showSuite struct {

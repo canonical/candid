@@ -9,12 +9,12 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/juju/simplekv"
 	"golang.org/x/net/context"
 	errgo "gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
 
 	"github.com/CanonicalLtd/candid/store"
-	"github.com/juju/simplekv"
 )
 
 // DischargeTokenStore is a store for discharge tokens. It wraps a

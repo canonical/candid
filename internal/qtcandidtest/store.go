@@ -17,8 +17,8 @@ import (
 	"github.com/CanonicalLtd/candid/store/memstore"
 )
 
-// Store implements a test fixture that contains a a store.Store,
-// meeting.MeetingStore and bakery.RootKeyStore for use with tests.
+// Store implements a test fixture that contains memory-based
+// store implementations for use with tests.
 type Store struct {
 	Store              store.Store
 	ProviderDataStore  store.ProviderDataStore

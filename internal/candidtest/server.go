@@ -10,6 +10,8 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/juju/aclstore/v2"
+	"github.com/juju/simplekv/memsimplekv"
 	"golang.org/x/net/context"
 	"gopkg.in/CanonicalLtd/candidclient.v1"
 	gc "gopkg.in/check.v1"
@@ -21,8 +23,6 @@ import (
 	"github.com/CanonicalLtd/candid/internal/auth"
 	"github.com/CanonicalLtd/candid/internal/identity"
 	"github.com/CanonicalLtd/candid/store"
-	"github.com/juju/aclstore/v2"
-	"github.com/juju/simplekv/memsimplekv"
 )
 
 var DefaultTemplate = template.New("")

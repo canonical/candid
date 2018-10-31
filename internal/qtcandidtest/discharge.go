@@ -97,7 +97,7 @@ func (s *DischargeCreator) AssertMacaroon(c *qt.C, ms macaroon.Slice, op bakery.
 // A VisitorFunc converts a function to a httpbakery.LegacyInteractor.
 type VisitorFunc func(*url.URL) error
 
-// VisitWebPage implements httpbakery.Visitor.VisitWebPage.
+// LegacyInteract implements httpbakery.LegacyInteractor.LegacyInteract.
 func (f VisitorFunc) LegacyInteract(ctx context.Context, _ *httpbakery.Client, _ string, u *url.URL) error {
 	return f(u)
 }

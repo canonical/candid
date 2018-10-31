@@ -3,10 +3,11 @@ package testing
 import (
 	"time"
 
-	"github.com/CanonicalLtd/candid/store"
 	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/yaml.v2"
+
+	"github.com/CanonicalLtd/candid/store"
 )
 
 func TestUnmarshal(c *gc.C, configYAML string) {

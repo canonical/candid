@@ -9,7 +9,7 @@ import (
 
 // LogTo configures loggo to log to qt.C for the duration
 // of the test. If TEST_LOGGING_CONFIG is set, it
-// will be used to configure the logging modules/.
+// will be used to configure the logging modules.
 //
 // When c.Done is called, the loggo configuration will
 // be reset.

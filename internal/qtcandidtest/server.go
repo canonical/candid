@@ -11,6 +11,8 @@ import (
 	"strings"
 
 	qt "github.com/frankban/quicktest"
+	aclstore "github.com/juju/aclstore/v2"
+	"github.com/juju/simplekv/memsimplekv"
 	"golang.org/x/net/context"
 	"gopkg.in/CanonicalLtd/candidclient.v1"
 	errgo "gopkg.in/errgo.v1"
@@ -21,8 +23,6 @@ import (
 	"github.com/CanonicalLtd/candid/internal/auth"
 	"github.com/CanonicalLtd/candid/internal/identity"
 	"github.com/CanonicalLtd/candid/store"
-	aclstore "github.com/juju/aclstore/v2"
-	"github.com/juju/simplekv/memsimplekv"
 )
 
 var DefaultTemplate = template.New("")
@@ -110,8 +110,8 @@ func NewServer(c *qt.C, p identity.ServerParams, versions map[string]identity.Ne
 	return s
 }
 
-// ThirdPartyInfo implements bakery.ThirdPartyLocator.THirdPartyInfo
-// allowing the suite to be used as a bakery.ThirdPArtyLocator.
+// ThirdPartyInfo implements bakery.ThirdPartyLocator.ThirdPartyInfo
+// allowing the suite to be used as a bakery.ThirdPartyLocator.
 func (s *Server) ThirdPartyInfo(ctx context.Context, loc string) (bakery.ThirdPartyInfo, error) {
 	if loc != s.URL {
 		return bakery.ThirdPartyInfo{}, bakery.ErrNotFound
