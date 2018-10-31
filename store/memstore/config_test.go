@@ -1,8 +1,9 @@
 package memstore_test
 
 import (
-	storetesting "github.com/CanonicalLtd/candid/store/testing"
 	gc "gopkg.in/check.v1"
+
+	storetesting "github.com/CanonicalLtd/candid/store/testing"
 )
 
 var _ = gc.Suite(&configSuite{})

@@ -6,12 +6,12 @@ package testing
 import (
 	"time"
 
+	"github.com/juju/simplekv"
 	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
 	errgo "gopkg.in/errgo.v1"
 
 	"github.com/CanonicalLtd/candid/store"
-	"github.com/juju/simplekv"
 )
 
 // KeyValueSuite contains a set of tests for KeyValueStore implementations. The

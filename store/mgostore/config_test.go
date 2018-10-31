@@ -3,6 +3,7 @@ package mgostore_test
 import (
 	"os"
 
+	"github.com/juju/mgotest"
 	gc "gopkg.in/check.v1"
 	errgo "gopkg.in/errgo.v1"
 	"gopkg.in/yaml.v2"
@@ -10,7 +11,6 @@ import (
 	"github.com/CanonicalLtd/candid/store"
 	"github.com/CanonicalLtd/candid/store/mgostore"
 	storetesting "github.com/CanonicalLtd/candid/store/testing"
-	"github.com/juju/mgotest"
 )
 
 var _ = gc.Suite(&configSuite{})

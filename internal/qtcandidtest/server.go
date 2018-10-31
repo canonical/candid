@@ -10,11 +10,11 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/juju/aclstore/v2"
+	qt "github.com/frankban/quicktest"
+	aclstore "github.com/juju/aclstore/v2"
 	"github.com/juju/simplekv/memsimplekv"
 	"golang.org/x/net/context"
 	"gopkg.in/CanonicalLtd/candidclient.v1"
-	gc "gopkg.in/check.v1"
 	errgo "gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
@@ -33,19 +33,8 @@ func init() {
 
 const loginTemplate = "login successful as user {{.Username}}\n"
 
-// A ServerSuite is a test suite that
-type ServerSuite struct {
-	// Params is used to configure the server. Any settings must be
-	// set before calling SetUpTest. At the least Store, MeetingStore
-	// and RootKeyStore must be configured.
-	Params identity.ServerParams
-
-	// Versions configures the API versions which will be served by
-	// the server. This must be set before calling SetUpTest.
-	Versions map[string]identity.NewAPIHandlerFunc
-
-	// The following fields will be available after calling SetUpTest.
-
+// Server implements a test fixture that contains a candid server.
+type Server struct {
 	// URL contains the URL of the server.
 	URL string
 
@@ -53,8 +42,7 @@ type ServerSuite struct {
 	// the servers.
 	Ctx context.Context
 
-	// params contains the final parameters that were passed to
-	// identity.New.
+	// params contains the parameters that were passed to identity.New.
 	params            identity.ServerParams
 	handler           *identity.Server
 	server            *httptest.Server
@@ -64,25 +52,33 @@ type ServerSuite struct {
 	agentID           int
 }
 
-// SetUpTest creates a new identity server and serves it. The server is
-// configured based on the Params and Versions fields. If the Key
-// parameter is not set then a new key will be generated. If the
-// PrivateAddr parameter is not set then it will default to localhost. If
-// the adminAgentPublicKey is not set then a new key will be generated,
-// note that if it is set the AdminClient and AdminIdentityClient can not
-// be used. If the Template parameter is not set then DefaultTemplate
-// will be used.
-func (s *ServerSuite) SetUpTest(c *gc.C) {
-	s.params = s.Params
+// NewMemServer returns a Server instance
+// that uses in-memory storage and serves
+// the given API version
+func NewMemServer(c *qt.C, versions map[string]identity.NewAPIHandlerFunc) *Server {
+	return NewServer(c, NewStore().ServerParams(), versions)
+}
+
+// NewServer returns new Server instance. The server parameters must
+// contain at least Store, MeetingStore and RootKeyStore. The versions
+// argument configures what API versions to serve.
+//
+// If p.Key is zero then a new key will be generated. If p.PrivateAddr
+// is zero then it will default to localhost. If p.Template is zero then
+// DefaultTemplate will be used.
+func NewServer(c *qt.C, p identity.ServerParams, versions map[string]identity.NewAPIHandlerFunc) *Server {
+	s := new(Server)
+	s.params = p
 	if s.params.ACLStore == nil {
 		s.params.ACLStore = aclstore.NewACLStore(memsimplekv.NewStore())
 	}
 	s.server = httptest.NewUnstartedServer(nil)
+	c.Defer(s.server.Close)
 	s.params.Location = "http://" + s.server.Listener.Addr().String()
 	if s.params.Key == nil {
 		var err error
 		s.params.Key, err = bakery.GenerateKey()
-		c.Assert(err, gc.Equals, nil)
+		c.Assert(err, qt.Equals, nil)
 	}
 	if s.params.PrivateAddr == "" {
 		s.params.PrivateAddr = "localhost"
@@ -90,34 +86,33 @@ func (s *ServerSuite) SetUpTest(c *gc.C) {
 	if s.params.AdminAgentPublicKey == nil {
 		var err error
 		s.adminAgentKey, err = bakery.GenerateKey()
-		c.Assert(err, gc.Equals, nil)
+		c.Assert(err, qt.Equals, nil)
 		s.params.AdminAgentPublicKey = &s.adminAgentKey.Public
 	}
 	if s.params.Template == nil {
 		s.params.Template = DefaultTemplate
 	}
 	var err error
-	s.handler, err = identity.New(s.params, s.Versions)
-	c.Assert(err, gc.Equals, nil)
+	s.handler, err = identity.New(s.params, versions)
+	c.Assert(err, qt.Equals, nil)
+	c.Defer(s.handler.Close)
 
 	s.server.Config.Handler = s.handler
 	s.server.Start()
 	s.URL = s.server.URL
-	s.Ctx, s.closeStore = s.Params.Store.Context(context.Background())
-	s.Ctx, s.closeMeetingStore = s.Params.MeetingStore.Context(context.Background())
+	ctx := context.Background()
+	ctx, closeStore := s.params.Store.Context(ctx)
+	c.Defer(closeStore)
+
+	ctx, closeMeetingStore := s.params.MeetingStore.Context(ctx)
+	c.Defer(closeMeetingStore)
+	s.Ctx = ctx
+	return s
 }
 
-// TearDownTest cleans up the resources created during SetUpTest.
-func (s *ServerSuite) TearDownTest(c *gc.C) {
-	s.closeMeetingStore()
-	s.closeStore()
-	s.server.Close()
-	s.handler.Close()
-}
-
-// ThirdPartyInfo implements bakery.ThirdPartyLocator.THirdPartyInfo
-// allowing the suite to be used as a bakery.ThirdPArtyLocator.
-func (s *ServerSuite) ThirdPartyInfo(ctx context.Context, loc string) (bakery.ThirdPartyInfo, error) {
+// ThirdPartyInfo implements bakery.ThirdPartyLocator.ThirdPartyInfo
+// allowing the suite to be used as a bakery.ThirdPartyLocator.
+func (s *Server) ThirdPartyInfo(ctx context.Context, loc string) (bakery.ThirdPartyInfo, error) {
 	if loc != s.URL {
 		return bakery.ThirdPartyInfo{}, bakery.ErrNotFound
 	}
@@ -127,10 +122,16 @@ func (s *ServerSuite) ThirdPartyInfo(ctx context.Context, loc string) (bakery.Th
 	}, nil
 }
 
-// Client creates a new httpbakery.Client which uses the given visitor as
+// Client is a convenience method that returns the result of
+// calling BakeryClient(i)
+func (s *Server) Client(i httpbakery.Interactor) *httpbakery.Client {
+	return BakeryClient(i)
+}
+
+// BakeryClient creates a new httpbakery.Client which uses the given visitor as
 // its WebPageVisitor. If no Visitor is specified then NoVisit will be
 // used.
-func (s *ServerSuite) Client(i httpbakery.Interactor) *httpbakery.Client {
+func BakeryClient(i httpbakery.Interactor) *httpbakery.Client {
 	cl := &httpbakery.Client{
 		Client: httpbakery.NewHTTPClient(),
 	}
@@ -142,7 +143,7 @@ func (s *ServerSuite) Client(i httpbakery.Interactor) *httpbakery.Client {
 
 // AdminClient creates a new httpbakery.Client that is configured to log
 // in as an admin user.
-func (s *ServerSuite) AdminClient() *httpbakery.Client {
+func (s *Server) AdminClient() *httpbakery.Client {
 	client := &httpbakery.Client{
 		Client: httpbakery.NewHTTPClient(),
 		Key:    s.adminAgentKey,
@@ -159,7 +160,7 @@ func (s *ServerSuite) AdminClient() *httpbakery.Client {
 
 // AdminIdentityClient creates a new candidclient.Client that is configured to log
 // in as an admin user.
-func (s *ServerSuite) AdminIdentityClient(c *gc.C) *candidclient.Client {
+func (s *Server) AdminIdentityClient() *candidclient.Client {
 	client, err := candidclient.New(candidclient.NewParams{
 		BaseURL: s.URL,
 		Client: &httpbakery.Client{
@@ -168,7 +169,9 @@ func (s *ServerSuite) AdminIdentityClient(c *gc.C) *candidclient.Client {
 		},
 		AgentUsername: auth.AdminUsername,
 	})
-	c.Assert(err, gc.Equals, nil)
+	if err != nil {
+		panic(err)
+	}
 	return client
 }
 
@@ -177,14 +180,14 @@ func (s *ServerSuite) AdminIdentityClient(c *gc.C) *candidclient.Client {
 // returned.
 //
 // The agent will be owned by admin@candid.
-func (s *ServerSuite) CreateAgent(c *gc.C, username string, groups ...string) *bakery.KeyPair {
+func (s *Server) CreateAgent(c *qt.C, username string, groups ...string) *bakery.KeyPair {
 	key, err := bakery.GenerateKey()
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 	name := strings.TrimSuffix(username, "@candid")
 	if name == username {
 		c.Fatalf("agent username must end in @candid")
 	}
-	err = s.Params.Store.UpdateIdentity(
+	err = s.params.Store.UpdateIdentity(
 		context.Background(),
 		&store.Identity{
 			ProviderID: store.MakeProviderIdentity("idm", name),
@@ -202,14 +205,14 @@ func (s *ServerSuite) CreateAgent(c *gc.C, username string, groups ...string) *b
 			store.Owner:      store.Set,
 		},
 	)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 	return key
 }
 
 // CreateUser creates a new user in the identity server's store with the
 // given name and groups. The user's username is returned.
-func (s *ServerSuite) CreateUser(c *gc.C, name string, groups ...string) string {
-	err := s.Params.Store.UpdateIdentity(
+func (s *Server) CreateUser(c *qt.C, name string, groups ...string) string {
+	err := s.params.Store.UpdateIdentity(
 		context.Background(),
 		&store.Identity{
 			ProviderID: store.MakeProviderIdentity("test", name),
@@ -221,7 +224,7 @@ func (s *ServerSuite) CreateUser(c *gc.C, name string, groups ...string) string 
 			store.Groups:   store.Set,
 		},
 	)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 	return name
 }
 
@@ -229,7 +232,7 @@ func (s *ServerSuite) CreateUser(c *gc.C, name string, groups ...string) string 
 // (which must end in @candid) and groups and then creates an
 // candidclient.Client
 // which authenticates using that agent.
-func (s *ServerSuite) IdentityClient(c *gc.C, username string, groups ...string) *candidclient.Client {
+func (s *Server) IdentityClient(c *qt.C, username string, groups ...string) *candidclient.Client {
 	key := s.CreateAgent(c, username, groups...)
 	client, err := candidclient.New(candidclient.NewParams{
 		BaseURL: s.URL,
@@ -239,7 +242,7 @@ func (s *ServerSuite) IdentityClient(c *gc.C, username string, groups ...string)
 		},
 		AgentUsername: username,
 	})
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 	return client
 }
 
@@ -247,18 +250,18 @@ func (s *ServerSuite) IdentityClient(c *gc.C, username string, groups ...string)
 // server. The server's URL will be prepended to the one specified in the
 // request and then the request will be performed using
 // http.DefaultClient.
-func (s *ServerSuite) Do(c *gc.C, req *http.Request) *http.Response {
+func (s *Server) Do(c *qt.C, req *http.Request) *http.Response {
 	resp, err := http.DefaultClient.Do(s.reqUrl(c, req))
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 	return resp
 }
 
 // Get is a convenience function for performing HTTP requests against the
 // server. The server's URL will be prepended to the one given and then
 // the GET will be performed using http.DefaultClient.
-func (s *ServerSuite) Get(c *gc.C, url string) *http.Response {
+func (s *Server) Get(c *qt.C, url string) *http.Response {
 	req, err := http.NewRequest("GET", url, nil)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 	return s.Do(c, req)
 }
 
@@ -266,15 +269,15 @@ func (s *ServerSuite) Get(c *gc.C, url string) *http.Response {
 // requests against the server. The server's URL will be prepended to the
 // one specified in the request and then a single request will be
 // performed using http.DefaultTransport.
-func (s *ServerSuite) RoundTrip(c *gc.C, req *http.Request) *http.Response {
+func (s *Server) RoundTrip(c *qt.C, req *http.Request) *http.Response {
 	resp, err := http.DefaultTransport.RoundTrip(s.reqUrl(c, req))
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 	return resp
 }
 
-func (s *ServerSuite) reqUrl(c *gc.C, req *http.Request) *http.Request {
+func (s *Server) reqUrl(c *qt.C, req *http.Request) *http.Request {
 	u, err := url.Parse(s.URL)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 	req.URL = u.ResolveReference(req.URL)
 	return req
 }

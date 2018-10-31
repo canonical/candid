@@ -4,9 +4,8 @@
 package internal_test
 
 import (
-	"time"
-
 	"context"
+	"time"
 
 	"github.com/juju/simplekv"
 	jc "github.com/juju/testing/checkers"

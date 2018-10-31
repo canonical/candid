@@ -1,10 +1,11 @@
 package sqlstore_test
 
 import (
-	storetesting "github.com/CanonicalLtd/candid/store/testing"
 	"github.com/juju/postgrestest"
 	gc "gopkg.in/check.v1"
 	errgo "gopkg.in/errgo.v1"
+
+	storetesting "github.com/CanonicalLtd/candid/store/testing"
 )
 
 var _ = gc.Suite(&configSuite{})

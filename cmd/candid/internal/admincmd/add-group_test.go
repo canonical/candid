@@ -4,10 +4,11 @@
 package admincmd_test
 
 import (
-	"github.com/CanonicalLtd/candid/store"
 	jc "github.com/juju/testing/checkers"
 	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
+
+	"github.com/CanonicalLtd/candid/store"
 )
 
 type addGroupSuite struct {
