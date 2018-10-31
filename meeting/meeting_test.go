@@ -60,7 +60,7 @@ func TestRendezvousWaitBeforeDone(t *testing.T) {
 	waitDone := make(chan struct{})
 	go func() {
 		data0, data1, err := m.Wait(ctx, id)
-		c.Check(err, qt.IsNil)
+		c.Check(err, qt.Equals, nil)
 		c.Check(string(data0), qt.Equals, "first data")
 		c.Check(string(data1), qt.Equals, "second data")
 
@@ -168,7 +168,7 @@ func TestRendezvousDifferentPlaces(t *testing.T) {
 	waitDone := make(chan struct{})
 	go func() {
 		data0, data1, err := m2.Wait(ctx, id)
-		c.Check(err, qt.IsNil)
+		c.Check(err, qt.Equals, nil)
 		c.Check(string(data0), qt.Equals, "first data")
 		c.Check(string(data1), qt.Equals, "second data")
 
@@ -486,7 +486,7 @@ func TestRequestCompletedCalled(t *testing.T) {
 	waitDone := make(chan struct{})
 	go func() {
 		_, _, err := m.Wait(ctx, id)
-		c.Check(err, qt.IsNil)
+		c.Check(err, qt.Equals, nil)
 		c.Check(tm.completedCallCount, qt.Equals, 1)
 
 		close(waitDone)

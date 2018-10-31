@@ -91,7 +91,7 @@ func (s *Suite) AssertLoginSuccess(c *gc.C, username string) {
 	c.Assert(s.visitCompleter.id.Username, gc.Equals, username)
 }
 
-// AssertLoginFailure asserts taht the login test has resulted in a
+// AssertLoginFailure asserts that the login test has resulted in a
 // failure with an error that matches the given regex.
 func (s *Suite) AssertLoginFailureMatches(c *gc.C, regex string) {
 	c.Assert(s.visitCompleter.called, gc.Equals, true)
