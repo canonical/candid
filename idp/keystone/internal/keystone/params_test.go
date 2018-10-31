@@ -39,7 +39,7 @@ func (s *paramsSuite) TestTimeUnmarshalJSON(c *gc.C) {
 			c.Assert(err, gc.ErrorMatches, test.expectError)
 			continue
 		}
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, gc.Equals, nil)
 		c.Assert(t.Equal(test.expect), gc.Equals, true, gc.Commentf("obtained: %#v, expected: %#v", t, test.expect))
 	}
 }

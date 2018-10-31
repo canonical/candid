@@ -53,7 +53,7 @@ func (s *staticSuite) makeLoginRequest(c *gc.C, i idp.IdentityProvider, username
 			}.Encode(),
 		),
 	)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.ParseForm()
 	rr := httptest.NewRecorder()

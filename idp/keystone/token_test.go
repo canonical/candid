@@ -67,9 +67,9 @@ func (s *tokenSuite) TestKeystoneTokenIdentityProviderHandle(c *gc.C) {
 	var tok keystoneidp.Token
 	tok.Login.ID = "789"
 	body, err := json.Marshal(tok)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	req, err := http.NewRequest("POST", "https://idp.test/login?did=1", bytes.NewReader(body))
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 	s.idp.Handle(s.Ctx, rr, req)
@@ -87,9 +87,9 @@ func (s *tokenSuite) TestKeystoneTokenIdentityProviderHandleBadToken(c *gc.C) {
 	var tok keystoneidp.Token
 	tok.Login.ID = "012"
 	body, err := json.Marshal(tok)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	req, err := http.NewRequest("POST", "https://idp.test/login?did=1", bytes.NewReader(body))
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 	s.idp.Handle(s.Ctx, rr, req)
@@ -98,7 +98,7 @@ func (s *tokenSuite) TestKeystoneTokenIdentityProviderHandleBadToken(c *gc.C) {
 
 func (s *tokenSuite) TestKeystoneTokenIdentityProviderHandleBadRequest(c *gc.C) {
 	req, err := http.NewRequest("POST", "https://idp.test/login?did=1", strings.NewReader("{"))
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 	s.idp.Handle(s.Ctx, rr, req)
@@ -114,7 +114,7 @@ identity-providers:
 `
 	var conf config.Config
 	err := yaml.Unmarshal([]byte(input), &conf)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(conf.IdentityProviders, gc.HasLen, 1)
 	c.Assert(conf.IdentityProviders[0].Name(), gc.Equals, "openstack3")
 }

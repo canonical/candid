@@ -150,7 +150,7 @@ func (s *ldapSuite) getSampleParams() ldap.Params {
 
 func (s *ldapSuite) setupIdp(c *gc.C, params ldap.Params, db ldapDB) idp.IdentityProvider {
 	i, err := ldap.NewIdentityProvider(params)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	s.ldapDialer = newMockLDAPDialer(db)
 	ldap.SetLDAP(i, s.ldapDialer.Dial)
 	i.Init(context.TODO(), s.InitParams(c, "https://example.com/test"))
@@ -166,7 +166,7 @@ func (s *ldapSuite) makeLoginRequest(c *gc.C, i idp.IdentityProvider, username, 
 			}.Encode(),
 		),
 	)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.ParseForm()
 	rr := httptest.NewRecorder()

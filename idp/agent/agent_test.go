@@ -23,7 +23,7 @@ identity-providers:
 `
 	var conf config.Config
 	err := yaml.Unmarshal([]byte(configYaml), &conf)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(conf.IdentityProviders, gc.HasLen, 1)
 	c.Assert(conf.IdentityProviders[0].Name(), gc.Equals, "agent")
 }

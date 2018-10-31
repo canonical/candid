@@ -72,7 +72,7 @@ func (s *serverSuite) TestNewServerWithVersions(c *gc.C) {
 		},
 		candid.Debug,
 	)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	defer h.Close()
 
 	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
@@ -87,7 +87,7 @@ func (s *serverSuite) TestNewServerWithVersions(c *gc.C) {
 func (s *serverSuite) TestNewServerRemovesAgentIDP(c *gc.C) {
 	var conf config.Config
 	err := yaml.Unmarshal([]byte(`{"identity-providers": [{"type":"agent"},{"type":"test","name":"test"}]}`), &conf)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	idps := make([]idp.IdentityProvider, len(conf.IdentityProviders))
 	for i, idp := range conf.IdentityProviders {
 		idps[i] = idp.IdentityProvider
@@ -105,7 +105,7 @@ func (s *serverSuite) TestNewServerRemovesAgentIDP(c *gc.C) {
 		},
 		candid.V1,
 	)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	h.Close()
 }
 

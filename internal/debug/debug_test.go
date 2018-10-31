@@ -93,7 +93,7 @@ func (s *debugSuite) TestServeDebugStatus(c *gc.C) {
 		ExpectBody: httptesting.BodyAsserter(func(c *gc.C, body json.RawMessage) {
 			var result map[string]debugstatus.CheckResult
 			err := json.Unmarshal(body, &result)
-			c.Assert(err, gc.IsNil)
+			c.Assert(err, gc.Equals, nil)
 			c.Assert(result, gc.HasLen, len(expectNames))
 			for k, v := range result {
 				c.Assert(v.Name, gc.Equals, expectNames[k], gc.Commentf("%s: incorrect name", k))

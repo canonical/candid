@@ -58,7 +58,7 @@ identity-providers:
 `
 	var conf config.Config
 	err := yaml.Unmarshal([]byte(configYaml), &conf)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	c.Assert(conf.IdentityProviders, gc.HasLen, 1)
 	c.Assert(conf.IdentityProviders[0].Name(), gc.Equals, "usso_oauth")
 }
@@ -174,7 +174,7 @@ func (s *ussooauthSuite) TestHandleVerifyFail(c *gc.C) {
 		req.URL,
 		nil,
 	)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.Equals, nil)
 	rr := httptest.NewRecorder()
 	s.idp.Handle(s.Ctx, rr, req)
 	s.AssertLoginFailureMatches(c, `invalid OAuth credentials`)
