@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"testing"
 
-	jujutesting "github.com/juju/testing"
 	"github.com/juju/testing/httptesting"
 	gc "gopkg.in/check.v1"
 	yaml "gopkg.in/yaml.v2"
@@ -22,7 +21,7 @@ import (
 )
 
 func TestPackage(t *testing.T) {
-	jujutesting.MgoTestPackage(t, nil)
+	gc.TestingT(t)
 }
 
 type serverSuite struct {

@@ -11,7 +11,7 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/juju/testing"
+	"github.com/juju/mgotest"
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/testing/httptesting"
 	"golang.org/x/crypto/nacl/box"
@@ -27,18 +27,22 @@ import (
 )
 
 type loginSuite struct {
-	testing.IsolatedMgoSuite
 	candidtest.ServerSuite
 
+	db      *mgotest.Database
 	backend store.Backend
 }
 
 var _ = gc.Suite(&loginSuite{})
 
 func (s *loginSuite) SetUpTest(c *gc.C) {
-	s.IsolatedMgoSuite.SetUpTest(c)
 	var err error
-	s.backend, err = mgostore.NewBackend(s.Session.DB("candid-test"))
+	s.db, err = mgotest.New()
+	if errgo.Cause(err) == mgotest.ErrDisabled {
+		c.Skip("mgotest disabled")
+	}
+	c.Assert(err, gc.Equals, nil)
+	s.backend, err = mgostore.NewBackend(s.db.Database)
 	c.Assert(err, gc.Equals, nil)
 
 	s.Params.MeetingStore = s.backend.MeetingStore()
@@ -57,8 +61,12 @@ func (s *loginSuite) SetUpTest(c *gc.C) {
 
 func (s *loginSuite) TearDownTest(c *gc.C) {
 	s.ServerSuite.TearDownTest(c)
-	s.backend.Close()
-	s.IsolatedMgoSuite.TearDownTest(c)
+	if s.backend != nil {
+		s.backend.Close()
+	}
+	if s.db != nil {
+		s.db.Close()
+	}
 }
 func (s *loginSuite) TestCookieEncodeDecode(c *gc.C) {
 	c1 := &debug.Cookie{

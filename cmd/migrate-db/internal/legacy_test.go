@@ -6,10 +6,11 @@ package internal_test
 import (
 	"time"
 
-	"github.com/juju/testing"
+	"github.com/juju/mgotest"
 	jc "github.com/juju/testing/checkers"
 	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
+	errgo "gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery"
 	mgo "gopkg.in/mgo.v2"
 
@@ -20,18 +21,20 @@ import (
 	"github.com/CanonicalLtd/candid/store/memstore"
 )
 
-type legacySuite struct {
-	testing.IsolatedMgoSuite
-}
+type legacySuite struct{}
 
 var _ = gc.Suite(&legacySuite{})
 
 func (s *legacySuite) TestLegacySource(c *gc.C) {
 	ctx := context.Background()
-	db := s.Session.DB("migration-test")
+	db, err := mgotest.New()
+	if errgo.Cause(err) == mgotest.ErrDisabled {
+		c.Skip("mmgotest disabled")
+	}
+	defer db.Close()
 	t1 := time.Now().Add(-1 * time.Minute).Round(time.Millisecond)
 	t2 := t1.Add(-1 * time.Minute).Round(time.Millisecond)
-	insert(c, db, &mongodoc.Identity{
+	insert(c, db.Database, &mongodoc.Identity{
 		Username:      "test1",
 		ExternalID:    "https://login.ubuntu.com/+id/AAAAAA",
 		Email:         "test1@example.com",
@@ -44,7 +47,7 @@ func (s *legacySuite) TestLegacySource(c *gc.C) {
 	})
 
 	k1 := bakery.MustGenerateKey()
-	insert(c, db, &mongodoc.Identity{
+	insert(c, db.Database, &mongodoc.Identity{
 		Username: "test2@admin@idm",
 		Owner:    "admin@idm",
 		Groups:   []string{"admin@idm", "grouplist@idm", "sshkeygetter@idm"},
@@ -53,14 +56,14 @@ func (s *legacySuite) TestLegacySource(c *gc.C) {
 		}},
 	})
 
-	insert(c, db, &mongodoc.Identity{
+	insert(c, db.Database, &mongodoc.Identity{
 		Username:   "test3@azure",
 		ExternalID: "openid-connect:https://login.live.com:AAAAAAAAAAAAAAAAAAAAAIDX0brimGEivOk0995Z2FB",
 		Email:      "test3@example.com",
 		FullName:   "Test User III",
 	})
 
-	insert(c, db, &mongodoc.Identity{
+	insert(c, db.Database, &mongodoc.Identity{
 		Username:   "AAAAAAA@usso",
 		ExternalID: "usso-openid:AAAAAAA",
 		Email:      "test4@example.com",
@@ -68,7 +71,7 @@ func (s *legacySuite) TestLegacySource(c *gc.C) {
 	})
 
 	st := memstore.NewStore()
-	err := internal.Copy(ctx, st, internal.NewLegacySource(db))
+	err = internal.Copy(ctx, st, internal.NewLegacySource(db.Database))
 	c.Assert(err, gc.Equals, nil)
 	identity1 := store.Identity{
 		Username: "test1",
