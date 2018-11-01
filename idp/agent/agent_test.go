@@ -4,7 +4,9 @@
 package agent_test
 
 import (
-	gc "gopkg.in/check.v1"
+	"testing"
+
+	qt "github.com/frankban/quicktest"
 	"gopkg.in/yaml.v2"
 
 	"github.com/CanonicalLtd/candid/config"
@@ -12,40 +14,42 @@ import (
 	"github.com/CanonicalLtd/candid/idp/agent"
 )
 
-type agentSuite struct{}
-
-var _ = gc.Suite(&agentSuite{})
-
-func (s *agentSuite) TestConfig(c *gc.C) {
+func TestConfig(t *testing.T) {
+	c := qt.New(t)
 	configYaml := `
 identity-providers:
  - type: agent
 `
 	var conf config.Config
 	err := yaml.Unmarshal([]byte(configYaml), &conf)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(conf.IdentityProviders, gc.HasLen, 1)
-	c.Assert(conf.IdentityProviders[0].Name(), gc.Equals, "agent")
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(conf.IdentityProviders, qt.HasLen, 1)
+	c.Assert(conf.IdentityProviders[0].Name(), qt.Equals, "agent")
 }
 
-func (s *agentSuite) TestName(c *gc.C) {
-	c.Assert(agent.IdentityProvider.Name(), gc.Equals, "agent")
+func TestName(t *testing.T) {
+	c := qt.New(t)
+	c.Assert(agent.IdentityProvider.Name(), qt.Equals, "agent")
 }
 
-func (s *agentSuite) TestDescription(c *gc.C) {
-	c.Assert(agent.IdentityProvider.Description(), gc.Equals, "")
+func TestDescription(t *testing.T) {
+	c := qt.New(t)
+	c.Assert(agent.IdentityProvider.Description(), qt.Equals, "")
 }
 
-func (s *agentSuite) TestInteractive(c *gc.C) {
-	c.Assert(agent.IdentityProvider.Interactive(), gc.Equals, false)
+func TestInteractive(t *testing.T) {
+	c := qt.New(t)
+	c.Assert(agent.IdentityProvider.Interactive(), qt.Equals, false)
 }
 
-func (s *agentSuite) TestURL(c *gc.C) {
+func TestURL(t *testing.T) {
+	c := qt.New(t)
 	u := agent.IdentityProvider.URL("1")
-	c.Assert(u, gc.Equals, "")
+	c.Assert(u, qt.Equals, "")
 }
 
-func (s *agentSuite) TestInitProducesError(c *gc.C) {
+func TestInitProducesError(t *testing.T) {
+	c := qt.New(t)
 	err := agent.IdentityProvider.Init(nil, idp.InitParams{})
-	c.Assert(err, gc.ErrorMatches, "agent login IDP no longer supported")
+	c.Assert(err, qt.ErrorMatches, "agent login IDP no longer supported")
 }
