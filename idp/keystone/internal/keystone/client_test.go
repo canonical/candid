@@ -8,16 +8,12 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"testing"
 
-	jc "github.com/juju/testing/checkers"
-	gc "gopkg.in/check.v1"
+	qt "github.com/frankban/quicktest"
 
 	"github.com/CanonicalLtd/candid/idp/keystone/internal/keystone"
 )
-
-type clientSuite struct{}
-
-var _ = gc.Suite(&clientSuite{})
 
 var unmarshalErrorTests = []struct {
 	about       string
@@ -39,27 +35,29 @@ var unmarshalErrorTests = []struct {
 	expectError: "unexpected end of JSON input",
 }}
 
-func (s *clientSuite) TestUnmarshalError(c *gc.C) {
-	for i, test := range unmarshalErrorTests {
-		c.Logf("%d. %s", i, test.about)
-		resp := &http.Response{
-			Body: ioutil.NopCloser(strings.NewReader(test.body)),
-			Header: http.Header{
-				"Content-Type": {"application/json"},
-			},
-			Request: &http.Request{
-				Method: "GET",
-				URL: &url.URL{
-					Scheme: "http",
-					Host:   "example.com",
-					Path:   "test",
+func TestUnmarshalError(t *testing.T) {
+	c := qt.New(t)
+	for _, test := range unmarshalErrorTests {
+		c.Run(test.about, func(c *qt.C) {
+			resp := &http.Response{
+				Body: ioutil.NopCloser(strings.NewReader(test.body)),
+				Header: http.Header{
+					"Content-Type": {"application/json"},
 				},
-			},
-		}
-		err := keystone.UnmarshalError(resp)
-		if test.expect != nil {
-			c.Assert(err, jc.DeepEquals, test.expect)
-		}
-		c.Assert(err, gc.ErrorMatches, test.expectError)
+				Request: &http.Request{
+					Method: "GET",
+					URL: &url.URL{
+						Scheme: "http",
+						Host:   "example.com",
+						Path:   "test",
+					},
+				},
+			}
+			err := keystone.UnmarshalError(resp)
+			if test.expect != nil {
+				c.Assert(err, qt.DeepEquals, test.expect)
+			}
+			c.Assert(err, qt.ErrorMatches, test.expectError)
+		})
 	}
 }
