@@ -112,7 +112,7 @@ type visitCompleter struct {
 
 func (l *visitCompleter) Success(_ context.Context, _ http.ResponseWriter, _ *http.Request, dischargeID string, id *store.Identity) {
 	if l.called {
-		l.c.Error("login completion method called more that once")
+		l.c.Error("login completion method called more than once")
 		return
 	}
 	l.called = true
@@ -122,7 +122,7 @@ func (l *visitCompleter) Success(_ context.Context, _ http.ResponseWriter, _ *ht
 
 func (l *visitCompleter) Failure(_ context.Context, _ http.ResponseWriter, _ *http.Request, dischargeID string, err error) {
 	if l.called {
-		l.c.Error("login completion method called more that once")
+		l.c.Error("login completion method called more than once")
 		return
 	}
 	l.called = true
@@ -132,7 +132,7 @@ func (l *visitCompleter) Failure(_ context.Context, _ http.ResponseWriter, _ *ht
 
 func (l *visitCompleter) RedirectSuccess(_ context.Context, _ http.ResponseWriter, _ *http.Request, returnTo, state string, id *store.Identity) {
 	if l.called {
-		l.c.Error("login completion method called more that once")
+		l.c.Error("login completion method called more than once")
 		return
 	}
 	l.called = true
@@ -143,7 +143,7 @@ func (l *visitCompleter) RedirectSuccess(_ context.Context, _ http.ResponseWrite
 
 func (l *visitCompleter) RedirectFailure(_ context.Context, _ http.ResponseWriter, _ *http.Request, returnTo, state string, err error) {
 	if l.called {
-		l.c.Error("login completion method called more that once")
+		l.c.Error("login completion method called more than once")
 		return
 	}
 	l.called = true
