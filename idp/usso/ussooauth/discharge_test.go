@@ -4,51 +4,41 @@
 package ussooauth_test
 
 import (
+	"testing"
+
+	qt "github.com/frankban/quicktest"
 	"github.com/juju/usso"
 	"golang.org/x/net/context"
 	"gopkg.in/CanonicalLtd/candidclient.v1/ussologin"
-	gc "gopkg.in/check.v1"
 
 	"github.com/CanonicalLtd/candid/idp"
-	"github.com/CanonicalLtd/candid/idp/usso/internal/mockusso"
+	mockusso "github.com/CanonicalLtd/candid/idp/usso/internal/qtmockusso"
 	"github.com/CanonicalLtd/candid/idp/usso/ussooauth"
-	"github.com/CanonicalLtd/candid/internal/candidtest"
+	"github.com/CanonicalLtd/candid/internal/discharger"
+	"github.com/CanonicalLtd/candid/internal/identity"
+	candidtest "github.com/CanonicalLtd/candid/internal/qtcandidtest"
 	"github.com/CanonicalLtd/candid/store"
 )
 
-type dischargeSuite struct {
-	candidtest.DischargeSuite
-	mockusso.Suite
-}
+func TestDischarge(t *testing.T) {
+	c := qt.New(t)
+	defer c.Done()
 
-var _ = gc.Suite(&dischargeSuite{})
-
-func (s *dischargeSuite) SetUpSuite(c *gc.C) {
-	s.Suite.SetUpSuite(c)
-	s.DischargeSuite.SetUpSuite(c)
-}
-
-func (s *dischargeSuite) TearDownSuite(c *gc.C) {
-	s.DischargeSuite.TearDownSuite(c)
-	s.Suite.TearDownSuite(c)
-}
-
-func (s *dischargeSuite) SetUpTest(c *gc.C) {
-	s.Suite.SetUpTest(c)
-	s.Params.IdentityProviders = []idp.IdentityProvider{
+	testStore := candidtest.NewStore()
+	sp := testStore.ServerParams()
+	sp.IdentityProviders = []idp.IdentityProvider{
 		ussooauth.IdentityProvider,
 	}
-	s.DischargeSuite.SetUpTest(c)
-}
+	candid := candidtest.NewServer(c, sp, map[string]identity.NewAPIHandlerFunc{
+		"discharger": discharger.NewAPIHandler,
+	})
+	dischargeCreator := candidtest.NewDischargeCreator(candid)
 
-func (s *dischargeSuite) TearDownTest(c *gc.C) {
-	s.DischargeSuite.TearDownTest(c)
-	s.Suite.TearDownTest(c)
-}
+	ussoSrv := mockusso.NewServer()
+	defer ussoSrv.Close()
 
-func (s *dischargeSuite) TestDischarge(c *gc.C) {
-	err := s.Params.Store.UpdateIdentity(
-		s.Ctx,
+	err := testStore.Store.UpdateIdentity(
+		candid.Ctx,
 		&store.Identity{
 			ProviderID: store.MakeProviderIdentity("usso", "https://login.ubuntu.com/+id/1234"),
 			Username:   "test",
@@ -63,8 +53,8 @@ func (s *dischargeSuite) TestDischarge(c *gc.C) {
 			store.Groups:   store.Set,
 		},
 	)
-	c.Assert(err, gc.Equals, nil)
-	s.MockUSSO.AddUser(&mockusso.User{
+	c.Assert(err, qt.Equals, nil)
+	ussoSrv.MockUSSO.AddUser(&mockusso.User{
 		ID:       "1234",
 		NickName: "test",
 		FullName: "Test User",
@@ -76,7 +66,7 @@ func (s *dischargeSuite) TestDischarge(c *gc.C) {
 		TokenKey:       "test-token",
 		TokenSecret:    "secret2",
 	})
-	s.MockUSSO.SetLoginUser("1234")
+	ussoSrv.MockUSSO.SetLoginUser("1234")
 	interactor := ussologin.NewInteractor(tokenGetterFunc(func(_ context.Context) (*usso.SSOData, error) {
 		return &usso.SSOData{
 			ConsumerKey:    "1234",
@@ -86,7 +76,7 @@ func (s *dischargeSuite) TestDischarge(c *gc.C) {
 			TokenSecret:    "secret2",
 		}, nil
 	}))
-	s.AssertDischarge(c, interactor)
+	dischargeCreator.AssertDischarge(c, interactor)
 }
 
 type tokenGetterFunc func(context.Context) (*usso.SSOData, error)
