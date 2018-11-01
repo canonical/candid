@@ -6,62 +6,51 @@ package usso_test
 import (
 	"net/http"
 	"net/url"
+	"testing"
 
-	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
 
 	"github.com/CanonicalLtd/candid/idp"
 	"github.com/CanonicalLtd/candid/idp/usso"
-	"github.com/CanonicalLtd/candid/idp/usso/internal/mockusso"
-	"github.com/CanonicalLtd/candid/internal/candidtest"
+	mockusso "github.com/CanonicalLtd/candid/idp/usso/internal/qtmockusso"
+	"github.com/CanonicalLtd/candid/internal/discharger"
+	"github.com/CanonicalLtd/candid/internal/identity"
+	candidtest "github.com/CanonicalLtd/candid/internal/qtcandidtest"
+	qt "github.com/frankban/quicktest"
 )
 
-type dischargeSuite struct {
-	candidtest.DischargeSuite
-	mockusso.Suite
-}
+func TestInteractiveDischarge(t *testing.T) {
+	c := qt.New(t)
+	defer c.Done()
 
-var _ = gc.Suite(&dischargeSuite{})
-
-func (s *dischargeSuite) SetUpSuite(c *gc.C) {
-	s.Suite.SetUpSuite(c)
-	s.DischargeSuite.SetUpSuite(c)
-}
-
-func (s *dischargeSuite) TearDownSuite(c *gc.C) {
-	s.DischargeSuite.TearDownSuite(c)
-	s.Suite.TearDownSuite(c)
-}
-
-func (s *dischargeSuite) SetUpTest(c *gc.C) {
-	s.Suite.SetUpTest(c)
-	s.Params.IdentityProviders = []idp.IdentityProvider{
+	store := candidtest.NewStore()
+	sp := store.ServerParams()
+	sp.IdentityProviders = []idp.IdentityProvider{
 		usso.NewIdentityProvider(usso.Params{}),
 	}
-	s.DischargeSuite.SetUpTest(c)
-}
+	candid := candidtest.NewServer(c, sp, map[string]identity.NewAPIHandlerFunc{
+		"discharger": discharger.NewAPIHandler,
+	})
+	dischargeCreator := candidtest.NewDischargeCreator(candid)
 
-func (s *dischargeSuite) TearDownTest(c *gc.C) {
-	s.DischargeSuite.TearDownTest(c)
-	s.Suite.TearDownTest(c)
-}
+	ussoSrv := mockusso.NewServer()
+	defer ussoSrv.Close()
 
-func (s *dischargeSuite) TestInteractiveDischarge(c *gc.C) {
-	s.MockUSSO.AddUser(&mockusso.User{
+	ussoSrv.MockUSSO.AddUser(&mockusso.User{
 		ID:       "test",
 		NickName: "test",
 		FullName: "Test User",
 		Email:    "test@example.com",
 		Groups:   []string{"test1", "test2"},
 	})
-	s.MockUSSO.SetLoginUser("test")
-	s.AssertDischarge(c, httpbakery.WebBrowserInteractor{
-		OpenWebBrowser: s.visitWebPage(c),
+	ussoSrv.MockUSSO.SetLoginUser("test")
+	dischargeCreator.AssertDischarge(c, httpbakery.WebBrowserInteractor{
+		OpenWebBrowser: visitWebPage(c),
 	})
 }
 
-func (s *dischargeSuite) visitWebPage(c *gc.C) func(u *url.URL) error {
+func visitWebPage(c *qt.C) func(u *url.URL) error {
 	return func(u *url.URL) error {
 		c.Logf("visiting %s", u)
 		client := http.Client{}
