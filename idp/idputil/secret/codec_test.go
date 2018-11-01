@@ -6,29 +6,20 @@ package secret_test
 import (
 	"net/http"
 	"net/http/httptest"
+	"testing"
 
-	jc "github.com/juju/testing/checkers"
-	gc "gopkg.in/check.v1"
+	qt "github.com/frankban/quicktest"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery"
 
 	"github.com/CanonicalLtd/candid/idp/idputil/secret"
 )
 
-type codecSuite struct {
-	key *bakery.KeyPair
-}
+var testKey = bakery.MustGenerateKey()
 
-var _ = gc.Suite(&codecSuite{})
-
-func (s *codecSuite) SetUpSuite(c *gc.C) {
-	var err error
-	s.key, err = bakery.GenerateKey()
-	c.Assert(err, gc.Equals, nil)
-}
-
-func (s *codecSuite) TestRoundTrip(c *gc.C) {
-	codec := secret.NewCodec(s.key)
+func TestRoundTrip(t *testing.T) {
+	c := qt.New(t)
+	codec := secret.NewCodec(testKey)
 	var a, b struct {
 		A int
 		B string
@@ -36,14 +27,15 @@ func (s *codecSuite) TestRoundTrip(c *gc.C) {
 	a.A = 1
 	a.B = "test"
 	msg, err := codec.Encode(a)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 	err = codec.Decode(msg, &b)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(b, jc.DeepEquals, a)
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(b, qt.DeepEquals, a)
 }
 
-func (s *codecSuite) TestDecodeBadBase64(c *gc.C) {
-	codec := secret.NewCodec(s.key)
+func TestDecodeBadBase64(t *testing.T) {
+	c := qt.New(t)
+	codec := secret.NewCodec(testKey)
 	var a, b struct {
 		A int
 		B string
@@ -51,14 +43,15 @@ func (s *codecSuite) TestDecodeBadBase64(c *gc.C) {
 	a.A = 1
 	a.B = "test"
 	msg, err := codec.Encode(a)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 	msg = "(" + msg[1:]
 	err = codec.Decode(msg, &b)
-	c.Assert(err, gc.ErrorMatches, "illegal base64 data at input byte 0")
+	c.Assert(err, qt.ErrorMatches, "illegal base64 data at input byte 0")
 }
 
-func (s *codecSuite) TestDecodeBadPublicKey(c *gc.C) {
-	codec := secret.NewCodec(s.key)
+func TestDecodeBadPublicKey(t *testing.T) {
+	c := qt.New(t)
+	codec := secret.NewCodec(testKey)
 	var a, b struct {
 		A int
 		B string
@@ -66,15 +59,16 @@ func (s *codecSuite) TestDecodeBadPublicKey(c *gc.C) {
 	a.A = 1
 	a.B = "test"
 	msg, err := codec.Encode(a)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 	msg = "A" + msg[:len(msg)-1]
 	err = codec.Decode(msg, &b)
-	c.Assert(err, gc.ErrorMatches, "unknown public key")
-	c.Assert(errgo.Cause(err), gc.Equals, secret.ErrDecryption)
+	c.Assert(err, qt.ErrorMatches, "unknown public key")
+	c.Assert(errgo.Cause(err), qt.Equals, secret.ErrDecryption)
 }
 
-func (s *codecSuite) TestDecodeDecryptionError(c *gc.C) {
-	codec := secret.NewCodec(s.key)
+func TestDecodeDecryptionError(t *testing.T) {
+	c := qt.New(t)
+	codec := secret.NewCodec(testKey)
 	var a, b struct {
 		A int
 		B string
@@ -82,15 +76,16 @@ func (s *codecSuite) TestDecodeDecryptionError(c *gc.C) {
 	a.A = 1
 	a.B = "test"
 	msg, err := codec.Encode(a)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 	msg = msg[:44] + msg
 	err = codec.Decode(msg, &b)
-	c.Assert(err, gc.ErrorMatches, "decryption error")
-	c.Assert(errgo.Cause(err), gc.Equals, secret.ErrDecryption)
+	c.Assert(err, qt.ErrorMatches, "decryption error")
+	c.Assert(errgo.Cause(err), qt.Equals, secret.ErrDecryption)
 }
 
-func (s *codecSuite) TestDecodeBufferTooShort(c *gc.C) {
-	codec := secret.NewCodec(s.key)
+func TestDecodeBufferTooShort(t *testing.T) {
+	c := qt.New(t)
+	codec := secret.NewCodec(testKey)
 	var a, b struct {
 		A int
 		B string
@@ -98,14 +93,15 @@ func (s *codecSuite) TestDecodeBufferTooShort(c *gc.C) {
 	a.A = 1
 	a.B = "test"
 	msg, err := codec.Encode(a)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 	msg = msg[:40]
 	err = codec.Decode(msg, &b)
-	c.Assert(err, gc.ErrorMatches, "buffer too short to decode")
+	c.Assert(err, qt.ErrorMatches, "buffer too short to decode")
 }
 
-func (s *codecSuite) TestDecodeUnmarshalError(c *gc.C) {
-	codec := secret.NewCodec(s.key)
+func TestDecodeUnmarshalError(t *testing.T) {
+	c := qt.New(t)
+	codec := secret.NewCodec(testKey)
 	var a struct {
 		A int
 		B string
@@ -113,17 +109,18 @@ func (s *codecSuite) TestDecodeUnmarshalError(c *gc.C) {
 	a.A = 1
 	a.B = "test"
 	msg, err := codec.Encode(a)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 	ej := errorJSON{errgo.New("test error")}
 	err = codec.Decode(msg, &ej)
-	c.Assert(err, gc.ErrorMatches, "test error")
+	c.Assert(err, qt.ErrorMatches, "test error")
 }
 
-func (s *codecSuite) TestEncodeMarshalError(c *gc.C) {
-	codec := secret.NewCodec(s.key)
+func TestEncodeMarshalError(t *testing.T) {
+	c := qt.New(t)
+	codec := secret.NewCodec(testKey)
 	msg, err := codec.Encode(errorJSON{errgo.New("test error")})
-	c.Assert(err, gc.ErrorMatches, "json: error calling MarshalJSON for type secret_test.errorJSON: test error")
-	c.Assert(msg, gc.Equals, "")
+	c.Assert(err, qt.ErrorMatches, "json: error calling MarshalJSON for type secret_test.errorJSON: test error")
+	c.Assert(msg, qt.Equals, "")
 }
 
 type errorJSON struct {
@@ -138,8 +135,9 @@ func (e errorJSON) UnmarshalJSON([]byte) error {
 	return e.err
 }
 
-func (s *codecSuite) TestCookieRoundTrip(c *gc.C) {
-	codec := secret.NewCodec(s.key)
+func TestCookieRoundTrip(t *testing.T) {
+	c := qt.New(t)
+	codec := secret.NewCodec(testKey)
 	w := httptest.NewRecorder()
 	var a, b struct {
 		A int
@@ -148,31 +146,33 @@ func (s *codecSuite) TestCookieRoundTrip(c *gc.C) {
 	a.A = 1
 	a.B = "test"
 	verification, err := codec.SetCookie(w, "test-cookie", a)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 	resp := w.Result()
 	defer resp.Body.Close()
 	cookies := resp.Cookies()
-	c.Assert(cookies, gc.HasLen, 1)
-	c.Assert(cookies[0].Name, gc.Equals, "test-cookie")
+	c.Assert(cookies, qt.HasLen, 1)
+	c.Assert(cookies[0].Name, qt.Equals, "test-cookie")
 	req, err := http.NewRequest("", "", nil)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 	req.AddCookie(cookies[0])
 	err = codec.Cookie(req, "test-cookie", verification, &b)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(b, jc.DeepEquals, a)
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(b, qt.DeepEquals, a)
 }
 
-func (s *codecSuite) TestCookieNoCookie(c *gc.C) {
-	codec := secret.NewCodec(s.key)
+func TestCookieNoCookie(t *testing.T) {
+	c := qt.New(t)
+	codec := secret.NewCodec(testKey)
 	req, err := http.NewRequest("", "", nil)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 	err = codec.Cookie(req, "test-cookie", "1234", nil)
-	c.Assert(err, gc.ErrorMatches, `invalid cookie: http: named cookie not present`)
-	c.Assert(errgo.Cause(err), gc.Equals, secret.ErrInvalidCookie)
+	c.Assert(err, qt.ErrorMatches, `invalid cookie: http: named cookie not present`)
+	c.Assert(errgo.Cause(err), qt.Equals, secret.ErrInvalidCookie)
 }
 
-func (s *codecSuite) TestCookieDecodeError(c *gc.C) {
-	codec := secret.NewCodec(s.key)
+func TestCookieDecodeError(t *testing.T) {
+	c := qt.New(t)
+	codec := secret.NewCodec(testKey)
 	w := httptest.NewRecorder()
 	var a struct {
 		A int
@@ -181,23 +181,24 @@ func (s *codecSuite) TestCookieDecodeError(c *gc.C) {
 	a.A = 1
 	a.B = "test"
 	_, err := codec.SetCookie(w, "test-cookie", a)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 	resp := w.Result()
 	defer resp.Body.Close()
 	cookies := resp.Cookies()
-	c.Assert(cookies, gc.HasLen, 1)
-	c.Assert(cookies[0].Name, gc.Equals, "test-cookie")
+	c.Assert(cookies, qt.HasLen, 1)
+	c.Assert(cookies[0].Name, qt.Equals, "test-cookie")
 	cookies[0].Value = "=" + cookies[0].Value
 	req, err := http.NewRequest("", "", nil)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 	req.AddCookie(cookies[0])
 	err = codec.Cookie(req, "test-cookie", "1234", nil)
-	c.Assert(err, gc.ErrorMatches, `invalid cookie: illegal base64 data at input byte 0`)
-	c.Assert(errgo.Cause(err), gc.Equals, secret.ErrInvalidCookie)
+	c.Assert(err, qt.ErrorMatches, `invalid cookie: illegal base64 data at input byte 0`)
+	c.Assert(errgo.Cause(err), qt.Equals, secret.ErrInvalidCookie)
 }
 
-func (s *codecSuite) TestCookieValidationError(c *gc.C) {
-	codec := secret.NewCodec(s.key)
+func TestCookieValidationError(t *testing.T) {
+	c := qt.New(t)
+	codec := secret.NewCodec(testKey)
 	w := httptest.NewRecorder()
 	var a struct {
 		A int
@@ -206,16 +207,16 @@ func (s *codecSuite) TestCookieValidationError(c *gc.C) {
 	a.A = 1
 	a.B = "test"
 	_, err := codec.SetCookie(w, "test-cookie", a)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 	resp := w.Result()
 	defer resp.Body.Close()
 	cookies := resp.Cookies()
-	c.Assert(cookies, gc.HasLen, 1)
-	c.Assert(cookies[0].Name, gc.Equals, "test-cookie")
+	c.Assert(cookies, qt.HasLen, 1)
+	c.Assert(cookies[0].Name, qt.Equals, "test-cookie")
 	req, err := http.NewRequest("", "", nil)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 	req.AddCookie(cookies[0])
 	err = codec.Cookie(req, "test-cookie", "1234", nil)
-	c.Assert(err, gc.ErrorMatches, `invalid cookie`)
-	c.Assert(errgo.Cause(err), gc.Equals, secret.ErrInvalidCookie)
+	c.Assert(err, qt.ErrorMatches, `invalid cookie`)
+	c.Assert(errgo.Cause(err), qt.Equals, secret.ErrInvalidCookie)
 }
