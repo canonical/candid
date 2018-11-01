@@ -8,23 +8,30 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"strings"
+	"testing"
 
 	"golang.org/x/net/context"
-	gc "gopkg.in/check.v1"
 
 	"github.com/CanonicalLtd/candid/idp"
-	"github.com/CanonicalLtd/candid/idp/idptest"
 	"github.com/CanonicalLtd/candid/idp/ldap"
+	idptest "github.com/CanonicalLtd/candid/idp/qtidptest"
+	candidtest "github.com/CanonicalLtd/candid/internal/qtcandidtest"
 	"github.com/CanonicalLtd/candid/store"
+	qt "github.com/frankban/quicktest"
+	"github.com/frankban/quicktest/qtsuite"
 )
 
 type ldapSuite struct {
-	idptest.Suite
-
-	ldapDialer *mockLDAPDialer
+	idptest *idptest.Fixture
 }
 
-var _ = gc.Suite(&ldapSuite{})
+func TestLDAP(t *testing.T) {
+	qtsuite.Run(qt.New(t), &ldapSuite{})
+}
+
+func (s *ldapSuite) Init(c *qt.C) {
+	s.idptest = idptest.NewFixture(c, candidtest.NewStore())
+}
 
 var newTests = []struct {
 	about       string
@@ -148,16 +155,15 @@ func (s *ldapSuite) getSampleParams() ldap.Params {
 	}
 }
 
-func (s *ldapSuite) setupIdp(c *gc.C, params ldap.Params, db ldapDB) idp.IdentityProvider {
+func (s *ldapSuite) setupIdp(c *qt.C, params ldap.Params, db ldapDB) idp.IdentityProvider {
 	i, err := ldap.NewIdentityProvider(params)
-	c.Assert(err, gc.Equals, nil)
-	s.ldapDialer = newMockLDAPDialer(db)
-	ldap.SetLDAP(i, s.ldapDialer.Dial)
-	i.Init(context.TODO(), s.InitParams(c, "https://example.com/test"))
+	c.Assert(err, qt.Equals, nil)
+	ldap.SetLDAP(i, newMockLDAPDialer(db).Dial)
+	i.Init(context.TODO(), s.idptest.InitParams(c, "https://example.com/test"))
 	return i
 }
 
-func (s *ldapSuite) makeLoginRequest(c *gc.C, i idp.IdentityProvider, username, password string) *httptest.ResponseRecorder {
+func (s *ldapSuite) makeLoginRequest(c *qt.C, i idp.IdentityProvider, username, password string) *httptest.ResponseRecorder {
 	req, err := http.NewRequest("POST", "/login",
 		strings.NewReader(
 			url.Values{
@@ -166,7 +172,7 @@ func (s *ldapSuite) makeLoginRequest(c *gc.C, i idp.IdentityProvider, username, 
 			}.Encode(),
 		),
 	)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.ParseForm()
 	rr := httptest.NewRecorder()
@@ -174,71 +180,72 @@ func (s *ldapSuite) makeLoginRequest(c *gc.C, i idp.IdentityProvider, username, 
 	return rr
 }
 
-func (s *ldapSuite) TestNewIdentityProvider(c *gc.C) {
-	for i, test := range newTests {
-		c.Logf("test %d. %s", i, test.about)
-		idp, err := ldap.NewIdentityProvider(test.params)
-		if test.expectError == "" {
-			c.Assert(err, gc.Equals, nil)
-			c.Assert(idp, gc.Not(gc.IsNil))
-			continue
-		}
-		c.Assert(err, gc.ErrorMatches, test.expectError)
-		c.Assert(idp, gc.IsNil)
+func (s *ldapSuite) TestNewIdentityProvider(c *qt.C) {
+	for _, test := range newTests {
+		c.Run(test.about, func(c *qt.C) {
+			idp, err := ldap.NewIdentityProvider(test.params)
+			if test.expectError == "" {
+				c.Assert(err, qt.Equals, nil)
+				c.Assert(idp, qt.Not(qt.IsNil))
+				return
+			}
+			c.Assert(err, qt.ErrorMatches, test.expectError)
+			c.Assert(idp, qt.IsNil)
+		})
 	}
 }
 
-func (s *ldapSuite) TestName(c *gc.C) {
+func (s *ldapSuite) TestName(c *qt.C) {
 	idp, err := ldap.NewIdentityProvider(s.getSampleParams())
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(idp.Name(), gc.Equals, "test")
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(idp.Name(), qt.Equals, "test")
 }
 
-func (s *ldapSuite) TestDescription(c *gc.C) {
+func (s *ldapSuite) TestDescription(c *qt.C) {
 	params := s.getSampleParams()
 	params.Description = "test description"
 	idp, err := ldap.NewIdentityProvider(params)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(idp.Description(), gc.Equals, "test description")
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(idp.Description(), qt.Equals, "test description")
 }
 
-func (s *ldapSuite) TestDomain(c *gc.C) {
+func (s *ldapSuite) TestDomain(c *qt.C) {
 	params := s.getSampleParams()
 	params.Domain = "test domain"
 	idp, err := ldap.NewIdentityProvider(params)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(idp.Domain(), gc.Equals, "test domain")
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(idp.Domain(), qt.Equals, "test domain")
 }
 
-func (s *ldapSuite) TestInteractive(c *gc.C) {
+func (s *ldapSuite) TestInteractive(c *qt.C) {
 	idp, err := ldap.NewIdentityProvider(s.getSampleParams())
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(idp.Interactive(), gc.Equals, true)
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(idp.Interactive(), qt.Equals, true)
 }
 
-func (s *ldapSuite) TestURL(c *gc.C) {
+func (s *ldapSuite) TestURL(c *qt.C) {
 	i, err := ldap.NewIdentityProvider(s.getSampleParams())
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 	i.Init(context.Background(), idp.InitParams{
 		URLPrefix: "https://example.com/test",
 	})
-	c.Assert(i.URL("1"), gc.Equals, "https://example.com/test/login?id=1")
+	c.Assert(i.URL("1"), qt.Equals, "https://example.com/test/login?id=1")
 }
 
-func (s *ldapSuite) TestHandle(c *gc.C) {
+func (s *ldapSuite) TestHandle(c *qt.C) {
 	params := s.getSampleParams()
 	params.Domain = "ldap"
 	i := s.setupIdp(c, params, s.getSampleLdapDB())
 	s.makeLoginRequest(c, i, "user1", "pass1")
-	s.AssertLoginSuccess(c, "user1@ldap")
-	s.AssertUser(c, &store.Identity{
+	s.idptest.AssertLoginSuccess(c, "user1@ldap")
+	s.idptest.Store.AssertUser(c, &store.Identity{
 		ProviderID: store.MakeProviderIdentity(
 			"test", "uid=user1,ou=users,dc=example,dc=com"),
 		Username: "user1@ldap",
 	})
 }
 
-func (s *ldapSuite) TestHandleCustomUserFilter(c *gc.C) {
+func (s *ldapSuite) TestHandleCustomUserFilter(c *qt.C) {
 	params := s.getSampleParams()
 	params.UserQueryFilter = "(customAttr=customValue)"
 	sampleDB := s.getSampleLdapDB()
@@ -246,15 +253,15 @@ func (s *ldapSuite) TestHandleCustomUserFilter(c *gc.C) {
 	sampleDB[1]["customAttr"] = []string{"customValue"}
 	i := s.setupIdp(c, params, sampleDB)
 	s.makeLoginRequest(c, i, "user1", "pass1")
-	s.AssertLoginSuccess(c, "user1")
-	s.AssertUser(c, &store.Identity{
+	s.idptest.AssertLoginSuccess(c, "user1")
+	s.idptest.Store.AssertUser(c, &store.Identity{
 		ProviderID: store.MakeProviderIdentity(
 			"test", "uid=user1,ou=users,dc=example,dc=com"),
 		Username: "user1",
 	})
 }
 
-func (s *ldapSuite) TestHandleUserDetails(c *gc.C) {
+func (s *ldapSuite) TestHandleUserDetails(c *qt.C) {
 	params := s.getSampleParams()
 	params.UserQueryAttrs.Email = "mail"
 	params.UserQueryAttrs.DisplayName = "displayName"
@@ -263,8 +270,8 @@ func (s *ldapSuite) TestHandleUserDetails(c *gc.C) {
 	sampleDB[1]["displayName"] = []string{"User One"}
 	i := s.setupIdp(c, params, sampleDB)
 	s.makeLoginRequest(c, i, "user1", "pass1")
-	s.AssertLoginSuccess(c, "user1")
-	s.AssertUser(c, &store.Identity{
+	s.idptest.AssertLoginSuccess(c, "user1")
+	s.idptest.Store.AssertUser(c, &store.Identity{
 		ProviderID: store.MakeProviderIdentity(
 			"test", "uid=user1,ou=users,dc=example,dc=com"),
 		Username: "user1",
@@ -273,7 +280,7 @@ func (s *ldapSuite) TestHandleUserDetails(c *gc.C) {
 	})
 }
 
-func (s *ldapSuite) TestHandleUserDetailsCustomIDAttr(c *gc.C) {
+func (s *ldapSuite) TestHandleUserDetailsCustomIDAttr(c *qt.C) {
 	params := s.getSampleParams()
 	params.UserQueryAttrs.ID = "myId"
 	sampleDB := s.getSampleLdapDB()
@@ -281,15 +288,15 @@ func (s *ldapSuite) TestHandleUserDetailsCustomIDAttr(c *gc.C) {
 	sampleDB[1]["myId"] = []string{"user1"}
 	i := s.setupIdp(c, params, sampleDB)
 	s.makeLoginRequest(c, i, "user1", "pass1")
-	s.AssertLoginSuccess(c, "user1")
-	s.AssertUser(c, &store.Identity{
+	s.idptest.AssertLoginSuccess(c, "user1")
+	s.idptest.Store.AssertUser(c, &store.Identity{
 		ProviderID: store.MakeProviderIdentity(
 			"test", "uid=user1,ou=users,dc=example,dc=com"),
 		Username: "user1",
 	})
 }
 
-func (s *ldapSuite) TestHandleWithGroups(c *gc.C) {
+func (s *ldapSuite) TestHandleWithGroups(c *qt.C) {
 	docs := []ldapDoc{{
 		"dn":          {"cn=group1,ou=users,dc=example,dc=com"},
 		"objectClass": {"groupOfNames"},
@@ -307,18 +314,18 @@ func (s *ldapSuite) TestHandleWithGroups(c *gc.C) {
 	sampleDB := append(s.getSampleLdapDB(), docs...)
 	i := s.setupIdp(c, s.getSampleParams(), sampleDB)
 	s.makeLoginRequest(c, i, "user1", "pass1")
-	s.AssertLoginSuccess(c, "user1")
-	identity := s.AssertUser(c, &store.Identity{
+	s.idptest.AssertLoginSuccess(c, "user1")
+	identity := s.idptest.Store.AssertUser(c, &store.Identity{
 		ProviderID: store.MakeProviderIdentity(
 			"test", "uid=user1,ou=users,dc=example,dc=com"),
 		Username: "user1",
 	})
-	groups, err := i.GetGroups(s.Ctx, identity)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(groups, gc.DeepEquals, []string{"group1", "group2"})
+	groups, err := i.GetGroups(s.idptest.Ctx, identity)
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(groups, qt.DeepEquals, []string{"group1", "group2"})
 }
 
-func (s *ldapSuite) TestHandleCustomGroupFilter(c *gc.C) {
+func (s *ldapSuite) TestHandleCustomGroupFilter(c *qt.C) {
 	params := s.getSampleParams()
 	params.GroupQueryFilter = "(&(customAttr=customValue)(user={{.User}}))"
 	docs := []ldapDoc{{
@@ -338,19 +345,19 @@ func (s *ldapSuite) TestHandleCustomGroupFilter(c *gc.C) {
 	sampleDB := append(s.getSampleLdapDB(), docs...)
 	i := s.setupIdp(c, params, sampleDB)
 	s.makeLoginRequest(c, i, "user1", "pass1")
-	s.AssertLoginSuccess(c, "user1")
-	identity := s.AssertUser(c, &store.Identity{
+	s.idptest.AssertLoginSuccess(c, "user1")
+	identity := s.idptest.Store.AssertUser(c, &store.Identity{
 		ProviderID: store.MakeProviderIdentity(
 			"test", "uid=user1,ou=users,dc=example,dc=com"),
 		Username: "user1",
 	})
-	groups, err := i.GetGroups(s.Ctx, identity)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(groups, gc.DeepEquals, []string{"group1", "group2"})
+	groups, err := i.GetGroups(s.idptest.Ctx, identity)
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(groups, qt.DeepEquals, []string{"group1", "group2"})
 }
 
-func (s *ldapSuite) TestHandleFailedLogin(c *gc.C) {
+func (s *ldapSuite) TestHandleFailedLogin(c *qt.C) {
 	i := s.setupIdp(c, s.getSampleParams(), s.getSampleLdapDB())
 	s.makeLoginRequest(c, i, "user1", "wrong")
-	s.AssertLoginFailureMatches(c, `Login failure`)
+	s.idptest.AssertLoginFailureMatches(c, `Login failure`)
 }
