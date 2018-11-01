@@ -8,25 +8,34 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"strings"
+	"testing"
 
+	qt "github.com/frankban/quicktest"
+	"github.com/frankban/quicktest/qtsuite"
 	"golang.org/x/net/context"
-	gc "gopkg.in/check.v1"
 
 	"github.com/CanonicalLtd/candid/idp"
-	"github.com/CanonicalLtd/candid/idp/idptest"
+	idptest "github.com/CanonicalLtd/candid/idp/qtidptest"
 	"github.com/CanonicalLtd/candid/idp/static"
+	candidtest "github.com/CanonicalLtd/candid/internal/qtcandidtest"
 	"github.com/CanonicalLtd/candid/store"
 )
 
 type staticSuite struct {
-	idptest.Suite
+	idptest *idptest.Fixture
 }
 
-var _ = gc.Suite(&staticSuite{})
+func TestStatic(t *testing.T) {
+	qtsuite.Run(qt.New(t), &staticSuite{})
+}
 
-func (s *staticSuite) setupIdp(c *gc.C, params static.Params) idp.IdentityProvider {
+func (s *staticSuite) Init(c *qt.C) {
+	s.idptest = idptest.NewFixture(c, candidtest.NewStore())
+}
+
+func (s *staticSuite) setupIdp(c *qt.C, params static.Params) idp.IdentityProvider {
 	i := static.NewIdentityProvider(params)
-	i.Init(context.TODO(), s.InitParams(c, "https://example.com/test"))
+	i.Init(context.TODO(), s.idptest.InitParams(c, "https://example.com/test"))
 	return i
 }
 
@@ -44,7 +53,7 @@ func (s *staticSuite) getSampleParams() static.Params {
 	}
 }
 
-func (s *staticSuite) makeLoginRequest(c *gc.C, i idp.IdentityProvider, username, password string) *httptest.ResponseRecorder {
+func (s *staticSuite) makeLoginRequest(c *qt.C, i idp.IdentityProvider, username, password string) *httptest.ResponseRecorder {
 	req, err := http.NewRequest("POST", "/login",
 		strings.NewReader(
 			url.Values{
@@ -53,7 +62,7 @@ func (s *staticSuite) makeLoginRequest(c *gc.C, i idp.IdentityProvider, username
 			}.Encode(),
 		),
 	)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.ParseForm()
 	rr := httptest.NewRecorder()
@@ -61,28 +70,28 @@ func (s *staticSuite) makeLoginRequest(c *gc.C, i idp.IdentityProvider, username
 	return rr
 }
 
-func (s *staticSuite) TestName(c *gc.C) {
+func (s *staticSuite) TestName(c *qt.C) {
 	idp := static.NewIdentityProvider(s.getSampleParams())
-	c.Assert(idp.Name(), gc.Equals, "test")
+	c.Assert(idp.Name(), qt.Equals, "test")
 }
 
-func (s *staticSuite) TestDomain(c *gc.C) {
+func (s *staticSuite) TestDomain(c *qt.C) {
 	params := s.getSampleParams()
 	params.Domain = "domain"
 	idp := static.NewIdentityProvider(params)
-	c.Assert(idp.Domain(), gc.Equals, "domain")
+	c.Assert(idp.Domain(), qt.Equals, "domain")
 }
 
-func (s *staticSuite) TestInteractive(c *gc.C) {
+func (s *staticSuite) TestInteractive(c *qt.C) {
 	idp := static.NewIdentityProvider(s.getSampleParams())
-	c.Assert(idp.Interactive(), gc.Equals, true)
+	c.Assert(idp.Interactive(), qt.Equals, true)
 }
 
-func (s *staticSuite) TestHandle(c *gc.C) {
+func (s *staticSuite) TestHandle(c *qt.C) {
 	i := s.setupIdp(c, s.getSampleParams())
 	s.makeLoginRequest(c, i, "user1", "pass1")
-	s.AssertLoginSuccess(c, "user1")
-	s.AssertUser(c, &store.Identity{
+	s.idptest.AssertLoginSuccess(c, "user1")
+	s.idptest.Store.AssertUser(c, &store.Identity{
 		ProviderID: store.MakeProviderIdentity("test", "user1"),
 		Username:   "user1",
 		Name:       "User One",
@@ -90,13 +99,13 @@ func (s *staticSuite) TestHandle(c *gc.C) {
 	})
 }
 
-func (s *staticSuite) TestHandleWithDomain(c *gc.C) {
+func (s *staticSuite) TestHandleWithDomain(c *qt.C) {
 	params := s.getSampleParams()
 	params.Domain = "domain"
 	i := s.setupIdp(c, params)
 	s.makeLoginRequest(c, i, "user1", "pass1")
-	s.AssertLoginSuccess(c, "user1@domain")
-	s.AssertUser(c, &store.Identity{
+	s.idptest.AssertLoginSuccess(c, "user1@domain")
+	s.idptest.Store.AssertUser(c, &store.Identity{
 		ProviderID: store.MakeProviderIdentity("test", "user1@domain"),
 		Username:   "user1@domain",
 		Name:       "User One",
@@ -104,47 +113,47 @@ func (s *staticSuite) TestHandleWithDomain(c *gc.C) {
 	})
 }
 
-func (s *staticSuite) TestGetGroups(c *gc.C) {
+func (s *staticSuite) TestGetGroups(c *qt.C) {
 	params := s.getSampleParams()
 	i := s.setupIdp(c, params)
 	s.makeLoginRequest(c, i, "user1", "pass1")
-	s.AssertLoginSuccess(c, "user1")
-	identity := s.AssertUser(c, &store.Identity{
+	s.idptest.AssertLoginSuccess(c, "user1")
+	identity := s.idptest.Store.AssertUser(c, &store.Identity{
 		ProviderID: store.MakeProviderIdentity("test", "user1"),
 		Username:   "user1",
 		Name:       "User One",
 		Email:      "user1@example.com",
 	})
-	groups, err := i.GetGroups(s.Ctx, identity)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(groups, gc.DeepEquals, []string{"group1", "group2"})
+	groups, err := i.GetGroups(s.idptest.Ctx, identity)
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(groups, qt.DeepEquals, []string{"group1", "group2"})
 }
 
-func (s *staticSuite) TestGetGroupsWithDomain(c *gc.C) {
+func (s *staticSuite) TestGetGroupsWithDomain(c *qt.C) {
 	params := s.getSampleParams()
 	params.Domain = "domain"
 	i := s.setupIdp(c, params)
 	s.makeLoginRequest(c, i, "user1", "pass1")
-	s.AssertLoginSuccess(c, "user1@domain")
-	identity := s.AssertUser(c, &store.Identity{
+	s.idptest.AssertLoginSuccess(c, "user1@domain")
+	identity := s.idptest.Store.AssertUser(c, &store.Identity{
 		ProviderID: store.MakeProviderIdentity("test", "user1@domain"),
 		Username:   "user1@domain",
 		Name:       "User One",
 		Email:      "user1@example.com",
 	})
-	groups, err := i.GetGroups(s.Ctx, identity)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(groups, gc.DeepEquals, []string{"group1", "group2"})
+	groups, err := i.GetGroups(s.idptest.Ctx, identity)
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(groups, qt.DeepEquals, []string{"group1", "group2"})
 }
 
-func (s *staticSuite) TestHandleFailedLoginWrongPassword(c *gc.C) {
+func (s *staticSuite) TestHandleFailedLoginWrongPassword(c *qt.C) {
 	i := s.setupIdp(c, s.getSampleParams())
 	s.makeLoginRequest(c, i, "user1", "wrong-pass")
-	s.AssertLoginFailureMatches(c, `authentication failed for user "user1"`)
+	s.idptest.AssertLoginFailureMatches(c, `authentication failed for user "user1"`)
 }
 
-func (s *staticSuite) TestHandleFailedLoginUnknownUser(c *gc.C) {
+func (s *staticSuite) TestHandleFailedLoginUnknownUser(c *qt.C) {
 	i := s.setupIdp(c, s.getSampleParams())
 	s.makeLoginRequest(c, i, "unknown", "pass")
-	s.AssertLoginFailureMatches(c, `authentication failed for user "unknown"`)
+	s.idptest.AssertLoginFailureMatches(c, `authentication failed for user "unknown"`)
 }
