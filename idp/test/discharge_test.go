@@ -4,41 +4,58 @@
 package test_test
 
 import (
+	"testing"
+
 	"gopkg.in/CanonicalLtd/candidclient.v1/params"
-	gc "gopkg.in/check.v1"
 
 	"github.com/CanonicalLtd/candid/idp"
 	"github.com/CanonicalLtd/candid/idp/test"
-	"github.com/CanonicalLtd/candid/internal/candidtest"
+	"github.com/CanonicalLtd/candid/internal/discharger"
+	"github.com/CanonicalLtd/candid/internal/identity"
+	candidtest "github.com/CanonicalLtd/candid/internal/qtcandidtest"
+	qt "github.com/frankban/quicktest"
+	"github.com/frankban/quicktest/qtsuite"
 )
 
 type dischargeSuite struct {
-	candidtest.DischargeSuite
-	interactor test.Interactor
+	candid           *candidtest.Server
+	dischargeCreator *candidtest.DischargeCreator
 }
 
-var _ = gc.Suite(&dischargeSuite{})
+func TestDischarge(t *testing.T) {
+	qtsuite.Run(qt.New(t), &dischargeSuite{})
+}
 
-func (s *dischargeSuite) SetUpTest(c *gc.C) {
-	s.Params.IdentityProviders = []idp.IdentityProvider{
+func (s *dischargeSuite) Init(c *qt.C) {
+	candidtest.LogTo(c)
+	store := candidtest.NewStore()
+	sp := store.ServerParams()
+	sp.IdentityProviders = []idp.IdentityProvider{
 		test.NewIdentityProvider(test.Params{
 			Name: "test",
 		}),
 	}
-	s.DischargeSuite.SetUpTest(c)
-	s.interactor = test.Interactor{
+	s.candid = candidtest.NewServer(c, sp, map[string]identity.NewAPIHandlerFunc{
+		"discharger": discharger.NewAPIHandler,
+	})
+	s.dischargeCreator = candidtest.NewDischargeCreator(s.candid)
+}
+
+func (s *dischargeSuite) TestInteractiveDischarge(c *qt.C) {
+	s.dischargeCreator.AssertDischarge(c, test.Interactor{
 		User: &params.User{
 			Username:   "test",
 			ExternalID: "https://example.com/+id/test",
 		},
-	}
+	})
 }
 
-func (s *dischargeSuite) TestInteractiveDischarge(c *gc.C) {
-	s.AssertDischarge(c, s.interactor)
-}
-
-func (s *dischargeSuite) TestNonInteractiveDischarge(c *gc.C) {
+func (s *dischargeSuite) TestNonInteractiveDischarge(c *qt.C) {
 	// TODO (mhilton) work out how to differentiate these.
-	s.AssertDischarge(c, s.interactor)
+	s.dischargeCreator.AssertDischarge(c, test.Interactor{
+		User: &params.User{
+			Username:   "test",
+			ExternalID: "https://example.com/+id/test",
+		},
+	})
 }

@@ -10,43 +10,43 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"testing"
 
-	jc "github.com/juju/testing/checkers"
-	"github.com/juju/testing/httptesting"
+	"github.com/juju/qthttptest"
 	"golang.org/x/net/context"
 	"gopkg.in/CanonicalLtd/candidclient.v1/params"
-	gc "gopkg.in/check.v1"
 	"gopkg.in/yaml.v2"
 
 	"github.com/CanonicalLtd/candid/config"
 	"github.com/CanonicalLtd/candid/idp"
-	"github.com/CanonicalLtd/candid/idp/idptest"
+	idptest "github.com/CanonicalLtd/candid/idp/qtidptest"
 	"github.com/CanonicalLtd/candid/idp/test"
+	candidtest "github.com/CanonicalLtd/candid/internal/qtcandidtest"
 	"github.com/CanonicalLtd/candid/store"
+	qt "github.com/frankban/quicktest"
 )
 
-type testSuite struct {
-	idptest.Suite
-	idp    idp.IdentityProvider
-	groups []string
-}
-
-var _ = gc.Suite(&testSuite{})
-
-func (s *testSuite) TestConfig(c *gc.C) {
+func TestConfig(t *testing.T) {
+	c := qt.New(t)
 	configYaml := `
 identity-providers:
  - type: test
 `
 	var conf config.Config
 	err := yaml.Unmarshal([]byte(configYaml), &conf)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(conf.IdentityProviders, gc.HasLen, 1)
-	c.Assert(conf.IdentityProviders[0].Name(), gc.Equals, "test")
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(conf.IdentityProviders, qt.HasLen, 1)
+	c.Assert(conf.IdentityProviders[0].Name(), qt.Equals, "test")
 }
 
-func (s *testSuite) SetUpTest(c *gc.C) {
-	s.Suite.SetUpTest(c)
+type testSuite struct {
+	idptest *idptest.Fixture
+	idp     idp.IdentityProvider
+	groups  []string
+}
+
+func (s *testSuite) Init(c *qt.C) {
+	s.idptest = idptest.NewFixture(c, candidtest.NewStore())
 	s.idp = test.NewIdentityProvider(test.Params{
 		Name:      "test",
 		GetGroups: s.getGroups,
@@ -57,36 +57,34 @@ func (s *testSuite) getGroups(*store.Identity) ([]string, error) {
 	return s.groups, nil
 }
 
-func (s *testSuite) TestName(c *gc.C) {
-	c.Assert(s.idp.Name(), gc.Equals, "test")
+func (s *testSuite) TestName(c *qt.C) {
+	c.Assert(s.idp.Name(), qt.Equals, "test")
 }
 
-func (s *testSuite) TestDescription(c *gc.C) {
-	c.Assert(s.idp.Description(), gc.Equals, "Test")
+func (s *testSuite) TestDescription(c *qt.C) {
+	c.Assert(s.idp.Description(), qt.Equals, "Test")
 }
 
-func (s *testSuite) TestInteractive(c *gc.C) {
-	c.Assert(s.idp.Interactive(), gc.Equals, true)
+func (s *testSuite) TestInteractive(c *qt.C) {
+	c.Assert(s.idp.Interactive(), qt.Equals, true)
 }
 
-func (s *testSuite) TestURL(c *gc.C) {
-	ctx := context.Background()
-	err := s.idp.Init(ctx, s.InitParams(c, "https://idp.test"))
-	c.Assert(err, gc.Equals, nil)
+func (s *testSuite) TestURL(c *qt.C) {
+	err := s.idp.Init(s.idptest.Ctx, s.idptest.InitParams(c, "https://idp.test"))
+	c.Assert(err, qt.Equals, nil)
 	u := s.idp.URL("1")
-	c.Assert(u, gc.Equals, "https://idp.test/login?id=1")
+	c.Assert(u, qt.Equals, "https://idp.test/login?id=1")
 }
 
-func (s *testSuite) TestHandleGet(c *gc.C) {
-	ctx := context.Background()
-	err := s.idp.Init(ctx, s.InitParams(c, "https://idp.test"))
-	c.Assert(err, gc.Equals, nil)
+func (s *testSuite) TestHandleGet(c *qt.C) {
+	err := s.idp.Init(s.idptest.Ctx, s.idptest.InitParams(c, "https://idp.test"))
+	c.Assert(err, qt.Equals, nil)
 	rr := httptest.NewRecorder()
 	req, err := http.NewRequest("GET", "/", nil)
-	c.Assert(err, gc.Equals, nil)
-	s.idp.Handle(ctx, rr, req)
-	s.AssertLoginNotComplete(c)
-	httptesting.AssertJSONResponse(c, rr, http.StatusOK,
+	c.Assert(err, qt.Equals, nil)
+	s.idp.Handle(s.idptest.Ctx, rr, req)
+	s.idptest.AssertLoginNotComplete(c)
+	qthttptest.AssertJSONResponse(c, rr, http.StatusOK,
 		test.TestInteractiveLoginResponse{
 			URL: "https://idp.test/login",
 		},
@@ -169,26 +167,27 @@ var handleTests = []struct {
 	expectError: `username test6 already in use`,
 }}
 
-func (s *testSuite) TestHandle(c *gc.C) {
-	ctx := context.Background()
-	for i, test := range handleTests {
-		c.Logf("%d. %s", i, test.about)
-		if test.createUser != nil {
-			err := s.Store.UpdateIdentity(ctx, test.createUser, store.Update{
-				store.Username: store.Set,
-				store.Name:     store.Set,
-			})
-			c.Assert(err, gc.Equals, nil)
-		}
-		err := s.idp.Init(ctx, s.InitParams(c, "https://idp.test"))
-		c.Assert(err, gc.Equals, nil)
-		rr := httptest.NewRecorder()
-		s.idp.Handle(ctx, rr, test.req)
-		if test.expectError != "" {
-			s.AssertLoginFailureMatches(c, test.expectError)
-			continue
-		}
-		s.AssertLoginSuccess(c, test.expectUser)
+func (s *testSuite) TestHandle(c *qt.C) {
+	ctx := s.idptest.Ctx
+	for _, test := range handleTests {
+		c.Run(test.about, func(c *qt.C) {
+			if test.createUser != nil {
+				err := s.idptest.Store.Store.UpdateIdentity(ctx, test.createUser, store.Update{
+					store.Username: store.Set,
+					store.Name:     store.Set,
+				})
+				c.Assert(err, qt.Equals, nil)
+			}
+			err := s.idp.Init(ctx, s.idptest.InitParams(c, "https://idp.test"))
+			c.Assert(err, qt.Equals, nil)
+			rr := httptest.NewRecorder()
+			s.idp.Handle(ctx, rr, test.req)
+			if test.expectError != "" {
+				s.idptest.AssertLoginFailureMatches(c, test.expectError)
+				return
+			}
+			s.idptest.AssertLoginSuccess(c, test.expectUser)
+		})
 	}
 }
 
@@ -205,9 +204,9 @@ func testLogin(u *params.User) *http.Request {
 	return req
 }
 
-func (s *testSuite) TestGetGroups(c *gc.C) {
+func (s *testSuite) TestGetGroups(c *qt.C) {
 	s.groups = []string{"g1", "g2"}
 	groups, err := s.idp.GetGroups(context.Background(), nil)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(groups, jc.DeepEquals, []string{"g1", "g2"})
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(groups, qt.DeepEquals, []string{"g1", "g2"})
 }
