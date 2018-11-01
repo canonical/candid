@@ -12,6 +12,7 @@ import (
 	"strings"
 	"testing"
 
+	qt "github.com/frankban/quicktest"
 	"github.com/juju/qthttptest"
 	"golang.org/x/net/context"
 	"gopkg.in/CanonicalLtd/candidclient.v1/params"
@@ -23,7 +24,6 @@ import (
 	"github.com/CanonicalLtd/candid/idp/test"
 	candidtest "github.com/CanonicalLtd/candid/internal/qtcandidtest"
 	"github.com/CanonicalLtd/candid/store"
-	qt "github.com/frankban/quicktest"
 )
 
 func TestConfig(t *testing.T) {

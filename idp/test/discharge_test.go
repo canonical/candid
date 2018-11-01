@@ -6,6 +6,8 @@ package test_test
 import (
 	"testing"
 
+	qt "github.com/frankban/quicktest"
+	"github.com/frankban/quicktest/qtsuite"
 	"gopkg.in/CanonicalLtd/candidclient.v1/params"
 
 	"github.com/CanonicalLtd/candid/idp"
@@ -13,8 +15,6 @@ import (
 	"github.com/CanonicalLtd/candid/internal/discharger"
 	"github.com/CanonicalLtd/candid/internal/identity"
 	candidtest "github.com/CanonicalLtd/candid/internal/qtcandidtest"
-	qt "github.com/frankban/quicktest"
-	"github.com/frankban/quicktest/qtsuite"
 )
 
 type dischargeSuite struct {
