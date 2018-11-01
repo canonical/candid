@@ -4,16 +4,14 @@
 package keystone_test
 
 import (
+	"fmt"
+	"testing"
 	"time"
 
-	gc "gopkg.in/check.v1"
+	qt "github.com/frankban/quicktest"
 
 	"github.com/CanonicalLtd/candid/idp/keystone/internal/keystone"
 )
-
-type paramsSuite struct{}
-
-var _ = gc.Suite(&paramsSuite{})
 
 var timeUnmarshalJSONTests = []struct {
 	json        string
@@ -30,16 +28,18 @@ var timeUnmarshalJSONTests = []struct {
 	expectError: `parsing time ""yesterday"" as ""2006-01-02T15:04:05"": cannot parse "yesterday"" as "2006"`,
 }}
 
-func (s *paramsSuite) TestTimeUnmarshalJSON(c *gc.C) {
+func TestTimeUnmarshalJSON(t *testing.T) {
+	c := qt.New(t)
 	for i, test := range timeUnmarshalJSONTests {
-		var t keystone.Time
-		c.Logf("%d. %q", i, test.json)
-		err := t.UnmarshalJSON([]byte(test.json))
-		if test.expectError != "" {
-			c.Assert(err, gc.ErrorMatches, test.expectError)
-			continue
-		}
-		c.Assert(err, gc.Equals, nil)
-		c.Assert(t.Equal(test.expect), gc.Equals, true, gc.Commentf("obtained: %#v, expected: %#v", t, test.expect))
+		c.Run(fmt.Sprintf("test%d", i), func(c *qt.C) {
+			var t keystone.Time
+			err := t.UnmarshalJSON([]byte(test.json))
+			if test.expectError != "" {
+				c.Assert(err, qt.ErrorMatches, test.expectError)
+				return
+			}
+			c.Assert(err, qt.Equals, nil)
+			c.Assert(t.Equal(test.expect), qt.Equals, true, qt.Commentf("obtained: %#v, expected: %#v", t, test.expect))
+		})
 	}
 }
