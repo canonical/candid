@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"testing"
 
+	qt "github.com/frankban/quicktest"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
 
@@ -17,7 +18,6 @@ import (
 	"github.com/CanonicalLtd/candid/internal/discharger"
 	"github.com/CanonicalLtd/candid/internal/identity"
 	candidtest "github.com/CanonicalLtd/candid/internal/qtcandidtest"
-	qt "github.com/frankban/quicktest"
 )
 
 func TestInteractiveDischarge(t *testing.T) {

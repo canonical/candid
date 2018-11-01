@@ -10,6 +10,8 @@ import (
 	"strings"
 	"testing"
 
+	qt "github.com/frankban/quicktest"
+	"github.com/frankban/quicktest/qtsuite"
 	"golang.org/x/net/context"
 
 	"github.com/CanonicalLtd/candid/idp"
@@ -17,8 +19,6 @@ import (
 	idptest "github.com/CanonicalLtd/candid/idp/qtidptest"
 	candidtest "github.com/CanonicalLtd/candid/internal/qtcandidtest"
 	"github.com/CanonicalLtd/candid/store"
-	qt "github.com/frankban/quicktest"
-	"github.com/frankban/quicktest/qtsuite"
 )
 
 type ldapSuite struct {
