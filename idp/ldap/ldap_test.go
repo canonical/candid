@@ -16,7 +16,7 @@ import (
 
 	"github.com/CanonicalLtd/candid/idp"
 	"github.com/CanonicalLtd/candid/idp/ldap"
-	idptest "github.com/CanonicalLtd/candid/idp/qtidptest"
+	"github.com/CanonicalLtd/candid/idp/idptest"
 	candidtest "github.com/CanonicalLtd/candid/internal/qtcandidtest"
 	"github.com/CanonicalLtd/candid/store"
 )
