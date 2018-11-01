@@ -15,20 +15,13 @@ import (
 	"gopkg.in/yaml.v2"
 
 	"github.com/CanonicalLtd/candid/config"
-	"github.com/CanonicalLtd/candid/idp"
 	keystoneidp "github.com/CanonicalLtd/candid/idp/keystone"
 	"github.com/CanonicalLtd/candid/idp/keystone/internal/keystone"
-	"github.com/CanonicalLtd/candid/idp/keystone/internal/mockkeystone"
-	idptest "github.com/CanonicalLtd/candid/idp/qtidptest"
-	candidtest "github.com/CanonicalLtd/candid/internal/qtcandidtest"
 	"github.com/CanonicalLtd/candid/store"
 )
 
 type keystoneSuite struct {
-	idptest *idptest.Fixture
-	server  *mockkeystone.Server
-	params  keystoneidp.Params
-	idp     idp.IdentityProvider
+	*fixture
 }
 
 func TestKeystone(t *testing.T) {
@@ -36,20 +29,11 @@ func TestKeystone(t *testing.T) {
 }
 
 func (s *keystoneSuite) Init(c *qt.C) {
-	s.idptest = idptest.NewFixture(c, candidtest.NewStore())
-	s.server = mockkeystone.NewServer()
-	c.Defer(s.server.Close)
-	s.params = keystoneidp.Params{
-		Name:        "openstack",
-		Description: "OpenStack",
-		Domain:      "openstack",
-		URL:         s.server.URL,
-	}
-	s.server.TokensFunc = testTokens
-	s.server.TenantsFunc = testTenants
-	s.idp = keystoneidp.NewIdentityProvider(s.params)
-	err := s.idp.Init(s.idptest.Ctx, s.idptest.InitParams(c, "https://idp.test"))
-	c.Assert(err, qt.Equals, nil)
+	s.fixture = newFixture(c, fixtureParams{
+		newIDP:      keystoneidp.NewIdentityProvider,
+		tokensFunc:  testTokens,
+		tenantsFunc: testTenants,
+	})
 }
 
 func (s *keystoneSuite) TestKeystoneIdentityProviderName(c *qt.C) {

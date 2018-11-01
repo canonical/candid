@@ -21,6 +21,7 @@ require (
 	github.com/juju/names v0.0.0-20160330150533-8a0aa0963bba
 	github.com/juju/persistent-cookiejar v0.0.0-20170428161559-d67418f14c93
 	github.com/juju/postgrestest v0.0.0-20180111150307-95c1ddb2775d
+	github.com/juju/qthttptest v0.0.1
 	github.com/juju/schema v0.0.0-20180109041850-e4f08199aa80
 	github.com/juju/simplekv v0.0.0-20180621131638-ff82918775e5
 	github.com/juju/testing v0.0.0-20180920084828-472a3e8b2073

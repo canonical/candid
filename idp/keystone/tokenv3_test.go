@@ -9,64 +9,51 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"testing"
 
-	gc "gopkg.in/check.v1"
+	qt "github.com/frankban/quicktest"
+	"github.com/frankban/quicktest/qtsuite"
 	"gopkg.in/yaml.v2"
 
 	"github.com/CanonicalLtd/candid/config"
-	"github.com/CanonicalLtd/candid/idp"
-	"github.com/CanonicalLtd/candid/idp/idptest"
 	keystoneidp "github.com/CanonicalLtd/candid/idp/keystone"
-	"github.com/CanonicalLtd/candid/idp/keystone/internal/mockkeystone"
 	"github.com/CanonicalLtd/candid/store"
 )
 
+func TestTokenV3(t *testing.T) {
+	qtsuite.Run(qt.New(t), &tokenV3Suite{})
+}
+
 type tokenV3Suite struct {
-	idptest.Suite
-	server *mockkeystone.Server
-	params keystoneidp.Params
-	idp    idp.IdentityProvider
+	*fixture
 }
 
-var _ = gc.Suite(&tokenV3Suite{})
-
-func (s *tokenV3Suite) SetUpTest(c *gc.C) {
-	s.Suite.SetUpTest(c)
-	s.server = mockkeystone.NewServer()
-	s.params = keystoneidp.Params{
-		Name:        "openstack",
-		Description: "OpenStack",
-		Domain:      "openstack",
-		URL:         s.server.URL,
-	}
-	s.server.AuthTokensFunc = testAuthTokens
-	s.server.UserGroupsFunc = testUserGroups
-	s.idp = keystoneidp.NewV3TokenIdentityProvider(s.params)
-	err := s.idp.Init(s.Ctx, s.InitParams(c, "https://idp.test"))
-	c.Assert(err, gc.Equals, nil)
+func (s *tokenV3Suite) Init(c *qt.C) {
+	s.fixture = newFixture(c, fixtureParams{
+		newIDP:         keystoneidp.NewV3TokenIdentityProvider,
+		authTokensFunc: testAuthTokens,
+		userGroupsFunc: testUserGroups,
+		tokensFunc:     testTokens,
+		tenantsFunc:    testTenants,
+	})
 }
 
-func (s *tokenV3Suite) TearDownTest(c *gc.C) {
-	s.server.Close()
-	s.Suite.TearDownTest(c)
+func (s *tokenV3Suite) TestKeystoneV3TokenIdentityProviderInteractive(c *qt.C) {
+	c.Assert(s.idp.Interactive(), qt.Equals, false)
 }
 
-func (s *tokenV3Suite) TestKeystoneV3TokenIdentityProviderInteractive(c *gc.C) {
-	c.Assert(s.idp.Interactive(), gc.Equals, false)
-}
-
-func (s *tokenV3Suite) TestKeystoneV3TokenIdentityProviderHandle(c *gc.C) {
+func (s *tokenV3Suite) TestKeystoneV3TokenIdentityProviderHandle(c *qt.C) {
 	var tok keystoneidp.Token
 	tok.Login.ID = "789"
 	body, err := json.Marshal(tok)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 	req, err := http.NewRequest("POST", "/login?did=1", bytes.NewReader(body))
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
-	s.idp.Handle(s.Ctx, rr, req)
-	s.AssertLoginSuccess(c, "testuser@openstack")
-	s.AssertUser(c, &store.Identity{
+	s.idp.Handle(s.idptest.Ctx, rr, req)
+	s.idptest.AssertLoginSuccess(c, "testuser@openstack")
+	s.idptest.Store.AssertUser(c, &store.Identity{
 		ProviderID: store.MakeProviderIdentity("openstack", "123@openstack"),
 		Username:   "testuser@openstack",
 		ProviderInfo: map[string][]string{
@@ -75,29 +62,29 @@ func (s *tokenV3Suite) TestKeystoneV3TokenIdentityProviderHandle(c *gc.C) {
 	})
 }
 
-func (s *tokenV3Suite) TestKeystoneV3TokenIdentityProviderHandleBadToken(c *gc.C) {
+func (s *tokenV3Suite) TestKeystoneV3TokenIdentityProviderHandleBadToken(c *qt.C) {
 	var tok keystoneidp.Token
 	tok.Login.ID = "012"
 	body, err := json.Marshal(tok)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 	req, err := http.NewRequest("POST", "https://idp.test/login?did=1", bytes.NewReader(body))
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
-	s.idp.Handle(s.Ctx, rr, req)
-	s.AssertLoginFailureMatches(c, `cannot log in: Post http.*: The request you have made requires authentication.`)
+	s.idp.Handle(s.idptest.Ctx, rr, req)
+	s.idptest.AssertLoginFailureMatches(c, `cannot log in: Post http.*: The request you have made requires authentication.`)
 }
 
-func (s *tokenV3Suite) TestKeystoneV3TokenIdentityProviderHandleBadRequest(c *gc.C) {
+func (s *tokenV3Suite) TestKeystoneV3TokenIdentityProviderHandleBadRequest(c *qt.C) {
 	req, err := http.NewRequest("POST", "https://idp.test/login?did=1", strings.NewReader("{"))
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
-	s.idp.Handle(s.Ctx, rr, req)
-	s.AssertLoginFailureMatches(c, `cannot unmarshal login request: cannot unmarshal into field Token: cannot unmarshal request body: unexpected end of JSON input`)
+	s.idp.Handle(s.idptest.Ctx, rr, req)
+	s.idptest.AssertLoginFailureMatches(c, `cannot unmarshal login request: cannot unmarshal into field Token: cannot unmarshal request body: unexpected end of JSON input`)
 }
 
-func (s *tokenV3Suite) TestRegisterConfig(c *gc.C) {
+func (s *tokenV3Suite) TestRegisterConfig(c *qt.C) {
 	input := `
 identity-providers:
  - type: keystonev3_token
@@ -106,7 +93,7 @@ identity-providers:
 `
 	var conf config.Config
 	err := yaml.Unmarshal([]byte(input), &conf)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(conf.IdentityProviders, gc.HasLen, 1)
-	c.Assert(conf.IdentityProviders[0].Name(), gc.Equals, "openstackv3_3")
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(conf.IdentityProviders, qt.HasLen, 1)
+	c.Assert(conf.IdentityProviders[0].Name(), qt.Equals, "openstackv3_3")
 }

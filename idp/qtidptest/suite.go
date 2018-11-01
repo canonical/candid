@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	qt "github.com/frankban/quicktest"
+	"github.com/juju/simplekv"
 	"golang.org/x/net/context"
 	"gopkg.in/macaroon-bakery.v2/bakery"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
@@ -14,7 +15,6 @@ import (
 	"github.com/CanonicalLtd/candid/idp"
 	qtcandidtest "github.com/CanonicalLtd/candid/internal/qtcandidtest"
 	"github.com/CanonicalLtd/candid/store"
-	"github.com/juju/simplekv"
 )
 
 // Fixture provides a test fixture that is helpful for testing identity
@@ -53,9 +53,9 @@ func NewFixture(c *qt.C, store *qtcandidtest.Store) *Fixture {
 	kv, err := store.ProviderDataStore.KeyValueStore(ctx, "idptest")
 	c.Assert(err, qt.Equals, nil)
 	return &Fixture{
-		Ctx:   ctx,
-		Oven:  oven,
-		Store: store,
+		Ctx:                   ctx,
+		Oven:                  oven,
+		Store:                 store,
 		dischargeTokenCreator: &dischargeTokenCreator{},
 		visitCompleter: &visitCompleter{
 			c: c,
@@ -87,7 +87,7 @@ func (s *Fixture) AssertLoginSuccess(c *qt.C, username string) {
 	c.Assert(s.visitCompleter.id.Username, qt.Equals, username)
 }
 
-// AssertLoginFailure asserts taht the login test has resulted in a
+// AssertLoginFailure asserts that the login test has resulted in a
 // failure with an error that matches the given regex.
 func (s *Fixture) AssertLoginFailureMatches(c *qt.C, regex string) {
 	c.Assert(s.visitCompleter.called, qt.Equals, true)
