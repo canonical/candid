@@ -3,50 +3,48 @@
 
 // Package testing provides useful tools for testing Store
 // implementations.
-package testing
+package storetest
 
 import (
 	"fmt"
 	"time"
 
-	jc "github.com/juju/testing/checkers"
+	qt "github.com/frankban/quicktest"
+	"github.com/frankban/quicktest/qtsuite"
 	"golang.org/x/net/context"
-	gc "gopkg.in/check.v1"
 	errgo "gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery"
 
 	"github.com/CanonicalLtd/candid/internal/auth"
-	"github.com/CanonicalLtd/candid/internal/candidtest"
+	candidtest "github.com/CanonicalLtd/candid/internal/qtcandidtest"
 	"github.com/CanonicalLtd/candid/store"
 )
 
 var pk1 = bakery.MustGenerateKey().Public
 var pk2 = bakery.MustGenerateKey().Public
 
-// StoreSuite contains a set of tests for Store implementations. The
+// storeSuite contains a set of tests for Store implementations. The
 // Store parameter need to be set before calling SetUpTest.
-type StoreSuite struct {
+type storeSuite struct {
+	newStore func(c *qt.C) store.Store
+
 	Store store.Store
-
 	ctx   context.Context
-	close func()
 }
 
-func (s *StoreSuite) SetUpSuite(c *gc.C) {}
-
-func (s *StoreSuite) TearDownSuite(c *gc.C) {}
-
-func (s *StoreSuite) SetUpTest(c *gc.C) {
-	s.ctx, s.close = s.Store.Context(context.Background())
+// TestStore runs a suite of tests on the given store implementation.
+func TestStore(c *qt.C, newStore func(c *qt.C) store.Store) {
+	qtsuite.Run(c, &storeSuite{
+		newStore: newStore,
+	})
 }
 
-func (s *StoreSuite) TearDownTest(c *gc.C) {
-	// As this suite is designed to be embedded in database specific
-	// ones it is possible for TearDownTest to be called when
-	// SetUpTest hasn't.
-	if s.close != nil {
-		s.close()
-	}
+func (s *storeSuite) Init(c *qt.C) {
+	s.Store = s.newStore(c)
+
+	ctx, close := s.Store.Context(context.Background())
+	c.Defer(close)
+	s.ctx = ctx
 }
 
 var updateIdentityTests = []struct {
@@ -740,7 +738,7 @@ var updateIdentityTests = []struct {
 	update: store.Update{},
 }}
 
-func (s *StoreSuite) TestUpdateIdentity(c *gc.C) {
+func (s *storeSuite) TestUpdateIdentity(c *qt.C) {
 	err := s.Store.UpdateIdentity(
 		s.ctx,
 		&store.Identity{
@@ -751,88 +749,89 @@ func (s *StoreSuite) TestUpdateIdentity(c *gc.C) {
 			store.Username: store.Set,
 		},
 	)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 
 	for i, test := range updateIdentityTests {
-		c.Logf("test %d. %s", i, test.about)
-		username := fmt.Sprintf("user%d", i)
-		pid := store.MakeProviderIdentity("test", username)
+		c.Run(test.about, func(c *qt.C) {
+			username := fmt.Sprintf("user%d", i)
+			pid := store.MakeProviderIdentity("test", username)
 
-		if test.startIdentity != nil {
-			update := store.Update{
-				store.Username:     store.Set,
-				store.Name:         store.Set,
-				store.Email:        store.Set,
-				store.Groups:       store.Set,
-				store.PublicKeys:   store.Set,
-				store.ProviderInfo: store.Set,
-				store.ExtraInfo:    store.Set,
+			if test.startIdentity != nil {
+				update := store.Update{
+					store.Username:     store.Set,
+					store.Name:         store.Set,
+					store.Email:        store.Set,
+					store.Groups:       store.Set,
+					store.PublicKeys:   store.Set,
+					store.ProviderInfo: store.Set,
+					store.ExtraInfo:    store.Set,
+				}
+				if test.startIdentity.ProviderID == "" {
+					test.startIdentity.ProviderID = pid
+				}
+				if test.startIdentity.Username == "" {
+					test.startIdentity.Username = username
+				}
+				if !test.startIdentity.LastDischarge.IsZero() {
+					update[store.LastDischarge] = store.Set
+				}
+				if !test.startIdentity.LastLogin.IsZero() {
+					update[store.LastLogin] = store.Set
+				}
+				err := s.Store.UpdateIdentity(s.ctx, test.startIdentity, update)
+				c.Assert(err, qt.Equals, nil)
 			}
-			if test.startIdentity.ProviderID == "" {
-				test.startIdentity.ProviderID = pid
-			}
-			if test.startIdentity.Username == "" {
-				test.startIdentity.Username = username
-			}
-			if !test.startIdentity.LastDischarge.IsZero() {
-				update[store.LastDischarge] = store.Set
-			}
-			if !test.startIdentity.LastLogin.IsZero() {
-				update[store.LastLogin] = store.Set
-			}
-			err := s.Store.UpdateIdentity(s.ctx, test.startIdentity, update)
-			c.Assert(err, gc.Equals, nil)
-		}
 
-		if test.updateIdentity.Username == "" && test.updateIdentity.ProviderID == "" {
-			test.updateIdentity.Username = username
-		}
-
-		if test.update[store.Username] == store.Set {
-			if test.updateIdentity.ProviderID == "" {
-				test.updateIdentity.ProviderID = pid
+			if test.updateIdentity.Username == "" && test.updateIdentity.ProviderID == "" {
+				test.updateIdentity.Username = username
 			}
-		}
 
-		err := s.Store.UpdateIdentity(s.ctx, test.updateIdentity, test.update)
-		if test.expectError != "" {
-			c.Assert(err, gc.ErrorMatches, test.expectError)
-			if test.expectErrorCause != nil {
-				c.Assert(errgo.Cause(err), gc.Equals, test.expectErrorCause)
+			if test.update[store.Username] == store.Set {
+				if test.updateIdentity.ProviderID == "" {
+					test.updateIdentity.ProviderID = pid
+				}
 			}
-		} else {
-			c.Assert(err, gc.Equals, nil)
-		}
-		if test.expectIdentity == nil {
-			continue
-		}
-		if test.expectIdentity.ProviderID == "" {
-			test.expectIdentity.ProviderID = pid
-		}
-		if test.expectIdentity.Username == "" {
-			test.expectIdentity.Username = username
-		}
-		obtained := store.Identity{
-			ProviderID: test.expectIdentity.ProviderID,
-		}
-		err = s.Store.Identity(s.ctx, &obtained)
-		c.Assert(err, gc.Equals, nil)
-		candidtest.AssertEqualIdentity(c, &obtained, test.expectIdentity)
+
+			err := s.Store.UpdateIdentity(s.ctx, test.updateIdentity, test.update)
+			if test.expectError != "" {
+				c.Assert(err, qt.ErrorMatches, test.expectError)
+				if test.expectErrorCause != nil {
+					c.Assert(errgo.Cause(err), qt.Equals, test.expectErrorCause)
+				}
+			} else {
+				c.Assert(err, qt.Equals, nil)
+			}
+			if test.expectIdentity == nil {
+				return
+			}
+			if test.expectIdentity.ProviderID == "" {
+				test.expectIdentity.ProviderID = pid
+			}
+			if test.expectIdentity.Username == "" {
+				test.expectIdentity.Username = username
+			}
+			obtained := store.Identity{
+				ProviderID: test.expectIdentity.ProviderID,
+			}
+			err = s.Store.Identity(s.ctx, &obtained)
+			c.Assert(err, qt.Equals, nil)
+			candidtest.AssertEqualIdentity(c, &obtained, test.expectIdentity)
+		})
 	}
 }
 
-func (s *StoreSuite) TestUpdateNotFoundNoQuery(c *gc.C) {
+func (s *storeSuite) TestUpdateNotFoundNoQuery(c *qt.C) {
 	identity := store.Identity{
 		Name: "Test User",
 	}
 	err := s.Store.UpdateIdentity(s.ctx, &identity, store.Update{
 		store.Name: store.Set,
 	})
-	c.Assert(errgo.Cause(err), gc.Equals, store.ErrNotFound)
-	c.Assert(err, gc.ErrorMatches, `identity not specified`)
+	c.Assert(errgo.Cause(err), qt.Equals, store.ErrNotFound)
+	c.Assert(err, qt.ErrorMatches, `identity not specified`)
 }
 
-func (s *StoreSuite) TestInsertDuplicateUsername(c *gc.C) {
+func (s *storeSuite) TestInsertDuplicateUsername(c *qt.C) {
 	err := s.Store.UpdateIdentity(
 		s.ctx,
 		&store.Identity{
@@ -843,7 +842,7 @@ func (s *StoreSuite) TestInsertDuplicateUsername(c *gc.C) {
 			store.Username: store.Set,
 		},
 	)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 
 	identity := store.Identity{
 		ProviderID: store.MakeProviderIdentity("test", "test-user"),
@@ -856,18 +855,18 @@ func (s *StoreSuite) TestInsertDuplicateUsername(c *gc.C) {
 			store.Username: store.Set,
 		},
 	)
-	c.Assert(err, gc.ErrorMatches, `username existing-user already in use`)
-	c.Assert(errgo.Cause(err), gc.Equals, store.ErrDuplicateUsername)
+	c.Assert(err, qt.ErrorMatches, `username existing-user already in use`)
+	c.Assert(errgo.Cause(err), qt.Equals, store.ErrDuplicateUsername)
 
 	identity2 := store.Identity{
 		ProviderID: store.MakeProviderIdentity("test", "test-user"),
 	}
 	err = s.Store.Identity(s.ctx, &identity2)
-	c.Assert(err, gc.ErrorMatches, `identity "test:test-user" not found`)
-	c.Assert(errgo.Cause(err), gc.Equals, store.ErrNotFound)
+	c.Assert(err, qt.ErrorMatches, `identity "test:test-user" not found`)
+	c.Assert(errgo.Cause(err), qt.Equals, store.ErrNotFound)
 }
 
-func (s *StoreSuite) TestUpdateIDDuplicateUsername(c *gc.C) {
+func (s *storeSuite) TestUpdateIDDuplicateUsername(c *qt.C) {
 	err := s.Store.UpdateIdentity(
 		s.ctx,
 		&store.Identity{
@@ -878,7 +877,7 @@ func (s *StoreSuite) TestUpdateIDDuplicateUsername(c *gc.C) {
 			store.Username: store.Set,
 		},
 	)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 
 	identity := store.Identity{
 		ProviderID: store.MakeProviderIdentity("test", "test-user"),
@@ -891,7 +890,7 @@ func (s *StoreSuite) TestUpdateIDDuplicateUsername(c *gc.C) {
 			store.Username: store.Set,
 		},
 	)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 
 	identity2 := store.Identity{
 		ID:       identity.ID,
@@ -904,11 +903,11 @@ func (s *StoreSuite) TestUpdateIDDuplicateUsername(c *gc.C) {
 			store.Username: store.Set,
 		},
 	)
-	c.Assert(err, gc.ErrorMatches, `username existing-user already in use`)
-	c.Assert(errgo.Cause(err), gc.Equals, store.ErrDuplicateUsername)
+	c.Assert(err, qt.ErrorMatches, `username existing-user already in use`)
+	c.Assert(errgo.Cause(err), qt.Equals, store.ErrDuplicateUsername)
 }
 
-func (s *StoreSuite) TestUpdateIDEmpty(c *gc.C) {
+func (s *storeSuite) TestUpdateIDEmpty(c *qt.C) {
 	identity := store.Identity{
 		ProviderID: store.MakeProviderIdentity("test", "test-user"),
 		Username:   "test-user",
@@ -920,7 +919,7 @@ func (s *StoreSuite) TestUpdateIDEmpty(c *gc.C) {
 			store.Username: store.Set,
 		},
 	)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 
 	identity2 := store.Identity{
 		ID: identity.ID,
@@ -930,10 +929,10 @@ func (s *StoreSuite) TestUpdateIDEmpty(c *gc.C) {
 		&identity2,
 		store.Update{},
 	)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 }
 
-func (s *StoreSuite) TestIdentity(c *gc.C) {
+func (s *storeSuite) TestIdentity(c *qt.C) {
 	identity := store.Identity{
 		ProviderID:    store.MakeProviderIdentity("test", "test-user"),
 		Username:      "test-user",
@@ -963,53 +962,53 @@ func (s *StoreSuite) TestIdentity(c *gc.C) {
 		store.ExtraInfo:     store.Set,
 		store.Owner:         store.Set,
 	})
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 
 	identity2 := store.Identity{
 		ID: identity.ID,
 	}
 	err = s.Store.Identity(s.ctx, &identity2)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(identity2, jc.DeepEquals, identity)
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(identity2, qt.DeepEquals, identity)
 
 	identity3 := store.Identity{
 		ProviderID: identity.ProviderID,
 	}
 	err = s.Store.Identity(s.ctx, &identity3)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(identity3, jc.DeepEquals, identity)
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(identity3, qt.DeepEquals, identity)
 
 	identity4 := store.Identity{
 		Username: identity.Username,
 	}
 	err = s.Store.Identity(s.ctx, &identity4)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(identity4, jc.DeepEquals, identity)
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(identity4, qt.DeepEquals, identity)
 }
 
-func (s *StoreSuite) TestIdentityNotFound(c *gc.C) {
+func (s *storeSuite) TestIdentityNotFound(c *qt.C) {
 	identity := store.Identity{
 		Username: "no-such-user",
 	}
 	err := s.Store.Identity(s.ctx, &identity)
-	c.Assert(errgo.Cause(err), gc.Equals, store.ErrNotFound)
-	c.Assert(err, gc.ErrorMatches, `user no-such-user not found`)
+	c.Assert(errgo.Cause(err), qt.Equals, store.ErrNotFound)
+	c.Assert(err, qt.ErrorMatches, `user no-such-user not found`)
 }
 
-func (s *StoreSuite) TestIdentityNotFoundNoQuery(c *gc.C) {
+func (s *storeSuite) TestIdentityNotFoundNoQuery(c *qt.C) {
 	identity := store.Identity{}
 	err := s.Store.Identity(s.ctx, &identity)
-	c.Assert(errgo.Cause(err), gc.Equals, store.ErrNotFound)
-	c.Assert(err, gc.ErrorMatches, `identity not specified`)
+	c.Assert(errgo.Cause(err), qt.Equals, store.ErrNotFound)
+	c.Assert(err, qt.ErrorMatches, `identity not specified`)
 }
 
-func (s *StoreSuite) TestIdentityNotFoundBadID(c *gc.C) {
+func (s *storeSuite) TestIdentityNotFoundBadID(c *qt.C) {
 	identity := store.Identity{
 		ID: "1234",
 	}
 	err := s.Store.Identity(s.ctx, &identity)
-	c.Assert(errgo.Cause(err), gc.Equals, store.ErrNotFound)
-	c.Assert(err, gc.ErrorMatches, `identity "1234" not found`)
+	c.Assert(errgo.Cause(err), qt.Equals, store.ErrNotFound)
+	c.Assert(err, qt.ErrorMatches, `identity "1234" not found`)
 }
 
 var testIdentities = []store.Identity{{
@@ -1387,7 +1386,7 @@ var findIdentitiesTests = []struct {
 	expect: []int{5},
 }}
 
-func (s *StoreSuite) TestFindIdentities(c *gc.C) {
+func (s *storeSuite) TestFindIdentities(c *qt.C) {
 	for i := range testIdentities {
 		var update store.Update
 		if testIdentities[i].Username != "" {
@@ -1421,21 +1420,21 @@ func (s *StoreSuite) TestFindIdentities(c *gc.C) {
 			update[store.Owner] = store.Set
 		}
 		err := s.Store.UpdateIdentity(s.ctx, &testIdentities[i], update)
-		c.Assert(err, gc.Equals, nil)
+		c.Assert(err, qt.Equals, nil)
 	}
 
 	for i, test := range findIdentitiesTests {
 		c.Logf("%d. %s", i, test.about)
 		identities, err := s.Store.FindIdentities(s.ctx, &test.ref, test.filter, test.sort, test.skip, test.limit)
-		c.Assert(err, gc.Equals, nil)
-		c.Assert(len(identities), gc.Equals, len(test.expect))
+		c.Assert(err, qt.Equals, nil)
+		c.Assert(len(identities), qt.Equals, len(test.expect))
 		for i, identity := range identities {
 			candidtest.AssertEqualIdentity(c, &identity, &testIdentities[test.expect[i]])
 		}
 	}
 }
 
-func (s *StoreSuite) TestIdentityCounts(c *gc.C) {
+func (s *storeSuite) TestIdentityCounts(c *qt.C) {
 	idps := []string{"a", "b", "c", "a", "b", "a"}
 	for i, idp := range idps {
 		username := fmt.Sprintf("user%d", i)
@@ -1445,11 +1444,11 @@ func (s *StoreSuite) TestIdentityCounts(c *gc.C) {
 		}, store.Update{
 			store.Username: store.Set,
 		})
-		c.Assert(err, gc.Equals, nil)
+		c.Assert(err, qt.Equals, nil)
 	}
 	counts, err := s.Store.IdentityCounts(s.ctx)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(counts, jc.DeepEquals, map[string]int{
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(counts, qt.DeepEquals, map[string]int{
 		"a": 3,
 		"b": 2,
 		"c": 1,
