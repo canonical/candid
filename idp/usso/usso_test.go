@@ -20,7 +20,7 @@ import (
 	"github.com/CanonicalLtd/candid/config"
 	"github.com/CanonicalLtd/candid/idp"
 	"github.com/CanonicalLtd/candid/idp/idputil"
-	idptest "github.com/CanonicalLtd/candid/idp/qtidptest"
+	"github.com/CanonicalLtd/candid/idp/idptest"
 	"github.com/CanonicalLtd/candid/idp/usso"
 	mockusso "github.com/CanonicalLtd/candid/idp/usso/internal/qtmockusso"
 	candidtest "github.com/CanonicalLtd/candid/internal/qtcandidtest"

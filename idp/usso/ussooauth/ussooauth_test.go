@@ -15,7 +15,7 @@ import (
 
 	"github.com/CanonicalLtd/candid/config"
 	"github.com/CanonicalLtd/candid/idp"
-	idptest "github.com/CanonicalLtd/candid/idp/qtidptest"
+	"github.com/CanonicalLtd/candid/idp/idptest"
 	mockusso "github.com/CanonicalLtd/candid/idp/usso/internal/qtmockusso"
 	"github.com/CanonicalLtd/candid/idp/usso/ussooauth"
 	candidtest "github.com/CanonicalLtd/candid/internal/qtcandidtest"

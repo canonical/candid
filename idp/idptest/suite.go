@@ -4,32 +4,24 @@
 package idptest
 
 import (
-	"html/template"
 	"net/http"
 
+	qt "github.com/frankban/quicktest"
+	"github.com/juju/simplekv"
 	"golang.org/x/net/context"
-	gc "gopkg.in/check.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
 
 	"github.com/CanonicalLtd/candid/idp"
-	"github.com/CanonicalLtd/candid/internal/candidtest"
+	qtcandidtest "github.com/CanonicalLtd/candid/internal/qtcandidtest"
 	"github.com/CanonicalLtd/candid/store"
 )
 
-// Suite provides a test suite that is helpful for testing identity
+// Fixture provides a test fixture that is helpful for testing identity
 // providers.
-type Suite struct {
-	candidtest.StoreSuite
-
-	// Template contains a template that will be passed in the
-	// idp.InitParams.
-	Template *template.Template
-
-	// The following fields will be available after calling SetUpTest.
-
-	// Ctx contains a context.Context that has been initialised with
-	// the stores.
+type Fixture struct {
+	// Ctx holds a context appropriate for using
+	// for store methods.
 	Ctx context.Context
 
 	// Oven contains a bakery.Oven that will be passed in the
@@ -37,88 +29,79 @@ type Suite struct {
 	// necessary.
 	Oven *bakery.Oven
 
+	// Store holds the store used by the fixture.
+	Store *qtcandidtest.Store
+
 	dischargeTokenCreator *dischargeTokenCreator
 	visitCompleter        *visitCompleter
-	closeStore            func()
-	closeMeetingStore     func()
+	kvStore               simplekv.Store
 }
 
-func (s *Suite) SetUpTest(c *gc.C) {
-	s.StoreSuite.SetUpTest(c)
-	s.Ctx, s.closeStore = s.Store.Context(context.Background())
-	s.Ctx, s.closeMeetingStore = s.MeetingStore.Context(s.Ctx)
+func NewFixture(c *qt.C, store *qtcandidtest.Store) *Fixture {
+	ctx, closeStore := store.Store.Context(context.Background())
+	c.Defer(closeStore)
+
+	ctx, closeMeetingStore := store.MeetingStore.Context(ctx)
+	c.Defer(closeMeetingStore)
+
 	key, err := bakery.GenerateKey()
-	c.Assert(err, gc.Equals, nil)
-	s.Oven = bakery.NewOven(bakery.OvenParams{
+	c.Assert(err, qt.Equals, nil)
+	oven := bakery.NewOven(bakery.OvenParams{
 		Key:      key,
 		Location: "idptest",
 	})
-}
-
-func (s *Suite) TearDownTest(c *gc.C) {
-	s.closeMeetingStore()
-	s.closeStore()
-	s.StoreSuite.TearDownTest(c)
+	kv, err := store.ProviderDataStore.KeyValueStore(ctx, "idptest")
+	c.Assert(err, qt.Equals, nil)
+	return &Fixture{
+		Ctx:                   ctx,
+		Oven:                  oven,
+		Store:                 store,
+		dischargeTokenCreator: &dischargeTokenCreator{},
+		visitCompleter: &visitCompleter{
+			c: c,
+		},
+		kvStore: kv,
+	}
 }
 
 // InitParams returns a completed InitParams that a test can use to pass
 // to idp.Init.
-func (s *Suite) InitParams(c *gc.C, prefix string) idp.InitParams {
-	s.dischargeTokenCreator = &dischargeTokenCreator{}
-	s.visitCompleter = &visitCompleter{
-		c: c,
-	}
-	kv, err := s.ProviderDataStore.KeyValueStore(s.Ctx, "idptest")
-	c.Assert(err, gc.Equals, nil)
+func (s *Fixture) InitParams(c *qt.C, prefix string) idp.InitParams {
 	return idp.InitParams{
-		Store:                 s.Store,
-		KeyValueStore:         kv,
+		Store:                 s.Store.Store,
+		KeyValueStore:         s.kvStore,
 		Oven:                  s.Oven,
 		Key:                   s.Oven.Key(),
 		URLPrefix:             prefix,
 		DischargeTokenCreator: s.dischargeTokenCreator,
 		VisitCompleter:        s.visitCompleter,
-		Template:              s.Template,
 	}
 }
 
 // AssertLoginSuccess asserts that the login test has resulted in a
 // successful login of the given user.
-func (s *Suite) AssertLoginSuccess(c *gc.C, username string) {
-	c.Assert(s.visitCompleter.called, gc.Equals, true)
-	c.Check(s.visitCompleter.err, gc.Equals, nil)
-	c.Assert(s.visitCompleter.id, gc.NotNil)
-	c.Assert(s.visitCompleter.id.Username, gc.Equals, username)
+func (s *Fixture) AssertLoginSuccess(c *qt.C, username string) {
+	c.Assert(s.visitCompleter.called, qt.Equals, true)
+	c.Check(s.visitCompleter.err, qt.Equals, nil)
+	c.Assert(s.visitCompleter.id, qt.Not(qt.IsNil))
+	c.Assert(s.visitCompleter.id.Username, qt.Equals, username)
 }
 
 // AssertLoginFailure asserts that the login test has resulted in a
 // failure with an error that matches the given regex.
-func (s *Suite) AssertLoginFailureMatches(c *gc.C, regex string) {
-	c.Assert(s.visitCompleter.called, gc.Equals, true)
-	c.Assert(s.visitCompleter.err, gc.ErrorMatches, regex)
+func (s *Fixture) AssertLoginFailureMatches(c *qt.C, regex string) {
+	c.Assert(s.visitCompleter.called, qt.Equals, true)
+	c.Assert(s.visitCompleter.err, qt.ErrorMatches, regex)
 }
 
 // AssertLoginNotComplete asserts that the login attempt has not yet
 // completed.
-func (s *Suite) AssertLoginNotComplete(c *gc.C) {
-	c.Assert(s.visitCompleter.called, gc.Equals, false)
-}
-
-// AssertUser asserts that the specified user is stored in the store.
-// It returns the stored identity.
-func (s *Suite) AssertUser(c *gc.C, id *store.Identity) *store.Identity {
-	id1 := store.Identity{
-		ProviderID: id.ProviderID,
-		Username:   id.Username,
-	}
-	err := s.Store.Identity(s.Ctx, &id1)
-	c.Assert(err, gc.Equals, nil)
-	candidtest.AssertEqualIdentity(c, &id1, id)
-	return &id1
+func (s *Fixture) AssertLoginNotComplete(c *qt.C) {
+	c.Assert(s.visitCompleter.called, qt.Equals, false)
 }
 
 type visitCompleter struct {
-	c           *gc.C
+	c           *qt.C
 	called      bool
 	dischargeID string
 	returnTo    string
@@ -129,7 +112,7 @@ type visitCompleter struct {
 
 func (l *visitCompleter) Success(_ context.Context, _ http.ResponseWriter, _ *http.Request, dischargeID string, id *store.Identity) {
 	if l.called {
-		l.c.Error("login completion method called more that once")
+		l.c.Error("login completion method called more than once")
 		return
 	}
 	l.called = true
@@ -139,7 +122,7 @@ func (l *visitCompleter) Success(_ context.Context, _ http.ResponseWriter, _ *ht
 
 func (l *visitCompleter) Failure(_ context.Context, _ http.ResponseWriter, _ *http.Request, dischargeID string, err error) {
 	if l.called {
-		l.c.Error("login completion method called more that once")
+		l.c.Error("login completion method called more than once")
 		return
 	}
 	l.called = true
@@ -149,7 +132,7 @@ func (l *visitCompleter) Failure(_ context.Context, _ http.ResponseWriter, _ *ht
 
 func (l *visitCompleter) RedirectSuccess(_ context.Context, _ http.ResponseWriter, _ *http.Request, returnTo, state string, id *store.Identity) {
 	if l.called {
-		l.c.Error("login completion method called more that once")
+		l.c.Error("login completion method called more than once")
 		return
 	}
 	l.called = true
@@ -160,7 +143,7 @@ func (l *visitCompleter) RedirectSuccess(_ context.Context, _ http.ResponseWrite
 
 func (l *visitCompleter) RedirectFailure(_ context.Context, _ http.ResponseWriter, _ *http.Request, returnTo, state string, err error) {
 	if l.called {
-		l.c.Error("login completion method called more that once")
+		l.c.Error("login completion method called more than once")
 		return
 	}
 	l.called = true

@@ -10,7 +10,7 @@ import (
 	keystoneidp "github.com/CanonicalLtd/candid/idp/keystone"
 	"github.com/CanonicalLtd/candid/idp/keystone/internal/keystone"
 	"github.com/CanonicalLtd/candid/idp/keystone/internal/mockkeystone"
-	idptest "github.com/CanonicalLtd/candid/idp/qtidptest"
+	"github.com/CanonicalLtd/candid/idp/idptest"
 	candidtest "github.com/CanonicalLtd/candid/internal/qtcandidtest"
 )
 
