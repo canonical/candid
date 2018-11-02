@@ -12,9 +12,9 @@ import (
 	"net/url"
 	"strings"
 
+	qt "github.com/frankban/quicktest"
 	"golang.org/x/net/context"
 	"gopkg.in/CanonicalLtd/candidclient.v1/params"
-	gc "gopkg.in/check.v1"
 	errgo "gopkg.in/errgo.v1"
 	"gopkg.in/httprequest.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery"
@@ -22,44 +22,53 @@ import (
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
 	"gopkg.in/macaroon-bakery.v2/httpbakery/agent"
 
-	"github.com/CanonicalLtd/candid/internal/candidtest"
+	"github.com/CanonicalLtd/candid/internal/discharger"
+	"github.com/CanonicalLtd/candid/internal/identity"
+	candidtest "github.com/CanonicalLtd/candid/internal/qtcandidtest"
 )
 
 type agentSuite struct {
-	candidtest.DischargeSuite
+	srv              *candidtest.Server
+	store            *candidtest.Store
+	dischargeCreator *candidtest.DischargeCreator
 }
 
-var _ = gc.Suite(&agentSuite{})
+func (s *agentSuite) Init(c *qt.C) {
+	s.srv = candidtest.NewMemServer(c, map[string]identity.NewAPIHandlerFunc{
+		"discharger": discharger.NewAPIHandler,
+	})
+	s.dischargeCreator = candidtest.NewDischargeCreator(s.srv)
+}
 
-func (s *agentSuite) TestHTTPBakeryAgentDischarge(c *gc.C) {
-	key := s.CreateAgent(c, "bob@candid")
-	client := s.Client(nil)
+func (s *agentSuite) TestHTTPBakeryAgentDischarge(c *qt.C) {
+	key := s.srv.CreateAgent(c, "bob@candid")
+	client := s.srv.Client(nil)
 	client.Key = key
 	err := agent.SetUpAuth(client, &agent.AuthInfo{
 		Key: client.Key,
 		Agents: []agent.Agent{{
-			URL:      s.URL,
+			URL:      s.srv.URL,
 			Username: "bob@candid",
 		}},
 	})
-	c.Assert(err, gc.Equals, nil)
-	ms, err := s.Discharge(c, "is-authenticated-user", client)
-	c.Assert(err, gc.Equals, nil)
-	_, err = s.Bakery.Checker.Auth(ms).Allow(context.Background(), identchecker.LoginOp)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
+	ms, err := s.dischargeCreator.Discharge(c, "is-authenticated-user", client)
+	c.Assert(err, qt.Equals, nil)
+	_, err = s.dischargeCreator.Bakery.Checker.Auth(ms).Allow(context.Background(), identchecker.LoginOp)
+	c.Assert(err, qt.Equals, nil)
 }
 
-func (s *agentSuite) TestGetAgentDischargeNoCookie(c *gc.C) {
+func (s *agentSuite) TestGetAgentDischargeNoCookie(c *qt.C) {
 	client := &httprequest.Client{
-		BaseURL: s.URL,
+		BaseURL: s.srv.URL,
 	}
 	err := client.Get(context.Background(), "/login/legacy-agent", nil)
-	c.Assert(err, gc.ErrorMatches, `Get http://.*/login/legacy-agent: no agent-login cookie found`)
+	c.Assert(err, qt.ErrorMatches, `Get http://.*/login/legacy-agent: no agent-login cookie found`)
 }
 
-func (s *agentSuite) TestLegacyAgentDischarge(c *gc.C) {
-	key := s.CreateAgent(c, "bob@candid")
-	client := s.Client(nil)
+func (s *agentSuite) TestLegacyAgentDischarge(c *qt.C) {
+	key := s.srv.CreateAgent(c, "bob@candid")
+	client := s.srv.Client(nil)
 	client.Key = key
 	// Set up the transport so that it mutates /discharge responses
 	// to delete the interaction methods so the client exercises
@@ -68,18 +77,18 @@ func (s *agentSuite) TestLegacyAgentDischarge(c *gc.C) {
 	err := agent.SetUpAuth(client, &agent.AuthInfo{
 		Key: client.Key,
 		Agents: []agent.Agent{{
-			URL:      s.URL,
+			URL:      s.srv.URL,
 			Username: "bob@candid",
 		}},
 	})
-	c.Assert(err, gc.Equals, nil)
-	ms, err := s.Discharge(c, "is-authenticated-user", client)
-	c.Assert(err, gc.Equals, nil)
-	_, err = s.Bakery.Checker.Auth(ms).Allow(context.Background(), identchecker.LoginOp)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
+	ms, err := s.dischargeCreator.Discharge(c, "is-authenticated-user", client)
+	c.Assert(err, qt.Equals, nil)
+	_, err = s.dischargeCreator.Bakery.Checker.Auth(ms).Allow(context.Background(), identchecker.LoginOp)
+	c.Assert(err, qt.Equals, nil)
 }
 
-func (s *agentSuite) TestLegacyCookieAgentDischarge(c *gc.C) {
+func (s *agentSuite) TestLegacyCookieAgentDischarge(c *qt.C) {
 	// legacy agent protocol with cookie:
 	//	    Agent                            Login Service
 	//	      |                                    |
@@ -100,9 +109,9 @@ func (s *agentSuite) TestLegacyCookieAgentDischarge(c *gc.C) {
 	// Note that we don't need the agent interactor in this
 	// scenario.
 
-	key := s.CreateAgent(c, "bob@candid")
+	key := s.srv.CreateAgent(c, "bob@candid")
 	var visit func(u *url.URL) error
-	client := s.Client(httpbakery.WebBrowserInteractor{
+	client := s.srv.Client(httpbakery.WebBrowserInteractor{
 		OpenWebBrowser: func(u *url.URL) error {
 			return visit(u)
 		},
@@ -115,9 +124,9 @@ func (s *agentSuite) TestLegacyCookieAgentDischarge(c *gc.C) {
 	visitCalled := false
 	visit = func(u *url.URL) error {
 		req, err := http.NewRequest("GET", u.String(), nil)
-		c.Assert(err, gc.Equals, nil)
+		c.Assert(err, qt.Equals, nil)
 		resp, err := client.Do(req)
-		c.Assert(err, gc.Equals, nil)
+		c.Assert(err, qt.Equals, nil)
 		resp.Body.Close()
 		visitCalled = true
 		return nil
@@ -126,15 +135,15 @@ func (s *agentSuite) TestLegacyCookieAgentDischarge(c *gc.C) {
 	// it and respond with a self-dischargable interaction-required
 	// error.
 	s.setAgentCookie(client.Jar, "bob@candid", &key.Public)
-	ms, err := s.Discharge(c, "is-authenticated-user", client)
-	c.Assert(err, gc.Equals, nil)
-	_, err = s.Bakery.Checker.Auth(ms).Allow(context.Background(), identchecker.LoginOp)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(visitCalled, gc.Equals, true)
+	ms, err := s.dischargeCreator.Discharge(c, "is-authenticated-user", client)
+	c.Assert(err, qt.Equals, nil)
+	_, err = s.dischargeCreator.Bakery.Checker.Auth(ms).Allow(context.Background(), identchecker.LoginOp)
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(visitCalled, qt.Equals, true)
 }
 
 func (s *agentSuite) setAgentCookie(jar http.CookieJar, username string, pk *bakery.PublicKey) {
-	u, err := url.Parse(s.URL)
+	u, err := url.Parse(s.srv.URL)
 	if err != nil {
 		panic(err)
 	}
