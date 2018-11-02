@@ -4,11 +4,11 @@
 package internal_test
 
 import (
-	"context"
 	"time"
 
 	"github.com/juju/simplekv"
 	jc "github.com/juju/testing/checkers"
+	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
 	errgo "gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
