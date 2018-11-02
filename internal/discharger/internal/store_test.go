@@ -4,46 +4,53 @@
 package internal_test
 
 import (
+	"testing"
 	"time"
 
+	qt "github.com/frankban/quicktest"
+	"github.com/frankban/quicktest/qtsuite"
 	"github.com/juju/simplekv"
-	jc "github.com/juju/testing/checkers"
 	"golang.org/x/net/context"
-	gc "gopkg.in/check.v1"
 	errgo "gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
 
-	"github.com/CanonicalLtd/candid/internal/candidtest"
 	"github.com/CanonicalLtd/candid/internal/discharger/internal"
+	candidtest "github.com/CanonicalLtd/candid/internal/qtcandidtest"
 	"github.com/CanonicalLtd/candid/store"
 )
 
-type storeSuite struct {
-	candidtest.StoreSuite
+func TestStore(t *testing.T) {
+	qtsuite.Run(qt.New(t), &storeSuite{})
 }
 
-var _ = gc.Suite(&storeSuite{})
+type storeSuite struct {
+	store *candidtest.Store
+}
 
-func (s *storeSuite) TestRoundTrip(c *gc.C) {
+func (s *storeSuite) Init(c *qt.C) {
+	s.store = candidtest.NewStore()
+}
+
+func (s *storeSuite) TestRoundTrip(c *qt.C) {
 	ctx := context.Background()
-	kv, err := s.ProviderDataStore.KeyValueStore(ctx, "test")
-	c.Assert(err, gc.Equals, nil)
+	kv, err := s.store.ProviderDataStore.KeyValueStore(ctx, "test")
+	c.Assert(err, qt.Equals, nil)
 	store := internal.NewDischargeTokenStore(kv)
 	dt := httpbakery.DischargeToken{
 		Kind:  "test",
 		Value: []byte("test-value"),
 	}
 	key, err := store.Put(ctx, &dt, time.Now().Add(time.Minute))
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 	dt1, err := store.Get(ctx, key)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(dt1, jc.DeepEquals, &dt)
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(dt1, qt.DeepEquals, &dt)
 }
 
-func (s *storeSuite) TestPutCanceled(c *gc.C) {
+func (s *storeSuite) TestPutCanceled(c *qt.C) {
 	ctx := context.Background()
-	kv, err := s.ProviderDataStore.KeyValueStore(ctx, "test")
-	c.Assert(err, gc.Equals, nil)
+	kv, err := s.store.ProviderDataStore.KeyValueStore(ctx, "test")
+	c.Assert(err, qt.Equals, nil)
 	store := internal.NewDischargeTokenStore(withSet(kv, func(context.Context, string, []byte, time.Time) error {
 		return context.Canceled
 	}))
@@ -52,14 +59,14 @@ func (s *storeSuite) TestPutCanceled(c *gc.C) {
 		Value: []byte("test-value"),
 	}
 	_, err = store.Put(ctx, &dt, time.Now().Add(time.Minute))
-	c.Assert(err, gc.ErrorMatches, "context canceled")
-	c.Assert(errgo.Cause(err), gc.Equals, context.Canceled)
+	c.Assert(err, qt.ErrorMatches, "context canceled")
+	c.Assert(errgo.Cause(err), qt.Equals, context.Canceled)
 }
 
-func (s *storeSuite) TestPutDeadlineExceeded(c *gc.C) {
+func (s *storeSuite) TestPutDeadlineExceeded(c *qt.C) {
 	ctx := context.Background()
-	kv, err := s.ProviderDataStore.KeyValueStore(ctx, "test")
-	c.Assert(err, gc.Equals, nil)
+	kv, err := s.store.ProviderDataStore.KeyValueStore(ctx, "test")
+	c.Assert(err, qt.Equals, nil)
 	store := internal.NewDischargeTokenStore(withSet(kv, func(context.Context, string, []byte, time.Time) error {
 		return context.DeadlineExceeded
 	}))
@@ -68,71 +75,71 @@ func (s *storeSuite) TestPutDeadlineExceeded(c *gc.C) {
 		Value: []byte("test-value"),
 	}
 	_, err = store.Put(ctx, &dt, time.Now().Add(time.Minute))
-	c.Assert(err, gc.ErrorMatches, "context deadline exceeded")
-	c.Assert(errgo.Cause(err), gc.Equals, context.DeadlineExceeded)
+	c.Assert(err, qt.ErrorMatches, "context deadline exceeded")
+	c.Assert(errgo.Cause(err), qt.Equals, context.DeadlineExceeded)
 }
 
-func (s *storeSuite) TestGetNotFound(c *gc.C) {
+func (s *storeSuite) TestGetNotFound(c *qt.C) {
 	ctx := context.Background()
-	kv, err := s.ProviderDataStore.KeyValueStore(ctx, "test")
-	c.Assert(err, gc.Equals, nil)
+	kv, err := s.store.ProviderDataStore.KeyValueStore(ctx, "test")
+	c.Assert(err, qt.Equals, nil)
 	st := internal.NewDischargeTokenStore(withGet(kv, func(context.Context, string) ([]byte, error) {
 		return nil, simplekv.ErrNotFound
 	}))
 	_, err = st.Get(ctx, "")
-	c.Assert(err, gc.ErrorMatches, "not found")
-	c.Assert(errgo.Cause(err), gc.Equals, store.ErrNotFound)
+	c.Assert(err, qt.ErrorMatches, "not found")
+	c.Assert(errgo.Cause(err), qt.Equals, store.ErrNotFound)
 }
 
-func (s *storeSuite) TestGetCanceled(c *gc.C) {
+func (s *storeSuite) TestGetCanceled(c *qt.C) {
 	ctx := context.Background()
-	kv, err := s.ProviderDataStore.KeyValueStore(ctx, "test")
-	c.Assert(err, gc.Equals, nil)
+	kv, err := s.store.ProviderDataStore.KeyValueStore(ctx, "test")
+	c.Assert(err, qt.Equals, nil)
 	st := internal.NewDischargeTokenStore(withGet(kv, func(context.Context, string) ([]byte, error) {
 		return nil, context.Canceled
 	}))
 	_, err = st.Get(ctx, "")
-	c.Assert(err, gc.ErrorMatches, "context canceled")
-	c.Assert(errgo.Cause(err), gc.Equals, context.Canceled)
+	c.Assert(err, qt.ErrorMatches, "context canceled")
+	c.Assert(errgo.Cause(err), qt.Equals, context.Canceled)
 }
 
-func (s *storeSuite) TestGetDeadlineExceeded(c *gc.C) {
+func (s *storeSuite) TestGetDeadlineExceeded(c *qt.C) {
 	ctx := context.Background()
-	kv, err := s.ProviderDataStore.KeyValueStore(ctx, "test")
-	c.Assert(err, gc.Equals, nil)
+	kv, err := s.store.ProviderDataStore.KeyValueStore(ctx, "test")
+	c.Assert(err, qt.Equals, nil)
 	st := internal.NewDischargeTokenStore(withGet(kv, func(context.Context, string) ([]byte, error) {
 		return nil, context.DeadlineExceeded
 	}))
 	_, err = st.Get(ctx, "")
-	c.Assert(err, gc.ErrorMatches, "context deadline exceeded")
-	c.Assert(errgo.Cause(err), gc.Equals, context.DeadlineExceeded)
+	c.Assert(err, qt.ErrorMatches, "context deadline exceeded")
+	c.Assert(errgo.Cause(err), qt.Equals, context.DeadlineExceeded)
 }
 
-func (s *storeSuite) TestGetInvalidJSON(c *gc.C) {
+func (s *storeSuite) TestGetInvalidJSON(c *qt.C) {
 	ctx := context.Background()
-	kv, err := s.ProviderDataStore.KeyValueStore(ctx, "test")
-	c.Assert(err, gc.Equals, nil)
+	kv, err := s.store.ProviderDataStore.KeyValueStore(ctx, "test")
+	c.Assert(err, qt.Equals, nil)
 	st := internal.NewDischargeTokenStore(withGet(kv, func(context.Context, string) ([]byte, error) {
 		return []byte("}"), nil
 	}))
 	_, err = st.Get(ctx, "")
-	c.Assert(err, gc.ErrorMatches, "invalid character '}' looking for beginning of value")
+	c.Assert(err, qt.ErrorMatches, "invalid character '}' looking for beginning of value")
 }
 
-func (s *storeSuite) TestExpiredEntry(c *gc.C) {
+func (s *storeSuite) TestExpiredEntry(c *qt.C) {
 	ctx := context.Background()
-	kv, err := s.ProviderDataStore.KeyValueStore(ctx, "test")
-	c.Assert(err, gc.Equals, nil)
+	kv, err := s.store.ProviderDataStore.KeyValueStore(ctx, "test")
+	c.Assert(err, qt.Equals, nil)
 	st := internal.NewDischargeTokenStore(kv)
 	dt := httpbakery.DischargeToken{
 		Kind:  "test",
 		Value: []byte("test-value"),
 	}
 	key, err := st.Put(ctx, &dt, time.Now())
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 	_, err = st.Get(ctx, key)
-	c.Assert(err, gc.ErrorMatches, `".*" not found`)
-	c.Assert(errgo.Cause(err), gc.Equals, store.ErrNotFound)
+	c.Assert(err, qt.ErrorMatches, `".*" not found`)
+	c.Assert(errgo.Cause(err), qt.Equals, store.ErrNotFound)
 }
 
 type testGetStore struct {
