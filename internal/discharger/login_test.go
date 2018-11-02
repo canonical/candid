@@ -8,25 +8,35 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"testing"
 	"time"
 
+	qt "github.com/frankban/quicktest"
+	"github.com/frankban/quicktest/qtsuite"
 	"gopkg.in/CanonicalLtd/candidclient.v1/params"
-	gc "gopkg.in/check.v1"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
 
 	"github.com/CanonicalLtd/candid/idp"
 	"github.com/CanonicalLtd/candid/idp/test"
+	"github.com/CanonicalLtd/candid/internal/discharger"
+	"github.com/CanonicalLtd/candid/internal/identity"
+	candidtest "github.com/CanonicalLtd/candid/internal/qtcandidtest"
 	"github.com/CanonicalLtd/candid/store"
 )
 
-type loginSuite struct {
-	apiSuite
+func TestLogin(t *testing.T) {
+	qtsuite.Run(qt.New(t), &loginSuite{})
 }
 
-var _ = gc.Suite(&loginSuite{})
+type loginSuite struct {
+	store *candidtest.Store
+	srv   *candidtest.Server
+}
 
-func (s *loginSuite) SetUpTest(c *gc.C) {
-	s.Params.IdentityProviders = []idp.IdentityProvider{
+func (s *loginSuite) Init(c *qt.C) {
+	s.store = candidtest.NewStore()
+	sp := s.store.ServerParams()
+	sp.IdentityProviders = []idp.IdentityProvider{
 		test.NewIdentityProvider(test.Params{
 			Name: "test",
 		}),
@@ -35,10 +45,12 @@ func (s *loginSuite) SetUpTest(c *gc.C) {
 			Domain: "test2",
 		}),
 	}
-	s.apiSuite.SetUpTest(c)
+	s.srv = candidtest.NewServer(c, sp, map[string]identity.NewAPIHandlerFunc{
+		"discharger": discharger.NewAPIHandler,
+	})
 }
 
-func (s *loginSuite) TestLegacyInteractiveLogin(c *gc.C) {
+func (s *loginSuite) TestLegacyInteractiveLogin(c *qt.C) {
 	jar := &testCookieJar{}
 	client := httpbakery.NewClient()
 	visitor := test.Interactor{
@@ -50,20 +62,20 @@ func (s *loginSuite) TestLegacyInteractiveLogin(c *gc.C) {
 			IDPGroups:  []string{"test1", "test2"},
 		},
 	}
-	u, err := url.Parse(s.URL + "/login/test/login")
-	c.Assert(err, gc.Equals, nil)
+	u, err := url.Parse(s.srv.URL + "/login/test/login")
+	c.Assert(err, qt.Equals, nil)
 	err = visitor.LegacyInteract(testContext, client, "", u)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(jar.cookies, gc.HasLen, 0)
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(jar.cookies, qt.HasLen, 0)
 	id := store.Identity{
 		ProviderID: "test:test",
 	}
-	err = s.Params.Store.Identity(testContext, &id)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(id.LastLogin.After(time.Now().Add(-1*time.Second)), gc.Equals, true, gc.Commentf("%#v", id))
+	err = s.store.Store.Identity(testContext, &id)
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(id.LastLogin.After(time.Now().Add(-1*time.Second)), qt.Equals, true, qt.Commentf("%#v", id))
 }
 
-func (s *loginSuite) TestNonInteractiveLogin(c *gc.C) {
+func (s *loginSuite) TestNonInteractiveLogin(c *qt.C) {
 	jar := &testCookieJar{}
 	client := httpbakery.NewClient()
 	visitor := test.Interactor{
@@ -76,64 +88,64 @@ func (s *loginSuite) TestNonInteractiveLogin(c *gc.C) {
 		},
 	}
 	req, err := http.NewRequest("GET", "/", nil)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 	ierr := httpbakery.NewInteractionRequiredError(nil, req)
-	ierr.SetInteraction("test", map[string]string{"url": s.URL + "/login/test/interact"})
+	ierr.SetInteraction("test", map[string]string{"url": s.srv.URL + "/login/test/interact"})
 	_, err = visitor.Interact(testContext, client, "", ierr)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(jar.cookies, gc.HasLen, 0)
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(jar.cookies, qt.HasLen, 0)
 	id := store.Identity{
 		ProviderID: "test:test",
 	}
-	err = s.Params.Store.Identity(testContext, &id)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(id.LastLogin.After(time.Now().Add(-1*time.Second)), gc.Equals, true)
+	err = s.store.Store.Identity(testContext, &id)
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(id.LastLogin.After(time.Now().Add(-1*time.Second)), qt.Equals, true)
 }
 
-func (s *loginSuite) TestLegacyLoginFailure(c *gc.C) {
+func (s *loginSuite) TestLegacyLoginFailure(c *qt.C) {
 	jar := &testCookieJar{}
 	client := httpbakery.NewClient()
 	visitor := test.Interactor{
 		User: &params.User{},
 	}
-	u, err := url.Parse(s.URL + "/login/test/login")
-	c.Assert(err, gc.Equals, nil)
+	u, err := url.Parse(s.srv.URL + "/login/test/login")
+	c.Assert(err, qt.Equals, nil)
 	err = visitor.LegacyInteract(testContext, client, "", u)
-	c.Assert(err, gc.ErrorMatches, `Post .*/login/test/login: identity not specified`)
-	c.Assert(jar.cookies, gc.HasLen, 0)
+	c.Assert(err, qt.ErrorMatches, `Post .*/login/test/login: identity not specified`)
+	c.Assert(jar.cookies, qt.HasLen, 0)
 }
 
-func (s *loginSuite) TestInteractiveIdentityProviderSelection(c *gc.C) {
+func (s *loginSuite) TestInteractiveIdentityProviderSelection(c *qt.C) {
 	resp := s.getNoRedirect(c, "/login")
 	defer resp.Body.Close()
-	c.Assert(resp.StatusCode, gc.Equals, http.StatusFound)
-	c.Assert(resp.Header.Get("Location"), gc.Equals, s.URL+"/login/test/login")
+	c.Assert(resp.StatusCode, qt.Equals, http.StatusFound)
+	c.Assert(resp.Header.Get("Location"), qt.Equals, s.srv.URL+"/login/test/login")
 }
 
-func (s *loginSuite) TestInteractiveIdentityProviderSelectionWithDomain(c *gc.C) {
+func (s *loginSuite) TestInteractiveIdentityProviderSelectionWithDomain(c *qt.C) {
 	resp := s.getNoRedirect(c, "/login?domain=test2")
 	defer resp.Body.Close()
-	c.Assert(resp.StatusCode, gc.Equals, http.StatusFound)
-	c.Assert(resp.Header.Get("Location"), gc.Equals, s.URL+"/login/test2/login")
+	c.Assert(resp.StatusCode, qt.Equals, http.StatusFound)
+	c.Assert(resp.Header.Get("Location"), qt.Equals, s.srv.URL+"/login/test2/login")
 }
 
-func (s *loginSuite) TestLoginMethodsIncludesAgent(c *gc.C) {
+func (s *loginSuite) TestLoginMethodsIncludesAgent(c *qt.C) {
 	req, err := http.NewRequest("GET", "/login-legacy", nil)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 	req.Header.Set("Accept", "application/json")
-	resp := s.Do(c, req)
+	resp := s.srv.Do(c, req)
 	defer resp.Body.Close()
-	c.Assert(resp.StatusCode, gc.Equals, http.StatusOK)
+	c.Assert(resp.StatusCode, qt.Equals, http.StatusOK)
 	buf, err := ioutil.ReadAll(resp.Body)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 	var lm params.LoginMethods
 	err = json.Unmarshal(buf, &lm)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(lm.Agent, gc.Equals, s.URL+"/login/legacy-agent")
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(lm.Agent, qt.Equals, s.srv.URL+"/login/legacy-agent")
 }
 
-func (s *loginSuite) getNoRedirect(c *gc.C, path string) *http.Response {
+func (s *loginSuite) getNoRedirect(c *qt.C, path string) *http.Response {
 	req, err := http.NewRequest("GET", path, nil)
-	c.Assert(err, gc.Equals, nil)
-	return s.RoundTrip(c, req)
+	c.Assert(err, qt.Equals, nil)
+	return s.srv.RoundTrip(c, req)
 }

@@ -3,9 +3,9 @@ package storetest
 import (
 	"time"
 
+	qt "github.com/frankban/quicktest"
 	"golang.org/x/net/context"
 	"gopkg.in/yaml.v2"
-	qt "github.com/frankban/quicktest"
 
 	"github.com/CanonicalLtd/candid/store"
 )

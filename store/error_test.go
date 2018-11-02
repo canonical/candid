@@ -6,8 +6,8 @@ package store_test
 import (
 	"testing"
 
-	errgo "gopkg.in/errgo.v1"
 	qt "github.com/frankban/quicktest"
+	errgo "gopkg.in/errgo.v1"
 
 	"github.com/CanonicalLtd/candid/store"
 )

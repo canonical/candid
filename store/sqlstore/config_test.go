@@ -11,7 +11,7 @@ import (
 func TestConfigUnmarshal(t *testing.T) {
 	c := qt.New(t)
 	defer c.Done()
-	
+
 	f := newFixture(c)
 	storetest.TestUnmarshal(c, `
 storage:
