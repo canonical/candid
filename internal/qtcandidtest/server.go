@@ -42,6 +42,9 @@ type Server struct {
 	// the servers.
 	Ctx context.Context
 
+	// Key holds the key that the server uses.
+	Key *bakery.KeyPair
+
 	// params contains the parameters that were passed to identity.New.
 	params            identity.ServerParams
 	handler           *identity.Server
@@ -80,6 +83,8 @@ func NewServer(c *qt.C, p identity.ServerParams, versions map[string]identity.Ne
 		s.params.Key, err = bakery.GenerateKey()
 		c.Assert(err, qt.Equals, nil)
 	}
+	s.Key = s.params.Key
+
 	if s.params.PrivateAddr == "" {
 		s.params.PrivateAddr = "localhost"
 	}

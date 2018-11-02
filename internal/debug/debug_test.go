@@ -7,19 +7,19 @@ import (
 	"encoding/json"
 	"net/http"
 	"regexp"
+	"testing"
 	"time"
 
+	qt "github.com/frankban/quicktest"
+	"github.com/frankban/quicktest/qtsuite"
 	"github.com/juju/mgotest"
-	"github.com/juju/testing"
-	"github.com/juju/testing/httptesting"
+	"github.com/juju/qthttptest"
 	"github.com/juju/utils/debugstatus"
-	gc "gopkg.in/check.v1"
 	errgo "gopkg.in/errgo.v1"
 
-	"github.com/CanonicalLtd/candid/internal/candidtest"
 	"github.com/CanonicalLtd/candid/internal/debug"
 	"github.com/CanonicalLtd/candid/internal/identity"
-	"github.com/CanonicalLtd/candid/store"
+	candidtest "github.com/CanonicalLtd/candid/internal/qtcandidtest"
 	"github.com/CanonicalLtd/candid/store/mgostore"
 	buildver "github.com/CanonicalLtd/candid/version"
 )
@@ -28,56 +28,26 @@ const (
 	version = "debug"
 )
 
+func TestDebug(t *testing.T) {
+	qtsuite.Run(qt.New(t), &debugSuite{})
+}
+
 type debugSuite struct {
-	testing.CleanupSuite
-	candidtest.ServerSuite
-
-	db      *mgotest.Database
-	backend store.Backend
+	srv *candidtest.Server
 }
 
-var _ = gc.Suite(&debugSuite{})
-
-func (s *debugSuite) SetUpTest(c *gc.C) {
-	s.CleanupSuite.SetUpTest(c)
-	var err error
-	s.db, err = mgotest.New()
-	if errgo.Cause(err) == mgotest.ErrDisabled {
-		c.Skip("mgotest disabled")
-	}
-	c.Assert(err, gc.Equals, nil)
-	s.backend, err = mgostore.NewBackend(s.db.Database)
-	c.Assert(err, gc.Equals, nil)
-
-	s.Params.MeetingStore = s.backend.MeetingStore()
-	s.Params.RootKeyStore = s.backend.BakeryRootKeyStore()
-	s.Params.Store = s.backend.Store()
-	s.Params.DebugStatusCheckerFuncs = s.backend.DebugStatusCheckerFuncs()
-	s.Versions = map[string]identity.NewAPIHandlerFunc{
-		version: debug.NewAPIHandler,
-	}
-	s.ServerSuite.SetUpTest(c)
+func (s *debugSuite) Init(c *qt.C) {
+	s.srv = newFixture(c).srv
 }
 
-func (s *debugSuite) TearDownTest(c *gc.C) {
-	s.ServerSuite.TearDownTest(c)
-	if s.backend != nil {
-		s.backend.Close()
-	}
-	if s.db != nil {
-		s.db.Close()
-	}
-	s.CleanupSuite.TearDownTest(c)
-}
-
-func (s *debugSuite) patchStartTime() time.Time {
+func (s *debugSuite) patchStartTime(c *qt.C) time.Time {
 	startTime := time.Now()
-	s.PatchValue(&debugstatus.StartTime, startTime)
+	c.Patch(&debugstatus.StartTime, startTime)
 	return startTime
 }
 
-func (s *debugSuite) TestServeDebugStatus(c *gc.C) {
-	startTime := s.patchStartTime()
+func (s *debugSuite) TestServeDebugStatus(c *qt.C) {
+	startTime := s.patchStartTime(c)
 	expectNames := map[string]string{
 		"server_started":    "Server started",
 		"mongo_collections": "MongoDB collections",
@@ -88,25 +58,58 @@ func (s *debugSuite) TestServeDebugStatus(c *gc.C) {
 		"mongo_collections": "All required collections exist",
 		"meeting_count":     "0",
 	}
-	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
-		URL: s.URL + "/debug/status",
-		ExpectBody: httptesting.BodyAsserter(func(c *gc.C, body json.RawMessage) {
+	qthttptest.AssertJSONCall(c, qthttptest.JSONCallParams{
+		URL: s.srv.URL + "/debug/status",
+		ExpectBody: qthttptest.BodyAsserter(func(c *qt.C, body json.RawMessage) {
 			var result map[string]debugstatus.CheckResult
 			err := json.Unmarshal(body, &result)
-			c.Assert(err, gc.Equals, nil)
-			c.Assert(result, gc.HasLen, len(expectNames))
+			c.Assert(err, qt.Equals, nil)
+			c.Assert(result, qt.HasLen, len(expectNames))
 			for k, v := range result {
-				c.Assert(v.Name, gc.Equals, expectNames[k], gc.Commentf("%s: incorrect name", k))
-				c.Assert(v.Value, gc.Matches, expectValues[k], gc.Commentf("%s: incorrect value", k))
+				c.Assert(v.Name, qt.Equals, expectNames[k], qt.Commentf("%s: incorrect name", k))
+				c.Assert(v.Value, qt.Matches, expectValues[k], qt.Commentf("%s: incorrect value", k))
 			}
 		}),
 	})
 }
 
-func (s *debugSuite) TestServeDebugInfo(c *gc.C) {
-	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
-		URL:          s.URL + "/debug/info",
+func (s *debugSuite) TestServeDebugInfo(c *qt.C) {
+	qthttptest.AssertJSONCall(c, qthttptest.JSONCallParams{
+		URL:          s.srv.URL + "/debug/info",
 		ExpectStatus: http.StatusOK,
 		ExpectBody:   buildver.VersionInfo,
 	})
+}
+
+type fixture struct {
+	srv *candidtest.Server
+}
+
+func newFixture(c *qt.C) *fixture {
+	db, err := mgotest.New()
+	if errgo.Cause(err) == mgotest.ErrDisabled {
+		c.Skip("mgotest disabled")
+	}
+	c.Assert(err, qt.Equals, nil)
+	backend, err := mgostore.NewBackend(db.Database)
+	if err != nil {
+		db.Close()
+		c.Fatal(err)
+	}
+	c.Assert(err, qt.Equals, nil)
+	c.Defer(backend.Close)
+
+	sp := identity.ServerParams{
+		MeetingStore:            backend.MeetingStore(),
+		RootKeyStore:            backend.BakeryRootKeyStore(),
+		Store:                   backend.Store(),
+		DebugStatusCheckerFuncs: backend.DebugStatusCheckerFuncs(),
+		DebugTeams:              []string{"debuggers"},
+	}
+	srv := candidtest.NewServer(c, sp, map[string]identity.NewAPIHandlerFunc{
+		version: debug.NewAPIHandler,
+	})
+	return &fixture{
+		srv: srv,
+	}
 }
