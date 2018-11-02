@@ -5,33 +5,22 @@ package identity_test
 
 import (
 	"net/http"
+	"testing"
 
+	qt "github.com/frankban/quicktest"
 	"github.com/juju/loggo"
-	jujutesting "github.com/juju/testing"
-	jc "github.com/juju/testing/checkers"
-	"github.com/juju/testing/httptesting"
+	"github.com/juju/qthttptest"
 	"github.com/julienschmidt/httprouter"
 	"gopkg.in/CanonicalLtd/candidclient.v1/params"
-	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/httprequest.v1"
 
 	"github.com/CanonicalLtd/candid/internal/identity"
+	candidtest "github.com/CanonicalLtd/candid/internal/qtcandidtest"
 )
 
-type jsonSuite struct {
-	jujutesting.IsolationSuite
-	mux *httprouter.Router
-}
-
-var _ = gc.Suite(&jsonSuite{})
-
-func (s *jsonSuite) SetUpTest(c *gc.C) {
-	s.IsolationSuite.SetUpTest(c)
-	s.mux = httprouter.New()
-}
-
-func (s *jsonSuite) TestHandleErrors(c *gc.C) {
+func TestHandleErrors(t *testing.T) {
+	c := qt.New(t)
 	for httpErr, paramsErr := range map[int]params.ErrorCode{
 		http.StatusNotFound:           params.ErrNotFound,
 		http.StatusForbidden:          params.ErrForbidden,
@@ -39,63 +28,72 @@ func (s *jsonSuite) TestHandleErrors(c *gc.C) {
 		http.StatusUnauthorized:       params.ErrUnauthorized,
 		http.StatusServiceUnavailable: params.ErrServiceUnavailable,
 	} {
-		mux := httprouter.New()
-		mux.Handle("GET", "/error/", identity.ReqServer.HandleErrors(func(httprequest.Params) error {
-			return errgo.WithCausef(nil, paramsErr, "bad wolf")
-		}))
-		httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
-			Handler:      mux,
-			URL:          "/error/",
-			ExpectStatus: httpErr,
-			ExpectBody: params.Error{
-				Message: "bad wolf",
-				Code:    paramsErr,
-			},
+		c.Run(string(paramsErr), func(c *qt.C) {
+			mux := httprouter.New()
+			mux.Handle("GET", "/error/", identity.ReqServer.HandleErrors(func(httprequest.Params) error {
+				return errgo.WithCausef(nil, paramsErr, "bad wolf")
+			}))
+			qthttptest.AssertJSONCall(c, qthttptest.JSONCallParams{
+				Handler:      mux,
+				URL:          "/error/",
+				ExpectStatus: httpErr,
+				ExpectBody: params.Error{
+					Message: "bad wolf",
+					Code:    paramsErr,
+				},
+			})
 		})
 	}
 }
 
-func (s *jsonSuite) TestHandleErrorsInternalServerError(c *gc.C) {
+func TestHandleErrorsInternalServerError(t *testing.T) {
+	c := qt.New(t)
+	candidtest.LogTo(c)
 	w := new(loggo.TestWriter)
 	loggo.RegisterWriter("test", w)
-	s.mux.Handle("GET", "/error/", identity.ReqServer.HandleErrors(func(httprequest.Params) error {
+	mux := httprouter.New()
+	mux.Handle("GET", "/error/", identity.ReqServer.HandleErrors(func(httprequest.Params) error {
 		return errgo.New("bad wolf")
 	}))
-	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
-		Handler:      s.mux,
+	qthttptest.AssertJSONCall(c, qthttptest.JSONCallParams{
+		Handler:      mux,
 		URL:          "/error/",
 		ExpectStatus: http.StatusInternalServerError,
 		ExpectBody: params.Error{
 			Message: "bad wolf",
 		},
 	})
-	c.Assert(w.Log(), jc.LogMatches, []jc.SimpleMessage{{loggo.ERROR, `Internal Server Error: bad wolf \(.*\)`}})
+	assertLogMatches(c, w.Log(), loggo.ERROR, `Internal Server Error: bad wolf \(.*\)`)
 }
 
-func (s *jsonSuite) TestHandleErrorsSuccess(c *gc.C) {
-	s.mux.Handle("GET", "/valid/", identity.ReqServer.HandleErrors(func(httprequest.Params) error {
+func TestHandleErrorsSuccess(t *testing.T) {
+	c := qt.New(t)
+	mux := httprouter.New()
+	mux.Handle("GET", "/valid/", identity.ReqServer.HandleErrors(func(httprequest.Params) error {
 		return nil
 	}))
 
 	// The valid path returns a response without errors.
-	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
-		Handler: s.mux,
+	qthttptest.AssertJSONCall(c, qthttptest.JSONCallParams{
+		Handler: mux,
 		URL:     "/valid/",
 	})
 }
 
-func (s *jsonSuite) TestHandleJSON(c *gc.C) {
+func TestHandleJSON(t *testing.T) {
+	c := qt.New(t)
 	// Set up server paths.
-	s.mux.Handle("GET", "/bad-request/", identity.ReqServer.HandleJSON(func(httprequest.Params) (interface{}, error) {
+	mux := httprouter.New()
+	mux.Handle("GET", "/bad-request/", identity.ReqServer.HandleJSON(func(httprequest.Params) (interface{}, error) {
 		return nil, errgo.WithCausef(nil, params.ErrBadRequest, "bad wolf")
 	}))
-	s.mux.Handle("GET", "/valid/", identity.ReqServer.HandleJSON(func(httprequest.Params) (interface{}, error) {
+	mux.Handle("GET", "/valid/", identity.ReqServer.HandleJSON(func(httprequest.Params) (interface{}, error) {
 		return "success", nil
 	}))
 
 	// The bad-request path returns an error response.
-	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
-		Handler:      s.mux,
+	qthttptest.AssertJSONCall(c, qthttptest.JSONCallParams{
+		Handler:      mux,
 		URL:          "/bad-request/",
 		ExpectStatus: http.StatusBadRequest,
 		ExpectBody: params.Error{
@@ -105,8 +103,8 @@ func (s *jsonSuite) TestHandleJSON(c *gc.C) {
 	})
 
 	// The valid path returns a success response.
-	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
-		Handler:    s.mux,
+	qthttptest.AssertJSONCall(c, qthttptest.JSONCallParams{
+		Handler:    mux,
 		URL:        "/valid/",
 		ExpectBody: "success",
 	})
