@@ -4,14 +4,16 @@
 package auth_test
 
 import (
+	"fmt"
 	"sort"
+	"testing"
 
+	qt "github.com/frankban/quicktest"
+	"github.com/frankban/quicktest/qtsuite"
 	"github.com/juju/aclstore/v2"
-	jc "github.com/juju/testing/checkers"
 	"golang.org/x/net/context"
 	"gopkg.in/CanonicalLtd/candidclient.v1"
 	"gopkg.in/CanonicalLtd/candidclient.v1/params"
-	gc "gopkg.in/check.v1"
 	errgo "gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery"
 	"gopkg.in/macaroon-bakery.v2/bakery/checkers"
@@ -21,29 +23,32 @@ import (
 	"github.com/CanonicalLtd/candid/idp"
 	"github.com/CanonicalLtd/candid/idp/test"
 	"github.com/CanonicalLtd/candid/internal/auth"
-	"github.com/CanonicalLtd/candid/internal/candidtest"
+	candidtest "github.com/CanonicalLtd/candid/internal/qtcandidtest"
 	"github.com/CanonicalLtd/candid/store"
 )
 
+func TestAuth(t *testing.T) {
+	qtsuite.Run(qt.New(t), &authSuite{})
+}
+
 type authSuite struct {
-	candidtest.StoreSuite
+	store *candidtest.Store
+
 	oven                *bakery.Oven
 	authorizer          *auth.Authorizer
 	context             context.Context
-	close               func()
 	adminAgentKey       *bakery.KeyPair
 	providerGroups      []string
 	providerGroupsError error
 }
 
-var _ = gc.Suite(&authSuite{})
-
 const identityLocation = "https://identity.test/id"
 
-func (s *authSuite) SetUpTest(c *gc.C) {
-	s.StoreSuite.SetUpTest(c)
+func (s *authSuite) Init(c *qt.C) {
+	s.store = candidtest.NewStore()
+
 	key, err := bakery.GenerateKey()
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 	locator := bakery.NewThirdPartyStore()
 	locator.AddInfo(identityLocation, bakery.ThirdPartyInfo{
 		PublicKey: key.Public,
@@ -55,16 +60,18 @@ func (s *authSuite) SetUpTest(c *gc.C) {
 		Location: "identity",
 	})
 	aclManager, err := aclstore.NewManager(context.Background(), aclstore.Params{
-		Store:             s.ACLStore,
+		Store:             s.store.ACLStore,
 		InitialAdminUsers: []string{auth.AdminUsername},
 	})
-	c.Assert(err, gc.Equals, nil)
-	s.context, s.close = s.Store.Context(context.Background())
+	c.Assert(err, qt.Equals, nil)
+	ctx, close := s.store.Store.Context(context.Background())
+	c.Defer(close)
+	s.context = ctx
 	s.authorizer, err = auth.New(auth.Params{
 		AdminPassword:    "password",
 		Location:         identityLocation,
 		MacaroonVerifier: s.oven,
-		Store:            s.Store,
+		Store:            s.store.Store,
 		IdentityProviders: []idp.IdentityProvider{
 			test.NewIdentityProvider(test.Params{
 				Name:      "test",
@@ -73,28 +80,23 @@ func (s *authSuite) SetUpTest(c *gc.C) {
 		},
 		ACLManager: aclManager,
 	})
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 	s.adminAgentKey, err = bakery.GenerateKey()
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 	err = s.authorizer.SetAdminPublicKey(s.context, &s.adminAgentKey.Public)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 }
 
 func (s *authSuite) getGroups(*store.Identity) ([]string, error) {
 	return s.providerGroups, s.providerGroupsError
 }
 
-func (s *authSuite) TearDownTest(c *gc.C) {
-	s.close()
-	s.StoreSuite.TearDownTest(c)
-}
-
-func (s *authSuite) createIdentity(c *gc.C, username string, pk *bakery.PublicKey, groups ...string) *auth.Identity {
+func (s *authSuite) createIdentity(c *qt.C, username string, pk *bakery.PublicKey, groups ...string) *auth.Identity {
 	var pks []bakery.PublicKey
 	if pk != nil {
 		pks = append(pks, *pk)
 	}
-	err := s.Store.UpdateIdentity(s.context, &store.Identity{
+	err := s.store.Store.UpdateIdentity(s.context, &store.Identity{
 		ProviderID: store.MakeProviderIdentity("test", username),
 		Username:   username,
 		Groups:     groups,
@@ -104,13 +106,13 @@ func (s *authSuite) createIdentity(c *gc.C, username string, pk *bakery.PublicKe
 		store.Groups:     store.Set,
 		store.PublicKeys: store.Set,
 	})
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 	id, err := s.authorizer.Identity(s.context, username)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 	return id
 }
 
-func (s authSuite) identityMacaroon(c *gc.C, username string) *bakery.Macaroon {
+func (s authSuite) identityMacaroon(c *qt.C, username string) *bakery.Macaroon {
 	m, err := s.oven.NewMacaroon(
 		s.context,
 		bakery.LatestVersion,
@@ -119,11 +121,11 @@ func (s authSuite) identityMacaroon(c *gc.C, username string) *bakery.Macaroon {
 		},
 		identchecker.LoginOp,
 	)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 	return m
 }
 
-func (s *authSuite) TestAuthorizeWithAdminCredentials(c *gc.C) {
+func (s *authSuite) TestAuthorizeWithAdminCredentials(c *qt.C) {
 	tests := []struct {
 		about              string
 		username           string
@@ -144,36 +146,37 @@ func (s *authSuite) TestAuthorizeWithAdminCredentials(c *gc.C) {
 		password:           "not-password",
 		expectErrorMessage: "could not determine identity: invalid credentials",
 	}}
-	for i, test := range tests {
-		c.Logf("test %d. %s", i, test.about)
-		ctx := context.Background()
-		if test.username != "" {
-			ctx = auth.ContextWithUserCredentials(ctx, test.username, test.password)
-		}
-		authInfo, err := s.authorizer.Auth(ctx, nil, identchecker.LoginOp)
-		if test.expectErrorMessage != "" {
-			c.Assert(err, gc.ErrorMatches, test.expectErrorMessage)
-			c.Assert(errgo.Cause(err), gc.Equals, params.ErrUnauthorized)
-			continue
-		}
-		c.Assert(err, gc.Equals, nil)
-		c.Assert(authInfo.Identity.Id(), gc.Equals, auth.AdminUsername)
+	for _, test := range tests {
+		c.Run(test.about, func(c *qt.C) {
+			ctx := context.Background()
+			if test.username != "" {
+				ctx = auth.ContextWithUserCredentials(ctx, test.username, test.password)
+			}
+			authInfo, err := s.authorizer.Auth(ctx, nil, identchecker.LoginOp)
+			if test.expectErrorMessage != "" {
+				c.Assert(err, qt.ErrorMatches, test.expectErrorMessage)
+				c.Assert(errgo.Cause(err), qt.Equals, params.ErrUnauthorized)
+				return
+			}
+			c.Assert(err, qt.Equals, nil)
+			c.Assert(authInfo.Identity.Id(), qt.Equals, auth.AdminUsername)
+		})
 	}
 }
 
-func (s *authSuite) TestUserHasPublicKeyCaveat(c *gc.C) {
+func (s *authSuite) TestUserHasPublicKeyCaveat(c *qt.C) {
 	key, err := bakery.GenerateKey()
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 	cav := auth.UserHasPublicKeyCaveat(params.Username("test"), &key.Public)
-	c.Assert(cav.Namespace, gc.Equals, auth.CheckersNamespace)
-	c.Assert(cav.Condition, gc.Matches, "user-has-public-key test .*")
-	c.Assert(cav.Location, gc.Equals, "")
+	c.Assert(cav.Namespace, qt.Equals, auth.CheckersNamespace)
+	c.Assert(cav.Condition, qt.Matches, "user-has-public-key test .*")
+	c.Assert(cav.Location, qt.Equals, "")
 }
 
-func (s *authSuite) TestUserHasPublicKeyChecker(c *gc.C) {
+func (s *authSuite) TestUserHasPublicKeyChecker(c *qt.C) {
 	key, err := bakery.GenerateKey()
-	c.Assert(err, gc.Equals, nil)
-	ctx, close := s.Store.Context(context.Background())
+	c.Assert(err, qt.Equals, nil)
+	ctx, close := s.store.Store.Context(context.Background())
 	defer close()
 	s.createIdentity(c, "test-user", &key.Public)
 
@@ -185,26 +188,26 @@ func (s *authSuite) TestUserHasPublicKeyChecker(c *gc.C) {
 	}
 
 	err = checkCaveat(auth.UserHasPublicKeyCaveat(params.Username("test-user"), &key.Public))
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 	// Unknown username
 	err = checkCaveat(auth.UserHasPublicKeyCaveat("test2", &key.Public))
-	c.Assert(err, gc.ErrorMatches, "caveat.*not satisfied: public key not valid for user")
+	c.Assert(err, qt.ErrorMatches, "caveat.*not satisfied: public key not valid for user")
 	// Incorrect public key
 	err = checkCaveat(auth.UserHasPublicKeyCaveat("test2", new(bakery.PublicKey)))
-	c.Assert(err, gc.ErrorMatches, "caveat.*not satisfied: public key not valid for user")
+	c.Assert(err, qt.ErrorMatches, "caveat.*not satisfied: public key not valid for user")
 	// Invalid argument
 	err = checkCaveat(checkers.Caveat{
 		Namespace: auth.CheckersNamespace,
 		Condition: "user-has-public-key test",
 	})
-	c.Assert(err, gc.ErrorMatches, "caveat.*not satisfied: caveat badly formatted")
+	c.Assert(err, qt.ErrorMatches, "caveat.*not satisfied: caveat badly formatted")
 
 	// Invalid public key
 	err = checkCaveat(checkers.Caveat{
 		Namespace: auth.CheckersNamespace,
 		Condition: "user-has-public-key test " + key.Public.String()[1:],
 	})
-	c.Assert(err, gc.ErrorMatches, `caveat.*not satisfied: invalid public key ".*": .*`)
+	c.Assert(err, qt.ErrorMatches, `caveat.*not satisfied: invalid public key ".*": .*`)
 }
 
 var aclForOpTests = []struct {
@@ -263,51 +266,52 @@ var aclForOpTests = []struct {
 	expect: []string{"bob", auth.AdminUsername},
 }}
 
-func (s *authSuite) TestACLForOp(c *gc.C) {
-	for i, test := range aclForOpTests {
-		c.Logf("test %d: %v", i, test.op)
-		sort.Strings(test.expect)
-		acl, public, err := auth.AuthorizerACLForOp(s.authorizer, context.Background(), test.op)
-		c.Assert(err, gc.Equals, nil)
-		sort.Strings(acl)
-		c.Assert(acl, gc.DeepEquals, test.expect)
-		c.Assert(public, gc.Equals, test.expectPublic)
+func (s *authSuite) TestACLForOp(c *qt.C) {
+	for _, test := range aclForOpTests {
+		c.Run(fmt.Sprintf("%s-%s", test.op.Entity, test.op.Action), func(c *qt.C) {
+			sort.Strings(test.expect)
+			acl, public, err := auth.AuthorizerACLForOp(s.authorizer, context.Background(), test.op)
+			c.Assert(err, qt.Equals, nil)
+			sort.Strings(acl)
+			c.Assert(acl, qt.DeepEquals, test.expect)
+			c.Assert(public, qt.Equals, test.expectPublic)
+		})
 	}
 }
 
-func (s *authSuite) TestAdminUserGroups(c *gc.C) {
+func (s *authSuite) TestAdminUserGroups(c *qt.C) {
 	ctx := auth.ContextWithUserCredentials(context.Background(), "admin", "password")
 	authInfo, err := s.authorizer.Auth(ctx, nil, identchecker.LoginOp)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 	assertAuthorizedGroups(c, authInfo, nil)
 }
 
-func (s *authSuite) TestNonExistentUserGroups(c *gc.C) {
+func (s *authSuite) TestNonExistentUserGroups(c *qt.C) {
 	m := s.identityMacaroon(c, "noone")
 	authInfo, err := s.authorizer.Auth(s.context, []macaroon.Slice{{m.M()}}, identchecker.LoginOp)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 	ident := authInfo.Identity.(*auth.Identity)
 	groups, err := ident.Groups(s.context)
-	c.Assert(err, gc.ErrorMatches, `user noone not found`)
-	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
-	c.Assert(groups, gc.IsNil)
+	c.Assert(err, qt.ErrorMatches, `user noone not found`)
+	c.Assert(errgo.Cause(err), qt.Equals, params.ErrNotFound)
+	c.Assert(groups, qt.IsNil)
 }
 
-func (s *authSuite) TestExistingUserGroups(c *gc.C) {
+func (s *authSuite) TestExistingUserGroups(c *qt.C) {
 	// good identity
 	s.createIdentity(c, "test", nil, "test-group1", "test-group2")
 	m := s.identityMacaroon(c, "test")
 	authInfo, err := s.authorizer.Auth(s.context, []macaroon.Slice{{m.M()}}, identchecker.LoginOp)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 	assertAuthorizedGroups(c, authInfo, []string{"test-group1", "test-group2"})
 }
 
-func assertAuthorizedGroups(c *gc.C, authInfo *identchecker.AuthInfo, expectGroups []string) {
-	c.Assert(authInfo.Identity, gc.NotNil)
+func assertAuthorizedGroups(c *qt.C, authInfo *identchecker.AuthInfo, expectGroups []string) {
+	c.Assert(authInfo.Identity, qt.Not(qt.IsNil))
 	ident := authInfo.Identity.(*auth.Identity)
 	groups, err := ident.Groups(context.Background())
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(groups, gc.DeepEquals, expectGroups)
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(groups, qt.DeepEquals, expectGroups)
 }
 
 var identityAllowTests = []struct {
@@ -366,31 +370,35 @@ var identityAllowTests = []struct {
 	expectAllowed:       true,
 }}
 
-func (s *authSuite) TestIdentityAllow(c *gc.C) {
-	for i, test := range identityAllowTests {
-		c.Logf("test %d: %v", i, test.about)
-		s.providerGroups = test.externalGroups
-		s.providerGroupsError = test.externalGroupsError
-		id := s.createIdentity(c, "testuser", nil, test.groups...)
-		ok, err := id.Allow(s.context, test.acl)
-		if test.expectError != "" {
-			c.Assert(err, gc.ErrorMatches, test.expectError)
-			c.Assert(ok, gc.Equals, false)
-		} else {
-			c.Assert(err, gc.Equals, nil)
-			c.Assert(ok, gc.Equals, test.expectAllowed)
-		}
+func (s *authSuite) TestIdentityAllow(c *qt.C) {
+	for _, test := range identityAllowTests {
+		c.Run(test.about, func(c *qt.C) {
+			s.providerGroups = test.externalGroups
+			s.providerGroupsError = test.externalGroupsError
+			id := s.createIdentity(c, "testuser", nil, test.groups...)
+			ok, err := id.Allow(s.context, test.acl)
+			if test.expectError != "" {
+				c.Assert(err, qt.ErrorMatches, test.expectError)
+				c.Assert(ok, qt.Equals, false)
+			} else {
+				c.Assert(err, qt.Equals, nil)
+				c.Assert(ok, qt.Equals, test.expectAllowed)
+			}
+		})
 	}
 }
 
-func (s *authSuite) TestAuthorizeMacaroonRequired(c *gc.C) {
+func (s *authSuite) TestAuthorizeMacaroonRequired(c *qt.C) {
 	authInfo, err := s.authorizer.Auth(s.context, nil, identchecker.LoginOp)
-	c.Assert(err, gc.ErrorMatches, `macaroon discharge required: authentication required`)
-	c.Assert(authInfo, gc.IsNil)
-	c.Assert(errgo.Cause(err), gc.FitsTypeOf, (*bakery.DischargeRequiredError)(nil))
-	derr := errgo.Cause(err).(*bakery.DischargeRequiredError)
-	c.Assert(derr.Ops, jc.DeepEquals, []bakery.Op{identchecker.LoginOp})
-	c.Assert(derr.Caveats, jc.DeepEquals, []checkers.Caveat{{Condition: "need-declared username is-authenticated-user", Location: "https://identity.test/id"}})
+	c.Assert(err, qt.ErrorMatches, `macaroon discharge required: authentication required`)
+	c.Assert(authInfo, qt.IsNil)
+	cause := errgo.Cause(err)
+	derr, ok := cause.(*bakery.DischargeRequiredError)
+	if !ok {
+		c.Fatalf("error %#v (cause type %T) is not DischargeRequiredError", err, cause)
+	}
+	c.Assert(derr.Ops, qt.DeepEquals, []bakery.Op{identchecker.LoginOp})
+	c.Assert(derr.Caveats, qt.DeepEquals, []checkers.Caveat{{Condition: "need-declared username is-authenticated-user", Location: "https://identity.test/id"}})
 }
 
 func op(entity, action string) bakery.Op {
