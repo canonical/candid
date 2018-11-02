@@ -5,38 +5,45 @@ package admincmd_test
 
 import (
 	"encoding/json"
+	"testing"
 	"time"
 
-	jc "github.com/juju/testing/checkers"
+	qt "github.com/frankban/quicktest"
+	"github.com/frankban/quicktest/qtsuite"
 	"golang.org/x/net/context"
-	gc "gopkg.in/check.v1"
 
 	"github.com/CanonicalLtd/candid/store"
 )
 
 type findSuite struct {
-	commandSuite
+	fixture *fixture
 }
 
-var _ = gc.Suite(&findSuite{})
+func TestFind(t *testing.T) {
+	qtsuite.Run(qt.New(t), &findSuite{})
+}
 
-func (s *findSuite) TestFindEmail(c *gc.C) {
+func (s *findSuite) Init(c *qt.C) {
+	s.fixture = newFixture(c)
+}
+
+func (s *findSuite) TestFindEmail(c *qt.C) {
 	ctx := context.Background()
-	s.server.AddIdentity(ctx, &store.Identity{
+	s.fixture.server.AddIdentity(ctx, &store.Identity{
 		ProviderID: store.MakeProviderIdentity("test", "bob"),
 		Username:   "bob",
 		Email:      "bob@example.com",
 	})
-	stdout := s.CheckSuccess(c, "find", "-a", "admin.agent", "-e", "bob@example.com")
-	c.Assert(stdout, gc.Equals, "bob\n")
+	stdout := s.fixture.CheckSuccess(c, "find", "-a", "admin.agent", "-e", "bob@example.com")
+	c.Assert(stdout, qt.Equals, "bob\n")
 }
 
-func (s *findSuite) TestFindEmailNotFound(c *gc.C) {
-	stdout := s.CheckSuccess(c, "find", "-a", "admin.agent", "-e", "bob@example.com")
-	c.Assert(stdout, gc.Equals, "\n")
+func (s *findSuite) TestFindEmailNotFound(c *qt.C) {
+	stdout := s.fixture.CheckSuccess(c, "find", "-a", "admin.agent", "-e", "bob@example.com")
+	c.Assert(stdout, qt.Equals, "\n")
 }
 
-func (s *findSuite) TestFindNoParameters(c *gc.C) {
+func (s *findSuite) TestFindNoParameters(c *qt.C) {
 	ctx := context.Background()
 	identites := []store.Identity{{
 		ProviderID: store.MakeProviderIdentity("test", "bob"),
@@ -50,16 +57,16 @@ func (s *findSuite) TestFindNoParameters(c *gc.C) {
 		Username:   "charlie",
 	}}
 	for _, id := range identites {
-		s.server.AddIdentity(ctx, &id)
+		s.fixture.server.AddIdentity(ctx, &id)
 	}
-	stdout := s.CheckSuccess(c, "find", "-a", "admin.agent", "--format", "json")
+	stdout := s.fixture.CheckSuccess(c, "find", "-a", "admin.agent", "--format", "json")
 	var usernames []string
 	err := json.Unmarshal([]byte(stdout), &usernames)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(usernames, jc.DeepEquals, []string{"admin@candid", "alice", "bob", "charlie"})
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(usernames, qt.DeepEquals, []string{"admin@candid", "alice", "bob", "charlie"})
 }
 
-func (s *findSuite) TestFindLastLoginTime(c *gc.C) {
+func (s *findSuite) TestFindLastLoginTime(c *qt.C) {
 	ctx := context.Background()
 	identities := []store.Identity{{
 		ProviderID: store.MakeProviderIdentity("test", "bob"),
@@ -76,16 +83,16 @@ func (s *findSuite) TestFindLastLoginTime(c *gc.C) {
 		LastLogin:  time.Now().Add(-1 * 24 * time.Hour),
 	}}
 	for _, id := range identities {
-		s.server.AddIdentity(ctx, &id)
+		s.fixture.server.AddIdentity(ctx, &id)
 	}
-	stdout := s.CheckSuccess(c, "find", "-a", "admin.agent", "--format", "json", "--last-login", "30")
+	stdout := s.fixture.CheckSuccess(c, "find", "-a", "admin.agent", "--format", "json", "--last-login", "30")
 	var usernames []string
 	err := json.Unmarshal([]byte(stdout), &usernames)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(usernames, jc.DeepEquals, []string{"alice", "charlie"})
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(usernames, qt.DeepEquals, []string{"alice", "charlie"})
 }
 
-func (s *findSuite) TestFindLastDischargeTime(c *gc.C) {
+func (s *findSuite) TestFindLastDischargeTime(c *qt.C) {
 	ctx := context.Background()
 	identities := []store.Identity{{
 		ProviderID:    store.MakeProviderIdentity("test", "bob"),
@@ -102,16 +109,16 @@ func (s *findSuite) TestFindLastDischargeTime(c *gc.C) {
 		LastDischarge: time.Now().Add(-1 * 24 * time.Hour),
 	}}
 	for _, id := range identities {
-		s.server.AddIdentity(ctx, &id)
+		s.fixture.server.AddIdentity(ctx, &id)
 	}
-	stdout := s.CheckSuccess(c, "find", "-a", "admin.agent", "--format", "json", "--last-discharge", "20")
+	stdout := s.fixture.CheckSuccess(c, "find", "-a", "admin.agent", "--format", "json", "--last-discharge", "20")
 	var usernames []string
 	err := json.Unmarshal([]byte(stdout), &usernames)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(usernames, jc.DeepEquals, []string{"admin@candid", "alice", "charlie"})
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(usernames, qt.DeepEquals, []string{"admin@candid", "alice", "charlie"})
 }
 
-func (s *findSuite) TestFindWithEmail(c *gc.C) {
+func (s *findSuite) TestFindWithEmail(c *qt.C) {
 	ctx := context.Background()
 	identities := []store.Identity{{
 		ProviderID: store.MakeProviderIdentity("test", "bob"),
@@ -127,13 +134,13 @@ func (s *findSuite) TestFindWithEmail(c *gc.C) {
 		Email:      "charlie@example.com",
 	}}
 	for _, id := range identities {
-		s.server.AddIdentity(ctx, &id)
+		s.fixture.server.AddIdentity(ctx, &id)
 	}
-	stdout := s.CheckSuccess(c, "find", "-a", "admin.agent", "-d", "email", "--format", "json")
+	stdout := s.fixture.CheckSuccess(c, "find", "-a", "admin.agent", "-d", "email", "--format", "json")
 	var usernames []map[string]string
 	err := json.Unmarshal([]byte(stdout), &usernames)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(usernames, jc.DeepEquals, []map[string]string{
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(usernames, qt.DeepEquals, []map[string]string{
 		{"username": "admin@candid", "email": ""},
 		{"username": "alice", "email": "alice@example.com"},
 		{"username": "bob", "email": "bob@example.com"},
@@ -141,7 +148,7 @@ func (s *findSuite) TestFindWithEmail(c *gc.C) {
 	})
 }
 
-func (s *findSuite) TestFindWithEmailAndGravatar(c *gc.C) {
+func (s *findSuite) TestFindWithEmailAndGravatar(c *qt.C) {
 	ctx := context.Background()
 	identities := []store.Identity{{
 		ProviderID: store.MakeProviderIdentity("test", "bob"),
@@ -157,13 +164,13 @@ func (s *findSuite) TestFindWithEmailAndGravatar(c *gc.C) {
 		Email:      "charlie@example.com",
 	}}
 	for _, id := range identities {
-		s.server.AddIdentity(ctx, &id)
+		s.fixture.server.AddIdentity(ctx, &id)
 	}
-	stdout := s.CheckSuccess(c, "find", "-a", "admin.agent", "-d", "email, gravatar_id", "--format", "json")
+	stdout := s.fixture.CheckSuccess(c, "find", "-a", "admin.agent", "-d", "email, gravatar_id", "--format", "json")
 	var usernames []map[string]string
 	err := json.Unmarshal([]byte(stdout), &usernames)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(usernames, jc.DeepEquals, []map[string]string{
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(usernames, qt.DeepEquals, []map[string]string{
 		{"username": "admin@candid", "email": "", "gravatar_id": ""},
 		{"username": "alice", "email": "alice@example.com", "gravatar_id": "c160f8cc69a4f0bf2b0362752353d060"},
 		{"username": "bob", "email": "bob@example.com", "gravatar_id": "4b9bb80620f03eb3719e0a061c14283d"},

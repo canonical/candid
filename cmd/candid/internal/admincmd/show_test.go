@@ -5,32 +5,40 @@ package admincmd_test
 
 import (
 	"path/filepath"
+	"testing"
 	"time"
 
 	"golang.org/x/net/context"
-	gc "gopkg.in/check.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery"
 
 	"github.com/CanonicalLtd/candid/store"
+	qt "github.com/frankban/quicktest"
+	"github.com/frankban/quicktest/qtsuite"
 )
 
 type showSuite struct {
-	commandSuite
+	fixture *fixture
 }
 
-var _ = gc.Suite(&showSuite{})
+func TestShow(t *testing.T) {
+	qtsuite.Run(qt.New(t), &showSuite{})
+}
 
-func (s *showSuite) TestShowUserWithAgentEnv(c *gc.C) {
+func (s *showSuite) Init(c *qt.C) {
+	s.fixture = newFixture(c)
+}
+
+func (s *showSuite) TestShowUserWithAgentEnv(c *qt.C) {
 	// This test acts as a proxy agent-env functionality in all the
 	// other command that use NewClient.
-	s.PatchEnvironment("BAKERY_AGENT_FILE", filepath.Join(s.Dir, "admin.agent"))
+	c.Setenv("BAKERY_AGENT_FILE", filepath.Join(s.fixture.Dir, "admin.agent"))
 	ctx := context.Background()
-	s.server.AddIdentity(ctx, &store.Identity{
+	s.fixture.server.AddIdentity(ctx, &store.Identity{
 		ProviderID: store.MakeProviderIdentity("test", "bob"),
 		Username:   "bob",
 	})
-	stdout := s.CheckSuccess(c, "show", "-u", "bob")
-	c.Assert(stdout, gc.Equals, `
+	stdout := s.fixture.CheckSuccess(c, "show", "-u", "bob")
+	c.Assert(stdout, qt.Equals, `
 username: bob
 external-id: test:bob
 name: ""
@@ -42,9 +50,9 @@ last-discharge: never
 `[1:])
 }
 
-func (s *showSuite) TestShowUser(c *gc.C) {
+func (s *showSuite) TestShowUser(c *qt.C) {
 	ctx := context.Background()
-	s.server.AddIdentity(ctx, &store.Identity{
+	s.fixture.server.AddIdentity(ctx, &store.Identity{
 		ProviderID:    store.MakeProviderIdentity("test", "bob"),
 		Username:      "bob",
 		Name:          "Bob Robertson",
@@ -56,8 +64,8 @@ func (s *showSuite) TestShowUser(c *gc.C) {
 			"sshkeys": {"key1", "key2"},
 		},
 	})
-	stdout := s.CheckSuccess(c, "show", "-a", "admin.agent", "-u", "bob")
-	c.Assert(stdout, gc.Equals, `
+	stdout := s.fixture.CheckSuccess(c, "show", "-a", "admin.agent", "-u", "bob")
+	c.Assert(stdout, qt.Equals, `
 username: bob
 external-id: test:bob
 name: Bob Robertson
@@ -73,9 +81,9 @@ last-discharge: "2016-12-25T00:00:00Z"
 `[1:])
 }
 
-func (s *showSuite) TestShowEmail(c *gc.C) {
+func (s *showSuite) TestShowEmail(c *qt.C) {
 	ctx := context.Background()
-	s.server.AddIdentity(ctx, &store.Identity{
+	s.fixture.server.AddIdentity(ctx, &store.Identity{
 		ProviderID:    store.MakeProviderIdentity("test", "bob"),
 		Username:      "bob",
 		Name:          "Bob Robertson",
@@ -87,8 +95,8 @@ func (s *showSuite) TestShowEmail(c *gc.C) {
 			"sshkeys": {"key1", "key2"},
 		},
 	})
-	stdout := s.CheckSuccess(c, "show", "-a", "admin.agent", "-e", "bob@example.com")
-	c.Assert(stdout, gc.Equals, `
+	stdout := s.fixture.CheckSuccess(c, "show", "-a", "admin.agent", "-e", "bob@example.com")
+	c.Assert(stdout, qt.Equals, `
 username: bob
 external-id: test:bob
 name: Bob Robertson
@@ -104,8 +112,8 @@ last-discharge: "2016-12-25T00:00:00Z"
 `[1:])
 }
 
-func (s *showSuite) TestShowEmailNotFound(c *gc.C) {
-	s.CheckError(
+func (s *showSuite) TestShowEmailNotFound(c *qt.C) {
+	s.fixture.CheckError(
 		c,
 		1,
 		`no user found for email "bob@example.com"`,
@@ -113,8 +121,8 @@ func (s *showSuite) TestShowEmailNotFound(c *gc.C) {
 	)
 }
 
-func (s *showSuite) TestShowNoParameters(c *gc.C) {
-	s.CheckError(
+func (s *showSuite) TestShowNoParameters(c *qt.C) {
+	s.fixture.CheckError(
 		c,
 		2,
 		`no user specified, please specify either username or email`,
@@ -122,7 +130,7 @@ func (s *showSuite) TestShowNoParameters(c *gc.C) {
 	)
 }
 
-func (s *showSuite) TestShowAgentUser(c *gc.C) {
+func (s *showSuite) TestShowAgentUser(c *qt.C) {
 	ctx := context.Background()
 	var pk bakery.PublicKey
 	identities := []store.Identity{{
@@ -139,10 +147,10 @@ func (s *showSuite) TestShowAgentUser(c *gc.C) {
 		LastDischarge: time.Date(2016, 12, 25, 0, 0, 0, 0, time.UTC),
 	}}
 	for _, id := range identities {
-		s.server.AddIdentity(ctx, &id)
+		s.fixture.server.AddIdentity(ctx, &id)
 	}
-	stdout := s.CheckSuccess(c, "show", "-a", "admin.agent", "-u", "a-1234@candid")
-	c.Assert(stdout, gc.Equals, `
+	stdout := s.fixture.CheckSuccess(c, "show", "-a", "admin.agent", "-u", "a-1234@candid")
+	c.Assert(stdout, qt.Equals, `
 username: a-1234@candid
 owner: alice
 public-keys:
@@ -156,14 +164,14 @@ last-discharge: "2016-12-25T00:00:00Z"
 `[1:])
 }
 
-func (s *showSuite) TestShowZeroValues(c *gc.C) {
+func (s *showSuite) TestShowZeroValues(c *qt.C) {
 	ctx := context.Background()
-	s.server.AddIdentity(ctx, &store.Identity{
+	s.fixture.server.AddIdentity(ctx, &store.Identity{
 		ProviderID: store.MakeProviderIdentity("test", "bob"),
 		Username:   "bob",
 	})
-	stdout := s.CheckSuccess(c, "show", "-a", "admin.agent", "-u", "bob")
-	c.Assert(stdout, gc.Equals, `
+	stdout := s.fixture.CheckSuccess(c, "show", "-a", "admin.agent", "-u", "bob")
+	c.Assert(stdout, qt.Equals, `
 username: bob
 external-id: test:bob
 name: ""
@@ -175,8 +183,8 @@ last-discharge: never
 `[1:])
 }
 
-func (s *showSuite) TestShowUserError(c *gc.C) {
-	s.CheckError(
+func (s *showSuite) TestShowUserError(c *qt.C) {
+	s.fixture.CheckError(
 		c,
 		1,
 		`Get http://.*/v1/u/bob: user bob not found`,
@@ -184,9 +192,9 @@ func (s *showSuite) TestShowUserError(c *gc.C) {
 	)
 }
 
-func (s *showSuite) TestShowUserJSON(c *gc.C) {
+func (s *showSuite) TestShowUserJSON(c *qt.C) {
 	ctx := context.Background()
-	s.server.AddIdentity(ctx, &store.Identity{
+	s.fixture.server.AddIdentity(ctx, &store.Identity{
 		ProviderID:    store.MakeProviderIdentity("test", "bob"),
 		Username:      "bob",
 		Name:          "Bob Robertson",
@@ -198,8 +206,8 @@ func (s *showSuite) TestShowUserJSON(c *gc.C) {
 			"sshkeys": {"key1", "key2"},
 		},
 	})
-	stdout := s.CheckSuccess(c, "show", "-a", "admin.agent", "-u", "bob", "--format", "json")
-	c.Assert(stdout, gc.Equals, `
+	stdout := s.fixture.CheckSuccess(c, "show", "-a", "admin.agent", "-u", "bob", "--format", "json")
+	c.Assert(stdout, qt.Equals, `
 {"username":"bob","external-id":"test:bob","name":"Bob Robertson","email":"bob@example.com","groups":["g1","g2"],"ssh-keys":["key1","key2"],"last-login":"2016-12-25T00:00:00Z","last-discharge":"2016-12-25T00:00:00Z"}
 `[1:])
 }

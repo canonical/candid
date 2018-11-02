@@ -7,72 +7,71 @@ import (
 	"bytes"
 	"path/filepath"
 
+	qt "github.com/frankban/quicktest"
 	"github.com/juju/cmd"
-	"github.com/juju/testing"
-	gc "gopkg.in/check.v1"
 	"gopkg.in/macaroon-bakery.v2/httpbakery/agent"
 
 	"github.com/CanonicalLtd/candid/candidtest"
 	"github.com/CanonicalLtd/candid/cmd/candid/internal/admincmd"
+	internalcandidtest "github.com/CanonicalLtd/candid/internal/qtcandidtest"
 )
 
-type commandSuite struct {
-	testing.IsolationSuite
-
+type fixture struct {
 	Dir string
 
 	command cmd.Command
 	server  *candidtest.Server
 }
 
-func (s *commandSuite) SetUpTest(c *gc.C) {
-	s.IsolationSuite.SetUpTest(c)
-	var err error
-	s.server, err = candidtest.New(nil)
-	c.Assert(err, gc.Equals, nil)
-	s.Dir = c.MkDir()
+func newFixture(c *qt.C) *fixture {
+	f := new(fixture)
+
+	srv, err := candidtest.New(nil)
+	c.Assert(err, qt.Equals, nil)
+	c.Defer(func() {
+		srv.Close()
+	})
+	f.server = srv
+
+	f.Dir = c.Mkdir()
 	// If the cookiejar gets saved, it gets saved to $HOME/.go-cookiejar, so make
 	// sure that's not in the current directory.
-	s.PatchEnvironment("HOME", s.Dir)
-	s.PatchEnvironment("CANDID_URL", s.server.URL)
-	err = admincmd.WriteAgentFile(filepath.Join(s.Dir, "admin.agent"), &agent.AuthInfo{
-		Key: s.server.AdminAgentKey,
+	c.Setenv("HOME", f.Dir)
+	c.Setenv("CANDID_URL", f.server.URL)
+	err = admincmd.WriteAgentFile(filepath.Join(f.Dir, "admin.agent"), &agent.AuthInfo{
+		Key: f.server.AdminAgentKey,
 		Agents: []agent.Agent{{
-			URL:      s.server.URL,
+			URL:      f.server.URL,
 			Username: "admin@candid",
 		}},
 	})
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 
-	s.command = admincmd.New()
+	f.command = admincmd.New()
+	internalcandidtest.LogTo(c)
+	return f
 }
 
-func (s *commandSuite) TearDownTest(c *gc.C) {
-	if s.server != nil {
-		s.server.Close()
-	}
-}
-
-func (s *commandSuite) CheckNoOutput(c *gc.C, args ...string) {
+func (s *fixture) CheckNoOutput(c *qt.C, args ...string) {
 	stdout := s.CheckSuccess(c, args...)
-	c.Assert(stdout, gc.Equals, "")
+	c.Assert(stdout, qt.Equals, "")
 }
 
-func (s *commandSuite) CheckSuccess(c *gc.C, args ...string) string {
+func (s *fixture) CheckSuccess(c *qt.C, args ...string) string {
 	code, stdout, stderr := s.Run(args...)
-	c.Assert(code, gc.Equals, 0, gc.Commentf("error code %d: (%s)", code, stderr))
-	c.Assert(stderr, gc.Equals, "", gc.Commentf("error code %d: (%s)", code, stderr))
+	c.Assert(code, qt.Equals, 0, qt.Commentf("error code %d: (%s)", code, stderr))
+	c.Assert(stderr, qt.Equals, "", qt.Commentf("error code %d: (%s)", code, stderr))
 	return stdout
 }
 
-func (s *commandSuite) CheckError(c *gc.C, expectCode int, expectMessage string, args ...string) {
+func (s *fixture) CheckError(c *qt.C, expectCode int, expectMessage string, args ...string) {
 	code, stdout, stderr := s.Run(args...)
-	c.Assert(code, gc.Equals, expectCode)
-	c.Assert(stderr, gc.Matches, "(ERROR|error:) "+expectMessage+"\n")
-	c.Assert(stdout, gc.Equals, "")
+	c.Assert(code, qt.Equals, expectCode)
+	c.Assert(stderr, qt.Matches, "(ERROR|error:) "+expectMessage+"\n")
+	c.Assert(stdout, qt.Equals, "")
 }
 
-func (s *commandSuite) Run(args ...string) (code int, stdout, stderr string) {
+func (s *fixture) Run(args ...string) (code int, stdout, stderr string) {
 	outbuf := new(bytes.Buffer)
 	errbuf := new(bytes.Buffer)
 	ctxt := &cmd.Context{
@@ -85,6 +84,6 @@ func (s *commandSuite) Run(args ...string) (code int, stdout, stderr string) {
 	return code, outbuf.String(), errbuf.String()
 }
 
-func (s *commandSuite) RunContext(ctxt *cmd.Context, args ...string) int {
+func (s *fixture) RunContext(ctxt *cmd.Context, args ...string) int {
 	return cmd.Main(s.command, ctxt, args)
 }
