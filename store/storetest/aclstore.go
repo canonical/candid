@@ -4,9 +4,9 @@
 package storetest
 
 import (
+	qt "github.com/frankban/quicktest"
 	"github.com/juju/aclstore/v2"
 	"golang.org/x/net/context"
-	qt "github.com/frankban/quicktest"
 )
 
 // TestACLStore runs tests on the given ACLStore implementation.

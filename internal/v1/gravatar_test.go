@@ -4,18 +4,18 @@
 package v1_test
 
 import (
-	gc "gopkg.in/check.v1"
+	"testing"
+
+	qt "github.com/frankban/quicktest"
 
 	"github.com/CanonicalLtd/candid/internal/v1"
 )
 
-type gravatarSuite struct{}
+func TestGravatarHash(t *testing.T) {
+	c := qt.New(t)
 
-var _ = gc.Suite(&gravatarSuite{})
-
-func (*gravatarSuite) TestGravatarHash(c *gc.C) {
-	c.Assert(v1.GravatarHash("myemail@domain.com"), gc.Equals, v1.GravatarHash("myemail@domain.com "))
-	c.Assert(v1.GravatarHash("myemail@domain.com"), gc.Equals, v1.GravatarHash(" myemail@domain.com"))
-	c.Assert(v1.GravatarHash("myemail@domain.com"), gc.Equals, v1.GravatarHash("MYEMAIL@domain.com"))
-	c.Assert(v1.GravatarHash("jbloggs3@example.com"), gc.Equals, "21e89fe03e3a3cc553933f99eb442d94")
+	c.Assert(v1.GravatarHash("myemail@domain.com"), qt.Equals, v1.GravatarHash("myemail@domain.com "))
+	c.Assert(v1.GravatarHash("myemail@domain.com"), qt.Equals, v1.GravatarHash(" myemail@domain.com"))
+	c.Assert(v1.GravatarHash("myemail@domain.com"), qt.Equals, v1.GravatarHash("MYEMAIL@domain.com"))
+	c.Assert(v1.GravatarHash("jbloggs3@example.com"), qt.Equals, "21e89fe03e3a3cc553933f99eb442d94")
 }

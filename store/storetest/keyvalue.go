@@ -17,7 +17,7 @@ import (
 
 type keyValueSuite struct {
 	newStore func(c *qt.C) store.ProviderDataStore
-	Store store.ProviderDataStore
+	Store    store.ProviderDataStore
 }
 
 func TestKeyValueStore(c *qt.C, newStore func(c *qt.C) store.ProviderDataStore) {
