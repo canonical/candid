@@ -4,19 +4,18 @@
 package store_test
 
 import (
-	gc "gopkg.in/check.v1"
+	"testing"
+
+	qt "github.com/frankban/quicktest"
 
 	"github.com/CanonicalLtd/candid/store"
 )
 
-type storeSuite struct{}
-
-var _ = gc.Suite(&storeSuite{})
-
-func (*storeSuite) TestProviderIdentity(c *gc.C) {
+func TestProviderIdentity(t *testing.T) {
+	c := qt.New(t)
 	pid := store.MakeProviderIdentity("test", "test-id")
-	c.Assert(pid, gc.Equals, store.ProviderIdentity("test:test-id"))
+	c.Assert(pid, qt.Equals, store.ProviderIdentity("test:test-id"))
 	prov, id := pid.Split()
-	c.Assert(prov, gc.Equals, "test")
-	c.Assert(id, gc.Equals, "test-id")
+	c.Assert(prov, qt.Equals, "test")
+	c.Assert(id, qt.Equals, "test-id")
 }

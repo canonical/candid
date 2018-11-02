@@ -4,33 +4,33 @@
 package store_test
 
 import (
-	gc "gopkg.in/check.v1"
+	"testing"
+
 	errgo "gopkg.in/errgo.v1"
+	qt "github.com/frankban/quicktest"
 
 	"github.com/CanonicalLtd/candid/store"
 )
 
-type errorSuite struct{}
-
-var _ = gc.Suite(&errorSuite{})
-
-func (*errorSuite) TestNotFoundError(c *gc.C) {
+func TestNotFoundError(t *testing.T) {
+	c := qt.New(t)
 	err := store.NotFoundError("1234", "", "")
-	c.Assert(errgo.Cause(err), gc.Equals, store.ErrNotFound)
-	c.Assert(err, gc.ErrorMatches, `identity "1234" not found`)
+	c.Assert(errgo.Cause(err), qt.Equals, store.ErrNotFound)
+	c.Assert(err, qt.ErrorMatches, `identity "1234" not found`)
 	err = store.NotFoundError("", store.MakeProviderIdentity("test", "test-user"), "")
-	c.Assert(errgo.Cause(err), gc.Equals, store.ErrNotFound)
-	c.Assert(err, gc.ErrorMatches, `identity "test:test-user" not found`)
+	c.Assert(errgo.Cause(err), qt.Equals, store.ErrNotFound)
+	c.Assert(err, qt.ErrorMatches, `identity "test:test-user" not found`)
 	err = store.NotFoundError("", "", "test-user")
-	c.Assert(errgo.Cause(err), gc.Equals, store.ErrNotFound)
-	c.Assert(err, gc.ErrorMatches, `user test-user not found`)
+	c.Assert(errgo.Cause(err), qt.Equals, store.ErrNotFound)
+	c.Assert(err, qt.ErrorMatches, `user test-user not found`)
 	err = store.NotFoundError("", "", "")
-	c.Assert(errgo.Cause(err), gc.Equals, store.ErrNotFound)
-	c.Assert(err, gc.ErrorMatches, `identity not specified`)
+	c.Assert(errgo.Cause(err), qt.Equals, store.ErrNotFound)
+	c.Assert(err, qt.ErrorMatches, `identity not specified`)
 }
 
-func (*errorSuite) TestDuplicateUsernameError(c *gc.C) {
+func TestDuplicateUsernameError(t *testing.T) {
+	c := qt.New(t)
 	err := store.DuplicateUsernameError("test-user")
-	c.Assert(errgo.Cause(err), gc.Equals, store.ErrDuplicateUsername)
-	c.Assert(err, gc.ErrorMatches, `username test-user already in use`)
+	c.Assert(errgo.Cause(err), qt.Equals, store.ErrDuplicateUsername)
+	c.Assert(err, qt.ErrorMatches, `username test-user already in use`)
 }
