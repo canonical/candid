@@ -7,8 +7,8 @@ import (
 	"gopkg.in/yaml.v2"
 
 	"github.com/CanonicalLtd/candid/store"
-	"github.com/CanonicalLtd/candid/store/storetest"
 	"github.com/CanonicalLtd/candid/store/mgostore"
+	"github.com/CanonicalLtd/candid/store/storetest"
 )
 
 func TestUnmarshal(t *testing.T) {

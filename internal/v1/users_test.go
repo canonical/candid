@@ -6,12 +6,13 @@ package v1_test
 import (
 	"fmt"
 	"strings"
+	"testing"
 	"time"
 
-	jc "github.com/juju/testing/checkers"
+	qt "github.com/frankban/quicktest"
+	"github.com/frankban/quicktest/qtsuite"
 	"gopkg.in/CanonicalLtd/candidclient.v1"
 	"gopkg.in/CanonicalLtd/candidclient.v1/params"
-	gc "gopkg.in/check.v1"
 	"gopkg.in/httprequest.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
@@ -20,29 +21,29 @@ import (
 	"github.com/CanonicalLtd/candid/idp"
 	testidp "github.com/CanonicalLtd/candid/idp/test"
 	"github.com/CanonicalLtd/candid/internal/auth"
-	"github.com/CanonicalLtd/candid/internal/candidtest"
 	"github.com/CanonicalLtd/candid/internal/discharger"
 	"github.com/CanonicalLtd/candid/internal/identity"
+	candidtest "github.com/CanonicalLtd/candid/internal/qtcandidtest"
 	"github.com/CanonicalLtd/candid/internal/v1"
 	"github.com/CanonicalLtd/candid/store"
 )
 
-var versions = map[string]identity.NewAPIHandlerFunc{
-	"discharger": discharger.NewAPIHandler,
-	"v1":         v1.NewAPIHandler,
+func TestUsersAPI(t *testing.T) {
+	qtsuite.Run(qt.New(t), &usersSuite{})
 }
 
 type usersSuite struct {
-	candidtest.StoreServerSuite
+	store       *candidtest.Store
+	srv         *candidtest.Server
 	adminClient *candidclient.Client
 }
 
-var _ = gc.Suite(&usersSuite{})
-
-func (s *usersSuite) SetUpTest(c *gc.C) {
+func (s *usersSuite) Init(c *qt.C) {
+	s.store = candidtest.NewStore()
+	sp := s.store.ServerParams()
 	// Ensure that there's an identity provider for the test identities
 	// we add so that group resolution on test identities works correctly.
-	s.Params.IdentityProviders = []idp.IdentityProvider{
+	sp.IdentityProviders = []idp.IdentityProvider{
 		testidp.NewIdentityProvider(testidp.Params{
 			Name:   "test",
 			Domain: "test",
@@ -51,12 +52,14 @@ func (s *usersSuite) SetUpTest(c *gc.C) {
 			},
 		}),
 	}
-	s.Versions = versions
-	s.StoreServerSuite.SetUpTest(c)
-	s.adminClient = s.AdminIdentityClient(c)
+	s.srv = candidtest.NewServer(c, sp, map[string]identity.NewAPIHandlerFunc{
+		"discharger": discharger.NewAPIHandler,
+		"v1":         v1.NewAPIHandler,
+	})
+	s.adminClient = s.srv.AdminIdentityClient()
 }
 
-func (s *usersSuite) TestRoundTripUser(c *gc.C) {
+func (s *usersSuite) TestRoundTripUser(c *qt.C) {
 	user := params.User{
 		Username:   "jbloggs",
 		ExternalID: "test:http://example.com/jbloggs",
@@ -68,10 +71,10 @@ func (s *usersSuite) TestRoundTripUser(c *gc.C) {
 	}
 	s.addUser(c, user)
 
-	resp, err := s.adminClient.User(s.Ctx, &params.UserRequest{
+	resp, err := s.adminClient.User(s.srv.Ctx, &params.UserRequest{
 		Username: user.Username,
 	})
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 
 	s.assertUser(c, *resp, user)
 }
@@ -90,13 +93,14 @@ var userErrorTests = []struct {
 	expectError: `Get .*/v1/u/bad-name-: cannot unmarshal parameters: cannot unmarshal into field Username: illegal username "bad-name-"`,
 }}
 
-func (s *usersSuite) TestUserErrors(c *gc.C) {
-	for i, test := range userErrorTests {
-		c.Logf("test %d. %s", i, test.about)
-		_, err := s.adminClient.User(s.Ctx, &params.UserRequest{
-			Username: test.username,
+func (s *usersSuite) TestUserErrors(c *qt.C) {
+	for _, test := range userErrorTests {
+		c.Run(test.about, func(c *qt.C) {
+			_, err := s.adminClient.User(s.srv.Ctx, &params.UserRequest{
+				Username: test.username,
+			})
+			c.Assert(err, qt.ErrorMatches, test.expectError)
 		})
-		c.Assert(err, gc.ErrorMatches, test.expectError)
 	}
 }
 
@@ -107,9 +111,9 @@ var (
 	pk2      = privKey2.Public
 )
 
-func (s *usersSuite) TestCreateAgent(c *gc.C) {
+func (s *usersSuite) TestCreateAgent(c *qt.C) {
 	client, err := candidclient.New(candidclient.NewParams{
-		BaseURL: s.URL,
+		BaseURL: s.srv.URL,
 		Client: &httpbakery.Client{
 			Client: httpbakery.NewHTTPClient(),
 			InteractionMethods: []httpbakery.Interactor{testidp.Interactor{
@@ -121,52 +125,52 @@ func (s *usersSuite) TestCreateAgent(c *gc.C) {
 			}},
 		},
 	})
-	c.Assert(err, gc.Equals, nil)
-	resp, err := client.CreateAgent(s.Ctx, &params.CreateAgentRequest{
+	c.Assert(err, qt.Equals, nil)
+	resp, err := client.CreateAgent(s.srv.Ctx, &params.CreateAgentRequest{
 		CreateAgentBody: params.CreateAgentBody{
 			FullName:   "my agent",
 			PublicKeys: []*bakery.PublicKey{&pk1},
 		},
 	})
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 	if !strings.HasPrefix(string(resp.Username), "a-") {
 		c.Errorf("unexpected agent username %q", resp.Username)
 	}
 	agentClient, err := candidclient.New(candidclient.NewParams{
-		BaseURL: s.URL,
+		BaseURL: s.srv.URL,
 		Client: &httpbakery.Client{
 			Client: httpbakery.NewHTTPClient(),
 			Key:    privKey1,
 		},
 		AgentUsername: string(resp.Username),
 	})
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 
-	whoAmIResp, err := agentClient.WhoAmI(s.Ctx, nil)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(whoAmIResp.User, gc.Equals, string(resp.Username))
+	whoAmIResp, err := agentClient.WhoAmI(s.srv.Ctx, nil)
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(whoAmIResp.User, qt.Equals, string(resp.Username))
 
-	groups, err := agentClient.UserGroups(s.Ctx, &params.UserGroupsRequest{
+	groups, err := agentClient.UserGroups(s.srv.Ctx, &params.UserGroupsRequest{
 		Username: resp.Username,
 	})
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(groups, gc.HasLen, 0)
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(groups, qt.HasLen, 0)
 }
 
-func (s *usersSuite) TestCreateAgentAsAgent(c *gc.C) {
-	client := s.IdentityClient(c, "testagent@candid", "testgroup")
-	_, err := client.CreateAgent(s.Ctx, &params.CreateAgentRequest{
+func (s *usersSuite) TestCreateAgentAsAgent(c *qt.C) {
+	client := s.srv.IdentityClient(c, "testagent@candid", "testgroup")
+	_, err := client.CreateAgent(s.srv.Ctx, &params.CreateAgentRequest{
 		CreateAgentBody: params.CreateAgentBody{
 			FullName:   "my agent",
 			PublicKeys: []*bakery.PublicKey{&pk1},
 		},
 	})
-	c.Assert(err, gc.ErrorMatches, `Post.*: cannot create an agent using an agent account`)
+	c.Assert(err, qt.ErrorMatches, `Post.*: cannot create an agent using an agent account`)
 }
 
-func (s *usersSuite) TestCreateAgentWithGroups(c *gc.C) {
+func (s *usersSuite) TestCreateAgentWithGroups(c *qt.C) {
 	client, err := candidclient.New(candidclient.NewParams{
-		BaseURL: s.URL,
+		BaseURL: s.srv.URL,
 		Client: &httpbakery.Client{
 			Client: httpbakery.NewHTTPClient(),
 			InteractionMethods: []httpbakery.Interactor{testidp.Interactor{
@@ -178,63 +182,63 @@ func (s *usersSuite) TestCreateAgentWithGroups(c *gc.C) {
 			}},
 		},
 	})
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 
 	// We can't create agents in groups that aren't in the owner's
 	// group list.
-	resp, err := client.CreateAgent(s.Ctx, &params.CreateAgentRequest{
+	resp, err := client.CreateAgent(s.srv.Ctx, &params.CreateAgentRequest{
 		CreateAgentBody: params.CreateAgentBody{
 			PublicKeys: []*bakery.PublicKey{&pk1},
 			Groups:     []string{"g1", "other", "g2"},
 		},
 	})
-	c.Assert(err, gc.ErrorMatches, `Post .*: cannot add agent to groups that you are not a member of`)
+	c.Assert(err, qt.ErrorMatches, `Post .*: cannot add agent to groups that you are not a member of`)
 
 	// We can create agents in groups that are a subset of the
 	// owner's groups.
-	resp, err = client.CreateAgent(s.Ctx, &params.CreateAgentRequest{
+	resp, err = client.CreateAgent(s.srv.Ctx, &params.CreateAgentRequest{
 		CreateAgentBody: params.CreateAgentBody{
 			PublicKeys: []*bakery.PublicKey{&pk1},
 			Groups:     []string{"g1", "g3"},
 		},
 	})
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 
 	// If the owner is removed from a group, the agent won't be
 	// in that group any more.
-	err = s.Store.UpdateIdentity(s.Ctx, &store.Identity{
+	err = s.store.Store.UpdateIdentity(s.srv.Ctx, &store.Identity{
 		Username: "bob",
 		Groups:   []string{"g3"},
 	}, store.Update{
 		store.Groups: store.Set,
 	})
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 
-	groups, err := s.adminClient.UserGroups(s.Ctx, &params.UserGroupsRequest{
+	groups, err := s.adminClient.UserGroups(s.srv.Ctx, &params.UserGroupsRequest{
 		Username: resp.Username,
 	})
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(groups, gc.DeepEquals, []string{"g3"})
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(groups, qt.DeepEquals, []string{"g3"})
 
 	// If the owner is added back to the group, the agent
 	// gets added back too.
-	err = s.Store.UpdateIdentity(s.Ctx, &store.Identity{
+	err = s.store.Store.UpdateIdentity(s.srv.Ctx, &store.Identity{
 		Username: "bob",
 		Groups:   []string{"g1", "g2", "g3", "g4"},
 	}, store.Update{
 		store.Groups: store.Set,
 	})
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 
-	groups, err = s.adminClient.UserGroups(s.Ctx, &params.UserGroupsRequest{
+	groups, err = s.adminClient.UserGroups(s.srv.Ctx, &params.UserGroupsRequest{
 		Username: resp.Username,
 	})
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(groups, gc.DeepEquals, []string{"g1", "g3"})
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(groups, qt.DeepEquals, []string{"g1", "g3"})
 }
 
-func (s *usersSuite) TestCreateParentAgent(c *gc.C) {
-	resp, err := s.adminClient.CreateAgent(s.Ctx, &params.CreateAgentRequest{
+func (s *usersSuite) TestCreateParentAgent(c *qt.C) {
+	resp, err := s.adminClient.CreateAgent(s.srv.Ctx, &params.CreateAgentRequest{
 		CreateAgentBody: params.CreateAgentBody{
 			FullName:   "my agent",
 			PublicKeys: []*bakery.PublicKey{&pk1},
@@ -242,34 +246,34 @@ func (s *usersSuite) TestCreateParentAgent(c *gc.C) {
 			Parent:     true,
 		},
 	})
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 	if !strings.HasPrefix(string(resp.Username), "a-") {
 		c.Errorf("unexpected agent username %q", resp.Username)
 	}
 	systemUserClient, err := candidclient.New(candidclient.NewParams{
-		BaseURL: s.URL,
+		BaseURL: s.srv.URL,
 		Client: &httpbakery.Client{
 			Client: httpbakery.NewHTTPClient(),
 			Key:    privKey1,
 		},
 		AgentUsername: string(resp.Username),
 	})
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 
-	whoAmIResp, err := systemUserClient.WhoAmI(s.Ctx, nil)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(whoAmIResp.User, gc.Equals, string(resp.Username))
+	whoAmIResp, err := systemUserClient.WhoAmI(s.srv.Ctx, nil)
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(whoAmIResp.User, qt.Equals, string(resp.Username))
 
-	groups, err := systemUserClient.UserGroups(s.Ctx, &params.UserGroupsRequest{
+	groups, err := systemUserClient.UserGroups(s.srv.Ctx, &params.UserGroupsRequest{
 		Username: resp.Username,
 	})
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(groups, jc.DeepEquals, []string{"g1", "g2"})
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(groups, qt.DeepEquals, []string{"g1", "g2"})
 }
 
-func (s *usersSuite) TestCreateParentAgentUnauthorized(c *gc.C) {
+func (s *usersSuite) TestCreateParentAgentUnauthorized(c *qt.C) {
 	client, err := candidclient.New(candidclient.NewParams{
-		BaseURL: s.URL,
+		BaseURL: s.srv.URL,
 		Client: &httpbakery.Client{
 			Client: httpbakery.NewHTTPClient(),
 			InteractionMethods: []httpbakery.Interactor{testidp.Interactor{
@@ -281,9 +285,9 @@ func (s *usersSuite) TestCreateParentAgentUnauthorized(c *gc.C) {
 			}},
 		},
 	})
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 
-	_, err = client.CreateAgent(s.Ctx, &params.CreateAgentRequest{
+	_, err = client.CreateAgent(s.srv.Ctx, &params.CreateAgentRequest{
 		CreateAgentBody: params.CreateAgentBody{
 			FullName:   "my agent",
 			PublicKeys: []*bakery.PublicKey{&pk1},
@@ -291,12 +295,12 @@ func (s *usersSuite) TestCreateParentAgentUnauthorized(c *gc.C) {
 			Parent:     true,
 		},
 	})
-	c.Assert(err, gc.ErrorMatches, `Post http://.*/v1/u: permission denied`)
+	c.Assert(err, qt.ErrorMatches, `Post http://.*/v1/u: permission denied`)
 }
 
-func (s *usersSuite) TestCreateParentAgentNotInGroups(c *gc.C) {
+func (s *usersSuite) TestCreateParentAgentNotInGroups(c *qt.C) {
 	client, err := candidclient.New(candidclient.NewParams{
-		BaseURL: s.URL,
+		BaseURL: s.srv.URL,
 		Client: &httpbakery.Client{
 			Client: httpbakery.NewHTTPClient(),
 			InteractionMethods: []httpbakery.Interactor{testidp.Interactor{
@@ -308,12 +312,12 @@ func (s *usersSuite) TestCreateParentAgentNotInGroups(c *gc.C) {
 			}},
 		},
 	})
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 
-	err = s.ACLStore.Add(s.Ctx, "write-user", []string{"bob"})
-	c.Assert(err, gc.Equals, nil)
+	err = s.store.ACLStore.Add(s.srv.Ctx, "write-user", []string{"bob"})
+	c.Assert(err, qt.Equals, nil)
 
-	_, err = client.CreateAgent(s.Ctx, &params.CreateAgentRequest{
+	_, err = client.CreateAgent(s.srv.Ctx, &params.CreateAgentRequest{
 		CreateAgentBody: params.CreateAgentBody{
 			FullName:   "my agent",
 			PublicKeys: []*bakery.PublicKey{&pk1},
@@ -321,63 +325,63 @@ func (s *usersSuite) TestCreateParentAgentNotInGroups(c *gc.C) {
 			Parent:     true,
 		},
 	})
-	c.Assert(err, gc.ErrorMatches, `Post http://.*/v1/u: cannot add agent to groups that you are not a member of`)
+	c.Assert(err, qt.ErrorMatches, `Post http://.*/v1/u: cannot add agent to groups that you are not a member of`)
 }
 
-func (s *usersSuite) TestCreateAgentAsParentAgent(c *gc.C) {
-	resp, err := s.adminClient.CreateAgent(s.Ctx, &params.CreateAgentRequest{
+func (s *usersSuite) TestCreateAgentAsParentAgent(c *qt.C) {
+	resp, err := s.adminClient.CreateAgent(s.srv.Ctx, &params.CreateAgentRequest{
 		CreateAgentBody: params.CreateAgentBody{
 			FullName:   "my agent",
 			PublicKeys: []*bakery.PublicKey{&pk1},
 			Parent:     true,
 		},
 	})
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 	if !strings.HasPrefix(string(resp.Username), "a-") {
 		c.Errorf("unexpected agent username %q", resp.Username)
 	}
 	systemUserClient, err := candidclient.New(candidclient.NewParams{
-		BaseURL: s.URL,
+		BaseURL: s.srv.URL,
 		Client: &httpbakery.Client{
 			Client: httpbakery.NewHTTPClient(),
 			Key:    privKey1,
 		},
 		AgentUsername: string(resp.Username),
 	})
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 
-	resp, err = systemUserClient.CreateAgent(s.Ctx, &params.CreateAgentRequest{
+	resp, err = systemUserClient.CreateAgent(s.srv.Ctx, &params.CreateAgentRequest{
 		CreateAgentBody: params.CreateAgentBody{
 			FullName:   "my agent 2",
 			PublicKeys: []*bakery.PublicKey{&pk1},
 		},
 	})
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 
 	client, err := candidclient.New(candidclient.NewParams{
-		BaseURL: s.URL,
+		BaseURL: s.srv.URL,
 		Client: &httpbakery.Client{
 			Client: httpbakery.NewHTTPClient(),
 			Key:    privKey1,
 		},
 		AgentUsername: string(resp.Username),
 	})
-	c.Assert(err, gc.Equals, nil)
-	_, err = client.CreateAgent(s.Ctx, &params.CreateAgentRequest{
+	c.Assert(err, qt.Equals, nil)
+	_, err = client.CreateAgent(s.srv.Ctx, &params.CreateAgentRequest{
 		CreateAgentBody: params.CreateAgentBody{
 			FullName:   "my agent",
 			PublicKeys: []*bakery.PublicKey{&pk1},
 		},
 	})
-	c.Assert(err, gc.ErrorMatches, `Post.*: cannot create an agent using an agent account`)
+	c.Assert(err, qt.ErrorMatches, `Post.*: cannot create an agent using an agent account`)
 }
 
-func (s *usersSuite) clearIdentities(c *gc.C) {
-	store, ok := s.Store.(interface {
+func (s *usersSuite) clearIdentities(c *qt.C) {
+	store, ok := s.store.Store.(interface {
 		RemoveAll()
 	})
 	if !ok {
-		c.Fatalf("store type %T does not implement RemoveAll", s.Store)
+		c.Fatalf("store type %T does not implement RemoveAll", s.store.Store)
 	}
 	store.RemoveAll()
 }
@@ -442,9 +446,9 @@ var queryUserTests = []struct {
 	expect:             []string{},
 }}
 
-func (s *usersSuite) TestQueryUsers(c *gc.C) {
-	err := s.Params.Store.UpdateIdentity(
-		s.Ctx,
+func (s *usersSuite) TestQueryUsers(c *qt.C) {
+	err := s.store.Store.UpdateIdentity(
+		s.srv.Ctx,
 		&store.Identity{
 			Username:      "jbloggs2",
 			ProviderID:    "test:http://example.com/jbloggs2",
@@ -465,48 +469,49 @@ func (s *usersSuite) TestQueryUsers(c *gc.C) {
 			store.LastDischarge: store.Set,
 		},
 	)
-	c.Assert(err, gc.Equals, nil)
-	for i, test := range queryUserTests {
-		c.Logf("test %d. %s", i, test.about)
-		req := params.QueryUsersRequest{
-			ExternalID: test.externalID,
-			Email:      test.email,
-		}
-		if !test.lastLoginSince.IsZero() {
-			req.LastLoginSince = test.lastLoginSince.Format(time.RFC3339Nano)
-		}
-		if !test.lastDIschargeSince.IsZero() {
-			req.LastDischargeSince = test.lastDIschargeSince.Format(time.RFC3339Nano)
-		}
-		users, err := s.adminClient.QueryUsers(s.Ctx, &req)
-		c.Assert(err, gc.Equals, nil)
-		c.Assert(users, jc.DeepEquals, test.expect)
+	c.Assert(err, qt.Equals, nil)
+	for _, test := range queryUserTests {
+		c.Run(test.about, func(c *qt.C) {
+			req := params.QueryUsersRequest{
+				ExternalID: test.externalID,
+				Email:      test.email,
+			}
+			if !test.lastLoginSince.IsZero() {
+				req.LastLoginSince = test.lastLoginSince.Format(time.RFC3339Nano)
+			}
+			if !test.lastDIschargeSince.IsZero() {
+				req.LastDischargeSince = test.lastDIschargeSince.Format(time.RFC3339Nano)
+			}
+			users, err := s.adminClient.QueryUsers(s.srv.Ctx, &req)
+			c.Assert(err, qt.Equals, nil)
+			c.Assert(users, qt.DeepEquals, test.expect)
+		})
 	}
 }
 
-func (s *usersSuite) TestQueryUsersBadLastLogin(c *gc.C) {
-	_, err := s.adminClient.QueryUsers(s.Ctx, &params.QueryUsersRequest{
+func (s *usersSuite) TestQueryUsersBadLastLogin(c *qt.C) {
+	_, err := s.adminClient.QueryUsers(s.srv.Ctx, &params.QueryUsersRequest{
 		LastLoginSince: "yesterday",
 	})
-	c.Assert(err, gc.ErrorMatches, `Get http://.*/v1/u?.*last-login-since=yesterday.*: cannot unmarshal last-login-since: parsing time "yesterday" as "2006-01-02T15:04:05Z07:00": cannot parse "yesterday" as "2006"`)
+	c.Assert(err, qt.ErrorMatches, `Get http://.*/v1/u?.*last-login-since=yesterday.*: cannot unmarshal last-login-since: parsing time "yesterday" as "2006-01-02T15:04:05Z07:00": cannot parse "yesterday" as "2006"`)
 }
 
-func (s *usersSuite) TestQueryUsersBadLastDischarge(c *gc.C) {
-	_, err := s.adminClient.QueryUsers(s.Ctx, &params.QueryUsersRequest{
+func (s *usersSuite) TestQueryUsersBadLastDischarge(c *qt.C) {
+	_, err := s.adminClient.QueryUsers(s.srv.Ctx, &params.QueryUsersRequest{
 		LastDischargeSince: "yesterday",
 	})
-	c.Assert(err, gc.ErrorMatches, `Get http://.*/v1/u?.*last-discharge-since=yesterday.*: cannot unmarshal last-discharge-since: parsing time "yesterday" as "2006-01-02T15:04:05Z07:00": cannot parse "yesterday" as "2006"`)
+	c.Assert(err, qt.ErrorMatches, `Get http://.*/v1/u?.*last-discharge-since=yesterday.*: cannot unmarshal last-discharge-since: parsing time "yesterday" as "2006-01-02T15:04:05Z07:00": cannot parse "yesterday" as "2006"`)
 }
 
-func (s *usersSuite) TestQueryUsersUnauthorized(c *gc.C) {
-	client := s.IdentityClient(c, "a-bob@candid", "bob")
-	_, err := client.QueryUsers(s.Ctx, &params.QueryUsersRequest{})
-	c.Assert(err, gc.ErrorMatches, `Get http://.*/v1/u?.*: permission denied`)
+func (s *usersSuite) TestQueryUsersUnauthorized(c *qt.C) {
+	client := s.srv.IdentityClient(c, "a-bob@candid", "bob")
+	_, err := client.QueryUsers(s.srv.Ctx, &params.QueryUsersRequest{})
+	c.Assert(err, qt.ErrorMatches, `Get http://.*/v1/u?.*: permission denied`)
 }
 
-func (s *usersSuite) TestQueryAgentUsers(c *gc.C) {
-	err := s.Params.Store.UpdateIdentity(
-		s.Ctx,
+func (s *usersSuite) TestQueryAgentUsers(c *qt.C) {
+	err := s.store.Store.UpdateIdentity(
+		s.srv.Ctx,
 		&store.Identity{
 			Username:      "jbloggs2",
 			ProviderID:    "test:http://example.com/jbloggs2",
@@ -527,9 +532,9 @@ func (s *usersSuite) TestQueryAgentUsers(c *gc.C) {
 			store.LastDischarge: store.Set,
 		},
 	)
-	c.Assert(err, gc.Equals, nil)
-	err = s.Params.Store.UpdateIdentity(
-		s.Ctx,
+	c.Assert(err, qt.Equals, nil)
+	err = s.store.Store.UpdateIdentity(
+		s.srv.Ctx,
 		&store.Identity{
 			Username:   "a-agent@candid",
 			ProviderID: "idm:a-agent",
@@ -540,25 +545,25 @@ func (s *usersSuite) TestQueryAgentUsers(c *gc.C) {
 			store.Owner:    store.Set,
 		},
 	)
-	c.Assert(err, gc.Equals, nil)
-	client := s.IdentityClient(c, "a-jbloggs2@candid", "jbloggs2")
-	users, err := client.QueryUsers(s.Ctx, &params.QueryUsersRequest{
+	c.Assert(err, qt.Equals, nil)
+	client := s.srv.IdentityClient(c, "a-jbloggs2@candid", "jbloggs2")
+	users, err := client.QueryUsers(s.srv.Ctx, &params.QueryUsersRequest{
 		Owner: "jbloggs2",
 	})
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(users, jc.DeepEquals, []string{"a-agent@candid"})
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(users, qt.DeepEquals, []string{"a-agent@candid"})
 }
 
-func (s *usersSuite) TestQueryAgentUsersOwnerNotFound(c *gc.C) {
-	client := s.IdentityClient(c, "a-jbloggs2@candid", "test")
-	users, err := client.QueryUsers(s.Ctx, &params.QueryUsersRequest{
+func (s *usersSuite) TestQueryAgentUsersOwnerNotFound(c *qt.C) {
+	client := s.srv.IdentityClient(c, "a-jbloggs2@candid", "test")
+	users, err := client.QueryUsers(s.srv.Ctx, &params.QueryUsersRequest{
 		Owner: "test",
 	})
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(users, jc.DeepEquals, []string{})
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(users, qt.DeepEquals, []string{})
 }
 
-func (s *usersSuite) TestSSHKeys(c *gc.C) {
+func (s *usersSuite) TestSSHKeys(c *qt.C) {
 	s.addUser(c, params.User{
 		Username:   "jbloggs",
 		ExternalID: "http://example.com/jbloggs",
@@ -570,91 +575,91 @@ func (s *usersSuite) TestSSHKeys(c *gc.C) {
 	})
 
 	// Check there is no ssh key for the user.
-	sshKeys, err := s.adminClient.GetSSHKeys(s.Ctx, &params.SSHKeysRequest{
+	sshKeys, err := s.adminClient.GetSSHKeys(s.srv.Ctx, &params.SSHKeysRequest{
 		Username: "jbloggs",
 	})
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(sshKeys.SSHKeys, jc.DeepEquals, []string(nil))
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(sshKeys.SSHKeys, qt.DeepEquals, []string(nil))
 
 	// Add ssh keys to the user.
-	err = s.adminClient.PutSSHKeys(s.Ctx, &params.PutSSHKeysRequest{
+	err = s.adminClient.PutSSHKeys(s.srv.Ctx, &params.PutSSHKeysRequest{
 		Username: "jbloggs",
 		Body: params.PutSSHKeysBody{
 			SSHKeys: []string{"36ASDER56", "22ERT56DG", "56ASDFASDF32"},
 			Add:     false,
 		},
 	})
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 
 	// Check it is present.
-	sshKeys, err = s.adminClient.GetSSHKeys(s.Ctx, &params.SSHKeysRequest{
+	sshKeys, err = s.adminClient.GetSSHKeys(s.srv.Ctx, &params.SSHKeysRequest{
 		Username: "jbloggs",
 	})
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(sshKeys.SSHKeys, jc.DeepEquals, []string{
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(sshKeys.SSHKeys, qt.DeepEquals, []string{
 		"36ASDER56",
 		"22ERT56DG",
 		"56ASDFASDF32",
 	})
 
 	// Remove some ssh keys.
-	err = s.adminClient.DeleteSSHKeys(s.Ctx, &params.DeleteSSHKeysRequest{
+	err = s.adminClient.DeleteSSHKeys(s.srv.Ctx, &params.DeleteSSHKeysRequest{
 		Username: "jbloggs",
 		Body: params.DeleteSSHKeysBody{
 			SSHKeys: []string{"22ERT56DG", "56ASDFASDF32"},
 		},
 	})
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 
 	// Check we only get one.
-	sshKeys, err = s.adminClient.GetSSHKeys(s.Ctx, &params.SSHKeysRequest{
+	sshKeys, err = s.adminClient.GetSSHKeys(s.srv.Ctx, &params.SSHKeysRequest{
 		Username: "jbloggs",
 	})
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(sshKeys.SSHKeys, jc.DeepEquals, []string{
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(sshKeys.SSHKeys, qt.DeepEquals, []string{
 		"36ASDER56",
 	})
 
 	// Delete an unknown ssh key just do nothing silently.
-	err = s.adminClient.DeleteSSHKeys(s.Ctx, &params.DeleteSSHKeysRequest{
+	err = s.adminClient.DeleteSSHKeys(s.srv.Ctx, &params.DeleteSSHKeysRequest{
 		Username: "jbloggs",
 		Body: params.DeleteSSHKeysBody{
 			SSHKeys: []string{"22ERT56DG"},
 		},
 	})
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 
 	// Check we only get one.
-	sshKeys, err = s.adminClient.GetSSHKeys(s.Ctx, &params.SSHKeysRequest{
+	sshKeys, err = s.adminClient.GetSSHKeys(s.srv.Ctx, &params.SSHKeysRequest{
 		Username: "jbloggs",
 	})
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(sshKeys.SSHKeys, jc.DeepEquals, []string{
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(sshKeys.SSHKeys, qt.DeepEquals, []string{
 		"36ASDER56",
 	})
 
 	// Append one ssh key.
-	err = s.adminClient.PutSSHKeys(s.Ctx, &params.PutSSHKeysRequest{
+	err = s.adminClient.PutSSHKeys(s.srv.Ctx, &params.PutSSHKeysRequest{
 		Username: "jbloggs",
 		Body: params.PutSSHKeysBody{
 			SSHKeys: []string{"90SDFGS45"},
 			Add:     true,
 		},
 	})
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 
 	// Check we get two.
-	sshKeys, err = s.adminClient.GetSSHKeys(s.Ctx, &params.SSHKeysRequest{
+	sshKeys, err = s.adminClient.GetSSHKeys(s.srv.Ctx, &params.SSHKeysRequest{
 		Username: "jbloggs",
 	})
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(sshKeys.SSHKeys, jc.DeepEquals, []string{
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(sshKeys.SSHKeys, qt.DeepEquals, []string{
 		"36ASDER56",
 		"90SDFGS45",
 	})
 }
 
-func (s *usersSuite) TestVerifyUserToken(c *gc.C) {
+func (s *usersSuite) TestVerifyUserToken(c *qt.C) {
 	s.addUser(c, params.User{
 		Username:   "jbloggs",
 		ExternalID: "http://example.com/jbloggs",
@@ -665,35 +670,35 @@ func (s *usersSuite) TestVerifyUserToken(c *gc.C) {
 		},
 	})
 
-	m, err := s.adminClient.UserToken(s.Ctx, &params.UserTokenRequest{
+	m, err := s.adminClient.UserToken(s.srv.Ctx, &params.UserTokenRequest{
 		Username: "jbloggs",
 	})
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 
-	declared, err := s.adminClient.VerifyToken(s.Ctx, &params.VerifyTokenRequest{
+	declared, err := s.adminClient.VerifyToken(s.srv.Ctx, &params.VerifyTokenRequest{
 		Macaroons: macaroon.Slice{m.M()},
 	})
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(declared, jc.DeepEquals, map[string]string{
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(declared, qt.DeepEquals, map[string]string{
 		"username": "jbloggs",
 	})
 
 	badm, err := macaroon.New([]byte{}, []byte("no such macaroon"), "loc", macaroon.LatestVersion)
-	c.Assert(err, gc.Equals, nil)
-	_, err = s.adminClient.VerifyToken(s.Ctx, &params.VerifyTokenRequest{
+	c.Assert(err, qt.Equals, nil)
+	_, err = s.adminClient.VerifyToken(s.srv.Ctx, &params.VerifyTokenRequest{
 		Macaroons: macaroon.Slice{badm},
 	})
-	c.Assert(err, gc.ErrorMatches, `Post .*/v1/verify: verification failure: macaroon discharge required: authentication required`)
+	c.Assert(err, qt.ErrorMatches, `Post .*/v1/verify: verification failure: macaroon discharge required: authentication required`)
 }
 
-func (s *usersSuite) TestUserTokenNotFound(c *gc.C) {
-	_, err := s.adminClient.UserToken(s.Ctx, &params.UserTokenRequest{
+func (s *usersSuite) TestUserTokenNotFound(c *qt.C) {
+	_, err := s.adminClient.UserToken(s.srv.Ctx, &params.UserTokenRequest{
 		Username: "not-there",
 	})
-	c.Assert(err, gc.ErrorMatches, `Get .*/v1/u/not-there/macaroon: user not-there not found`)
+	c.Assert(err, qt.ErrorMatches, `Get .*/v1/u/not-there/macaroon: user not-there not found`)
 }
 
-func (s *usersSuite) TestDischargeToken(c *gc.C) {
+func (s *usersSuite) TestDischargeToken(c *qt.C) {
 	s.addUser(c, params.User{
 		Username:   "jbloggs",
 		ExternalID: "http://example.com/jbloggs",
@@ -705,18 +710,18 @@ func (s *usersSuite) TestDischargeToken(c *gc.C) {
 	})
 
 	client := &httprequest.Client{
-		BaseURL: s.URL,
-		Doer:    s.AdminClient(),
+		BaseURL: s.srv.URL,
+		Doer:    s.srv.AdminClient(),
 	}
 	var resp params.DischargeTokenForUserResponse
-	err := client.Get(s.Ctx, "/v1/discharge-token-for-user?username=jbloggs", &resp)
-	c.Assert(err, gc.Equals, nil)
+	err := client.Get(s.srv.Ctx, "/v1/discharge-token-for-user?username=jbloggs", &resp)
+	c.Assert(err, qt.Equals, nil)
 
-	declared, err := s.adminClient.VerifyToken(s.Ctx, &params.VerifyTokenRequest{
+	declared, err := s.adminClient.VerifyToken(s.srv.Ctx, &params.VerifyTokenRequest{
 		Macaroons: macaroon.Slice{resp.DischargeToken.M()},
 	})
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(declared, jc.DeepEquals, map[string]string{
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(declared, qt.DeepEquals, map[string]string{
 		"username": "jbloggs",
 	})
 }
@@ -740,7 +745,7 @@ var userGroupTests = []struct {
 	expectError: `Get .*/v1/u/not-there/groups: user not-there not found`,
 }}
 
-func (s *usersSuite) TestUserGroups(c *gc.C) {
+func (s *usersSuite) TestUserGroups(c *qt.C) {
 	s.addUser(c, params.User{
 		Username:   "jbloggs",
 		ExternalID: "http://example.com/jbloggs",
@@ -758,21 +763,22 @@ func (s *usersSuite) TestUserGroups(c *gc.C) {
 		},
 	})
 
-	for i, test := range userGroupTests {
-		c.Logf("test %d. %s", i, test.about)
-		groups, err := s.adminClient.UserGroups(s.Ctx, &params.UserGroupsRequest{
-			Username: test.username,
+	for _, test := range userGroupTests {
+		c.Run(test.about, func(c *qt.C) {
+			groups, err := s.adminClient.UserGroups(s.srv.Ctx, &params.UserGroupsRequest{
+				Username: test.username,
+			})
+			if test.expectError != "" {
+				c.Assert(err, qt.ErrorMatches, test.expectError)
+				return
+			}
+			c.Assert(err, qt.Equals, nil)
+			c.Assert(groups, qt.DeepEquals, test.expectGroups)
 		})
-		if test.expectError != "" {
-			c.Assert(err, gc.ErrorMatches, test.expectError)
-			continue
-		}
-		c.Assert(err, gc.Equals, nil)
-		c.Assert(groups, jc.DeepEquals, test.expectGroups)
 	}
 }
 
-func (s *usersSuite) TestSetUserGroups(c *gc.C) {
+func (s *usersSuite) TestSetUserGroups(c *qt.C) {
 	s.addUser(c, params.User{
 		Username:   "jbloggs",
 		ExternalID: "http://example.com/jbloggs",
@@ -784,22 +790,22 @@ func (s *usersSuite) TestSetUserGroups(c *gc.C) {
 		},
 	})
 
-	err := s.adminClient.SetUserGroups(s.Ctx, &params.SetUserGroupsRequest{
+	err := s.adminClient.SetUserGroups(s.srv.Ctx, &params.SetUserGroupsRequest{
 		Username: "jbloggs",
 		Groups:   params.Groups{Groups: []string{"test3", "test4"}},
 	})
-	c.Assert(err, gc.Equals, nil)
-	groups, err := s.adminClient.UserGroups(s.Ctx, &params.UserGroupsRequest{
+	c.Assert(err, qt.Equals, nil)
+	groups, err := s.adminClient.UserGroups(s.srv.Ctx, &params.UserGroupsRequest{
 		Username: "jbloggs",
 	})
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(groups, jc.DeepEquals, []string{"test3", "test4"})
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(groups, qt.DeepEquals, []string{"test3", "test4"})
 
-	err = s.adminClient.SetUserGroups(s.Ctx, &params.SetUserGroupsRequest{
+	err = s.adminClient.SetUserGroups(s.srv.Ctx, &params.SetUserGroupsRequest{
 		Username: "not-there",
 		Groups:   params.Groups{Groups: []string{"test3", "test4"}},
 	})
-	c.Assert(err, gc.ErrorMatches, `Put .*/v1/u/not-there/groups: user not-there not found`)
+	c.Assert(err, qt.ErrorMatches, `Put .*/v1/u/not-there/groups: user not-there not found`)
 }
 
 var modifyUserGroupsTests = []struct {
@@ -838,41 +844,42 @@ var modifyUserGroupsTests = []struct {
 	expectError: `Post .*/v1/u/not-there/groups: user not-there not found`,
 }}
 
-func (s *usersSuite) TestModifyUserGroups(c *gc.C) {
+func (s *usersSuite) TestModifyUserGroups(c *qt.C) {
 	for i, test := range modifyUserGroupsTests {
-		c.Logf("test %d. %s", i, test.about)
-		username := params.Username(fmt.Sprintf("test-%d", i))
-		if test.username == "" {
-			test.username = username
-		}
-		s.addUser(c, params.User{
-			Username:   username,
-			ExternalID: "test:http://example.com/" + string(username),
-			IDPGroups:  test.startGroups,
-		})
-		err := s.adminClient.ModifyUserGroups(s.Ctx, &params.ModifyUserGroupsRequest{
-			Username: test.username,
-			Groups: params.ModifyGroups{
-				Add:    test.addGroups,
-				Remove: test.removeGroups,
-			},
-		})
+		c.Run(test.about, func(c *qt.C) {
+			username := params.Username(fmt.Sprintf("test-%d", i))
+			if test.username == "" {
+				test.username = username
+			}
+			s.addUser(c, params.User{
+				Username:   username,
+				ExternalID: "test:http://example.com/" + string(username),
+				IDPGroups:  test.startGroups,
+			})
+			err := s.adminClient.ModifyUserGroups(s.srv.Ctx, &params.ModifyUserGroupsRequest{
+				Username: test.username,
+				Groups: params.ModifyGroups{
+					Add:    test.addGroups,
+					Remove: test.removeGroups,
+				},
+			})
 
-		if test.expectError != "" {
-			c.Assert(err, gc.ErrorMatches, test.expectError)
-			continue
-		}
-		c.Assert(err, gc.Equals, nil)
+			if test.expectError != "" {
+				c.Assert(err, qt.ErrorMatches, test.expectError)
+				return
+			}
+			c.Assert(err, qt.Equals, nil)
 
-		groups, err := s.adminClient.UserGroups(s.Ctx, &params.UserGroupsRequest{
-			Username: test.username,
+			groups, err := s.adminClient.UserGroups(s.srv.Ctx, &params.UserGroupsRequest{
+				Username: test.username,
+			})
+			c.Assert(err, qt.Equals, nil)
+			c.Assert(groups, qt.DeepEquals, test.expectGroups)
 		})
-		c.Assert(err, gc.Equals, nil)
-		c.Assert(groups, jc.DeepEquals, test.expectGroups)
 	}
 }
 
-func (s *usersSuite) TestUserIDPGroups(c *gc.C) {
+func (s *usersSuite) TestUserIDPGroups(c *qt.C) {
 	s.addUser(c, params.User{
 		Username:   "jbloggs",
 		ExternalID: "http://example.com/jbloggs",
@@ -884,145 +891,145 @@ func (s *usersSuite) TestUserIDPGroups(c *gc.C) {
 		},
 	})
 
-	groups, err := s.adminClient.UserIDPGroups(s.Ctx, &params.UserIDPGroupsRequest{
+	groups, err := s.adminClient.UserIDPGroups(s.srv.Ctx, &params.UserIDPGroupsRequest{
 		UserGroupsRequest: params.UserGroupsRequest{
 			Username: "jbloggs",
 		},
 	})
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(groups, jc.DeepEquals, []string{"test1", "test2"})
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(groups, qt.DeepEquals, []string{"test1", "test2"})
 }
 
-func (s *usersSuite) TestWhoAmIWithAuthenticatedUser(c *gc.C) {
-	client := s.IdentityClient(c, "bob@candid")
-	resp, err := client.WhoAmI(s.Ctx, nil)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(resp.User, gc.Equals, "bob@candid")
+func (s *usersSuite) TestWhoAmIWithAuthenticatedUser(c *qt.C) {
+	client := s.srv.IdentityClient(c, "bob@candid")
+	resp, err := client.WhoAmI(s.srv.Ctx, nil)
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(resp.User, qt.Equals, "bob@candid")
 }
 
-func (s *usersSuite) TestWhoAmIWithNoUser(c *gc.C) {
+func (s *usersSuite) TestWhoAmIWithNoUser(c *qt.C) {
 	client, err := candidclient.New(candidclient.NewParams{
-		BaseURL: s.URL,
-		Client:  s.Client(nil),
+		BaseURL: s.srv.URL,
+		Client:  s.srv.Client(nil),
 	})
-	c.Assert(err, gc.Equals, nil)
-	_, err = client.WhoAmI(s.Ctx, nil)
-	c.Assert(err, gc.ErrorMatches, `Get .*/v1/whoami: cannot get discharge from ".*": cannot start interactive session: interaction required but not possible`)
+	c.Assert(err, qt.Equals, nil)
+	_, err = client.WhoAmI(s.srv.Ctx, nil)
+	c.Assert(err, qt.ErrorMatches, `Get .*/v1/whoami: cannot get discharge from ".*": cannot start interactive session: interaction required but not possible`)
 }
 
-func (s *usersSuite) TestExtraInfo(c *gc.C) {
+func (s *usersSuite) TestExtraInfo(c *qt.C) {
 	s.addUser(c, params.User{
 		Username:   "jbloggs",
 		ExternalID: "http://example.com/jbloggs",
 	})
-	err := s.adminClient.SetUserExtraInfo(s.Ctx, &params.SetUserExtraInfoRequest{
+	err := s.adminClient.SetUserExtraInfo(s.srv.Ctx, &params.SetUserExtraInfoRequest{
 		Username: "jbloggs",
 		ExtraInfo: map[string]interface{}{
 			"item1": 1,
 			"item2": "two",
 		},
 	})
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 
-	ei, err := s.adminClient.UserExtraInfo(s.Ctx, &params.UserExtraInfoRequest{
+	ei, err := s.adminClient.UserExtraInfo(s.srv.Ctx, &params.UserExtraInfoRequest{
 		Username: "jbloggs",
 	})
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(ei, jc.DeepEquals, map[string]interface{}{
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(ei, qt.DeepEquals, map[string]interface{}{
 		"item1": 1.0,
 		"item2": "two",
 	})
 
-	err = s.adminClient.SetUserExtraInfo(s.Ctx, &params.SetUserExtraInfoRequest{
+	err = s.adminClient.SetUserExtraInfo(s.srv.Ctx, &params.SetUserExtraInfoRequest{
 		Username: "jbloggs",
 		ExtraInfo: map[string]interface{}{
 			"item1": 2,
 			"item3": "three",
 		},
 	})
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 
-	ei, err = s.adminClient.UserExtraInfo(s.Ctx, &params.UserExtraInfoRequest{
+	ei, err = s.adminClient.UserExtraInfo(s.srv.Ctx, &params.UserExtraInfoRequest{
 		Username: "jbloggs",
 	})
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(ei, jc.DeepEquals, map[string]interface{}{
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(ei, qt.DeepEquals, map[string]interface{}{
 		"item1": 2.0,
 		"item2": "two",
 		"item3": "three",
 	})
 
-	item, err := s.adminClient.UserExtraInfoItem(s.Ctx, &params.UserExtraInfoItemRequest{
+	item, err := s.adminClient.UserExtraInfoItem(s.srv.Ctx, &params.UserExtraInfoItemRequest{
 		Username: "jbloggs",
 		Item:     "item2",
 	})
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(item, gc.Equals, "two")
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(item, qt.Equals, "two")
 
-	err = s.adminClient.SetUserExtraInfoItem(s.Ctx, &params.SetUserExtraInfoItemRequest{
+	err = s.adminClient.SetUserExtraInfoItem(s.srv.Ctx, &params.SetUserExtraInfoItemRequest{
 		Username: "jbloggs",
 		Item:     "item2",
 		Data:     "TWO",
 	})
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 
-	ei, err = s.adminClient.UserExtraInfo(s.Ctx, &params.UserExtraInfoRequest{
+	ei, err = s.adminClient.UserExtraInfo(s.srv.Ctx, &params.UserExtraInfoRequest{
 		Username: "jbloggs",
 	})
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(ei, jc.DeepEquals, map[string]interface{}{
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(ei, qt.DeepEquals, map[string]interface{}{
 		"item1": 2.0,
 		"item2": "TWO",
 		"item3": "three",
 	})
 }
 
-func (s *usersSuite) TestExtraInfoNotFound(c *gc.C) {
-	err := s.adminClient.SetUserExtraInfo(s.Ctx, &params.SetUserExtraInfoRequest{
+func (s *usersSuite) TestExtraInfoNotFound(c *qt.C) {
+	err := s.adminClient.SetUserExtraInfo(s.srv.Ctx, &params.SetUserExtraInfoRequest{
 		Username: "not-there",
 		ExtraInfo: map[string]interface{}{
 			"item1": 1,
 			"item2": "two",
 		},
 	})
-	c.Assert(err, gc.ErrorMatches, `Put .*/v1/u/not-there/extra-info: user not-there not found`)
+	c.Assert(err, qt.ErrorMatches, `Put .*/v1/u/not-there/extra-info: user not-there not found`)
 
-	_, err = s.adminClient.UserExtraInfo(s.Ctx, &params.UserExtraInfoRequest{
+	_, err = s.adminClient.UserExtraInfo(s.srv.Ctx, &params.UserExtraInfoRequest{
 		Username: "not-there",
 	})
-	c.Assert(err, gc.ErrorMatches, `Get .*/v1/u/not-there/extra-info: user not-there not found`)
+	c.Assert(err, qt.ErrorMatches, `Get .*/v1/u/not-there/extra-info: user not-there not found`)
 
-	_, err = s.adminClient.UserExtraInfoItem(s.Ctx, &params.UserExtraInfoItemRequest{
+	_, err = s.adminClient.UserExtraInfoItem(s.srv.Ctx, &params.UserExtraInfoItemRequest{
 		Username: "not-there",
 		Item:     "item2",
 	})
-	c.Assert(err, gc.ErrorMatches, `Get .*/v1/u/not-there/extra-info/item2: user not-there not found`)
+	c.Assert(err, qt.ErrorMatches, `Get .*/v1/u/not-there/extra-info/item2: user not-there not found`)
 
-	err = s.adminClient.SetUserExtraInfoItem(s.Ctx, &params.SetUserExtraInfoItemRequest{
+	err = s.adminClient.SetUserExtraInfoItem(s.srv.Ctx, &params.SetUserExtraInfoItemRequest{
 		Username: "not-there",
 		Item:     "item2",
 		Data:     "TWO",
 	})
-	c.Assert(err, gc.ErrorMatches, `Put .*/v1/u/not-there/extra-info/item2: user not-there not found`)
+	c.Assert(err, qt.ErrorMatches, `Put .*/v1/u/not-there/extra-info/item2: user not-there not found`)
 }
 
-func (s *usersSuite) assertUser(c *gc.C, u1, u2 params.User) {
+func (s *usersSuite) assertUser(c *qt.C, u1, u2 params.User) {
 	u1.GravatarID = ""
 	u1.LastLogin = nil
 	u1.LastDischarge = nil
 	u2.GravatarID = ""
 	u2.LastLogin = nil
 	u2.LastDischarge = nil
-	c.Assert(len(u1.PublicKeys), gc.Equals, len(u2.PublicKeys), gc.Commentf("mismatch in public keys"))
+	c.Assert(len(u1.PublicKeys), qt.Equals, len(u2.PublicKeys), qt.Commentf("mismatch in public keys"))
 	for i, pk := range u1.PublicKeys {
-		c.Assert(pk.Key, gc.Equals, u2.PublicKeys[i].Key)
+		c.Assert(pk.Key, qt.Equals, u2.PublicKeys[i].Key)
 	}
 	u1.PublicKeys = nil
 	u2.PublicKeys = nil
-	c.Assert(u1, jc.DeepEquals, u2)
+	c.Assert(u1, qt.DeepEquals, u2)
 }
 
-func (s *usersSuite) addUser(c *gc.C, u params.User) {
+func (s *usersSuite) addUser(c *qt.C, u params.User) {
 	identity := store.Identity{
 		Username:   string(u.Username),
 		ProviderID: store.ProviderIdentity(u.ExternalID),
@@ -1036,11 +1043,11 @@ func (s *usersSuite) addUser(c *gc.C, u params.User) {
 		owner := store.Identity{
 			Username: string(u.Owner),
 		}
-		err := s.Store.Identity(s.Ctx, &owner)
-		c.Assert(err, gc.Equals, nil)
+		err := s.store.Store.Identity(s.srv.Ctx, &owner)
+		c.Assert(err, qt.Equals, nil)
 		identity.Owner = owner.ProviderID
 	}
-	err := s.Store.UpdateIdentity(s.Ctx, &identity, store.Update{
+	err := s.store.Store.UpdateIdentity(s.srv.Ctx, &identity, store.Update{
 		store.Username:     store.Set,
 		store.Name:         store.Set,
 		store.Email:        store.Set,
@@ -1049,7 +1056,7 @@ func (s *usersSuite) addUser(c *gc.C, u params.User) {
 		store.ProviderInfo: store.Set,
 		store.Owner:        store.Set,
 	})
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 }
 
 func publicKeys(pks []*bakery.PublicKey) []bakery.PublicKey {

@@ -1,4 +1,5 @@
 package memstore_test
+
 import (
 	"testing"
 
@@ -6,8 +7,8 @@ import (
 	"github.com/juju/aclstore/v2"
 	"github.com/juju/simplekv/memsimplekv"
 
-	"github.com/CanonicalLtd/candid/store"
 	"github.com/CanonicalLtd/candid/meeting"
+	"github.com/CanonicalLtd/candid/store"
 	"github.com/CanonicalLtd/candid/store/memstore"
 	"github.com/CanonicalLtd/candid/store/storetest"
 )
@@ -15,7 +16,7 @@ import (
 func TestKeyValueStore(t *testing.T) {
 	c := qt.New(t)
 	defer c.Done()
-	
+
 	storetest.TestKeyValueStore(c, func(c *qt.C) store.ProviderDataStore {
 		return memstore.NewProviderDataStore()
 	})
