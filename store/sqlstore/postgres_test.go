@@ -1,54 +1,64 @@
 package sqlstore_test
 
 import (
+	"testing"
+
+	qt "github.com/frankban/quicktest"
+	aclstore "github.com/juju/aclstore/v2"
 	"github.com/juju/postgrestest"
-	jc "github.com/juju/testing/checkers"
 	"golang.org/x/net/context"
-	gc "gopkg.in/check.v1"
 	errgo "gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery"
 
+	"github.com/CanonicalLtd/candid/meeting"
 	"github.com/CanonicalLtd/candid/store"
 	"github.com/CanonicalLtd/candid/store/sqlstore"
-	storetesting "github.com/CanonicalLtd/candid/store/testing"
+	"github.com/CanonicalLtd/candid/store/storetest"
 )
 
-type postgresSuite struct {
-	storetesting.StoreSuite
-	backend store.Backend
-	pg      *postgrestest.DB
+func TestKeyValueStore(t *testing.T) {
+	c := qt.New(t)
+	defer c.Done()
+
+	storetest.TestKeyValueStore(c, func(c *qt.C) store.ProviderDataStore {
+		return newFixture(c).backend.ProviderDataStore()
+	})
 }
 
-var _ = gc.Suite(&postgresSuite{})
+func TestStore(t *testing.T) {
+	c := qt.New(t)
+	defer c.Done()
 
-func (s *postgresSuite) SetUpTest(c *gc.C) {
-	var err error
-	s.pg, err = postgrestest.New()
-	if errgo.Cause(err) == postgrestest.ErrDisabled {
-		c.Skip(err.Error())
-		return
-	}
-	c.Assert(err, gc.Equals, nil)
-	s.backend, err = sqlstore.NewBackend("postgres", s.pg.DB)
-	c.Assert(err, gc.Equals, nil)
-	s.Store = s.backend.Store()
-	s.StoreSuite.SetUpTest(c)
+	storetest.TestStore(c, func(c *qt.C) store.Store {
+		return newFixture(c).backend.Store()
+	})
 }
 
-func (s *postgresSuite) TearDownTest(c *gc.C) {
-	if s.Store != nil {
-		s.StoreSuite.TearDownTest(c)
-	}
-	if s.backend != nil {
-		s.backend.Close()
-	}
-	if s.pg != nil {
-		s.pg.Close()
-	}
+func TestMeetingStore(t *testing.T) {
+	c := qt.New(t)
+	defer c.Done()
+
+	storetest.TestMeetingStore(c, func(c *qt.C) meeting.Store {
+		return newFixture(c).backend.MeetingStore()
+	}, sqlstore.PutAtTime)
 }
 
-func (s *postgresSuite) TestUpdateIDNotFound(c *gc.C) {
-	err := s.Store.UpdateIdentity(
+func TestACLStore(t *testing.T) {
+	c := qt.New(t)
+	defer c.Done()
+
+	storetest.TestACLStore(c, func(c *qt.C) aclstore.ACLStore {
+		return newFixture(c).backend.ACLStore()
+	})
+}
+
+func TestUpdateIDNotFound(t *testing.T) {
+	c := qt.New(t)
+	defer c.Done()
+
+	f := newFixture(c)
+
+	err := f.backend.Store().UpdateIdentity(
 		context.Background(),
 		&store.Identity{
 			ID:   "1000000",
@@ -58,47 +68,69 @@ func (s *postgresSuite) TestUpdateIDNotFound(c *gc.C) {
 			store.Name: store.Set,
 		},
 	)
-	c.Assert(err, gc.ErrorMatches, `identity "1000000" not found`)
-	c.Assert(errgo.Cause(err), gc.Equals, store.ErrNotFound)
+	c.Assert(err, qt.ErrorMatches, `identity "1000000" not found`)
+	c.Assert(errgo.Cause(err), qt.Equals, store.ErrNotFound)
 }
 
-func (s *postgresSuite) TestUpdateIDEmptyNotFound(c *gc.C) {
-	err := s.Store.UpdateIdentity(
+func TestUpdateIDEmptyNotFound(t *testing.T) {
+	c := qt.New(t)
+	defer c.Done()
+
+	f := newFixture(c)
+
+	err := f.backend.Store().UpdateIdentity(
 		context.Background(),
 		&store.Identity{
 			ID: "1000000",
 		},
 		store.Update{},
 	)
-	c.Assert(err, gc.ErrorMatches, `identity "1000000" not found`)
-	c.Assert(errgo.Cause(err), gc.Equals, store.ErrNotFound)
+	c.Assert(err, qt.ErrorMatches, `identity "1000000" not found`)
+	c.Assert(errgo.Cause(err), qt.Equals, store.ErrNotFound)
 }
 
-func (s *postgresSuite) TestUpdateUsernameEmptyNotFound(c *gc.C) {
-	err := s.Store.UpdateIdentity(
+func TestUpdateUsernameEmptyNotFound(t *testing.T) {
+	c := qt.New(t)
+	defer c.Done()
+
+	f := newFixture(c)
+
+	err := f.backend.Store().UpdateIdentity(
 		context.Background(),
 		&store.Identity{
 			Username: "no-user",
 		},
 		store.Update{},
 	)
-	c.Assert(err, gc.ErrorMatches, `user no-user not found`)
-	c.Assert(errgo.Cause(err), gc.Equals, store.ErrNotFound)
+	c.Assert(err, qt.ErrorMatches, `user no-user not found`)
+	c.Assert(errgo.Cause(err), qt.Equals, store.ErrNotFound)
 }
 
-func (s *postgresSuite) TestUpdateProviderIDEmptyNotFound(c *gc.C) {
-	err := s.Store.UpdateIdentity(
+func TestUpdateProviderIDEmptyNotFound(t *testing.T) {
+	c := qt.New(t)
+	defer c.Done()
+
+	f := newFixture(c)
+
+	err := f.backend.Store().UpdateIdentity(
 		context.Background(),
 		&store.Identity{
 			ProviderID: store.MakeProviderIdentity("test", "no-user"),
 		},
 		store.Update{},
 	)
-	c.Assert(err, gc.ErrorMatches, `identity "test:no-user" not found`)
-	c.Assert(errgo.Cause(err), gc.Equals, store.ErrNotFound)
+	c.Assert(err, qt.ErrorMatches, `identity "test:no-user" not found`)
+	c.Assert(errgo.Cause(err), qt.Equals, store.ErrNotFound)
 }
 
-func (s *postgresSuite) TestInitIdempotent(c *gc.C) {
+func TestInitIdempotent(t *testing.T) {
+	c := qt.New(t)
+	defer c.Done()
+
+	f := newFixture(c)
+
+	testStore := f.backend.Store()
+
 	var pk1 bakery.PublicKey
 	id1 := store.Identity{
 		ProviderID: store.MakeProviderIdentity("test", "test-1"),
@@ -114,7 +146,7 @@ func (s *postgresSuite) TestInitIdempotent(c *gc.C) {
 		},
 		Owner: store.MakeProviderIdentity("test", "test-0"),
 	}
-	err := s.Store.UpdateIdentity(
+	err := testStore.UpdateIdentity(
 		context.Background(),
 		&id1,
 		store.Update{
@@ -127,82 +159,36 @@ func (s *postgresSuite) TestInitIdempotent(c *gc.C) {
 			store.Owner:        store.Set,
 		},
 	)
-	c.Assert(err, gc.Equals, nil)
-	backend, err := sqlstore.NewBackend("postgres", s.pg.DB)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
+	backend, err := sqlstore.NewBackend("postgres", f.pg.DB)
+	c.Assert(err, qt.Equals, nil)
 	id2 := store.Identity{
 		ProviderID: store.MakeProviderIdentity("test", "test-1"),
 	}
 	err = backend.Store().Identity(context.Background(), &id2)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(id2, jc.DeepEquals, id1)
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(id2, qt.DeepEquals, id1)
 }
 
-type postgresKeyValueSuite struct {
-	storetesting.KeyValueSuite
+type fixture struct {
 	backend store.Backend
 	pg      *postgrestest.DB
 }
 
-var _ = gc.Suite(&postgresKeyValueSuite{})
-
-func (s *postgresKeyValueSuite) SetUpTest(c *gc.C) {
-	var err error
-	s.pg, err = postgrestest.New()
+func newFixture(c *qt.C) *fixture {
+	pg, err := postgrestest.New()
 	if errgo.Cause(err) == postgrestest.ErrDisabled {
 		c.Skip(err.Error())
-		return
 	}
-	c.Assert(err, gc.Equals, nil)
-	s.backend, err = sqlstore.NewBackend("postgres", s.pg.DB)
-	c.Assert(err, gc.Equals, nil)
-	s.Store = s.backend.ProviderDataStore()
-	s.KeyValueSuite.SetUpTest(c)
-}
+	c.Assert(err, qt.Equals, nil)
 
-func (s *postgresKeyValueSuite) TearDownTest(c *gc.C) {
-	if s.Store != nil {
-		s.KeyValueSuite.TearDownTest(c)
-	}
-	if s.backend != nil {
-		s.backend.Close()
-	}
-	if s.pg != nil {
-		s.pg.Close()
-	}
-}
+	backend, err := sqlstore.NewBackend("postgres", pg.DB)
+	c.Assert(err, qt.Equals, nil)
+	// Note: closing backend also closes the db.
+	c.Defer(backend.Close)
 
-type postgresMeetingSuite struct {
-	storetesting.MeetingSuite
-	backend store.Backend
-	pg      *postgrestest.DB
-}
-
-var _ = gc.Suite(&postgresMeetingSuite{})
-
-func (s *postgresMeetingSuite) SetUpTest(c *gc.C) {
-	var err error
-	s.pg, err = postgrestest.New()
-	if errgo.Cause(err) == postgrestest.ErrDisabled {
-		c.Skip(err.Error())
-		return
-	}
-	c.Assert(err, gc.Equals, nil)
-	s.backend, err = sqlstore.NewBackend("postgres", s.pg.DB)
-	c.Assert(err, gc.Equals, nil)
-	s.Store = s.backend.MeetingStore()
-	s.PutAtTimeFunc = sqlstore.PutAtTime
-	s.MeetingSuite.SetUpTest(c)
-}
-
-func (s *postgresMeetingSuite) TearDownTest(c *gc.C) {
-	if s.Store != nil {
-		s.MeetingSuite.TearDownTest(c)
-	}
-	if s.backend != nil {
-		s.backend.Close()
-	}
-	if s.pg != nil {
-		s.pg.Close()
+	return &fixture{
+		pg:      pg,
+		backend: backend,
 	}
 }
