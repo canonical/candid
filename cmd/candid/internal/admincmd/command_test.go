@@ -13,7 +13,7 @@ import (
 
 	"github.com/CanonicalLtd/candid/candidtest"
 	"github.com/CanonicalLtd/candid/cmd/candid/internal/admincmd"
-	internalcandidtest "github.com/CanonicalLtd/candid/internal/qtcandidtest"
+	internalcandidtest "github.com/CanonicalLtd/candid/internal/candidtest"
 )
 
 type fixture struct {

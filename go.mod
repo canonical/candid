@@ -24,7 +24,6 @@ require (
 	github.com/juju/qthttptest v0.0.1
 	github.com/juju/schema v0.0.0-20180109041850-e4f08199aa80
 	github.com/juju/simplekv v0.0.0-20180621131638-ff82918775e5
-	github.com/juju/testing v0.0.0-20180920084828-472a3e8b2073
 	github.com/juju/usso v0.0.0-20160418121039-5b79b358f4bb
 	github.com/juju/utils v0.0.0-20180820210520-bf9cc5bdd62d
 	github.com/julienschmidt/httprouter v0.0.0-20151013225520-77a895ad01eb
@@ -48,7 +47,6 @@ require (
 	google.golang.org/appengine v1.2.0 // indirect
 	gopkg.in/CanonicalLtd/candidclient.v1 v1.0.0
 	gopkg.in/asn1-ber.v1 v1.0.0-20170511165959-379148ca0225
-	gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127
 	gopkg.in/errgo.v1 v1.0.0
 	gopkg.in/goose.v1 v1.0.0-20161130145116-8f055ce635d6
 	gopkg.in/httprequest.v1 v1.1.2

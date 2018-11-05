@@ -20,7 +20,7 @@ import (
 
 	"github.com/CanonicalLtd/candid/internal/auth"
 	"github.com/CanonicalLtd/candid/internal/auth/httpauth"
-	candidtest "github.com/CanonicalLtd/candid/internal/qtcandidtest"
+	"github.com/CanonicalLtd/candid/internal/candidtest"
 )
 
 type authSuite struct {

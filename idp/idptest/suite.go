@@ -13,7 +13,7 @@ import (
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
 
 	"github.com/CanonicalLtd/candid/idp"
-	qtcandidtest "github.com/CanonicalLtd/candid/internal/qtcandidtest"
+	"github.com/CanonicalLtd/candid/internal/candidtest"
 	"github.com/CanonicalLtd/candid/store"
 )
 
@@ -30,14 +30,14 @@ type Fixture struct {
 	Oven *bakery.Oven
 
 	// Store holds the store used by the fixture.
-	Store *qtcandidtest.Store
+	Store *candidtest.Store
 
 	dischargeTokenCreator *dischargeTokenCreator
 	visitCompleter        *visitCompleter
 	kvStore               simplekv.Store
 }
 
-func NewFixture(c *qt.C, store *qtcandidtest.Store) *Fixture {
+func NewFixture(c *qt.C, store *candidtest.Store) *Fixture {
 	ctx, closeStore := store.Store.Context(context.Background())
 	c.Defer(closeStore)
 

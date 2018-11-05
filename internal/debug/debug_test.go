@@ -17,9 +17,9 @@ import (
 	"github.com/juju/utils/debugstatus"
 	errgo "gopkg.in/errgo.v1"
 
+	"github.com/CanonicalLtd/candid/internal/candidtest"
 	"github.com/CanonicalLtd/candid/internal/debug"
 	"github.com/CanonicalLtd/candid/internal/identity"
-	candidtest "github.com/CanonicalLtd/candid/internal/qtcandidtest"
 	"github.com/CanonicalLtd/candid/store/mgostore"
 	buildver "github.com/CanonicalLtd/candid/version"
 )

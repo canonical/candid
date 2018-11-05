@@ -9,9 +9,7 @@ import (
 	"testing"
 	"time"
 
-	jujutesting "github.com/juju/testing"
-	jc "github.com/juju/testing/checkers"
-	gc "gopkg.in/check.v1"
+	qt "github.com/frankban/quicktest"
 	"gopkg.in/macaroon-bakery.v2/bakery"
 
 	"github.com/CanonicalLtd/candid/config"
@@ -19,16 +17,6 @@ import (
 	"github.com/CanonicalLtd/candid/store"
 	_ "github.com/CanonicalLtd/candid/store/memstore"
 )
-
-func TestPackage(t *testing.T) {
-	gc.TestingT(t)
-}
-
-type configSuite struct {
-	jujutesting.IsolationSuite
-}
-
-var _ = gc.Suite(&configSuite{})
 
 const testConfig = `
 listen-address: 1.2.3.4:5678
@@ -102,39 +90,42 @@ http-proxy: http://proxy.example.com:3128
 no-proxy: localhost,.example.com
 `
 
-func (s *configSuite) readConfig(c *gc.C, content string) (*config.Config, error) {
+func readConfig(c *qt.C, content string) (*config.Config, error) {
 	// Write the configuration content to file.
-	path := path.Join(c.MkDir(), "config.yaml")
+	path := path.Join(c.Mkdir(), "config.yaml")
 	err := ioutil.WriteFile(path, []byte(content), 0666)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 
 	// Read the configuration.
 	return config.Read(path)
 }
 
-func (s *configSuite) TestRead(c *gc.C) {
+func TestRead(t *testing.T) {
+	c := qt.New(t)
+	defer c.Done()
+
 	idp.Register("usso", testIdentityProvider)
 	idp.Register("keystone", testIdentityProvider)
 	store.Register("test", testStorageBackend)
-	conf, err := s.readConfig(c, testConfig)
-	c.Assert(err, gc.Equals, nil)
+	conf, err := readConfig(c, testConfig)
+	c.Assert(err, qt.Equals, nil)
 	// Check that the TLS configuration creates a valid *tls.Config
 	tlsConfig := conf.TLSConfig()
-	c.Assert(tlsConfig, gc.Not(gc.IsNil))
+	c.Assert(tlsConfig, qt.Not(qt.IsNil))
 	conf.TLSCert = ""
 	conf.TLSKey = ""
 
 	var key bakery.KeyPair
 	err = key.Public.UnmarshalText([]byte("CIdWcEUN+0OZnKW9KwruRQnQDY/qqzVdD30CijwiWCk="))
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 	err = key.Private.UnmarshalText([]byte("8PjzjakvIlh3BVFKe8axinRDutF6EDIfjtuf4+JaNow="))
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 
 	var adminPubKey bakery.PublicKey
 	err = adminPubKey.UnmarshalText([]byte("dUnC8p9p3nygtE2h92a47Ooq0rXg0fVSm3YBWou5/UQ="))
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 
-	c.Assert(conf, jc.DeepEquals, &config.Config{
+	c.Assert(conf, qt.DeepEquals, &config.Config{
 		Storage: &store.Config{
 			BackendFactory: storageBackend{
 				Params: map[string]string{
@@ -172,31 +163,43 @@ func (s *configSuite) TestRead(c *gc.C) {
 	})
 }
 
-func (s *configSuite) TestReadErrorNotFound(c *gc.C) {
-	cfg, err := config.Read(path.Join(c.MkDir(), "no-such-file.yaml"))
-	c.Assert(err, gc.ErrorMatches, ".* no such file or directory")
-	c.Assert(cfg, gc.IsNil)
+func TestReadErrorNotFound(t *testing.T) {
+	c := qt.New(t)
+	defer c.Done()
+
+	cfg, err := config.Read(path.Join(c.Mkdir(), "no-such-file.yaml"))
+	c.Assert(err, qt.ErrorMatches, ".* no such file or directory")
+	c.Assert(cfg, qt.IsNil)
 }
 
-func (s *configSuite) TestReadErrorEmpty(c *gc.C) {
-	cfg, err := s.readConfig(c, "")
-	c.Assert(err, gc.ErrorMatches, "missing fields storage, listen-address, private-key, public-key, location, private-addr in config file")
-	c.Assert(cfg, gc.IsNil)
+func TestReadErrorEmpty(t *testing.T) {
+	c := qt.New(t)
+	defer c.Done()
+
+	cfg, err := readConfig(c, "")
+	c.Assert(err, qt.ErrorMatches, "missing fields storage, listen-address, private-key, public-key, location, private-addr in config file")
+	c.Assert(cfg, qt.IsNil)
 }
 
-func (s *configSuite) TestReadErrorInvalidYAML(c *gc.C) {
-	cfg, err := s.readConfig(c, ":")
-	c.Assert(err, gc.ErrorMatches, "cannot parse .*: yaml: did not find expected key")
-	c.Assert(cfg, gc.IsNil)
+func TestReadErrorInvalidYAML(t *testing.T) {
+	c := qt.New(t)
+	defer c.Done()
+
+	cfg, err := readConfig(c, ":")
+	c.Assert(err, qt.ErrorMatches, "cannot parse .*: yaml: did not find expected key")
+	c.Assert(cfg, qt.IsNil)
 }
 
-func (s *configSuite) TestUnrecognisedIDP(c *gc.C) {
-	cfg, err := s.readConfig(c, `
+func TestUnrecognisedIDP(t *testing.T) {
+	c := qt.New(t)
+	defer c.Done()
+
+	cfg, err := readConfig(c, `
 identity-providers:
  - type: nosuch
 `)
-	c.Assert(err, gc.ErrorMatches, `cannot parse ".*": unrecognised identity provider type "nosuch"`)
-	c.Assert(cfg, gc.IsNil)
+	c.Assert(err, qt.ErrorMatches, `cannot parse ".*": unrecognised identity provider type "nosuch"`)
+	c.Assert(cfg, qt.IsNil)
 }
 
 type identityProvider struct {

@@ -12,11 +12,11 @@ import (
 	"gopkg.in/CanonicalLtd/candidclient.v1/ussologin"
 
 	"github.com/CanonicalLtd/candid/idp"
-	mockusso "github.com/CanonicalLtd/candid/idp/usso/internal/qtmockusso"
+	"github.com/CanonicalLtd/candid/idp/usso/internal/mockusso"
 	"github.com/CanonicalLtd/candid/idp/usso/ussooauth"
+	"github.com/CanonicalLtd/candid/internal/candidtest"
 	"github.com/CanonicalLtd/candid/internal/discharger"
 	"github.com/CanonicalLtd/candid/internal/identity"
-	candidtest "github.com/CanonicalLtd/candid/internal/qtcandidtest"
 	"github.com/CanonicalLtd/candid/store"
 )
 

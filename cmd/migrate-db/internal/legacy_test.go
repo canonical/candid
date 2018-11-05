@@ -30,6 +30,7 @@ func TestLegacySource(t *testing.T) {
 	if errgo.Cause(err) == mgotest.ErrDisabled {
 		c.Skip("mmgotest disabled")
 	}
+	c.Assert(err, qt.Equals, nil)
 	defer db.Close()
 	t1 := time.Now().Add(-1 * time.Minute).Round(time.Millisecond)
 	t2 := t1.Add(-1 * time.Minute).Round(time.Millisecond)

@@ -12,7 +12,7 @@ import (
 	"golang.org/x/net/context"
 
 	"github.com/CanonicalLtd/candid/idp/usso/internal/kvnoncestore"
-	candidtest "github.com/CanonicalLtd/candid/internal/qtcandidtest"
+	"github.com/CanonicalLtd/candid/internal/candidtest"
 )
 
 var _ openid.NonceStore = (*kvnoncestore.Store)(nil)

@@ -11,7 +11,7 @@ import (
 	keystoneidp "github.com/CanonicalLtd/candid/idp/keystone"
 	"github.com/CanonicalLtd/candid/idp/keystone/internal/keystone"
 	"github.com/CanonicalLtd/candid/idp/keystone/internal/mockkeystone"
-	candidtest "github.com/CanonicalLtd/candid/internal/qtcandidtest"
+	"github.com/CanonicalLtd/candid/internal/candidtest"
 )
 
 type fixture struct {
