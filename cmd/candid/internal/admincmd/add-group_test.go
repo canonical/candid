@@ -4,52 +4,60 @@
 package admincmd_test
 
 import (
-	jc "github.com/juju/testing/checkers"
+	"testing"
+
+	qt "github.com/frankban/quicktest"
+	"github.com/frankban/quicktest/qtsuite"
 	"golang.org/x/net/context"
-	gc "gopkg.in/check.v1"
 
 	"github.com/CanonicalLtd/candid/store"
 )
 
 type addGroupSuite struct {
-	commandSuite
+	fixture *fixture
 }
 
-var _ = gc.Suite(&addGroupSuite{})
+func TestAddGroup(t *testing.T) {
+	qtsuite.Run(qt.New(t), &addGroupSuite{})
+}
 
-func (s *addGroupSuite) TestAddGroup(c *gc.C) {
+func (s *addGroupSuite) Init(c *qt.C) {
+	s.fixture = newFixture(c)
+}
+
+func (s *addGroupSuite) TestAddGroup(c *qt.C) {
 	ctx := context.Background()
-	s.server.AddIdentity(ctx, &store.Identity{
+	s.fixture.server.AddIdentity(ctx, &store.Identity{
 		ProviderID: store.MakeProviderIdentity("test", "bob"),
 		Username:   "bob",
 	})
-	s.CheckNoOutput(c, "add-group", "-a", "admin.agent", "-u", "bob", "test1", "test2")
+	s.fixture.CheckNoOutput(c, "add-group", "-a", "admin.agent", "-u", "bob", "test1", "test2")
 	identity := store.Identity{
 		ProviderID: store.MakeProviderIdentity("test", "bob"),
 	}
-	err := s.server.Store.Identity(ctx, &identity)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(identity.Groups, jc.DeepEquals, []string{"test1", "test2"})
+	err := s.fixture.server.Store.Identity(ctx, &identity)
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(identity.Groups, qt.DeepEquals, []string{"test1", "test2"})
 }
 
-func (s *addGroupSuite) TestAddGroupForEmail(c *gc.C) {
+func (s *addGroupSuite) TestAddGroupForEmail(c *qt.C) {
 	ctx := context.Background()
-	s.server.AddIdentity(ctx, &store.Identity{
+	s.fixture.server.AddIdentity(ctx, &store.Identity{
 		ProviderID: store.MakeProviderIdentity("test", "bob"),
 		Username:   "bob",
 		Email:      "bob@example.com",
 	})
-	s.CheckNoOutput(c, "add-group", "-a", "admin.agent", "-e", "bob@example.com", "test1", "test2")
+	s.fixture.CheckNoOutput(c, "add-group", "-a", "admin.agent", "-e", "bob@example.com", "test1", "test2")
 	identity := store.Identity{
 		ProviderID: store.MakeProviderIdentity("test", "bob"),
 	}
-	err := s.server.Store.Identity(ctx, &identity)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(identity.Groups, jc.DeepEquals, []string{"test1", "test2"})
+	err := s.fixture.server.Store.Identity(ctx, &identity)
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(identity.Groups, qt.DeepEquals, []string{"test1", "test2"})
 }
 
-func (s *addGroupSuite) TestAddGroupForEmailNotFound(c *gc.C) {
-	s.CheckError(
+func (s *addGroupSuite) TestAddGroupForEmailNotFound(c *qt.C) {
+	s.fixture.CheckError(
 		c,
 		1,
 		`no user found for email "alice@example.com"`,
@@ -57,7 +65,7 @@ func (s *addGroupSuite) TestAddGroupForEmailNotFound(c *gc.C) {
 	)
 }
 
-func (s *addGroupSuite) TestAddGroupForEmailMultipleUsers(c *gc.C) {
+func (s *addGroupSuite) TestAddGroupForEmailMultipleUsers(c *qt.C) {
 	ctx := context.Background()
 	identities := []store.Identity{{
 		ProviderID: store.MakeProviderIdentity("test", "alice"),
@@ -69,9 +77,9 @@ func (s *addGroupSuite) TestAddGroupForEmailMultipleUsers(c *gc.C) {
 		Email:      "bob@example.com",
 	}}
 	for _, id := range identities {
-		s.server.AddIdentity(ctx, &id)
+		s.fixture.server.AddIdentity(ctx, &id)
 	}
-	s.CheckError(
+	s.fixture.CheckError(
 		c,
 		1,
 		`more than one user found with email "bob@example.com" \(alice, bob\)`,
@@ -79,8 +87,8 @@ func (s *addGroupSuite) TestAddGroupForEmailMultipleUsers(c *gc.C) {
 	)
 }
 
-func (s *addGroupSuite) TestAddGroupNoUser(c *gc.C) {
-	s.CheckError(
+func (s *addGroupSuite) TestAddGroupNoUser(c *qt.C) {
+	s.fixture.CheckError(
 		c,
 		2,
 		`no user specified, please specify either username or email`,
@@ -88,8 +96,8 @@ func (s *addGroupSuite) TestAddGroupNoUser(c *gc.C) {
 	)
 }
 
-func (s *addGroupSuite) TestAddGroupUserAndEmail(c *gc.C) {
-	s.CheckError(
+func (s *addGroupSuite) TestAddGroupUserAndEmail(c *qt.C) {
+	s.fixture.CheckError(
 		c,
 		2,
 		`both username and email specified, please specify either username or email`,
