@@ -7,8 +7,9 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/juju/testing/httptesting"
-	gc "gopkg.in/check.v1"
+	qt "github.com/frankban/quicktest"
+	"github.com/frankban/quicktest/qtsuite"
+	"github.com/juju/qthttptest"
 	yaml "gopkg.in/yaml.v2"
 
 	"github.com/CanonicalLtd/candid"
@@ -20,36 +21,31 @@ import (
 	"github.com/CanonicalLtd/candid/version"
 )
 
-func TestPackage(t *testing.T) {
-	gc.TestingT(t)
+func TestServer(t *testing.T) {
+	qtsuite.Run(qt.New(t), &serverSuite{})
 }
 
 type serverSuite struct {
-	candidtest.StoreSuite
+	store *candidtest.Store
 }
 
-var _ = gc.Suite(&serverSuite{})
-
-func (s *serverSuite) TestNewServerWithNoVersions(c *gc.C) {
-	h, err := candid.NewServer(candid.ServerParams{
-		PrivateAddr: "localhost",
-	})
-	c.Assert(err, gc.ErrorMatches, `identity server must serve at least one version of the API`)
-	c.Assert(h, gc.IsNil)
+func (s *serverSuite) Init(c *qt.C) {
+	s.store = candidtest.NewStore()
 }
 
-func (s *serverSuite) TestNewServerWithUnregisteredVersion(c *gc.C) {
+func (s *serverSuite) TestNewServerWithNoVersions(c *qt.C) {
+	h, err := candid.NewServer(candid.ServerParams(s.store.ServerParams()))
+	c.Assert(err, qt.ErrorMatches, `identity server must serve at least one version of the API`)
+	c.Assert(h, qt.IsNil)
+}
+
+func (s *serverSuite) TestNewServerWithUnregisteredVersion(c *qt.C) {
 	h, err := candid.NewServer(
-		candid.ServerParams{
-			Store:        s.Store,
-			MeetingStore: s.MeetingStore,
-			RootKeyStore: s.BakeryRootKeyStore,
-			PrivateAddr:  "localhost",
-		},
+		candid.ServerParams(s.store.ServerParams()),
 		"wrong",
 	)
-	c.Assert(err, gc.ErrorMatches, `unknown version "wrong"`)
-	c.Assert(h, gc.IsNil)
+	c.Assert(err, qt.ErrorMatches, `unknown version "wrong"`)
+	c.Assert(h, qt.IsNil)
 }
 
 type versionResponse struct {
@@ -57,25 +53,19 @@ type versionResponse struct {
 	Path    string
 }
 
-func (s *serverSuite) TestVersions(c *gc.C) {
-	c.Assert(candid.Versions(), gc.DeepEquals, []string{"debug", "discharger", "v1"})
+func (s *serverSuite) TestVersions(c *qt.C) {
+	c.Assert(candid.Versions(), qt.DeepEquals, []string{"debug", "discharger", "v1"})
 }
 
-func (s *serverSuite) TestNewServerWithVersions(c *gc.C) {
+func (s *serverSuite) TestNewServerWithVersions(c *qt.C) {
 	h, err := candid.NewServer(
-		candid.ServerParams{
-			Store:        s.Store,
-			MeetingStore: s.MeetingStore,
-			RootKeyStore: s.BakeryRootKeyStore,
-			PrivateAddr:  "localhost",
-			ACLStore:     s.ACLStore,
-		},
+		candid.ServerParams(s.store.ServerParams()),
 		candid.Debug,
 	)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 	defer h.Close()
 
-	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+	qthttptest.AssertJSONCall(c, qthttptest.JSONCallParams{
 		Handler:      h,
 		URL:          "/debug/info",
 		ExpectStatus: http.StatusOK,
@@ -84,33 +74,23 @@ func (s *serverSuite) TestNewServerWithVersions(c *gc.C) {
 	assertDoesNotServeVersion(c, h, "v0")
 }
 
-func (s *serverSuite) TestNewServerRemovesAgentIDP(c *gc.C) {
+func (s *serverSuite) TestNewServerRemovesAgentIDP(c *qt.C) {
 	var conf config.Config
 	err := yaml.Unmarshal([]byte(`{"identity-providers": [{"type":"agent"},{"type":"test","name":"test"}]}`), &conf)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 	idps := make([]idp.IdentityProvider, len(conf.IdentityProviders))
 	for i, idp := range conf.IdentityProviders {
 		idps[i] = idp.IdentityProvider
 	}
-	// The agent identity provider will error on initialisation if it
-	// is not removed from the set.
-	h, err := candid.NewServer(
-		candid.ServerParams{
-			Store:             s.Store,
-			MeetingStore:      s.MeetingStore,
-			RootKeyStore:      s.BakeryRootKeyStore,
-			PrivateAddr:       "localhost",
-			IdentityProviders: idps,
-			ACLStore:          s.ACLStore,
-		},
-		candid.V1,
-	)
-	c.Assert(err, gc.Equals, nil)
+	sp := candid.ServerParams(s.store.ServerParams())
+	sp.IdentityProviders = idps
+	h, err := candid.NewServer(sp, candid.V1)
+	c.Assert(err, qt.Equals, nil)
 	h.Close()
 }
 
-func assertServesVersion(c *gc.C, h http.Handler, vers string) {
-	httptesting.AssertJSONCall(c, httptesting.JSONCallParams{
+func assertServesVersion(c *qt.C, h http.Handler, vers string) {
+	qthttptest.AssertJSONCall(c, qthttptest.JSONCallParams{
 		Handler: h,
 		URL:     "/" + vers + "/some/path",
 		ExpectBody: versionResponse{
@@ -120,10 +100,10 @@ func assertServesVersion(c *gc.C, h http.Handler, vers string) {
 	})
 }
 
-func assertDoesNotServeVersion(c *gc.C, h http.Handler, vers string) {
-	rec := httptesting.DoRequest(c, httptesting.DoRequestParams{
+func assertDoesNotServeVersion(c *qt.C, h http.Handler, vers string) {
+	rec := qthttptest.DoRequest(c, qthttptest.DoRequestParams{
 		Handler: h,
 		URL:     "/" + vers + "/some/path",
 	})
-	c.Assert(rec.Code, gc.Equals, http.StatusNotFound)
+	c.Assert(rec.Code, qt.Equals, http.StatusNotFound)
 }

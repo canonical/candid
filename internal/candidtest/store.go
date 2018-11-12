@@ -4,26 +4,23 @@
 package candidtest
 
 import (
+	qt "github.com/frankban/quicktest"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/juju/aclstore/v2"
+	aclstore "github.com/juju/aclstore/v2"
 	"github.com/juju/simplekv/memsimplekv"
-	"github.com/juju/testing"
-	gc "gopkg.in/check.v1"
+	"golang.org/x/net/context"
 	"gopkg.in/macaroon-bakery.v2/bakery"
 
+	"github.com/CanonicalLtd/candid/internal/identity"
 	"github.com/CanonicalLtd/candid/meeting"
 	"github.com/CanonicalLtd/candid/store"
 	"github.com/CanonicalLtd/candid/store/memstore"
 )
 
-// A StoreSuite is a test suite that initializes a store.Store,
-// meeting.MeetingStore and bakery.RootKeyStore for use with tests.
-type StoreSuite struct {
-	testing.IsolationSuite
-
-	// The following stores will be initialised after calling SetUpTest
-
+// Store implements a test fixture that contains memory-based
+// store implementations for use with tests.
+type Store struct {
 	Store              store.Store
 	ProviderDataStore  store.ProviderDataStore
 	MeetingStore       meeting.Store
@@ -31,52 +28,45 @@ type StoreSuite struct {
 	ACLStore           aclstore.ACLStore
 }
 
-func (s *StoreSuite) SetUpSuite(c *gc.C) {
-	s.IsolationSuite.SetUpSuite(c)
+// NewStore returns a new Store that uses in-memory storage.
+func NewStore() *Store {
+	return &Store{
+		Store:              memstore.NewStore(),
+		ProviderDataStore:  memstore.NewProviderDataStore(),
+		MeetingStore:       memstore.NewMeetingStore(),
+		BakeryRootKeyStore: bakery.NewMemRootKeyStore(),
+		ACLStore:           aclstore.NewACLStore(memsimplekv.NewStore()),
+	}
 }
 
-func (s *StoreSuite) TearDownSuite(c *gc.C) {
-	s.IsolationSuite.TearDownSuite(c)
+// ServerParams returns parameters suitable for passing
+// to NewServer that will use s as its store.
+func (s *Store) ServerParams() identity.ServerParams {
+	return identity.ServerParams{
+		Store:             s.Store,
+		ProviderDataStore: s.ProviderDataStore,
+		MeetingStore:      s.MeetingStore,
+		RootKeyStore:      s.BakeryRootKeyStore,
+		ACLStore:          s.ACLStore,
+	}
 }
 
-func (s *StoreSuite) SetUpTest(c *gc.C) {
-	s.IsolationSuite.SetUpTest(c)
-	s.Store = memstore.NewStore()
-	s.ProviderDataStore = memstore.NewProviderDataStore()
-	s.MeetingStore = memstore.NewMeetingStore()
-	s.BakeryRootKeyStore = bakery.NewMemRootKeyStore()
-	s.ACLStore = aclstore.NewACLStore(memsimplekv.NewStore())
-}
-
-func (s *StoreSuite) TearDownTest(c *gc.C) {
-	s.IsolationSuite.TearDownTest(c)
-}
-
-// A StoreServerSuite combines a StoreSuite and a ServerSuite to provider
-// an initialized server with storage.
-type StoreServerSuite struct {
-	StoreSuite
-	ServerSuite
-}
-
-func (s *StoreServerSuite) SetUpTest(c *gc.C) {
-	s.StoreSuite.SetUpTest(c)
-	s.Params.Store = s.Store
-	s.Params.ProviderDataStore = s.ProviderDataStore
-	s.Params.MeetingStore = s.MeetingStore
-	s.Params.RootKeyStore = s.BakeryRootKeyStore
-	s.Params.ACLStore = s.ACLStore
-	s.ServerSuite.SetUpTest(c)
-}
-
-func (s *StoreServerSuite) TearDownTest(c *gc.C) {
-	s.ServerSuite.TearDownTest(c)
-	s.StoreSuite.TearDownTest(c)
+// AssertUser asserts that the specified user is stored in the store.
+// It returns the stored identity.
+func (s *Store) AssertUser(c *qt.C, id *store.Identity) *store.Identity {
+	id1 := store.Identity{
+		ProviderID: id.ProviderID,
+		Username:   id.Username,
+	}
+	err := s.Store.Identity(context.Background(), &id1)
+	c.Assert(err, qt.Equals, nil)
+	AssertEqualIdentity(c, &id1, id)
+	return &id1
 }
 
 // AssertEqualIdentity asserts that the two provided identites are
 // semantically equivilent.
-func AssertEqualIdentity(c *gc.C, obtained, expected *store.Identity) {
+func AssertEqualIdentity(c *qt.C, obtained, expected *store.Identity) {
 	if expected.ID == "" {
 		obtained.ID = ""
 	}

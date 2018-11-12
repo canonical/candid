@@ -7,36 +7,37 @@ import (
 	"net/http"
 	"net/http/httptest"
 
-	"github.com/juju/testing/httptesting"
-	gc "gopkg.in/check.v1"
+	"github.com/juju/qthttptest"
 )
 
-type Suite struct {
+// Server represents a mock USSO server.
+type Server struct {
 	MockUSSO *Handler
 	server   *httptest.Server
 	saved    http.RoundTripper
 }
 
-func (s *Suite) SetUpSuite(c *gc.C) {
-	s.MockUSSO = New("https://login.ubuntu.com")
+// NewServer starts a mock USSO server and also modifies
+// http.DefaultTransport to redirect requests addressed to
+// https://login.ubuntu.com to it.
+//
+// The returned Server must be closed after use.
+func NewServer() *Server {
+	s := &Server{
+		MockUSSO: New("https://login.ubuntu.com"),
+	}
 	s.server = httptest.NewServer(s.MockUSSO)
-	rt := httptesting.URLRewritingTransport{
+	rt := qthttptest.URLRewritingTransport{
 		MatchPrefix:  "https://login.ubuntu.com",
 		Replace:      s.server.URL,
 		RoundTripper: http.DefaultTransport,
 	}
 	s.saved = http.DefaultTransport
 	http.DefaultTransport = rt
+	return s
 }
 
-func (s *Suite) TearDownSuite(c *gc.C) {
+func (s *Server) Close() {
 	http.DefaultTransport = s.saved
 	s.server.Close()
-}
-
-func (s *Suite) SetUpTest(c *gc.C) {
-}
-
-func (s *Suite) TearDownTest(c *gc.C) {
-	s.MockUSSO.Reset()
 }

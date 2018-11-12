@@ -13,7 +13,7 @@ import (
 
 	qt "github.com/frankban/quicktest"
 	"github.com/frankban/quicktest/qtsuite"
-	"github.com/juju/testing/httptesting"
+	"github.com/juju/qthttptest"
 	"golang.org/x/net/context"
 	"gopkg.in/yaml.v2"
 
@@ -22,8 +22,8 @@ import (
 	"github.com/CanonicalLtd/candid/idp/idptest"
 	"github.com/CanonicalLtd/candid/idp/idputil"
 	"github.com/CanonicalLtd/candid/idp/usso"
-	mockusso "github.com/CanonicalLtd/candid/idp/usso/internal/qtmockusso"
-	candidtest "github.com/CanonicalLtd/candid/internal/qtcandidtest"
+	"github.com/CanonicalLtd/candid/idp/usso/internal/mockusso"
+	"github.com/CanonicalLtd/candid/internal/candidtest"
 	"github.com/CanonicalLtd/candid/store"
 )
 
@@ -182,7 +182,7 @@ func (s *ussoSuite) TestInteractiveLoginFromDifferentProvider(c *qt.C) {
 	mockUSSO := mockusso.New("https://login.badplace.com")
 	server := httptest.NewServer(mockUSSO)
 	defer server.Close()
-	c.Patch(&http.DefaultTransport, httptesting.URLRewritingTransport{
+	c.Patch(&http.DefaultTransport, qthttptest.URLRewritingTransport{
 		MatchPrefix:  "https://login.badplace.com",
 		Replace:      server.URL,
 		RoundTripper: http.DefaultTransport,
@@ -337,7 +337,7 @@ func (s *ussoSuite) TestGetGroups(c *qt.C) {
 	}))
 	defer lp.Close()
 
-	rt := httptesting.URLRewritingTransport{
+	rt := qthttptest.URLRewritingTransport{
 		MatchPrefix:  "https://api.launchpad.net/devel",
 		Replace:      lp.URL,
 		RoundTripper: http.DefaultTransport,
