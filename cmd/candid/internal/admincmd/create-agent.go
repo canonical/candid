@@ -25,6 +25,7 @@ type createAgentCommand struct {
 	agentFile     string
 	agentFullName string
 	admin         bool
+	parent        bool
 	publicKey     *bakery.PublicKey
 }
 
@@ -76,6 +77,7 @@ func (c *createAgentCommand) SetFlags(f *gnuflag.FlagSet) {
 	f.StringVar(&c.agentFile, "agent-file", "", "")
 	f.BoolVar(&c.admin, "admin", false, "generate an agent file for the admin user; does not contact the identity manager service")
 	f.StringVar(&c.agentFullName, "name", "", "name of agent")
+	f.BoolVar(&c.parent, "parent", false, "create a parent agent")
 }
 
 func (c *createAgentCommand) Init(args []string) error {
@@ -129,6 +131,7 @@ func (c *createAgentCommand) Run(cmdctx *cmd.Context) error {
 				FullName:   c.agentFullName,
 				Groups:     c.groups,
 				PublicKeys: []*bakery.PublicKey{c.publicKey},
+				Parent:     c.parent,
 			},
 		})
 		if err != nil {

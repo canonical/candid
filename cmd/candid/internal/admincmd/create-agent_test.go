@@ -6,6 +6,7 @@ package admincmd_test
 import (
 	"encoding/json"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	qt "github.com/frankban/quicktest"
@@ -120,5 +121,18 @@ func (s *createAgentSuite) TestCreateAgentWithAdminFlag(c *qt.C) {
 	agents := v.Agents
 	c.Assert(agents, qt.HasLen, 1)
 	c.Assert(agents[0].Username, qt.Equals, "admin@candid")
+	c.Assert(agents[0].URL, qt.Equals, s.fixture.server.URL)
+}
+func (s *createAgentSuite) TestCreateAgentWithParentFlag(c *qt.C) {
+	// With the -n flag, it doesn't contact the candid server at all.
+	out := s.fixture.CheckSuccess(c, "create-agent", "-a", "admin.agent", "--parent")
+	var v agent.AuthInfo
+	err := json.Unmarshal([]byte(out), &v)
+	c.Assert(err, qt.Equals, nil)
+	agents := v.Agents
+	c.Assert(agents, qt.HasLen, 1)
+	if !strings.HasPrefix(string(agents[0].Username), "a-") {
+		c.Errorf("unexpected agent username %q", agents[0].Username)
+	}
 	c.Assert(agents[0].URL, qt.Equals, s.fixture.server.URL)
 }
