@@ -33,7 +33,14 @@ type backend struct {
 // NewBackend creates a new Backend instance using the given
 // *mgo.Database. The given Database's underlying session will be
 // copied. The Backend must be closed when finished with.
-func NewBackend(db *mgo.Database) (store.Backend, error) {
+func NewBackend(db *mgo.Database) (_ store.Backend, err error) {
+	db = db.With(db.Session.Copy())
+	defer func() {
+		if err != nil {
+			db.Session.Close()
+		}
+	}()
+
 	if err := ensureIdentityIndexes(db); err != nil {
 		return nil, errgo.Mask(err)
 	}
@@ -49,7 +56,7 @@ func NewBackend(db *mgo.Database) (store.Backend, error) {
 		return nil, errgo.Mask(err)
 	}
 	return &backend{
-		db:       db.With(db.Session.Copy()),
+		db:       db,
 		rootKeys: rk,
 		aclStore: aclstore.NewACLStore(aclStore),
 	}, nil
