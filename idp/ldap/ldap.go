@@ -301,7 +301,14 @@ func (idp *identityProvider) loginUser(ctx context.Context, username, password s
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}
-	return idp.loginDN(ctx, conn, dn, password)
+	id, err := idp.loginDN(ctx, conn, dn, password)
+	if err != nil {
+		if errgo.Cause(err) == params.ErrNotFound {
+			return nil, errgo.Notef(err, "user %q not found", username)
+		}
+		return nil, errgo.Mask(err)
+	}
+	return id, nil
 }
 
 func (idp *identityProvider) loginDN(ctx context.Context, conn ldapConn, dn, password string) (*store.Identity, error) {
@@ -319,6 +326,9 @@ func (idp *identityProvider) loginDN(ctx context.Context, conn ldapConn, dn, pas
 	res, err := conn.Search(req)
 	if err != nil {
 		return nil, errgo.Mask(err)
+	}
+	if len(res.Entries) == 0 {
+		return nil, errgo.WithCausef(nil, params.ErrNotFound, "")
 	}
 	var username, email, name string
 	for _, attr := range res.Entries[0].Attributes {
