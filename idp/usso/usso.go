@@ -44,6 +44,9 @@ func init() {
 type Params struct {
 	// LaunchpadTeams contains any private teams that the system needs to know about.
 	LaunchpadTeams []string `yaml:"launchpad-teams"`
+
+	// Domain contains the domain that the identities are created in.
+	Domain string
 }
 
 // NewIdentityProvider creates a new LDAP identity provider.
@@ -57,6 +60,7 @@ func NewIdentityProvider(p Params) idp.IdentityProvider {
 			Help:      "The duration of launchpad login, /people, and super_teams_collection_link requests.",
 		}),
 		launchpadTeams: p.LaunchpadTeams,
+		domain:         p.Domain,
 	}
 }
 
@@ -67,8 +71,9 @@ type identityProvider struct {
 	codec        *secret.Codec
 	groupCache   *cache.Cache
 	groupMonitor prometheus.Summary
-	// openIdRequestedTeams contains any private teams that the system needs to know about.
+	// launchpadTeams contains any private teams that the system needs to know about.
 	launchpadTeams []string
+	domain         string
 }
 
 // Name gives the name of the identity provider (usso).
@@ -77,8 +82,8 @@ func (*identityProvider) Name() string {
 }
 
 // Domain implements idp.IdentityProvider.Domain.
-func (*identityProvider) Domain() string {
-	return ""
+func (idp *identityProvider) Domain() string {
+	return idp.domain
 }
 
 // Description gives a description of the identity provider.
@@ -175,9 +180,11 @@ func (idp *identityProvider) callback(ctx context.Context, w http.ResponseWriter
 		errorf(err)
 		return
 	}
+
+	username := resp.SReg[openid.SRegNickname]
 	identity := store.Identity{
 		ProviderID: store.MakeProviderIdentity("usso", resp.ID),
-		Username:   resp.SReg[openid.SRegNickname],
+		Username:   idputil.NameWithDomain(username, idp.domain),
 		Email:      resp.SReg[openid.SRegEmail],
 		Name:       resp.SReg[openid.SRegFullName],
 		ProviderInfo: map[string][]string{
@@ -185,10 +192,10 @@ func (idp *identityProvider) callback(ctx context.Context, w http.ResponseWriter
 		},
 	}
 	switch {
-	case identity.Username == "":
+	case username == "":
 		err = errgo.New("username not specified")
-	case !names.IsValidUser(identity.Username):
-		err = errgo.Newf("invalid username %q", identity.Username)
+	case !names.IsValidUser(username):
+		err = errgo.Newf("invalid username %q", username)
 	case identity.Email == "":
 		err = errgo.New("email address not specified")
 	case identity.Name == "":

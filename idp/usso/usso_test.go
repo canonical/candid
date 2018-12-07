@@ -60,6 +60,10 @@ func (s *ussoSuite) TestName(c *qt.C) {
 	c.Assert(s.idp.Name(), qt.Equals, "usso")
 }
 
+func (s *ussoSuite) TestDomain(c *qt.C) {
+	c.Assert(s.idp.Domain(), qt.Equals, "")
+}
+
 func (s *ussoSuite) TestDescription(c *qt.C) {
 	c.Assert(s.idp.Description(), qt.Equals, "Ubuntu SSO")
 }
@@ -388,4 +392,28 @@ func (s *ussoSuite) roundTrip(c *qt.C, url string) *http.Response {
 	resp, err := http.DefaultTransport.RoundTrip(req)
 	c.Assert(err, qt.Equals, nil)
 	return resp
+}
+
+func (s *ussoSuite) TestWithDomain(c *qt.C) {
+	s.idp = usso.NewIdentityProvider(usso.Params{
+		Domain: "test1",
+	})
+	err := s.idp.Init(s.idptest.Ctx, s.idptest.InitParams(c, "https://idp.test"))
+	c.Assert(err, qt.Equals, nil)
+
+	c.Assert(s.idp.Domain(), qt.Equals, "test1")
+
+	ussoSrv := mockusso.NewServer()
+	defer ussoSrv.Close()
+	ussoSrv.MockUSSO.AddUser(&mockusso.User{
+		ID:       "test",
+		NickName: "test",
+		FullName: "Test User",
+		Email:    "test@example.com",
+	})
+	ussoSrv.MockUSSO.SetLoginUser("test")
+	resp := s.roundTrip(c, s.ussoURL(c, s.idptest.Ctx, "2"))
+	defer resp.Body.Close()
+	s.get(c, s.idptest.Ctx, resp.Header.Get("Location"))
+	s.idptest.AssertLoginSuccess(c, "test@test1")
 }
