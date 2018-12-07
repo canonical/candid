@@ -361,3 +361,14 @@ func (s *ldapSuite) TestHandleFailedLogin(c *qt.C) {
 	s.makeLoginRequest(c, i, "user1", "wrong")
 	s.idptest.AssertLoginFailureMatches(c, `Login failure`)
 }
+
+func (s *ldapSuite) TestHandleUserFilterNoMatch(c *qt.C) {
+	params := s.getSampleParams()
+	params.UserQueryFilter = "(customAttr=customValue)"
+	sampleDB := s.getSampleLdapDB()
+	sampleDB[1]["objectClass"] = []string{"ignored"}
+	sampleDB[1]["customAttr"] = []string{"customValue2"}
+	i := s.setupIdp(c, params, sampleDB)
+	s.makeLoginRequest(c, i, "user1", "pass1")
+	s.idptest.AssertLoginFailureMatches(c, `user "user1" not found: not found`)
+}
