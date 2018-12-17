@@ -30,7 +30,7 @@ if (/*@cc_on!@*/false) {
         <div class="login">
           <div class="login__full-form">
             <div class="login__env-name">Login</div>{{if .Error}}
-            <div class="login__failure-message" style="">{{.Error}}</div>{{end}}
+            <div class="login__failure-message">{{.Error}}</div>{{end}}
             <form class="login__form" method="post" action="{{.Action}}">
               <label class="login__label">
                   Username

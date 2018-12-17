@@ -30,7 +30,7 @@ if (/*@cc_on!@*/false) {
         <div class="login">
           <div class="login__full-form">
             <div class="login__env-name">User Registration</div>
-{{if .Error}}            <div class="login__failure-message" style="">{{.Error}}</div>
+{{if .Error}}            <div class="login__failure-message">{{.Error}}</div>
 {{end}}            <form class="login__form" method="post" action="register">
               <input type="hidden" name="state" value="{{.State}}" />
               <label class="login__label">
