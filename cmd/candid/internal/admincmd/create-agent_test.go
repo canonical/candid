@@ -4,6 +4,7 @@
 package admincmd_test
 
 import (
+	"context"
 	"encoding/json"
 	"path/filepath"
 	"strings"
@@ -11,7 +12,6 @@ import (
 
 	qt "github.com/frankban/quicktest"
 	"github.com/frankban/quicktest/qtsuite"
-	"golang.org/x/net/context"
 	"gopkg.in/macaroon-bakery.v2/httpbakery/agent"
 
 	"github.com/CanonicalLtd/candid/cmd/candid/internal/admincmd"

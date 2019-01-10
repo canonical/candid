@@ -5,11 +5,11 @@
 package idp
 
 import (
+	"context"
 	"html/template"
 	"net/http"
 
 	"github.com/juju/simplekv"
-	"golang.org/x/net/context"
 	"gopkg.in/macaroon-bakery.v2/bakery"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
 

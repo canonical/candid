@@ -4,12 +4,12 @@
 package auth
 
 import (
+	"context"
 	"sort"
 	"strings"
 
 	"github.com/juju/aclstore/v2"
 	"github.com/juju/loggo"
-	"golang.org/x/net/context"
 	"gopkg.in/CanonicalLtd/candidclient.v1/params"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery"

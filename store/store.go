@@ -4,11 +4,11 @@
 package store
 
 import (
+	"context"
 	"database/sql/driver"
 	"strings"
 	"time"
 
-	"golang.org/x/net/context"
 	errgo "gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery"
 )

@@ -4,9 +4,10 @@
 package mgostore
 
 import (
+	"context"
+
 	"github.com/juju/simplekv"
 	"github.com/juju/simplekv/mgosimplekv"
-	"golang.org/x/net/context"
 )
 
 // an providerDataStore implements store.ProviderDataStore.

@@ -4,10 +4,10 @@
 package memstore
 
 import (
+	"context"
 	"sync"
 	"time"
 
-	"golang.org/x/net/context"
 	errgo "gopkg.in/errgo.v1"
 
 	"github.com/CanonicalLtd/candid/meeting"

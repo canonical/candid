@@ -6,6 +6,7 @@
 package memstore
 
 import (
+	"context"
 	"fmt"
 	"sort"
 	"strconv"
@@ -13,7 +14,6 @@ import (
 	"sync"
 	"time"
 
-	"golang.org/x/net/context"
 	errgo "gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery"
 

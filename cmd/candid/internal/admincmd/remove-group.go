@@ -4,8 +4,9 @@
 package admincmd
 
 import (
+	"context"
+
 	"github.com/juju/cmd"
-	"golang.org/x/net/context"
 	"gopkg.in/CanonicalLtd/candidclient.v1/params"
 	"gopkg.in/errgo.v1"
 )

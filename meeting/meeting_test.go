@@ -4,6 +4,7 @@
 package meeting_test
 
 import (
+	"context"
 	"crypto/rand"
 	"fmt"
 	"sync"
@@ -14,7 +15,6 @@ import (
 	qt "github.com/frankban/quicktest"
 	"github.com/juju/clock"
 	"github.com/juju/clock/testclock"
-	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
 
 	"github.com/CanonicalLtd/candid/meeting"

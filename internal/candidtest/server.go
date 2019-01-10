@@ -4,6 +4,7 @@
 package candidtest
 
 import (
+	"context"
 	"html/template"
 	"net/http"
 	"net/http/httptest"
@@ -13,7 +14,6 @@ import (
 	qt "github.com/frankban/quicktest"
 	aclstore "github.com/juju/aclstore/v2"
 	"github.com/juju/simplekv/memsimplekv"
-	"golang.org/x/net/context"
 	"gopkg.in/CanonicalLtd/candidclient.v1"
 	errgo "gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery"

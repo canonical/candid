@@ -4,9 +4,10 @@
 package sqlstore
 
 import (
+	"context"
+
 	"github.com/juju/simplekv"
 	"github.com/juju/simplekv/sqlsimplekv"
-	"golang.org/x/net/context"
 )
 
 // A providerDataStore implements store.ProviderDataStore.

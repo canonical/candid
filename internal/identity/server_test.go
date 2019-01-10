@@ -4,6 +4,7 @@
 package identity_test
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -20,7 +21,6 @@ import (
 	"github.com/juju/loggo"
 	"github.com/juju/qthttptest"
 	"github.com/julienschmidt/httprouter"
-	"golang.org/x/net/context"
 	"gopkg.in/CanonicalLtd/candidclient.v1/params"
 	"gopkg.in/httprequest.v1"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"

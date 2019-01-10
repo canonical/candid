@@ -4,6 +4,7 @@
 package discharger
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -11,7 +12,6 @@ import (
 	"time"
 
 	"github.com/julienschmidt/httprouter"
-	"golang.org/x/net/context"
 	"golang.org/x/net/trace"
 	candidclient "gopkg.in/CanonicalLtd/candidclient.v1"
 	"gopkg.in/CanonicalLtd/candidclient.v1/params"

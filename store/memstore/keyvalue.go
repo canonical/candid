@@ -4,11 +4,11 @@
 package memstore
 
 import (
+	"context"
 	"sync"
 
 	"github.com/juju/simplekv"
 	"github.com/juju/simplekv/memsimplekv"
-	"golang.org/x/net/context"
 
 	"github.com/CanonicalLtd/candid/store"
 )

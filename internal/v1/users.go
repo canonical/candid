@@ -4,6 +4,7 @@
 package v1
 
 import (
+	"context"
 	"crypto/md5"
 	"crypto/rand"
 	"encoding/json"
@@ -11,7 +12,6 @@ import (
 	"strings"
 	"time"
 
-	"golang.org/x/net/context"
 	"gopkg.in/CanonicalLtd/candidclient.v1"
 	"gopkg.in/CanonicalLtd/candidclient.v1/params"
 	"gopkg.in/errgo.v1"

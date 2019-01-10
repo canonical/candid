@@ -6,12 +6,12 @@
 package idputil
 
 import (
+	"context"
 	"html/template"
 	"net/http"
 	"net/url"
 
 	"github.com/juju/loggo"
-	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/httprequest.v1"
 )

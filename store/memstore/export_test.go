@@ -4,9 +4,8 @@
 package memstore
 
 import (
+	"context"
 	"time"
-
-	"golang.org/x/net/context"
 
 	"github.com/CanonicalLtd/candid/meeting"
 )

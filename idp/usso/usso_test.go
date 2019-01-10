@@ -4,6 +4,7 @@
 package usso_test
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -14,7 +15,6 @@ import (
 	qt "github.com/frankban/quicktest"
 	"github.com/frankban/quicktest/qtsuite"
 	"github.com/juju/qthttptest"
-	"golang.org/x/net/context"
 	"gopkg.in/yaml.v2"
 
 	"github.com/CanonicalLtd/candid/config"

@@ -7,10 +7,10 @@
 package test
 
 import (
+	"context"
 	"net/http"
 	"strings"
 
-	"golang.org/x/net/context"
 	"gopkg.in/CanonicalLtd/candidclient.v1/params"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/httprequest.v1"

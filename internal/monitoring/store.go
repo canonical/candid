@@ -4,9 +4,10 @@
 package monitoring
 
 import (
+	"context"
+
 	"github.com/juju/loggo"
 	"github.com/prometheus/client_golang/prometheus"
-	"golang.org/x/net/context"
 
 	"github.com/CanonicalLtd/candid/store"
 )

@@ -6,12 +6,12 @@
 package candidtest
 
 import (
+	"context"
 	"net"
 	"net/http"
 
 	"github.com/juju/aclstore/v2"
 	"github.com/juju/simplekv/memsimplekv"
-	"golang.org/x/net/context"
 	errgo "gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery"
 

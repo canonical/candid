@@ -6,6 +6,7 @@
 package meeting
 
 import (
+	"context"
 	"net"
 	"net/http"
 	"sync"
@@ -15,7 +16,6 @@ import (
 	"github.com/juju/loggo"
 	"github.com/juju/utils"
 	"github.com/julienschmidt/httprouter"
-	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/httprequest.v1"
 	"gopkg.in/tomb.v2"

@@ -4,6 +4,7 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"flag"
 	"fmt"
@@ -11,7 +12,6 @@ import (
 	"os"
 
 	_ "github.com/lib/pq"
-	"golang.org/x/net/context"
 	errgo "gopkg.in/errgo.v1"
 	mgo "gopkg.in/mgo.v2"
 

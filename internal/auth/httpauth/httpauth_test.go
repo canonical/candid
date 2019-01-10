@@ -4,6 +4,7 @@
 package httpauth_test
 
 import (
+	"context"
 	"encoding/base64"
 	"net/http"
 	"testing"
@@ -11,7 +12,6 @@ import (
 	qt "github.com/frankban/quicktest"
 	"github.com/frankban/quicktest/qtsuite"
 	"github.com/juju/aclstore/v2"
-	"golang.org/x/net/context"
 	"gopkg.in/CanonicalLtd/candidclient.v1/params"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery"
