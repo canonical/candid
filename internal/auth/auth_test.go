@@ -4,6 +4,7 @@
 package auth_test
 
 import (
+	"context"
 	"fmt"
 	"sort"
 	"testing"
@@ -11,7 +12,6 @@ import (
 	qt "github.com/frankban/quicktest"
 	"github.com/frankban/quicktest/qtsuite"
 	"github.com/juju/aclstore/v2"
-	"golang.org/x/net/context"
 	"gopkg.in/CanonicalLtd/candidclient.v1"
 	"gopkg.in/CanonicalLtd/candidclient.v1/params"
 	errgo "gopkg.in/errgo.v1"

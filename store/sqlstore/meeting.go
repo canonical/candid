@@ -4,10 +4,10 @@
 package sqlstore
 
 import (
+	"context"
 	"database/sql"
 	"time"
 
-	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
 )
 

@@ -4,12 +4,12 @@
 package kvnoncestore_test
 
 import (
+	"context"
 	"testing"
 	"time"
 
 	qt "github.com/frankban/quicktest"
 	"github.com/yohcop/openid-go"
-	"golang.org/x/net/context"
 
 	"github.com/CanonicalLtd/candid/idp/usso/internal/kvnoncestore"
 	"github.com/CanonicalLtd/candid/internal/candidtest"

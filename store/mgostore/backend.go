@@ -4,12 +4,12 @@
 package mgostore
 
 import (
+	"context"
 	"time"
 
 	"github.com/juju/aclstore/v2"
 	"github.com/juju/simplekv/mgosimplekv"
 	"github.com/juju/utils/debugstatus"
-	"golang.org/x/net/context"
 	errgo "gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery"
 	"gopkg.in/macaroon-bakery.v2/bakery/mgorootkeystore"

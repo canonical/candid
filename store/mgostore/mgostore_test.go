@@ -1,13 +1,13 @@
 package mgostore_test
 
 import (
+	"context"
 	"os"
 	"testing"
 
 	qt "github.com/frankban/quicktest"
 	aclstore "github.com/juju/aclstore/v2"
 	"github.com/juju/mgotest"
-	"golang.org/x/net/context"
 	errgo "gopkg.in/errgo.v1"
 
 	"github.com/CanonicalLtd/candid/meeting"

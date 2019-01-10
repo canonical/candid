@@ -4,10 +4,10 @@
 package discharger
 
 import (
+	"context"
 	"encoding/base64"
 	"net/http"
 
-	"golang.org/x/net/context"
 	"gopkg.in/CanonicalLtd/candidclient.v1/params"
 	errgo "gopkg.in/errgo.v1"
 	"gopkg.in/httprequest.v1"

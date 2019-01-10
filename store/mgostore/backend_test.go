@@ -1,11 +1,11 @@
 package mgostore_test
 
 import (
+	"context"
 	"testing"
 
 	qt "github.com/frankban/quicktest"
 	"github.com/juju/mgotest"
-	"golang.org/x/net/context"
 	errgo "gopkg.in/errgo.v1"
 
 	"github.com/CanonicalLtd/candid/store"

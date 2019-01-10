@@ -4,7 +4,8 @@
 package meeting
 
 import (
-	"golang.org/x/net/context"
+	"context"
+
 	"gopkg.in/httprequest.v1"
 )
 

@@ -7,6 +7,7 @@ package ussooauth
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"io/ioutil"
 	"mime"
@@ -15,7 +16,6 @@ import (
 	"regexp"
 	"strings"
 
-	"golang.org/x/net/context"
 	"gopkg.in/CanonicalLtd/candidclient.v1/ussologin"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/httprequest.v1"

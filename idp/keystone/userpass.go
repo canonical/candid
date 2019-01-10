@@ -4,11 +4,11 @@
 package keystone
 
 import (
+	"context"
 	"net/http"
 	"strings"
 
 	"github.com/juju/schema"
-	"golang.org/x/net/context"
 	"gopkg.in/CanonicalLtd/candidclient.v1/params"
 	"gopkg.in/errgo.v1"
 	gooseidentity "gopkg.in/goose.v1/identity"

@@ -4,12 +4,12 @@
 package internal_test
 
 import (
+	"context"
 	"testing"
 	"time"
 
 	qt "github.com/frankban/quicktest"
 	"github.com/juju/mgotest"
-	"golang.org/x/net/context"
 	errgo "gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery"
 	mgo "gopkg.in/mgo.v2"

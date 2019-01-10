@@ -4,11 +4,11 @@
 package ussooauth_test
 
 import (
+	"context"
 	"testing"
 
 	qt "github.com/frankban/quicktest"
 	"github.com/juju/usso"
-	"golang.org/x/net/context"
 	"gopkg.in/CanonicalLtd/candidclient.v1/ussologin"
 
 	"github.com/CanonicalLtd/candid/idp"

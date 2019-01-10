@@ -4,10 +4,10 @@
 package httpauth
 
 import (
+	"context"
 	"net/http"
 	"time"
 
-	"golang.org/x/net/context"
 	"gopkg.in/CanonicalLtd/candidclient.v1/params"
 	errgo "gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery"

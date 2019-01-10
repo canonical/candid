@@ -6,8 +6,9 @@
 package discharger
 
 import (
+	"context"
+
 	"github.com/juju/loggo"
-	"golang.org/x/net/context"
 	"golang.org/x/net/trace"
 	"gopkg.in/CanonicalLtd/candidclient.v1/params"
 	"gopkg.in/errgo.v1"

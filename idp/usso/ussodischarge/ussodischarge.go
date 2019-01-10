@@ -6,6 +6,7 @@
 package ussodischarge
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha1"
@@ -20,7 +21,6 @@ import (
 	"time"
 
 	"github.com/juju/loggo"
-	"golang.org/x/net/context"
 	"gopkg.in/CanonicalLtd/candidclient.v1/params"
 	"gopkg.in/CanonicalLtd/candidclient.v1/ussodischarge"
 	"gopkg.in/errgo.v1"

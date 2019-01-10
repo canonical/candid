@@ -5,12 +5,12 @@
 package kvnoncestore
 
 import (
+	"context"
 	"fmt"
 	"time"
 
 	"github.com/juju/loggo"
 	"github.com/juju/simplekv"
-	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
 )
 

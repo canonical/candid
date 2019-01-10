@@ -1,10 +1,10 @@
 package storetest
 
 import (
+	"context"
 	"time"
 
 	qt "github.com/frankban/quicktest"
-	"golang.org/x/net/context"
 	"gopkg.in/yaml.v2"
 
 	"github.com/CanonicalLtd/candid/store"
