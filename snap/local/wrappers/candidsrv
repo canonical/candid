@@ -1,7 +1,7 @@
 #!/bin/bash -eu
 
-CONFIG_FILE="${SNAP_COMMON}/config.yaml"
-ADMIN_AGENT_FILE="${SNAP_COMMON}/admin.keys"
+CONFIG_FILE="${SNAP_DATA}/config.yaml"
+ADMIN_AGENT_FILE="${SNAP_DATA}/admin.keys"
 
 if [ ! -e "$CONFIG_FILE" ]; then
     cp "${SNAP}/config/config.yaml" "$CONFIG_FILE"
