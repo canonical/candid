@@ -3,13 +3,13 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
 	"log"
 	"time"
 
-	"golang.org/x/net/context"
 	"gopkg.in/CanonicalLtd/candidclient.v1/ussodischarge"
 	errgo "gopkg.in/errgo.v1"
 	"gopkg.in/httprequest.v1"

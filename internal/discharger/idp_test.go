@@ -4,6 +4,7 @@
 package discharger_test
 
 import (
+	"context"
 	"encoding/json"
 	"html/template"
 	"net/http"
@@ -11,7 +12,6 @@ import (
 	"time"
 
 	qt "github.com/frankban/quicktest"
-	"golang.org/x/net/context"
 	"gopkg.in/CanonicalLtd/candidclient.v1/params"
 	errgo "gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery"

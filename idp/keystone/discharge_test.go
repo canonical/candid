@@ -4,6 +4,7 @@
 package keystone_test
 
 import (
+	"context"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -12,7 +13,6 @@ import (
 
 	qt "github.com/frankban/quicktest"
 	"github.com/frankban/quicktest/qtsuite"
-	"golang.org/x/net/context"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/httprequest.v1"
 	envschemaform "gopkg.in/juju/environschema.v1/form"

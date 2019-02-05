@@ -4,10 +4,11 @@
 package admincmd
 
 import (
+	"context"
+
 	"github.com/juju/aclstore/v2/aclclient"
 	"github.com/juju/cmd"
 	"github.com/juju/gnuflag"
-	"golang.org/x/net/context"
 	errgo "gopkg.in/errgo.v1"
 )
 

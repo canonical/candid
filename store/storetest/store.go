@@ -6,12 +6,12 @@
 package storetest
 
 import (
+	"context"
 	"fmt"
 	"time"
 
 	qt "github.com/frankban/quicktest"
 	"github.com/frankban/quicktest/qtsuite"
-	"golang.org/x/net/context"
 	errgo "gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery"
 

@@ -6,12 +6,12 @@
 package openid
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"time"
 
 	"github.com/coreos/go-oidc"
-	"golang.org/x/net/context"
 	"golang.org/x/oauth2"
 	"gopkg.in/CanonicalLtd/candidclient.v1/params"
 	"gopkg.in/errgo.v1"

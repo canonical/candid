@@ -4,13 +4,13 @@
 package internal
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"time"
 
 	"github.com/juju/simplekv"
-	"golang.org/x/net/context"
 	errgo "gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
 

@@ -5,6 +5,7 @@ package discharger_test
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"io"
@@ -19,7 +20,6 @@ import (
 	qt "github.com/frankban/quicktest"
 	"github.com/frankban/quicktest/qtsuite"
 	"github.com/juju/qthttptest"
-	"golang.org/x/net/context"
 	"gopkg.in/CanonicalLtd/candidclient.v1/params"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/httprequest.v1"

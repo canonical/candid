@@ -1,13 +1,13 @@
 package sqlstore
 
 import (
+	"context"
 	"database/sql"
 	sqldriver "database/sql/driver"
 	"strconv"
 	"time"
 
 	"github.com/juju/loggo"
-	"golang.org/x/net/context"
 	errgo "gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery"
 

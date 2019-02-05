@@ -4,11 +4,11 @@
 package idptest
 
 import (
+	"context"
 	"net/http"
 
 	qt "github.com/frankban/quicktest"
 	"github.com/juju/simplekv"
-	"golang.org/x/net/context"
 	"gopkg.in/macaroon-bakery.v2/bakery"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
 

@@ -5,9 +5,9 @@ package auth
 
 import (
 	"bytes"
+	"context"
 	"strings"
 
-	"golang.org/x/net/context"
 	"gopkg.in/CanonicalLtd/candidclient.v1/params"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery"

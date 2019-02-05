@@ -4,7 +4,8 @@
 package admincmd_test
 
 import (
-	"golang.org/x/net/context"
+	"context"
+
 	"gopkg.in/CanonicalLtd/candidclient.v1"
 	errgo "gopkg.in/errgo.v1"
 	"gopkg.in/httprequest.v1"

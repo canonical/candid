@@ -7,6 +7,7 @@ package ldap
 
 import (
 	"bytes"
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
@@ -16,7 +17,6 @@ import (
 	"strings"
 	"text/template"
 
-	"golang.org/x/net/context"
 	"gopkg.in/CanonicalLtd/candidclient.v1/params"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/ldap.v2"

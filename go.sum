@@ -6,7 +6,6 @@ github.com/coreos/go-oidc v0.0.0-20170119174436-2cc7913f9f6f h1:M6NCFw9bacbe5kX3
 github.com/coreos/go-oidc v0.0.0-20170119174436-2cc7913f9f6f/go.mod h1:CgnwVTmzoESiwO9qyAFEMiHoZ1nMCKZlZ9V6mm3/LKc=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
-github.com/frankban/quicktest v0.8.0 h1:0pC4i0WOk64oyRuJPxNIIZmhk8c4Ccypmlk5BTpDyiM=
 github.com/frankban/quicktest v0.8.0/go.mod h1:1Bb+ZdFimNFekaSbjJw9uAMDBC4SvpBzuk2wc0U1Dqk=
 github.com/frankban/quicktest v1.1.0 h1:Fw/voXLo2r0Tvu5uy/GV/W5XpT7LYfbrqottX3kz8YE=
 github.com/frankban/quicktest v1.1.0/go.mod h1:R98jIehRai+d1/3Hv2//jOVCTJhW1VBavT6B6CuGq2k=
@@ -15,7 +14,6 @@ github.com/garyburd/go-oauth v0.0.0-20150329160146-3131beb69b81/go.mod h1:HfkOCN
 github.com/golang/protobuf v1.0.0/go.mod h1:6lQm79b+lXiMfvg/cZm0SGofjICqVBUtrP5yJMmIC1U=
 github.com/golang/protobuf v1.2.0 h1:P3YflyNX/ehuJFLhxviNdFxQPkGK5cDcApsge1SqnvM=
 github.com/golang/protobuf v1.2.0/go.mod h1:6lQm79b+lXiMfvg/cZm0SGofjICqVBUtrP5yJMmIC1U=
-github.com/google/go-cmp v0.1.0 h1:9tmYDKxX2N1am4Ooz6a2HC7DfK0CWNuhT8T/Fi/bvtA=
 github.com/google/go-cmp v0.1.0/go.mod h1:oXzfMopK8JAjlY9xF4vHSVASa0yLyX7SntLO5aqRK0M=
 github.com/google/go-cmp v0.2.0 h1:+dTQ8DZQJz0Mb/HjFlkptS1FeQ4cWSnN941F8aEG4SQ=
 github.com/google/go-cmp v0.2.0/go.mod h1:oXzfMopK8JAjlY9xF4vHSVASa0yLyX7SntLO5aqRK0M=
@@ -56,7 +54,6 @@ github.com/juju/qthttptest v0.0.1/go.mod h1://LCf/Ls22/rPw2u1yWukUJvYtfPY4nYpWUl
 github.com/juju/retry v0.0.0-20151029024821-62c620325291/go.mod h1:OohPQGsr4pnxwD5YljhQ+TZnuVRYpa5irjugL1Yuif4=
 github.com/juju/retry v0.0.0-20180821225755-9058e192b216 h1:/eQL7EJQKFHByJe3DeE8Z36yqManj9UY5zppDoQi4FU=
 github.com/juju/retry v0.0.0-20180821225755-9058e192b216/go.mod h1:OohPQGsr4pnxwD5YljhQ+TZnuVRYpa5irjugL1Yuif4=
-github.com/juju/schema v0.0.0-20160420044203-075de04f9b7d h1:JYANSZLNBXFgnNfGDOUAV+atWFDmOqJ1WPNmyS+YCCw=
 github.com/juju/schema v0.0.0-20160420044203-075de04f9b7d/go.mod h1:7dL+43wADDfx5rD9ibr5H9Dgr4iOM3uHOa1i4IVLak8=
 github.com/juju/schema v0.0.0-20180109041850-e4f08199aa80 h1:zZbJxnEdj3Qtgp4V604CYw6kudIbcf1oOliipA0hl/g=
 github.com/juju/schema v0.0.0-20180109041850-e4f08199aa80/go.mod h1:7dL+43wADDfx5rD9ibr5H9Dgr4iOM3uHOa1i4IVLak8=
@@ -78,12 +75,10 @@ github.com/juju/webbrowser v0.0.0-20160309143629-54b8c57083b4 h1:go1FDIXkFL8AUWg
 github.com/juju/webbrowser v0.0.0-20160309143629-54b8c57083b4/go.mod h1:G6PCelgkM6cuvyD10iYJsjLBsSadVXtJ+nBxFAxE2BU=
 github.com/julienschmidt/httprouter v0.0.0-20151013225520-77a895ad01eb h1:a8sYyruWLyKeMay8GPF+nwZ36xT7A0oNyn68Q6wJ5cc=
 github.com/julienschmidt/httprouter v0.0.0-20151013225520-77a895ad01eb/go.mod h1:SYymIcj16QtmaHHD7aYtjjsJG7VTCxuUUipMqKk8s4w=
-github.com/kr/pretty v0.0.0-20160823170715-cfb55aafdaf3 h1:dhwb1Ev84SKKVBfLuhR4bw/29yYHzwtTyTLUWWnvYxI=
 github.com/kr/pretty v0.0.0-20160823170715-cfb55aafdaf3/go.mod h1:Bvhd+E3laJ0AVkG0c9rmtZcnhV0HQ3+c3YxxqTvc/gA=
 github.com/kr/pretty v0.1.0 h1:L/CwN0zerZDmRFUapSPitk6f+Q3+0za1rQkzVuMiMFI=
 github.com/kr/pretty v0.1.0/go.mod h1:dAy3ld7l9f0ibDNOQOHHMYYIIbhfbHSm3C4ZsoJORNo=
 github.com/kr/pty v1.1.1/go.mod h1:pFQYn66WHrOpPYNljwOMqo10TkYh1fy3cYio2l3bCsQ=
-github.com/kr/text v0.0.0-20160504234017-7cafcd837844 h1:kpzneEBeC0dMewP3gr/fADv1OlblH9r1goWVwpOt3TU=
 github.com/kr/text v0.0.0-20160504234017-7cafcd837844/go.mod h1:sjUstKUATFIcff4qlB53Kml0wQPtJVc/3fWrmuUmcfA=
 github.com/kr/text v0.1.0 h1:45sCR5RtlFHMR4UwH9sdQ5TC8v0qDQCHnXt+kaKSTVE=
 github.com/kr/text v0.1.0/go.mod h1:4Jbv+DJW3UT/LiOwJeYQe1efqtUx/iVham/4vfdArNI=
@@ -109,7 +104,7 @@ github.com/prometheus/client_model v0.0.0-20150212101744-fa8ad6fec335 h1:0E/5GnG
 github.com/prometheus/client_model v0.0.0-20150212101744-fa8ad6fec335/go.mod h1:MbSGuTsp3dbXC40dX6PRTWyKYBIrTGTE9sqQNg2J8bo=
 github.com/prometheus/common v0.0.0-20160503220532-dd586c1c5abb h1:4nodWtieL+B8///SoWfGVctTGFgMsLRY5ilTNM86Vr8=
 github.com/prometheus/common v0.0.0-20160503220532-dd586c1c5abb/go.mod h1:daVV7qP5qjZbuso7PdcryaAu0sAZbrN9i7WWcTMWvro=
-github.com/prometheus/procfs v0.0.0-20160411190841-abf152e5f3e9 h1:IrO4Eb9oGw+GxzOhO4b2QC5EWO85Omh/4iTSPZktMm8=
+github.com/prometheus/procfs v0.0.0-20160411190841-abf152e5f3e9 h1:ex32PG6WhE5zviWS08vcXTwX2IkaH9zpeYZZvrmj3/U=
 github.com/prometheus/procfs v0.0.0-20160411190841-abf152e5f3e9/go.mod h1:c3At6R/oaqEKCNdg8wHV1ftS6bRYblBhIjjI8uT2IGk=
 github.com/rogpeppe/fastuuid v0.0.0-20150106093220-6724a57986af h1:gu+uRPtBe88sKxUCEXRoeCvVG90TJmwhiqRpvdhQFng=
 github.com/rogpeppe/fastuuid v0.0.0-20150106093220-6724a57986af/go.mod h1:XWv6SoW27p1b0cqNHllgS5HIMJraePCO15w5zCzIWYg=
@@ -122,7 +117,6 @@ golang.org/x/crypto v0.0.0-20181009213950-7c1a557ab941 h1:qBTHLajHecfu+xzRI9PqVD
 golang.org/x/crypto v0.0.0-20181009213950-7c1a557ab941/go.mod h1:6SG95UA2DQfeDnfUPMdvaQW0Q7yPrPDi9nlGo2tz2b4=
 golang.org/x/net v0.0.0-20171107184841-a337091b0525/go.mod h1:mL1N/T3taQHkDXs73rZJwtUhF3w3ftmwwsq0BUmARs4=
 golang.org/x/net v0.0.0-20180306060152-d25186b37f34/go.mod h1:mL1N/T3taQHkDXs73rZJwtUhF3w3ftmwwsq0BUmARs4=
-golang.org/x/net v0.0.0-20180724234803-3673e40ba225 h1:kNX+jCowfMYzvlSvJu5pQWEmyWFrBXJ3PBy10xKMXK8=
 golang.org/x/net v0.0.0-20180724234803-3673e40ba225/go.mod h1:mL1N/T3taQHkDXs73rZJwtUhF3w3ftmwwsq0BUmARs4=
 golang.org/x/net v0.0.0-20181017193950-04a2e542c03f h1:4pRM7zYwpBjCnfA1jRmhItLxYJkaEnsmuAcRtA347DA=
 golang.org/x/net v0.0.0-20181017193950-04a2e542c03f/go.mod h1:mL1N/T3taQHkDXs73rZJwtUhF3w3ftmwwsq0BUmARs4=
@@ -142,7 +136,6 @@ gopkg.in/asn1-ber.v1 v1.0.0-20170511165959-379148ca0225/go.mod h1:cuepJuh7vyXfUy
 gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=
 gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127 h1:qIbj1fsPNlZgppZ+VLlY7N33q108Sa+fhmuc+sWQYwY=
 gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=
-gopkg.in/errgo.v1 v1.0.0-20161222125816-442357a80af5 h1:C61FEf19ZFrkIbSSCWRHvzrtgrcRh/kiH4HZ5VIIqe8=
 gopkg.in/errgo.v1 v1.0.0-20161222125816-442357a80af5/go.mod h1:u0ALmqvLRxLI95fkdCEWrE6mhWYZW1aMOJHp5YXLHTg=
 gopkg.in/errgo.v1 v1.0.0 h1:n+7XfCyygBFb8sEjg6692xjC6Us50TFRO54+xYUEwjE=
 gopkg.in/errgo.v1 v1.0.0/go.mod h1:CxwszS/Xz1C49Ucd2i6Zil5UToP1EmyrFhKaMVbg1mk=
@@ -153,7 +146,6 @@ gopkg.in/httprequest.v1 v1.1.2 h1:dxQgu0dVQ81s7iAUTYkT7xzxM3y9RkwVgN//UVjYruc=
 gopkg.in/httprequest.v1 v1.1.2/go.mod h1:/CkavNL+g3qLOrpFHVrEx4NKepeqR4XTZWNj4sGGjz0=
 gopkg.in/juju/environschema.v1 v1.0.0-20151104115810-7359fc7857ab h1:kygRC4uJrga6LigPehhgIF5yzml4GIv0Na2GeUHALQk=
 gopkg.in/juju/environschema.v1 v1.0.0-20151104115810-7359fc7857ab/go.mod h1:Kq3Lf4sWr8hWSgxmDKY2Esv2Ab6zTgNk6uWyL9xC8ks=
-gopkg.in/juju/names.v2 v2.0.0-20171113112047-54f00845ae47 h1:w2Yt8TmMuXAoC+J6ZkSJxSVoGtMl3+0HCc0xLveuFBY=
 gopkg.in/juju/names.v2 v2.0.0-20171113112047-54f00845ae47/go.mod h1:XXa/v5qG1IsStRg5KTE8JkDMndoDMOKH1YYw0jSUWaM=
 gopkg.in/juju/names.v2 v2.0.0-20180621093930-fd59336b4621 h1:7IcAZvbCvk9R2jC+M0eA8RFKsYEYOvRejWLhUnKGWHU=
 gopkg.in/juju/names.v2 v2.0.0-20180621093930-fd59336b4621/go.mod h1:XXa/v5qG1IsStRg5KTE8JkDMndoDMOKH1YYw0jSUWaM=

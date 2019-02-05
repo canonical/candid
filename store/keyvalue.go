@@ -4,8 +4,9 @@
 package store
 
 import (
+	"context"
+
 	"github.com/juju/simplekv"
-	"golang.org/x/net/context"
 )
 
 // An ProviderDataStore is a data store that supports identity provider

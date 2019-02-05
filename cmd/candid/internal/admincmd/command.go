@@ -4,6 +4,7 @@
 package admincmd
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -14,7 +15,6 @@ import (
 	"github.com/juju/cmd"
 	"github.com/juju/gnuflag"
 	"github.com/juju/persistent-cookiejar"
-	"golang.org/x/net/context"
 	"golang.org/x/net/publicsuffix"
 	"gopkg.in/CanonicalLtd/candidclient.v1"
 	"gopkg.in/CanonicalLtd/candidclient.v1/params"

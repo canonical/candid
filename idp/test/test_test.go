@@ -5,6 +5,7 @@ package test_test
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
@@ -14,7 +15,6 @@ import (
 
 	qt "github.com/frankban/quicktest"
 	"github.com/juju/qthttptest"
-	"golang.org/x/net/context"
 	"gopkg.in/CanonicalLtd/candidclient.v1/params"
 	"gopkg.in/yaml.v2"
 

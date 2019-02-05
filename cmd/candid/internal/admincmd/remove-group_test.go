@@ -4,11 +4,11 @@
 package admincmd_test
 
 import (
+	"context"
 	"testing"
 
 	qt "github.com/frankban/quicktest"
 	"github.com/frankban/quicktest/qtsuite"
-	"golang.org/x/net/context"
 
 	"github.com/CanonicalLtd/candid/store"
 )

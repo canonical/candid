@@ -4,11 +4,11 @@
 package debug
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/juju/loggo"
 	"github.com/juju/utils/debugstatus"
-	"golang.org/x/net/context"
 	"gopkg.in/httprequest.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery"
 

@@ -4,6 +4,7 @@
 package discharger
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding"
 	"fmt"
@@ -12,7 +13,6 @@ import (
 	"strings"
 	"time"
 
-	"golang.org/x/net/context"
 	"golang.org/x/net/trace"
 	"gopkg.in/CanonicalLtd/candidclient.v1"
 	"gopkg.in/CanonicalLtd/candidclient.v1/params"

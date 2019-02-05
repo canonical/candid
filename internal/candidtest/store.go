@@ -4,12 +4,13 @@
 package candidtest
 
 import (
+	"context"
+
 	qt "github.com/frankban/quicktest"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	aclstore "github.com/juju/aclstore/v2"
 	"github.com/juju/simplekv/memsimplekv"
-	"golang.org/x/net/context"
 	"gopkg.in/macaroon-bakery.v2/bakery"
 
 	"github.com/CanonicalLtd/candid/internal/identity"

@@ -4,9 +4,9 @@
 package mgostore
 
 import (
+	"context"
 	"fmt"
 
-	"golang.org/x/net/context"
 	errgo "gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery"
 	mgo "gopkg.in/mgo.v2"

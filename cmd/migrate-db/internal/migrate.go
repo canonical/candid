@@ -4,10 +4,10 @@
 package internal
 
 import (
+	"context"
 	"log"
 	"strings"
 
-	"golang.org/x/net/context"
 	errgo "gopkg.in/errgo.v1"
 
 	"github.com/CanonicalLtd/candid/store"
