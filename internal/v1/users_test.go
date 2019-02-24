@@ -76,7 +76,9 @@ func (s *usersSuite) TestRoundTripUser(c *qt.C) {
 	})
 	c.Assert(err, qt.Equals, nil)
 
-	s.assertUser(c, *resp, user)
+	user2 := user
+	user2.IDPGroups = []string{"test@test"}
+	s.assertUser(c, *resp, user2)
 }
 
 var userErrorTests = []struct {
@@ -177,7 +179,7 @@ func (s *usersSuite) TestCreateAgentWithGroups(c *qt.C) {
 				User: &params.User{
 					Username:   "bob",
 					ExternalID: "test:bob",
-					IDPGroups:  []string{"g1", "g2", "g3"},
+					IDPGroups:  []string{"g1", "g2t", "g3"},
 				},
 			}},
 		},
@@ -189,7 +191,7 @@ func (s *usersSuite) TestCreateAgentWithGroups(c *qt.C) {
 	resp, err := client.CreateAgent(s.srv.Ctx, &params.CreateAgentRequest{
 		CreateAgentBody: params.CreateAgentBody{
 			PublicKeys: []*bakery.PublicKey{&pk1},
-			Groups:     []string{"g1", "other", "g2"},
+			Groups:     []string{"g1@test", "other", "g2@est"},
 		},
 	})
 	c.Assert(err, qt.ErrorMatches, `Post .*: cannot add agent to groups that you are not a member of`)
@@ -199,7 +201,7 @@ func (s *usersSuite) TestCreateAgentWithGroups(c *qt.C) {
 	resp, err = client.CreateAgent(s.srv.Ctx, &params.CreateAgentRequest{
 		CreateAgentBody: params.CreateAgentBody{
 			PublicKeys: []*bakery.PublicKey{&pk1},
-			Groups:     []string{"g1", "g3"},
+			Groups:     []string{"g1@test", "g3@test"},
 		},
 	})
 	c.Assert(err, qt.Equals, nil)
@@ -218,7 +220,7 @@ func (s *usersSuite) TestCreateAgentWithGroups(c *qt.C) {
 		Username: resp.Username,
 	})
 	c.Assert(err, qt.Equals, nil)
-	c.Assert(groups, qt.DeepEquals, []string{"g3"})
+	c.Assert(groups, qt.DeepEquals, []string{"g3@test"})
 
 	// If the owner is added back to the group, the agent
 	// gets added back too.
@@ -234,7 +236,7 @@ func (s *usersSuite) TestCreateAgentWithGroups(c *qt.C) {
 		Username: resp.Username,
 	})
 	c.Assert(err, qt.Equals, nil)
-	c.Assert(groups, qt.DeepEquals, []string{"g1", "g3"})
+	c.Assert(groups, qt.DeepEquals, []string{"g1@test", "g3@test"})
 }
 
 func (s *usersSuite) TestCreateParentAgent(c *qt.C) {
@@ -820,7 +822,7 @@ var modifyUserGroupsTests = []struct {
 	about:        "add groups",
 	startGroups:  []string{"test1", "test2"},
 	addGroups:    []string{"test3", "test4"},
-	expectGroups: []string{"test1", "test2", "test3", "test4"},
+	expectGroups: []string{"test1@test", "test2@test", "test3@test", "test4@test"},
 }, {
 	about:        "remove groups",
 	startGroups:  []string{"test1", "test2"},
@@ -836,7 +838,7 @@ var modifyUserGroupsTests = []struct {
 	about:        "remove groups not a member of",
 	startGroups:  []string{"test1", "test2"},
 	removeGroups: []string{"test5"},
-	expectGroups: []string{"test1", "test2"},
+	expectGroups: []string{"test1@test", "test2@test"},
 }, {
 	about:       "user not found",
 	username:    "not-there",

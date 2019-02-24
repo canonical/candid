@@ -560,11 +560,23 @@ type idpGroupResolver struct {
 // idp and adding them to the set stored in the identity server.
 func (r idpGroupResolver) resolveGroups(ctx context.Context, id *store.Identity) ([]string, error) {
 	groups, err := r.idp.GetGroups(ctx, id)
+	for i, g := range groups {
+		groups[i] = groupWithDomain(g, r.idp.Domain())
+	}
 	if err != nil {
 		// We couldn't get the groups, so return only those stored in the database.
 		return id.Groups, errgo.Mask(err)
 	}
 	return uniqueStrings(append(groups, id.Groups...)), nil
+}
+
+// groupWithDomain adds the given domain to the group name, if it is
+// non-zero.
+func groupWithDomain(group, domain string) string {
+	if domain == "" {
+		return group
+	}
+	return group + "@" + domain
 }
 
 // uniqueStrings removes all duplicates from the supplied

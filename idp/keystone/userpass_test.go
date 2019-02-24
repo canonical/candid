@@ -70,12 +70,12 @@ func (s *userpassSuite) TestKeystoneUserpassIdentityProviderHandleResponse(c *qt
 		ProviderID: store.MakeProviderIdentity("openstack", "abc@openstack"),
 		Username:   "testuser@openstack",
 		ProviderInfo: map[string][]string{
-			"groups": {"abc_project@openstack"},
+			"groups": {"abc_project"},
 		},
 	})
 	groups, err := s.idp.GetGroups(s.idptest.Ctx, identity)
 	c.Assert(err, qt.Equals, nil)
-	c.Assert(groups, qt.DeepEquals, []string{"abc_project@openstack"})
+	c.Assert(groups, qt.DeepEquals, []string{"abc_project"})
 }
 
 func (s *userpassSuite) TestKeystoneUserpassIdentityProviderHandleBadRequest(c *qt.C) {

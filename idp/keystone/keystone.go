@@ -220,7 +220,7 @@ func (idp *identityProvider) getGroups(ctx context.Context, token string) ([]str
 	}
 	groups := make([]string, len(resp.Tenants))
 	for i, t := range resp.Tenants {
-		groups[i] = idp.qualifiedName(t.Name)
+		groups[i] = t.Name
 	}
 	return groups, nil
 }
@@ -273,7 +273,7 @@ func (idp *identityProvider) getGroupsV3(ctx context.Context, token, user string
 	}
 	groups := make([]string, len(resp.Groups))
 	for i, g := range resp.Groups {
-		groups[i] = idp.qualifiedName(g.Name)
+		groups[i] = g.Name
 	}
 	return groups, nil
 }

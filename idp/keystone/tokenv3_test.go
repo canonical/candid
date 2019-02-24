@@ -57,7 +57,7 @@ func (s *tokenV3Suite) TestKeystoneV3TokenIdentityProviderHandle(c *qt.C) {
 		ProviderID: store.MakeProviderIdentity("openstack", "123@openstack"),
 		Username:   "testuser@openstack",
 		ProviderInfo: map[string][]string{
-			"groups": {"abc_group@openstack"},
+			"groups": {"abc_group"},
 		},
 	})
 }
