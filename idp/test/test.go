@@ -104,7 +104,13 @@ func (idp *identityProvider) GetGroups(_ context.Context, id *store.Identity) ([
 	if f == nil {
 		return nil, nil
 	}
-	return f(id)
+	groups, err := f(id)
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
+	groups2 := make([]string, len(groups))
+	copy(groups2, groups)
+	return groups2, nil
 }
 
 // Handle handles the login process.
