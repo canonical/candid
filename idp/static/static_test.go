@@ -129,7 +129,7 @@ func (s *staticSuite) TestGetGroups(c *qt.C) {
 	c.Assert(groups, qt.DeepEquals, []string{"group1", "group2"})
 }
 
-func (s *staticSuite) TestGetGroupsWithDomain(c *qt.C) {
+func (s *staticSuite) TestGetGroupsReturnsNewSlice(c *qt.C) {
 	params := s.getSampleParams()
 	params.Domain = "domain"
 	i := s.setupIdp(c, params)
@@ -142,6 +142,10 @@ func (s *staticSuite) TestGetGroupsWithDomain(c *qt.C) {
 		Email:      "user1@example.com",
 	})
 	groups, err := i.GetGroups(s.idptest.Ctx, identity)
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(groups, qt.DeepEquals, []string{"group1", "group2"})
+	groups[0] = "group1@domain"
+	groups, err = i.GetGroups(s.idptest.Ctx, identity)
 	c.Assert(err, qt.Equals, nil)
 	c.Assert(groups, qt.DeepEquals, []string{"group1", "group2"})
 }
