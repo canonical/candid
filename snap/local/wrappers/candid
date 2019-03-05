@@ -1,5 +1,5 @@
 #!/bin/sh -eu
-url=$(grep ^location /var/snap/candid/common/config.yaml | cut -d: -f2- | sed "s/[ '\"]//g" || true)
+url=$(grep ^location /var/snap/candid/current/config.yaml | cut -d: -f2- | sed "s/[ '\"]//g" || true)
 
 if [ -z "${CANDID_URL:-}" ] && [ -n "${url}" ]; then
     export CANDID_URL=${url}
