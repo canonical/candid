@@ -9,7 +9,7 @@ The easiest way to start using the candid service is with the snap:
     snap install candid --edge
 
 The configuration file used by the snap can be found in
-`/var/snap/candid/common/config.yaml`.
+`/var/snap/candid/current/config.yaml`.
 
 ## Development
 
