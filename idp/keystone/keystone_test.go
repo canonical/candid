@@ -69,18 +69,7 @@ func (s *keystoneSuite) TestKeystoneIdentityProviderHandleGet(c *qt.C) {
 	s.idptest.AssertLoginNotComplete(c)
 	c.Assert(rr.Code, qt.Equals, http.StatusOK)
 	c.Assert(rr.HeaderMap.Get("Content-Type"), qt.Equals, "text/html;charset=UTF-8")
-	c.Assert(rr.Body.String(), qt.Equals, `<!doctype html>
-<html>
-	<head><title>OpenStack Login</title></head>
-	<body>
-		<form method="POST" action="https://idp.test/login?id=1">
-			<p><label>Username: <input type="text" name="username"></label></p>
-			<p><label>Password: <input type="password" name="password"></label></p>
-			<p><input type="submit"></p>
-		</form>
-	</body>
-</html>
-`)
+	c.Assert(rr.Body.String(), qt.Equals, "https://idp.test/login?id=1\n")
 }
 
 func (s *keystoneSuite) TestKeystoneIdentityProviderHandlePost(c *qt.C) {

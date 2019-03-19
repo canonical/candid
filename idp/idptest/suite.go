@@ -75,6 +75,7 @@ func (s *Fixture) InitParams(c *qt.C, prefix string) idp.InitParams {
 		URLPrefix:             prefix,
 		DischargeTokenCreator: s.dischargeTokenCreator,
 		VisitCompleter:        s.visitCompleter,
+		Template:              candidtest.DefaultTemplate,
 	}
 }
 

@@ -7,7 +7,6 @@ package keystone
 
 import (
 	"context"
-	"html/template"
 	"net/http"
 
 	"gopkg.in/CanonicalLtd/candidclient.v1/params"
@@ -149,29 +148,14 @@ func (idp *identityProvider) Handle(ctx context.Context, w http.ResponseWriter, 
 		return
 	}
 	w.Header().Set("Content-Type", "text/html;charset=UTF-8")
+	loginTemplate := idp.initParams.Template.Lookup("login-form")
 	err := loginTemplate.Execute(w, map[string]string{
-		"Description": idp.params.Description,
-		"Callback":    idp.URL(idputil.DischargeID(req)),
+		"Action": idp.URL(idputil.DischargeID(req)),
 	})
 	if err != nil {
 		idp.initParams.VisitCompleter.Failure(ctx, w, req, idputil.DischargeID(req), err)
 	}
 }
-
-var loginTemplate = template.Must(template.New("").Parse(loginPage))
-
-const loginPage = `<!doctype html>
-<html>
-	<head><title>{{.Description}} Login</title></head>
-	<body>
-		<form method="POST" action="{{.Callback}}">
-			<p><label>Username: <input type="text" name="username"></label></p>
-			<p><label>Password: <input type="password" name="password"></label></p>
-			<p><input type="submit"></p>
-		</form>
-	</body>
-</html>
-`
 
 // doLogin performs the login with the keystone server.
 func (idp *identityProvider) doLogin(ctx context.Context, a keystone.Auth) (*store.Identity, error) {

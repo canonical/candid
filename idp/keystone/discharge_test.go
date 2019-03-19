@@ -5,10 +5,6 @@ package keystone_test
 
 import (
 	"context"
-	"io/ioutil"
-	"net/http"
-	"net/url"
-	"regexp"
 	"testing"
 
 	qt "github.com/frankban/quicktest"
@@ -82,38 +78,8 @@ func (s *dischargeSuite) Init(c *qt.C) {
 
 func (s *dischargeSuite) TestInteractiveDischarge(c *qt.C) {
 	s.dischargeCreator.AssertDischarge(c, httpbakery.WebBrowserInteractor{
-		OpenWebBrowser: s.visitInteractive,
+		OpenWebBrowser: candidtest.PasswordLogin(c, "testuser", "testpass"),
 	})
-}
-
-var urlRegexp = regexp.MustCompile(`[Aa][Cc][Tt][Ii][Oo][Nn]="(.*)"`)
-
-func (s *dischargeSuite) visitInteractive(u *url.URL) error {
-	resp, err := http.Get(u.String())
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return err
-	}
-	sm := urlRegexp.FindSubmatch(body)
-	if len(sm) < 2 {
-		return errgo.Newf("could not find URL: %q", body)
-	}
-	resp, err = http.PostForm(string(sm[1]), url.Values{
-		"username": []string{"testuser"},
-		"password": []string{"testpass"},
-	})
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return errgo.Newf("bad status %q", resp.Status)
-	}
-	return nil
 }
 
 func (s *dischargeSuite) TestFormDischarge(c *qt.C) {
