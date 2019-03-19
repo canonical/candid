@@ -39,7 +39,7 @@ func (s *staticSuite) setupIdp(c *qt.C, params static.Params) idp.IdentityProvid
 	return i
 }
 
-func (s *staticSuite) getSampleParams() static.Params {
+func getSampleParams() static.Params {
 	return static.Params{
 		Name: "test",
 		Users: map[string]static.UserInfo{
@@ -71,24 +71,24 @@ func (s *staticSuite) makeLoginRequest(c *qt.C, i idp.IdentityProvider, username
 }
 
 func (s *staticSuite) TestName(c *qt.C) {
-	idp := static.NewIdentityProvider(s.getSampleParams())
+	idp := static.NewIdentityProvider(getSampleParams())
 	c.Assert(idp.Name(), qt.Equals, "test")
 }
 
 func (s *staticSuite) TestDomain(c *qt.C) {
-	params := s.getSampleParams()
+	params := getSampleParams()
 	params.Domain = "domain"
 	idp := static.NewIdentityProvider(params)
 	c.Assert(idp.Domain(), qt.Equals, "domain")
 }
 
 func (s *staticSuite) TestInteractive(c *qt.C) {
-	idp := static.NewIdentityProvider(s.getSampleParams())
+	idp := static.NewIdentityProvider(getSampleParams())
 	c.Assert(idp.Interactive(), qt.Equals, true)
 }
 
 func (s *staticSuite) TestHandle(c *qt.C) {
-	i := s.setupIdp(c, s.getSampleParams())
+	i := s.setupIdp(c, getSampleParams())
 	s.makeLoginRequest(c, i, "user1", "pass1")
 	s.idptest.AssertLoginSuccess(c, "user1")
 	s.idptest.Store.AssertUser(c, &store.Identity{
@@ -100,7 +100,7 @@ func (s *staticSuite) TestHandle(c *qt.C) {
 }
 
 func (s *staticSuite) TestHandleWithDomain(c *qt.C) {
-	params := s.getSampleParams()
+	params := getSampleParams()
 	params.Domain = "domain"
 	i := s.setupIdp(c, params)
 	s.makeLoginRequest(c, i, "user1", "pass1")
@@ -114,7 +114,7 @@ func (s *staticSuite) TestHandleWithDomain(c *qt.C) {
 }
 
 func (s *staticSuite) TestGetGroups(c *qt.C) {
-	params := s.getSampleParams()
+	params := getSampleParams()
 	i := s.setupIdp(c, params)
 	s.makeLoginRequest(c, i, "user1", "pass1")
 	s.idptest.AssertLoginSuccess(c, "user1")
@@ -130,7 +130,7 @@ func (s *staticSuite) TestGetGroups(c *qt.C) {
 }
 
 func (s *staticSuite) TestGetGroupsReturnsNewSlice(c *qt.C) {
-	params := s.getSampleParams()
+	params := getSampleParams()
 	params.Domain = "domain"
 	i := s.setupIdp(c, params)
 	s.makeLoginRequest(c, i, "user1", "pass1")
@@ -151,13 +151,13 @@ func (s *staticSuite) TestGetGroupsReturnsNewSlice(c *qt.C) {
 }
 
 func (s *staticSuite) TestHandleFailedLoginWrongPassword(c *qt.C) {
-	i := s.setupIdp(c, s.getSampleParams())
+	i := s.setupIdp(c, getSampleParams())
 	s.makeLoginRequest(c, i, "user1", "wrong-pass")
 	s.idptest.AssertLoginFailureMatches(c, `authentication failed for user "user1"`)
 }
 
 func (s *staticSuite) TestHandleFailedLoginUnknownUser(c *qt.C) {
-	i := s.setupIdp(c, s.getSampleParams())
+	i := s.setupIdp(c, getSampleParams())
 	s.makeLoginRequest(c, i, "unknown", "pass")
 	s.idptest.AssertLoginFailureMatches(c, `authentication failed for user "unknown"`)
 }

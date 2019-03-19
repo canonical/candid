@@ -21,7 +21,7 @@ import (
 	macaroon "gopkg.in/macaroon.v2"
 
 	"github.com/CanonicalLtd/candid/idp"
-	"github.com/CanonicalLtd/candid/idp/test"
+	"github.com/CanonicalLtd/candid/idp/static"
 	"github.com/CanonicalLtd/candid/internal/auth"
 	"github.com/CanonicalLtd/candid/internal/candidtest"
 	"github.com/CanonicalLtd/candid/store"
@@ -34,12 +34,10 @@ func TestAuth(t *testing.T) {
 type authSuite struct {
 	store *candidtest.Store
 
-	oven                *bakery.Oven
-	authorizer          *auth.Authorizer
-	context             context.Context
-	adminAgentKey       *bakery.KeyPair
-	providerGroups      []string
-	providerGroupsError error
+	oven          *bakery.Oven
+	authorizer    *auth.Authorizer
+	context       context.Context
+	adminAgentKey *bakery.KeyPair
 }
 
 const identityLocation = "https://identity.test/id"
@@ -73,9 +71,14 @@ func (s *authSuite) Init(c *qt.C) {
 		MacaroonVerifier: s.oven,
 		Store:            s.store.Store,
 		IdentityProviders: []idp.IdentityProvider{
-			test.NewIdentityProvider(test.Params{
-				Name:      "test",
-				GetGroups: s.getGroups,
+			static.NewIdentityProvider(static.Params{
+				Name: "test",
+				Users: map[string]static.UserInfo{
+					"testuser": {
+						Password: "testpass",
+						Groups:   []string{"somegroup"},
+					},
+				},
 			}),
 		},
 		ACLManager: aclManager,
@@ -85,10 +88,6 @@ func (s *authSuite) Init(c *qt.C) {
 	c.Assert(err, qt.Equals, nil)
 	err = s.authorizer.SetAdminPublicKey(s.context, &s.adminAgentKey.Public)
 	c.Assert(err, qt.Equals, nil)
-}
-
-func (s *authSuite) getGroups(*store.Identity) ([]string, error) {
-	return s.providerGroups, s.providerGroupsError
 }
 
 func (s *authSuite) createIdentity(c *qt.C, username string, pk *bakery.PublicKey, groups ...string) *auth.Identity {
@@ -353,28 +352,19 @@ var identityAllowTests = []struct {
 	groups:        []string{"x", "somegroup"},
 	expectAllowed: true,
 }, {
-	about:          "user is allowed if they're in the expected group externally",
-	acl:            []string{"somegroup"},
-	externalGroups: []string{"x", "somegroup"},
-	expectAllowed:  true,
+	about:         "user is allowed if they're in the expected group externally",
+	acl:           []string{"somegroup"},
+	expectAllowed: true,
 }, {
 	about:         "user is not allowed if they're not in the expected group",
-	acl:           []string{"somegroup"},
-	groups:        []string{"x"},
+	acl:           []string{"othergroup"},
+	groups:        []string{"somegroup"},
 	expectAllowed: false,
-}, {
-	about:               "error from external groups is ignored",
-	acl:                 []string{"somegroup"},
-	groups:              []string{"somegroup"},
-	externalGroupsError: errgo.New("some error"),
-	expectAllowed:       true,
 }}
 
 func (s *authSuite) TestIdentityAllow(c *qt.C) {
 	for _, test := range identityAllowTests {
 		c.Run(test.about, func(c *qt.C) {
-			s.providerGroups = test.externalGroups
-			s.providerGroupsError = test.externalGroupsError
 			id := s.createIdentity(c, "testuser", nil, test.groups...)
 			ok, err := id.Allow(s.context, test.acl)
 			if test.expectError != "" {

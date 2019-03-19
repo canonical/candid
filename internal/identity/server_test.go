@@ -26,7 +26,7 @@ import (
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
 
 	"github.com/CanonicalLtd/candid/idp"
-	"github.com/CanonicalLtd/candid/idp/test"
+	"github.com/CanonicalLtd/candid/idp/static"
 	"github.com/CanonicalLtd/candid/internal/auth"
 	"github.com/CanonicalLtd/candid/internal/candidtest"
 	"github.com/CanonicalLtd/candid/internal/debug"
@@ -280,11 +280,8 @@ func (s *fullServerSuite) Init(c *qt.C) {
 	s.store = candidtest.NewStore()
 	sp := s.store.ServerParams()
 	sp.IdentityProviders = []idp.IdentityProvider{
-		test.NewIdentityProvider(test.Params{
+		static.NewIdentityProvider(static.Params{
 			Name: "test",
-			GetGroups: func(*store.Identity) ([]string, error) {
-				return []string{"g1", "g2", "g3"}, nil
-			},
 		}),
 	}
 	s.srv = candidtest.NewServer(c, sp, map[string]identity.NewAPIHandlerFunc{

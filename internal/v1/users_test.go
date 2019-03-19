@@ -19,7 +19,7 @@ import (
 	macaroon "gopkg.in/macaroon.v2"
 
 	"github.com/CanonicalLtd/candid/idp"
-	testidp "github.com/CanonicalLtd/candid/idp/test"
+	"github.com/CanonicalLtd/candid/idp/static"
 	"github.com/CanonicalLtd/candid/internal/auth"
 	"github.com/CanonicalLtd/candid/internal/candidtest"
 	"github.com/CanonicalLtd/candid/internal/discharger"
@@ -36,6 +36,7 @@ type usersSuite struct {
 	store       *candidtest.Store
 	srv         *candidtest.Server
 	adminClient *candidclient.Client
+	interactor  httpbakery.WebBrowserInteractor
 }
 
 func (s *usersSuite) Init(c *qt.C) {
@@ -44,11 +45,13 @@ func (s *usersSuite) Init(c *qt.C) {
 	// Ensure that there's an identity provider for the test identities
 	// we add so that group resolution on test identities works correctly.
 	sp.IdentityProviders = []idp.IdentityProvider{
-		testidp.NewIdentityProvider(testidp.Params{
-			Name:   "test",
-			Domain: "test",
-			GetGroups: func(id *store.Identity) ([]string, error) {
-				return nil, nil
+		static.NewIdentityProvider(static.Params{
+			Name: "test",
+			Users: map[string]static.UserInfo{
+				"bob": {
+					Password: "bobpassword",
+					Groups:   []string{"g1", "g2", "testgroup"},
+				},
 			},
 		}),
 	}
@@ -57,6 +60,9 @@ func (s *usersSuite) Init(c *qt.C) {
 		"v1":         v1.NewAPIHandler,
 	})
 	s.adminClient = s.srv.AdminIdentityClient()
+	s.interactor = httpbakery.WebBrowserInteractor{
+		OpenWebBrowser: candidtest.PasswordLogin(c, "bob", "bobpassword"),
+	}
 }
 
 func (s *usersSuite) TestRoundTripUser(c *qt.C) {
@@ -113,16 +119,7 @@ var (
 func (s *usersSuite) TestCreateAgent(c *qt.C) {
 	client, err := candidclient.New(candidclient.NewParams{
 		BaseURL: s.srv.URL,
-		Client: &httpbakery.Client{
-			Client: httpbakery.NewHTTPClient(),
-			InteractionMethods: []httpbakery.Interactor{testidp.Interactor{
-				User: &params.User{
-					Username:   "bob",
-					ExternalID: "test:bob",
-					IDPGroups:  []string{"testgroup"},
-				},
-			}},
-		},
+		Client:  s.srv.Client(s.interactor),
 	})
 	c.Assert(err, qt.Equals, nil)
 	resp, err := client.CreateAgent(s.srv.Ctx, &params.CreateAgentRequest{
@@ -170,16 +167,7 @@ func (s *usersSuite) TestCreateAgentAsAgent(c *qt.C) {
 func (s *usersSuite) TestCreateAgentWithGroups(c *qt.C) {
 	client, err := candidclient.New(candidclient.NewParams{
 		BaseURL: s.srv.URL,
-		Client: &httpbakery.Client{
-			Client: httpbakery.NewHTTPClient(),
-			InteractionMethods: []httpbakery.Interactor{testidp.Interactor{
-				User: &params.User{
-					Username:   "bob",
-					ExternalID: "test:bob",
-					IDPGroups:  []string{"g1", "g2", "g3"},
-				},
-			}},
-		},
+		Client:  s.srv.Client(s.interactor),
 	})
 	c.Assert(err, qt.Equals, nil)
 
@@ -193,6 +181,8 @@ func (s *usersSuite) TestCreateAgentWithGroups(c *qt.C) {
 	})
 	c.Assert(err, qt.ErrorMatches, `Post .*: cannot add agent to groups that you are not a member of`)
 
+	s.setUserGroups(c, "bob", "g3")
+
 	// We can create agents in groups that are a subset of the
 	// owner's groups.
 	resp, err = client.CreateAgent(s.srv.Ctx, &params.CreateAgentRequest{
@@ -205,35 +195,33 @@ func (s *usersSuite) TestCreateAgentWithGroups(c *qt.C) {
 
 	// If the owner is removed from a group, the agent won't be
 	// in that group any more.
-	err = s.store.Store.UpdateIdentity(s.srv.Ctx, &store.Identity{
-		Username: "bob",
-		Groups:   []string{"g3"},
-	}, store.Update{
-		store.Groups: store.Set,
-	})
-	c.Assert(err, qt.Equals, nil)
+	s.setUserGroups(c, "bob")
 
 	groups, err := s.adminClient.UserGroups(s.srv.Ctx, &params.UserGroupsRequest{
 		Username: resp.Username,
 	})
 	c.Assert(err, qt.Equals, nil)
-	c.Assert(groups, qt.DeepEquals, []string{"g3"})
+	c.Assert(groups, qt.DeepEquals, []string{"g1"})
 
 	// If the owner is added back to the group, the agent
 	// gets added back too.
-	err = s.store.Store.UpdateIdentity(s.srv.Ctx, &store.Identity{
-		Username: "bob",
-		Groups:   []string{"g1", "g2", "g3", "g4"},
-	}, store.Update{
-		store.Groups: store.Set,
-	})
-	c.Assert(err, qt.Equals, nil)
+	s.setUserGroups(c, "bob", "g3", "g4")
 
 	groups, err = s.adminClient.UserGroups(s.srv.Ctx, &params.UserGroupsRequest{
 		Username: resp.Username,
 	})
 	c.Assert(err, qt.Equals, nil)
 	c.Assert(groups, qt.DeepEquals, []string{"g1", "g3"})
+}
+
+func (s *usersSuite) setUserGroups(c *qt.C, username string, groups ...string) {
+	err := s.store.Store.UpdateIdentity(s.srv.Ctx, &store.Identity{
+		Username: username,
+		Groups:   groups,
+	}, store.Update{
+		store.Groups: store.Set,
+	})
+	c.Assert(err, qt.Equals, nil)
 }
 
 func (s *usersSuite) TestCreateParentAgent(c *qt.C) {
@@ -273,16 +261,7 @@ func (s *usersSuite) TestCreateParentAgent(c *qt.C) {
 func (s *usersSuite) TestCreateParentAgentUnauthorized(c *qt.C) {
 	client, err := candidclient.New(candidclient.NewParams{
 		BaseURL: s.srv.URL,
-		Client: &httpbakery.Client{
-			Client: httpbakery.NewHTTPClient(),
-			InteractionMethods: []httpbakery.Interactor{testidp.Interactor{
-				User: &params.User{
-					Username:   "bob",
-					ExternalID: "test:bob",
-					IDPGroups:  []string{"g1", "g2", "g3"},
-				},
-			}},
-		},
+		Client:  s.srv.Client(s.interactor),
 	})
 	c.Assert(err, qt.Equals, nil)
 
@@ -300,16 +279,7 @@ func (s *usersSuite) TestCreateParentAgentUnauthorized(c *qt.C) {
 func (s *usersSuite) TestCreateParentAgentNotInGroups(c *qt.C) {
 	client, err := candidclient.New(candidclient.NewParams{
 		BaseURL: s.srv.URL,
-		Client: &httpbakery.Client{
-			Client: httpbakery.NewHTTPClient(),
-			InteractionMethods: []httpbakery.Interactor{testidp.Interactor{
-				User: &params.User{
-					Username:   "bob",
-					ExternalID: "test:bob",
-					IDPGroups:  []string{"g1", "g2"},
-				},
-			}},
-		},
+		Client:  s.srv.Client(s.interactor),
 	})
 	c.Assert(err, qt.Equals, nil)
 
