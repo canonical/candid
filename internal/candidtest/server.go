@@ -29,9 +29,13 @@ var DefaultTemplate = template.New("")
 
 func init() {
 	template.Must(DefaultTemplate.New("login").Parse(loginTemplate))
+	template.Must(DefaultTemplate.New("login-form").Parse(loginFormTemplate))
 }
 
-const loginTemplate = "login successful as user {{.Username}}\n"
+const (
+	loginTemplate     = "login successful as user {{.Username}}\n"
+	loginFormTemplate = "{{.Action}}\n"
+)
 
 // Server implements a test fixture that contains a candid server.
 type Server struct {

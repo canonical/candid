@@ -125,7 +125,7 @@ var newTests = []struct {
 	expectError: `invalid 'group-query-filter' config parameter.*`,
 }}
 
-func (s *ldapSuite) getSampleLdapDB() ldapDB {
+func getSampleLdapDB() ldapDB {
 	return ldapDB{{
 		// admin user (used for search binds)
 		"dn":           {"cn=test,dc=example,dc=com"},
@@ -143,7 +143,7 @@ func (s *ldapSuite) getSampleLdapDB() ldapDB {
 	}}
 }
 
-func (s *ldapSuite) getSampleParams() ldap.Params {
+func getSampleParams() ldap.Params {
 	return ldap.Params{
 		Name:             "test",
 		URL:              "ldap://localhost",
@@ -196,13 +196,13 @@ func (s *ldapSuite) TestNewIdentityProvider(c *qt.C) {
 }
 
 func (s *ldapSuite) TestName(c *qt.C) {
-	idp, err := ldap.NewIdentityProvider(s.getSampleParams())
+	idp, err := ldap.NewIdentityProvider(getSampleParams())
 	c.Assert(err, qt.Equals, nil)
 	c.Assert(idp.Name(), qt.Equals, "test")
 }
 
 func (s *ldapSuite) TestDescription(c *qt.C) {
-	params := s.getSampleParams()
+	params := getSampleParams()
 	params.Description = "test description"
 	idp, err := ldap.NewIdentityProvider(params)
 	c.Assert(err, qt.Equals, nil)
@@ -210,7 +210,7 @@ func (s *ldapSuite) TestDescription(c *qt.C) {
 }
 
 func (s *ldapSuite) TestDomain(c *qt.C) {
-	params := s.getSampleParams()
+	params := getSampleParams()
 	params.Domain = "test domain"
 	idp, err := ldap.NewIdentityProvider(params)
 	c.Assert(err, qt.Equals, nil)
@@ -218,13 +218,13 @@ func (s *ldapSuite) TestDomain(c *qt.C) {
 }
 
 func (s *ldapSuite) TestInteractive(c *qt.C) {
-	idp, err := ldap.NewIdentityProvider(s.getSampleParams())
+	idp, err := ldap.NewIdentityProvider(getSampleParams())
 	c.Assert(err, qt.Equals, nil)
 	c.Assert(idp.Interactive(), qt.Equals, true)
 }
 
 func (s *ldapSuite) TestURL(c *qt.C) {
-	i, err := ldap.NewIdentityProvider(s.getSampleParams())
+	i, err := ldap.NewIdentityProvider(getSampleParams())
 	c.Assert(err, qt.Equals, nil)
 	i.Init(context.Background(), idp.InitParams{
 		URLPrefix: "https://example.com/test",
@@ -233,9 +233,9 @@ func (s *ldapSuite) TestURL(c *qt.C) {
 }
 
 func (s *ldapSuite) TestHandle(c *qt.C) {
-	params := s.getSampleParams()
+	params := getSampleParams()
 	params.Domain = "ldap"
-	i := s.setupIdp(c, params, s.getSampleLdapDB())
+	i := s.setupIdp(c, params, getSampleLdapDB())
 	s.makeLoginRequest(c, i, "user1", "pass1")
 	s.idptest.AssertLoginSuccess(c, "user1@ldap")
 	s.idptest.Store.AssertUser(c, &store.Identity{
@@ -246,9 +246,9 @@ func (s *ldapSuite) TestHandle(c *qt.C) {
 }
 
 func (s *ldapSuite) TestHandleCustomUserFilter(c *qt.C) {
-	params := s.getSampleParams()
+	params := getSampleParams()
 	params.UserQueryFilter = "(customAttr=customValue)"
-	sampleDB := s.getSampleLdapDB()
+	sampleDB := getSampleLdapDB()
 	sampleDB[1]["objectClass"] = []string{"ignored"}
 	sampleDB[1]["customAttr"] = []string{"customValue"}
 	i := s.setupIdp(c, params, sampleDB)
@@ -262,10 +262,10 @@ func (s *ldapSuite) TestHandleCustomUserFilter(c *qt.C) {
 }
 
 func (s *ldapSuite) TestHandleUserDetails(c *qt.C) {
-	params := s.getSampleParams()
+	params := getSampleParams()
 	params.UserQueryAttrs.Email = "mail"
 	params.UserQueryAttrs.DisplayName = "displayName"
-	sampleDB := s.getSampleLdapDB()
+	sampleDB := getSampleLdapDB()
 	sampleDB[1]["mail"] = []string{"user1@example.com"}
 	sampleDB[1]["displayName"] = []string{"User One"}
 	i := s.setupIdp(c, params, sampleDB)
@@ -281,9 +281,9 @@ func (s *ldapSuite) TestHandleUserDetails(c *qt.C) {
 }
 
 func (s *ldapSuite) TestHandleUserDetailsCustomIDAttr(c *qt.C) {
-	params := s.getSampleParams()
+	params := getSampleParams()
 	params.UserQueryAttrs.ID = "myId"
-	sampleDB := s.getSampleLdapDB()
+	sampleDB := getSampleLdapDB()
 	sampleDB[1]["uid"] = []string{"ignored"}
 	sampleDB[1]["myId"] = []string{"user1"}
 	i := s.setupIdp(c, params, sampleDB)
@@ -311,8 +311,8 @@ func (s *ldapSuite) TestHandleWithGroups(c *qt.C) {
 		"cn":          {"group2"},
 		"member":      {"uid=user1,ou=users,dc=example,dc=com"},
 	}}
-	sampleDB := append(s.getSampleLdapDB(), docs...)
-	i := s.setupIdp(c, s.getSampleParams(), sampleDB)
+	sampleDB := append(getSampleLdapDB(), docs...)
+	i := s.setupIdp(c, getSampleParams(), sampleDB)
 	s.makeLoginRequest(c, i, "user1", "pass1")
 	s.idptest.AssertLoginSuccess(c, "user1")
 	identity := s.idptest.Store.AssertUser(c, &store.Identity{
@@ -326,7 +326,7 @@ func (s *ldapSuite) TestHandleWithGroups(c *qt.C) {
 }
 
 func (s *ldapSuite) TestHandleCustomGroupFilter(c *qt.C) {
-	params := s.getSampleParams()
+	params := getSampleParams()
 	params.GroupQueryFilter = "(&(customAttr=customValue)(user={{.User}}))"
 	docs := []ldapDoc{{
 		"dn":         {"cn=group1,ou=users,dc=example,dc=com"},
@@ -342,7 +342,7 @@ func (s *ldapSuite) TestHandleCustomGroupFilter(c *qt.C) {
 		"cn":         {"group2"},
 		"user":       {"uid=user1,ou=users,dc=example,dc=com"},
 	}}
-	sampleDB := append(s.getSampleLdapDB(), docs...)
+	sampleDB := append(getSampleLdapDB(), docs...)
 	i := s.setupIdp(c, params, sampleDB)
 	s.makeLoginRequest(c, i, "user1", "pass1")
 	s.idptest.AssertLoginSuccess(c, "user1")
@@ -357,15 +357,15 @@ func (s *ldapSuite) TestHandleCustomGroupFilter(c *qt.C) {
 }
 
 func (s *ldapSuite) TestHandleFailedLogin(c *qt.C) {
-	i := s.setupIdp(c, s.getSampleParams(), s.getSampleLdapDB())
+	i := s.setupIdp(c, getSampleParams(), getSampleLdapDB())
 	s.makeLoginRequest(c, i, "user1", "wrong")
 	s.idptest.AssertLoginFailureMatches(c, `Login failure`)
 }
 
 func (s *ldapSuite) TestHandleUserFilterNoMatch(c *qt.C) {
-	params := s.getSampleParams()
+	params := getSampleParams()
 	params.UserQueryFilter = "(customAttr=customValue)"
-	sampleDB := s.getSampleLdapDB()
+	sampleDB := getSampleLdapDB()
 	sampleDB[1]["objectClass"] = []string{"ignored"}
 	sampleDB[1]["customAttr"] = []string{"customValue2"}
 	i := s.setupIdp(c, params, sampleDB)

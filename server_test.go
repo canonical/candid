@@ -16,7 +16,7 @@ import (
 	"github.com/CanonicalLtd/candid/config"
 	"github.com/CanonicalLtd/candid/idp"
 	_ "github.com/CanonicalLtd/candid/idp/agent"
-	_ "github.com/CanonicalLtd/candid/idp/test"
+	_ "github.com/CanonicalLtd/candid/idp/static"
 	"github.com/CanonicalLtd/candid/internal/candidtest"
 	"github.com/CanonicalLtd/candid/version"
 )
@@ -76,7 +76,7 @@ func (s *serverSuite) TestNewServerWithVersions(c *qt.C) {
 
 func (s *serverSuite) TestNewServerRemovesAgentIDP(c *qt.C) {
 	var conf config.Config
-	err := yaml.Unmarshal([]byte(`{"identity-providers": [{"type":"agent"},{"type":"test","name":"test"}]}`), &conf)
+	err := yaml.Unmarshal([]byte(`{"identity-providers": [{"type":"agent"},{"type":"static","name":"test"}]}`), &conf)
 	c.Assert(err, qt.Equals, nil)
 	idps := make([]idp.IdentityProvider, len(conf.IdentityProviders))
 	for i, idp := range conf.IdentityProviders {
