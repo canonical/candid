@@ -178,9 +178,53 @@ func PostLoginForm(username, password string) ResponseHandler {
 	}
 }
 
+// SelectInteractiveLogin is a ResponseHandler that processes the list of
+// login methods in the incoming response and performs a GET on that URL.
+// If rh is non-nil it will be used to further process the response
+// before returning to the caller.
+func SelectInteractiveLogin(rh ResponseHandler) ResponseHandler {
+	return func(client *http.Client, resp *http.Response) (*http.Response, error) {
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			return nil, errgo.Newf("unexpected status %q", resp.Status)
+		}
+		body, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			return nil, errgo.Mask(err)
+		}
+		// The body, as specified by the
+		// authenticationRequiredTemplate, will be a list of
+		// interactive login URLs, one on each line. Choose the
+		// first valid one.
+		parts := bytes.Split(body, []byte("\n"))
+		lurl := ""
+		for _, p := range parts {
+			if len(p) == 0 {
+				continue
+			}
+			s := string(p)
+			if _, err := url.Parse(s); err == nil {
+				lurl = s
+				break
+			}
+		}
+		if lurl == "" {
+			return nil, errgo.New("login returned no URLs")
+		}
+		resp, err = client.Get(lurl)
+		if err != nil {
+			return resp, errgo.Mask(err)
+		}
+		if rh != nil {
+			resp, err = rh(client, resp)
+		}
+		return resp, errgo.Mask(err, errgo.Any)
+	}
+}
+
 // PasswordLogin return a function that can be used with
 // httpbakery.WebBrowserInteractor.OpenWebBrowser that will be configured
 // to perform a username/password login using the given values.
 func PasswordLogin(c *qt.C, username, password string) func(u *url.URL) error {
-	return OpenWebBrowser(c, PostLoginForm(username, password))
+	return OpenWebBrowser(c, SelectInteractiveLogin(PostLoginForm(username, password)))
 }

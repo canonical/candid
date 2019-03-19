@@ -9,8 +9,9 @@ import (
 	"context"
 	"net/http"
 
+	"github.com/juju/loggo"
 	"gopkg.in/CanonicalLtd/candidclient.v1/params"
-	"gopkg.in/errgo.v1"
+	errgo "gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
 
 	"github.com/CanonicalLtd/candid/idp"
@@ -18,6 +19,8 @@ import (
 	"github.com/CanonicalLtd/candid/idp/keystone/internal/keystone"
 	"github.com/CanonicalLtd/candid/store"
 )
+
+var logger = loggo.GetLogger("candid.idp.keystone")
 
 func init() {
 	idp.Register("keystone", constructor(NewIdentityProvider))
@@ -116,8 +119,8 @@ func (idp *identityProvider) Init(_ context.Context, params idp.InitParams) erro
 }
 
 // URL implements idp.IdentityProvider.URL.
-func (idp *identityProvider) URL(dischargeID string) string {
-	return idputil.URL(idp.initParams.URLPrefix, "/login", dischargeID)
+func (idp *identityProvider) URL(state string) string {
+	return idputil.RedirectURL(idp.initParams.URLPrefix, "/login", state)
 }
 
 // SetInteraction implements idp.IdentityProvider.SetInteraction.
@@ -133,6 +136,12 @@ func (*identityProvider) GetGroups(ctx context.Context, identity *store.Identity
 
 // Handle implements idp.IdentityProvider.Handle.
 func (idp *identityProvider) Handle(ctx context.Context, w http.ResponseWriter, req *http.Request) {
+	var ls idputil.LoginState
+	if err := idp.initParams.Codec.Cookie(req, idputil.LoginCookieName, req.Form.Get("state"), &ls); err != nil {
+		logger.Infof("Invalid login state: %s", err)
+		idputil.BadRequestf(w, "Login failed: invalid login state")
+		return
+	}
 	if req.Form.Get("username") != "" {
 		user, err := idp.doLogin(ctx, keystone.Auth{
 			PasswordCredentials: &keystone.PasswordCredentials{
@@ -141,19 +150,24 @@ func (idp *identityProvider) Handle(ctx context.Context, w http.ResponseWriter, 
 			},
 		})
 		if err != nil {
-			idp.initParams.VisitCompleter.Failure(ctx, w, req, idputil.DischargeID(req), err)
+			idp.initParams.VisitCompleter.RedirectFailure(ctx, w, req, ls.ReturnTo, ls.State, err)
 			return
 		}
-		idp.initParams.VisitCompleter.Success(ctx, w, req, idputil.DischargeID(req), user)
+		idp.initParams.VisitCompleter.RedirectSuccess(ctx, w, req, ls.ReturnTo, ls.State, user)
 		return
 	}
 	w.Header().Set("Content-Type", "text/html;charset=UTF-8")
 	loginTemplate := idp.initParams.Template.Lookup("login-form")
+	if loginTemplate == nil {
+		idp.initParams.VisitCompleter.RedirectFailure(ctx, w, req, ls.ReturnTo, ls.State, errgo.New("cannot load login template"))
+		return
+	}
 	err := loginTemplate.Execute(w, map[string]string{
-		"Action": idp.URL(idputil.DischargeID(req)),
+		"Action": idp.URL(idputil.State(req)),
 	})
 	if err != nil {
-		idp.initParams.VisitCompleter.Failure(ctx, w, req, idputil.DischargeID(req), err)
+		// The template failed part way through rendering.
+		logger.Errorf("cannot render login template: %s", err)
 	}
 }
 

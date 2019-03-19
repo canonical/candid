@@ -20,8 +20,11 @@ import (
 	"gopkg.in/macaroon-bakery.v2/bakery/checkers"
 	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
+	macaroon "gopkg.in/macaroon.v2"
 
 	"github.com/CanonicalLtd/candid/idp"
+	"github.com/CanonicalLtd/candid/idp/idputil/secret"
+	"github.com/CanonicalLtd/candid/internal/auth"
 	"github.com/CanonicalLtd/candid/internal/discharger/internal"
 	"github.com/CanonicalLtd/candid/internal/identity"
 	"github.com/CanonicalLtd/candid/store"
@@ -37,7 +40,14 @@ const (
 	dischargeTokenDuration = identityMacaroonDuration
 )
 
-func initIDPs(ctx context.Context, params identity.HandlerParams, dt *dischargeTokenCreator, vc *visitCompleter) error {
+type initIDPParams struct {
+	identity.HandlerParams
+	Codec                 *secret.Codec
+	DischargeTokenCreator *dischargeTokenCreator
+	VisitCompleter        *visitCompleter
+}
+
+func initIDPs(ctx context.Context, params initIDPParams) error {
 	for _, ip := range params.IdentityProviders {
 		kvStore, err := params.ProviderDataStore.KeyValueStore(ctx, ip.Name())
 		if err != nil {
@@ -47,10 +57,10 @@ func initIDPs(ctx context.Context, params identity.HandlerParams, dt *dischargeT
 			Store:                 params.Store,
 			KeyValueStore:         kvStore,
 			Oven:                  params.Oven,
-			Key:                   params.Key,
+			Codec:                 params.Codec,
 			URLPrefix:             params.Location + "/login/" + ip.Name(),
-			DischargeTokenCreator: dt,
-			VisitCompleter:        vc,
+			DischargeTokenCreator: params.DischargeTokenCreator,
+			VisitCompleter:        params.VisitCompleter,
 			Template:              params.Template,
 		}); err != nil {
 			return errgo.Mask(err)
@@ -122,10 +132,23 @@ func (c *visitCompleter) Success(ctx context.Context, w http.ResponseWriter, req
 		c.Failure(ctx, w, req, dischargeID, errgo.Mask(err))
 		return
 	}
+	c.successToken(ctx, w, req, dischargeID, dt, id)
+}
+
+func (c *visitCompleter) successToken(ctx context.Context, w http.ResponseWriter, req *http.Request, dischargeID string, dt *httpbakery.DischargeToken, id *store.Identity) {
 	if dischargeID != "" {
 		if err := c.place.Done(ctx, dischargeID, &loginInfo{DischargeToken: dt}); err != nil {
 			c.Failure(ctx, w, req, dischargeID, errgo.Mask(err))
 			return
+		}
+	}
+	if id == nil {
+		id = &store.Identity{
+			Username: usernameFromDischargeToken(dt),
+		}
+		if err := c.params.Store.Identity(ctx, id); err != nil {
+			// Log, but otherwise ignore this error, the username is probably enough.
+			logger.Errorf("cannot look up user identity: %s", err)
 		}
 	}
 	t := c.params.Template.Lookup("login")
@@ -168,7 +191,7 @@ func (c *visitCompleter) RedirectSuccess(ctx context.Context, w http.ResponseWri
 	if state != "" {
 		v.Set("state", state)
 	}
-	if err := redirect(w, req, returnTo, v); err != nil {
+	if err := c.redirect(w, req, returnTo, v); err != nil {
 		identity.WriteError(ctx, w, err)
 	}
 	return
@@ -185,7 +208,7 @@ func (c *visitCompleter) RedirectFailure(ctx context.Context, w http.ResponseWri
 	if ec, ok := errgo.Cause(err).(params.ErrorCode); ok {
 		v.Set("error_code", string(ec))
 	}
-	if rerr := redirect(w, req, returnTo, v); rerr == nil {
+	if rerr := c.redirect(w, req, returnTo, v); rerr == nil {
 		return
 	}
 	identity.WriteError(ctx, w, err)
@@ -195,9 +218,11 @@ func (c *visitCompleter) RedirectFailure(ctx context.Context, w http.ResponseWri
 // address with the given query parameters. If an error is returned it
 // will be because the returnTo address is invalid and therefore it will
 // not be possible to redirect to it.
-func redirect(w http.ResponseWriter, req *http.Request, returnTo string, query url.Values) error {
+func (c *visitCompleter) redirect(w http.ResponseWriter, req *http.Request, returnTo string, query url.Values) error {
 	u, err := url.Parse(returnTo)
-	if returnTo == "" || err != nil {
+	// We only support logins from ourselves for now, so only allow a
+	// redirect if it returns back to ourselves.
+	if !strings.HasPrefix(returnTo, c.params.Location) || err != nil {
 		return errgo.WithCausef(err, params.ErrBadRequest, "invalid return_to")
 	}
 	q := u.Query()
@@ -205,6 +230,17 @@ func redirect(w http.ResponseWriter, req *http.Request, returnTo string, query u
 		q[k] = append(q[k], v...)
 	}
 	u.RawQuery = q.Encode()
-	http.Redirect(w, req, u.String(), http.StatusTemporaryRedirect)
+	http.Redirect(w, req, u.String(), http.StatusSeeOther)
 	return nil
+}
+
+func usernameFromDischargeToken(dt *httpbakery.DischargeToken) string {
+	if dt.Kind != "macaroon" {
+		return ""
+	}
+	var m macaroon.Macaroon
+	if err := m.UnmarshalBinary(dt.Value); err != nil {
+		return ""
+	}
+	return checkers.InferDeclared(auth.Namespace, macaroon.Slice{&m})["username"]
 }

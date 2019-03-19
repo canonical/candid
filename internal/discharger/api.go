@@ -15,6 +15,7 @@ import (
 	"gopkg.in/httprequest.v1"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
 
+	"github.com/CanonicalLtd/candid/idp/idputil/secret"
 	"github.com/CanonicalLtd/candid/internal/auth/httpauth"
 	"github.com/CanonicalLtd/candid/internal/discharger/internal"
 	"github.com/CanonicalLtd/candid/internal/identity"
@@ -41,7 +42,14 @@ func NewAPIHandler(params identity.HandlerParams) ([]httprequest.Handler, error)
 		dischargeTokenStore:   dts,
 		place:                 place,
 	}
-	if err := initIDPs(context.Background(), params, dt, vc); err != nil {
+	codec := secret.NewCodec(params.Key)
+	err = initIDPs(context.Background(), initIDPParams{
+		HandlerParams:         params,
+		Codec:                 codec,
+		DischargeTokenCreator: dt,
+		VisitCompleter:        vc,
+	})
+	if err != nil {
 		return nil, errgo.Mask(err)
 	}
 	checker := &thirdPartyCaveatChecker{
@@ -57,6 +65,7 @@ func NewAPIHandler(params identity.HandlerParams) ([]httprequest.Handler, error)
 		visitCompleter:        vc,
 		place:                 place,
 		reqAuth:               reqAuth,
+		codec:                 codec,
 	}))
 	d := httpbakery.NewDischarger(httpbakery.DischargerParams{
 		CheckerP:        checker,
@@ -85,6 +94,7 @@ type handlerParams struct {
 	visitCompleter        *visitCompleter
 	place                 *place
 	reqAuth               *httpauth.Authorizer
+	codec                 *secret.Codec
 }
 
 // handlerCreator returns a function that creates new instances of the discharger API handler for a request.

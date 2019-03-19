@@ -14,7 +14,7 @@ import (
 	qt "github.com/frankban/quicktest"
 	aclstore "github.com/juju/aclstore/v2"
 	"github.com/juju/simplekv/memsimplekv"
-	"gopkg.in/CanonicalLtd/candidclient.v1"
+	candidclient "gopkg.in/CanonicalLtd/candidclient.v1"
 	errgo "gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
@@ -28,13 +28,16 @@ import (
 var DefaultTemplate = template.New("")
 
 func init() {
+	template.Must(DefaultTemplate.New("authentication-required").Parse(authenticationRequiredTemplate))
 	template.Must(DefaultTemplate.New("login").Parse(loginTemplate))
 	template.Must(DefaultTemplate.New("login-form").Parse(loginFormTemplate))
 }
 
 const (
-	loginTemplate     = "login successful as user {{.Username}}\n"
-	loginFormTemplate = "{{.Action}}\n"
+	// This format is interpretted by SelectInteractiveLogin.
+	authenticationRequiredTemplate = "{{range .IDPs}}{{.URL}}\n{{end}}"
+	loginTemplate                  = "login successful as user {{.Username}}\n"
+	loginFormTemplate              = "{{.Action}}\n"
 )
 
 // Server implements a test fixture that contains a candid server.

@@ -5,10 +5,6 @@ package static_test
 
 import (
 	"context"
-	"net/http"
-	"net/http/httptest"
-	"net/url"
-	"strings"
 	"testing"
 
 	qt "github.com/frankban/quicktest"
@@ -20,6 +16,8 @@ import (
 	"github.com/CanonicalLtd/candid/internal/candidtest"
 	"github.com/CanonicalLtd/candid/store"
 )
+
+const idpPrefix = "https://idp.example.com"
 
 type staticSuite struct {
 	idptest *idptest.Fixture
@@ -35,7 +33,7 @@ func (s *staticSuite) Init(c *qt.C) {
 
 func (s *staticSuite) setupIdp(c *qt.C, params static.Params) idp.IdentityProvider {
 	i := static.NewIdentityProvider(params)
-	i.Init(context.TODO(), s.idptest.InitParams(c, "https://example.com/test"))
+	i.Init(context.TODO(), s.idptest.InitParams(c, idpPrefix))
 	return i
 }
 
@@ -51,23 +49,6 @@ func getSampleParams() static.Params {
 			},
 		},
 	}
-}
-
-func (s *staticSuite) makeLoginRequest(c *qt.C, i idp.IdentityProvider, username, password string) *httptest.ResponseRecorder {
-	req, err := http.NewRequest("POST", "/login",
-		strings.NewReader(
-			url.Values{
-				"username": {username},
-				"password": {password},
-			}.Encode(),
-		),
-	)
-	c.Assert(err, qt.Equals, nil)
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req.ParseForm()
-	rr := httptest.NewRecorder()
-	i.Handle(context.TODO(), rr, req)
-	return rr
 }
 
 func (s *staticSuite) TestName(c *qt.C) {
@@ -89,8 +70,14 @@ func (s *staticSuite) TestInteractive(c *qt.C) {
 
 func (s *staticSuite) TestHandle(c *qt.C) {
 	i := s.setupIdp(c, getSampleParams())
-	s.makeLoginRequest(c, i, "user1", "pass1")
-	s.idptest.AssertLoginSuccess(c, "user1")
+	id, err := s.idptest.DoInteractiveLogin(c, i, idpPrefix+"/login", candidtest.PostLoginForm("user1", "pass1"))
+	c.Assert(err, qt.Equals, nil)
+	candidtest.AssertEqualIdentity(c, id, &store.Identity{
+		ProviderID: store.MakeProviderIdentity("test", "user1"),
+		Username:   "user1",
+		Name:       "User One",
+		Email:      "user1@example.com",
+	})
 	s.idptest.Store.AssertUser(c, &store.Identity{
 		ProviderID: store.MakeProviderIdentity("test", "user1"),
 		Username:   "user1",
@@ -103,8 +90,15 @@ func (s *staticSuite) TestHandleWithDomain(c *qt.C) {
 	params := getSampleParams()
 	params.Domain = "domain"
 	i := s.setupIdp(c, params)
-	s.makeLoginRequest(c, i, "user1", "pass1")
-	s.idptest.AssertLoginSuccess(c, "user1@domain")
+	id, err := s.idptest.DoInteractiveLogin(c, i, idpPrefix+"/login", candidtest.PostLoginForm("user1", "pass1"))
+	c.Assert(err, qt.Equals, nil)
+
+	candidtest.AssertEqualIdentity(c, id, &store.Identity{
+		ProviderID: store.MakeProviderIdentity("test", "user1@domain"),
+		Username:   "user1@domain",
+		Name:       "User One",
+		Email:      "user1@example.com",
+	})
 	s.idptest.Store.AssertUser(c, &store.Identity{
 		ProviderID: store.MakeProviderIdentity("test", "user1@domain"),
 		Username:   "user1@domain",
@@ -116,8 +110,8 @@ func (s *staticSuite) TestHandleWithDomain(c *qt.C) {
 func (s *staticSuite) TestGetGroups(c *qt.C) {
 	params := getSampleParams()
 	i := s.setupIdp(c, params)
-	s.makeLoginRequest(c, i, "user1", "pass1")
-	s.idptest.AssertLoginSuccess(c, "user1")
+	_, err := s.idptest.DoInteractiveLogin(c, i, idpPrefix+"/login", candidtest.PostLoginForm("user1", "pass1"))
+	c.Assert(err, qt.Equals, nil)
 	identity := s.idptest.Store.AssertUser(c, &store.Identity{
 		ProviderID: store.MakeProviderIdentity("test", "user1"),
 		Username:   "user1",
@@ -133,8 +127,8 @@ func (s *staticSuite) TestGetGroupsReturnsNewSlice(c *qt.C) {
 	params := getSampleParams()
 	params.Domain = "domain"
 	i := s.setupIdp(c, params)
-	s.makeLoginRequest(c, i, "user1", "pass1")
-	s.idptest.AssertLoginSuccess(c, "user1@domain")
+	_, err := s.idptest.DoInteractiveLogin(c, i, idpPrefix+"/login", candidtest.PostLoginForm("user1", "pass1"))
+	c.Assert(err, qt.Equals, nil)
 	identity := s.idptest.Store.AssertUser(c, &store.Identity{
 		ProviderID: store.MakeProviderIdentity("test", "user1@domain"),
 		Username:   "user1@domain",
@@ -152,12 +146,12 @@ func (s *staticSuite) TestGetGroupsReturnsNewSlice(c *qt.C) {
 
 func (s *staticSuite) TestHandleFailedLoginWrongPassword(c *qt.C) {
 	i := s.setupIdp(c, getSampleParams())
-	s.makeLoginRequest(c, i, "user1", "wrong-pass")
-	s.idptest.AssertLoginFailureMatches(c, `authentication failed for user "user1"`)
+	_, err := s.idptest.DoInteractiveLogin(c, i, idpPrefix+"/login", candidtest.PostLoginForm("user1", "wrong-pass"))
+	c.Assert(err, qt.ErrorMatches, `authentication failed for user "user1"`)
 }
 
 func (s *staticSuite) TestHandleFailedLoginUnknownUser(c *qt.C) {
 	i := s.setupIdp(c, getSampleParams())
-	s.makeLoginRequest(c, i, "unknown", "pass")
-	s.idptest.AssertLoginFailureMatches(c, `authentication failed for user "unknown"`)
+	_, err := s.idptest.DoInteractiveLogin(c, i, idpPrefix+"/login", candidtest.PostLoginForm("unknown", "pass"))
+	c.Assert(err, qt.ErrorMatches, `authentication failed for user "unknown"`)
 }

@@ -14,6 +14,8 @@ import (
 	"github.com/CanonicalLtd/candid/internal/candidtest"
 )
 
+const idpPrefix = "https://idp.example.com"
+
 type fixture struct {
 	idptest *idptest.Fixture
 	server  *mockkeystone.Server
@@ -50,7 +52,7 @@ func newFixture(c *qt.C, p fixtureParams) *fixture {
 	s.server.TenantsFunc = p.tenantsFunc
 	s.server.UserGroupsFunc = p.userGroupsFunc
 	s.idp = p.newIDP(s.params)
-	err := s.idp.Init(s.idptest.Ctx, s.idptest.InitParams(c, "https://idp.test"))
+	err := s.idp.Init(s.idptest.Ctx, s.idptest.InitParams(c, idpPrefix))
 	c.Assert(err, qt.Equals, nil)
 	return s
 }
