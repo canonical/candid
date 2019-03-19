@@ -5,7 +5,10 @@ package admincmd_test
 
 import (
 	"bytes"
+	"context"
+	"io/ioutil"
 	"path/filepath"
+	"testing"
 
 	qt "github.com/frankban/quicktest"
 	"github.com/juju/cmd"
@@ -14,6 +17,7 @@ import (
 	"github.com/CanonicalLtd/candid/candidtest"
 	"github.com/CanonicalLtd/candid/cmd/candid/internal/admincmd"
 	internalcandidtest "github.com/CanonicalLtd/candid/internal/candidtest"
+	"github.com/CanonicalLtd/candid/store"
 )
 
 type fixture struct {
@@ -86,4 +90,70 @@ func (s *fixture) Run(args ...string) (code int, stdout, stderr string) {
 
 func (s *fixture) RunContext(ctxt *cmd.Context, args ...string) int {
 	return cmd.Main(s.command, ctxt, args)
+}
+
+func TestLoadCACerts(t *testing.T) {
+	c := qt.New(t)
+	defer c.Done()
+
+	srv, err := candidtest.NewTLS(nil)
+	c.Assert(err, qt.Equals, nil)
+	defer srv.Close()
+
+	srv.AddIdentity(context.Background(), &store.Identity{
+		ProviderID: store.MakeProviderIdentity("test", "bob"),
+		Username:   "bob",
+	})
+
+	dir := c.Mkdir()
+	c.Setenv("HOME", dir)
+	c.Setenv("CANDID_URL", srv.URL)
+	c.Setenv("BAKERY_AGENT_FILE", filepath.Join(dir, "admin.agent"))
+	err = admincmd.WriteAgentFile(filepath.Join(dir, "admin.agent"), &agent.AuthInfo{
+		Key: srv.AdminAgentKey,
+		Agents: []agent.Agent{{
+			URL:      srv.URL,
+			Username: "admin@candid",
+		}},
+	})
+	c.Assert(err, qt.Equals, nil)
+
+	certFile := filepath.Join(dir, "cacerts.pem")
+	emptyFile := filepath.Join(dir, "empty.pem")
+	unreadableFile := filepath.Join(dir, "unreadable.pem")
+	nonExistentFile := filepath.Join(dir, "non-existent.pem")
+
+	err = ioutil.WriteFile(certFile, srv.CACert, 0600)
+	c.Assert(err, qt.Equals, nil)
+	err = ioutil.WriteFile(emptyFile, nil, 0600)
+	c.Assert(err, qt.Equals, nil)
+	err = ioutil.WriteFile(unreadableFile, nil, 0)
+	c.Assert(err, qt.Equals, nil)
+
+	c.Setenv("CANDID_CA_CERTS", emptyFile+":"+unreadableFile+":"+nonExistentFile+"::"+certFile)
+
+	outbuf := new(bytes.Buffer)
+	errbuf := new(bytes.Buffer)
+	ctxt := &cmd.Context{
+		Dir:    dir,
+		Stdin:  bytes.NewReader(nil),
+		Stdout: outbuf,
+		Stderr: errbuf,
+	}
+
+	code := cmd.Main(admincmd.New(), ctxt, []string{"show", "-u", "bob"})
+	c.Assert(code, qt.Equals, 0, qt.Commentf("%s", errbuf.String()))
+
+	c.Assert(outbuf.String(), qt.Equals, `
+username: bob
+external-id: test:bob
+name: ""
+email: ""
+groups: []
+ssh-keys: []
+last-login: never
+last-discharge: never
+`[1:])
+
+	c.Assert(errbuf.String(), qt.Equals, "")
 }

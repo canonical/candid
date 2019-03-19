@@ -1,12 +1,15 @@
 // Copyright 2018 Canonical Ltd.
 // Licensed under the AGPLv3, see LICENCE file for details.
 
+//go:generate go run generate_certs.go -o certs.go
+
 // Package candidtest provides an inmemory candid service for use in
 // tests.
 package candidtest
 
 import (
 	"context"
+	"crypto/tls"
 	"net"
 	"net/http"
 
@@ -26,6 +29,10 @@ import (
 type Server struct {
 	// URL contains the URL where the server is listening.
 	URL string
+
+	// CACert contains the PEM encoded CA certificate that signed the
+	// server's certificate, if the server is using TLS.
+	CACert []byte
 
 	// AdminAgentKey contains the key required to authenticate as the
 	// admin agent.
@@ -48,6 +55,35 @@ type Server struct {
 // when finished with.
 func New(users map[string]static.UserInfo) (*Server, error) {
 	s := new(Server)
+	if err := s.init(users); err != nil {
+		return nil, errgo.Mask(err)
+	}
+
+	go s.server.Serve(s.listener)
+	return s, nil
+}
+
+// NewTLS is like New except the listening server will be using TLS.
+func NewTLS(users map[string]static.UserInfo) (*Server, error) {
+	s := new(Server)
+
+	s.CACert = caCert
+	cert, err := tls.X509KeyPair(cert, key)
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
+	if err := s.init(users); err != nil {
+		return nil, errgo.Mask(err)
+	}
+
+	s.server.TLSConfig = &tls.Config{
+		Certificates: []tls.Certificate{cert},
+	}
+	go s.server.ServeTLS(s.listener, "", "")
+	return s, nil
+}
+
+func (s *Server) init(users map[string]static.UserInfo) error {
 	s.Store = memstore.NewStore()
 	s.MeetingStore = memstore.NewMeetingStore()
 	s.ProviderDataStore = memstore.NewProviderDataStore()
@@ -55,11 +91,11 @@ func New(users map[string]static.UserInfo) (*Server, error) {
 	s.ACLStore = aclstore.NewACLStore(memsimplekv.NewStore())
 	key, err := bakery.GenerateKey()
 	if err != nil {
-		return nil, errgo.Mask(err)
+		return errgo.Mask(err)
 	}
 	s.AdminAgentKey, err = bakery.GenerateKey()
 	if err != nil {
-		return nil, errgo.Mask(err)
+		return errgo.Mask(err)
 	}
 	staticIDP := static.NewIdentityProvider(static.Params{
 		Name:  "static",
@@ -67,9 +103,13 @@ func New(users map[string]static.UserInfo) (*Server, error) {
 	})
 	s.listener, err = net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
-		return nil, errgo.Mask(err)
+		return errgo.Mask(err)
 	}
-	s.URL = "http://" + s.listener.Addr().String()
+	if s.CACert == nil {
+		s.URL = "http://" + s.listener.Addr().String()
+	} else {
+		s.URL = "https://" + s.listener.Addr().String()
+	}
 	s.server = new(http.Server)
 	s.server.Handler, err = candid.NewServer(candid.ServerParams{
 		MeetingStore:      s.MeetingStore,
@@ -86,15 +126,9 @@ func New(users map[string]static.UserInfo) (*Server, error) {
 		PrivateAddr:         "127.0.0.1",
 	}, candid.Debug, candid.Discharger, candid.V1)
 	if err != nil {
-		return nil, errgo.Mask(err)
+		return errgo.Mask(err)
 	}
-
-	go s.run()
-	return s, nil
-}
-
-func (s *Server) run() {
-	s.server.Serve(s.listener)
+	return nil
 }
 
 // AddIdentity adds a new identity to the server.
