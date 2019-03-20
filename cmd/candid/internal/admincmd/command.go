@@ -5,10 +5,14 @@ package admincmd
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 
@@ -40,6 +44,13 @@ To use agent credentials for Candid operations, use the --agent flag
 or specify the BAKERY_AGENT_FILE environment variable, both of which
 hold the path to a file containing agent credentials in JSON format
 (see the create-agent subcommand for details).
+
+To configure additional CA certificates for the client an environment
+variable CANDID_CA_CERTS can be used. This contains a colon separated list
+of files which should each contain a list of PEM encoded certificates. All
+of these certificates will be added to the certificates from the system
+pool. Any file in the list which cannot be found, or cannot be read by
+the current user will be silently skipped.
 `
 
 func New() cmd.Command {
@@ -144,8 +155,41 @@ func (c *candidCommand) bakeryClientLocked(ctxt *cmd.Context) (*httpbakery.Clien
 		bClient.Client.Jar = jar
 		bClient.AddInteractor(httpbakery.WebBrowserInteractor{})
 	}
+	if err := c.loadCACerts(bClient.Client); err != nil {
+		return nil, errgo.Mask(err)
+	}
 	c.bakeryClient = bClient
 	return bClient, nil
+}
+
+// loadCACerts loads any certificates found in the files specified by
+// CANDID_CA_CERTS, if any, and adds them to the system CA certificates
+// for this client.
+func (c *candidCommand) loadCACerts(client *http.Client) error {
+	certPool, err := x509.SystemCertPool()
+	if err != nil {
+		return errgo.Notef(err, "cannot load system CA certificates")
+	}
+	for _, fn := range filepath.SplitList(os.Getenv("CANDID_CA_CERTS")) {
+		buf, err := ioutil.ReadFile(fn)
+		if os.IsNotExist(err) || os.IsPermission(err) {
+			// If the file doesn't exist, or is not readable
+			// ignore it. This allows the environment
+			// variable to be set with potential paths even
+			// when there are no certificates to load.
+			continue
+		}
+		if err != nil {
+			return errgo.Notef(err, "cannot load CA certificates")
+		}
+		certPool.AppendCertsFromPEM(buf)
+	}
+	client.Transport = &http.Transport{
+		TLSClientConfig: &tls.Config{
+			RootCAs: certPool,
+		},
+	}
+	return nil
 }
 
 // Client creates a new candidclient.Client using the parameters specified
