@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/juju/loggo"
 	"gopkg.in/CanonicalLtd/candidclient.v1/params"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
@@ -18,6 +19,8 @@ import (
 	"github.com/CanonicalLtd/candid/idp/idputil"
 	"github.com/CanonicalLtd/candid/store"
 )
+
+var logger = loggo.GetLogger("candid.idp.static")
 
 func init() {
 	idp.Register("static", func(unmarshal func(interface{}) error) (idp.IdentityProvider, error) {
@@ -95,8 +98,8 @@ func (idp *identityProvider) Init(ctx context.Context, params idp.InitParams) er
 }
 
 // URL implements idp.IdentityProvider.URL.
-func (idp *identityProvider) URL(dischargeID string) string {
-	return idputil.URL(idp.initParams.URLPrefix, "/login", dischargeID)
+func (idp *identityProvider) URL(state string) string {
+	return idputil.RedirectURL(idp.initParams.URLPrefix, "/login", state)
 }
 
 // SetInteraction implements idp.IdentityProvider.SetInteraction.
@@ -117,15 +120,22 @@ func (idp *identityProvider) GetGroups(ctx context.Context, identity *store.Iden
 
 // Handle implements idp.IdentityProvider.Handle.
 func (idp *identityProvider) Handle(ctx context.Context, w http.ResponseWriter, req *http.Request) {
+	var ls idputil.LoginState
+	if err := idp.initParams.Codec.Cookie(req, idputil.LoginCookieName, req.Form.Get("state"), &ls); err != nil {
+		logger.Infof("Invalid login state: %s", err)
+		idputil.BadRequestf(w, "Login failed: invalid login state")
+		return
+	}
+
 	switch strings.TrimPrefix(req.URL.Path, idp.initParams.URLPrefix) {
 	case "/login":
-		if err := idp.handleLogin(ctx, w, req); err != nil {
-			idp.initParams.VisitCompleter.Failure(ctx, w, req, idputil.DischargeID(req), err)
+		if err := idp.handleLogin(ctx, w, req, ls); err != nil {
+			idp.initParams.VisitCompleter.RedirectFailure(ctx, w, req, ls.ReturnTo, ls.State, err)
 		}
 	}
 }
 
-func (idp *identityProvider) handleLogin(ctx context.Context, w http.ResponseWriter, req *http.Request) error {
+func (idp *identityProvider) handleLogin(ctx context.Context, w http.ResponseWriter, req *http.Request, ls idputil.LoginState) error {
 	switch req.Method {
 	default:
 		return errgo.WithCausef(nil, params.ErrBadRequest, "unsupported method %q", req.Method)
@@ -134,9 +144,9 @@ func (idp *identityProvider) handleLogin(ctx context.Context, w http.ResponseWri
 	case "POST":
 		id, err := idp.loginUser(ctx, req.Form.Get("username"), req.Form.Get("password"))
 		if err != nil {
-			return err
+			return errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 		}
-		idp.initParams.VisitCompleter.Success(ctx, w, req, idputil.DischargeID(req), id)
+		idp.initParams.VisitCompleter.RedirectSuccess(ctx, w, req, ls.ReturnTo, ls.State, id)
 		return nil
 	}
 }
@@ -162,5 +172,5 @@ func (idp *identityProvider) loginUser(ctx context.Context, user, password strin
 			return id, nil
 		}
 	}
-	return nil, errgo.Newf("authentication failed for user %q", user)
+	return nil, errgo.WithCausef(nil, params.ErrUnauthorized, "authentication failed for user %q", user)
 }

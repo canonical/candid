@@ -5,18 +5,16 @@ package keystone_test
 
 import (
 	"net/http"
-	"net/http/httptest"
-	"net/url"
-	"strings"
 	"testing"
 
 	qt "github.com/frankban/quicktest"
 	"github.com/frankban/quicktest/qtsuite"
-	"gopkg.in/yaml.v2"
+	yaml "gopkg.in/yaml.v2"
 
 	"github.com/CanonicalLtd/candid/config"
 	keystoneidp "github.com/CanonicalLtd/candid/idp/keystone"
 	"github.com/CanonicalLtd/candid/idp/keystone/internal/keystone"
+	"github.com/CanonicalLtd/candid/internal/candidtest"
 	"github.com/CanonicalLtd/candid/store"
 )
 
@@ -57,36 +55,19 @@ func (s *keystoneSuite) TestKeystoneIdentityProviderUseNameForDescription(c *qt.
 
 func (s *keystoneSuite) TestKeystoneIdentityProviderURL(c *qt.C) {
 	u := s.idp.URL("1")
-	c.Assert(u, qt.Equals, "https://idp.test/login?id=1")
+	c.Assert(u, qt.Equals, idpPrefix+"/login?state=1")
 }
 
-func (s *keystoneSuite) TestKeystoneIdentityProviderHandleGet(c *qt.C) {
-	req, err := http.NewRequest("GET", "/login?id=1", nil)
+func (s *keystoneSuite) TestKeystoneIdentityProviderHandleSuccess(c *qt.C) {
+	id, err := s.idptest.DoInteractiveLogin(c, s.idp, idpPrefix+"/login", candidtest.PostLoginForm("testuser", "testpass"))
 	c.Assert(err, qt.Equals, nil)
-	req.ParseForm()
-	rr := httptest.NewRecorder()
-	s.idp.Handle(s.idptest.Ctx, rr, req)
-	s.idptest.AssertLoginNotComplete(c)
-	c.Assert(rr.Code, qt.Equals, http.StatusOK)
-	c.Assert(rr.HeaderMap.Get("Content-Type"), qt.Equals, "text/html;charset=UTF-8")
-	c.Assert(rr.Body.String(), qt.Equals, "https://idp.test/login?id=1\n")
-}
-
-func (s *keystoneSuite) TestKeystoneIdentityProviderHandlePost(c *qt.C) {
-	req, err := http.NewRequest("POST", "/login?did=1",
-		strings.NewReader(
-			url.Values{
-				"username": {"testuser"},
-				"password": {"testpass"},
-			}.Encode(),
-		),
-	)
-	c.Assert(err, qt.Equals, nil)
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req.ParseForm()
-	rr := httptest.NewRecorder()
-	s.idp.Handle(s.idptest.Ctx, rr, req)
-	s.idptest.AssertLoginSuccess(c, "testuser@openstack")
+	candidtest.AssertEqualIdentity(c, id, &store.Identity{
+		ProviderID: store.MakeProviderIdentity("openstack", "abc@openstack"),
+		Username:   "testuser@openstack",
+		ProviderInfo: map[string][]string{
+			"groups": {"abc_project"},
+		},
+	})
 	s.idptest.Store.AssertUser(c, &store.Identity{
 		ProviderID: store.MakeProviderIdentity("openstack", "abc@openstack"),
 		Username:   "testuser@openstack",
@@ -97,37 +78,13 @@ func (s *keystoneSuite) TestKeystoneIdentityProviderHandlePost(c *qt.C) {
 }
 
 func (s *keystoneSuite) TestKeystoneIdentityProviderHandlePostBadPassword(c *qt.C) {
-	req, err := http.NewRequest("POST", "/login?did=1",
-		strings.NewReader(
-			url.Values{
-				"username": {"testuser"},
-				"password": {"nottestpass"},
-			}.Encode(),
-		),
-	)
-	c.Assert(err, qt.Equals, nil)
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req.ParseForm()
-	rr := httptest.NewRecorder()
-	s.idp.Handle(s.idptest.Ctx, rr, req)
-	s.idptest.AssertLoginFailureMatches(c, `cannot log in: Post http.*: invalid credentials`)
+	_, err := s.idptest.DoInteractiveLogin(c, s.idp, idpPrefix+"/login", candidtest.PostLoginForm("testuser", "nottestpass"))
+	c.Assert(err, qt.ErrorMatches, `cannot log in: Post http.*: invalid credentials`)
 }
 
 func (s *keystoneSuite) TestKeystoneIdentityProviderHandlePostNoTenants(c *qt.C) {
-	req, err := http.NewRequest("POST", "/login?did=1",
-		strings.NewReader(
-			url.Values{
-				"username": {"testuser2"},
-				"password": {"testpass"},
-			}.Encode(),
-		),
-	)
-	c.Assert(err, qt.Equals, nil)
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req.ParseForm()
-	rr := httptest.NewRecorder()
-	s.idp.Handle(s.idptest.Ctx, rr, req)
-	s.idptest.AssertLoginFailureMatches(c, `cannot get tenants: Get .*: bad token`)
+	_, err := s.idptest.DoInteractiveLogin(c, s.idp, idpPrefix+"/login", candidtest.PostLoginForm("testuser2", "testpass"))
+	c.Assert(err, qt.ErrorMatches, `cannot get tenants: Get .*: bad token`)
 }
 
 func (s *keystoneSuite) TestKeystoneIdentityProviderHandleExistingUser(c *qt.C) {
@@ -142,20 +99,9 @@ func (s *keystoneSuite) TestKeystoneIdentityProviderHandleExistingUser(c *qt.C) 
 		},
 	)
 	c.Assert(err, qt.Equals, nil)
-	req, err := http.NewRequest("POST", "/login?did=1",
-		strings.NewReader(
-			url.Values{
-				"username": {"testuser"},
-				"password": {"testpass"},
-			}.Encode(),
-		),
-	)
-	c.Assert(err, qt.Equals, nil)
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req.ParseForm()
-	rr := httptest.NewRecorder()
-	s.idp.Handle(s.idptest.Ctx, rr, req)
-	s.idptest.AssertLoginFailureMatches(c, `cannot update identity: username testuser@openstack already in use`)
+
+	_, err = s.idptest.DoInteractiveLogin(c, s.idp, idpPrefix+"/login", candidtest.PostLoginForm("testuser", "testpass"))
+	c.Assert(err, qt.ErrorMatches, `cannot update identity: username testuser@openstack already in use`)
 }
 
 var configTests = []struct {

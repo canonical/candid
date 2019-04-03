@@ -24,7 +24,6 @@ import (
 
 	"github.com/CanonicalLtd/candid/idp"
 	"github.com/CanonicalLtd/candid/idp/idputil"
-	"github.com/CanonicalLtd/candid/idp/idputil/secret"
 	"github.com/CanonicalLtd/candid/idp/usso/internal/kvnoncestore"
 	"github.com/CanonicalLtd/candid/store"
 )
@@ -68,7 +67,6 @@ func NewIdentityProvider(p Params) idp.IdentityProvider {
 type identityProvider struct {
 	client       *openid.Client
 	initParams   idp.InitParams
-	codec        *secret.Codec
 	groupCache   *cache.Cache
 	groupMonitor prometheus.Summary
 	// launchpadTeams contains any private teams that the system needs to know about.
@@ -104,13 +102,12 @@ func (idp *identityProvider) Init(_ context.Context, params idp.InitParams) erro
 		kvnoncestore.New(params.KeyValueStore, time.Minute),
 		nil,
 	)
-	idp.codec = secret.NewCodec(params.Key)
 	return nil
 }
 
 // URL gets the login URL to use this identity provider.
-func (idp *identityProvider) URL(dischargeID string) string {
-	return idputil.URL(idp.initParams.URLPrefix, "/login", dischargeID)
+func (idp *identityProvider) URL(state string) string {
+	return idputil.RedirectURL(idp.initParams.URLPrefix, "/login", state)
 }
 
 // SetInteraction sets the interaction information for
@@ -119,7 +116,6 @@ func (idp *identityProvider) SetInteraction(ierr *httpbakery.Error, dischargeID 
 
 // Handle handles the Ubuntu SSO login process.
 func (idp *identityProvider) Handle(ctx context.Context, w http.ResponseWriter, req *http.Request) {
-	logger.Debugf("handling %s", req.URL.Path)
 	switch req.URL.Path {
 	case "/callback":
 		idp.callback(ctx, w, req)
@@ -129,20 +125,7 @@ func (idp *identityProvider) Handle(ctx context.Context, w http.ResponseWriter, 
 }
 
 func (idp *identityProvider) login(ctx context.Context, w http.ResponseWriter, req *http.Request) {
-	query := ""
-	if returnTo, state := idputil.RedirectParams(req); returnTo != "" {
-		verification, err := idp.codec.SetCookie(w, idputil.RedirectCookieName, idputil.RedirectState{
-			ReturnTo: returnTo,
-			State:    state,
-		})
-		if err != nil {
-			idp.initParams.VisitCompleter.RedirectFailure(ctx, w, req, returnTo, state, errgo.Mask(err))
-			return
-		}
-		query = "?state=" + verification
-	} else if dischargeID := idputil.DischargeID(req); dischargeID != "" {
-		query = "?id=" + dischargeID
-	}
+	query := "?state=" + idputil.State(req)
 	realm := idp.initParams.URLPrefix + "/callback"
 	callback := realm + query
 	url := idp.client.RedirectURL(&openid.Request{
@@ -155,30 +138,29 @@ func (idp *identityProvider) login(ctx context.Context, w http.ResponseWriter, r
 }
 
 func (idp *identityProvider) callback(ctx context.Context, w http.ResponseWriter, req *http.Request) {
+	var ls idputil.LoginState
+	if err := idp.initParams.Codec.Cookie(req, idputil.LoginCookieName, req.Form.Get("state"), &ls); err != nil {
+		logger.Infof("Invalid login state: %s", err)
+		idputil.BadRequestf(w, "Login failed: invalid login state")
+		return
+	}
+
 	successf := func(id *store.Identity) {
-		idp.initParams.VisitCompleter.Success(ctx, w, req, idputil.DischargeID(req), id)
+		idp.initParams.VisitCompleter.RedirectSuccess(ctx, w, req, ls.ReturnTo, ls.State, id)
 	}
 	errorf := func(err error) {
-		idp.initParams.VisitCompleter.Failure(ctx, w, req, idputil.DischargeID(req), err)
-	}
-	if verification := req.Form.Get("state"); verification != "" {
-		var rs idputil.RedirectState
-		if err := idp.codec.Cookie(req, idputil.RedirectCookieName, verification, &rs); err != nil {
-			errorf(err)
-			return
-		}
-		successf = func(id *store.Identity) {
-			idp.initParams.VisitCompleter.RedirectSuccess(ctx, w, req, rs.ReturnTo, rs.State, id)
-		}
-		errorf = func(err error) {
-			idp.initParams.VisitCompleter.RedirectFailure(ctx, w, req, rs.ReturnTo, rs.State, err)
-		}
+		idp.initParams.VisitCompleter.RedirectFailure(ctx, w, req, ls.ReturnTo, ls.State, err)
 	}
 
 	resp, err := idp.client.Verify(idp.initParams.URLPrefix + req.URL.String())
 	if err != nil {
 		errorf(err)
 		return
+	}
+
+	// Work around bug in the usso package
+	if len(resp.Teams) == 1 && resp.Teams[0] == "" {
+		resp.Teams = nil
 	}
 
 	username := resp.SReg[openid.SRegNickname]

@@ -13,6 +13,7 @@ import (
 	"gopkg.in/macaroon-bakery.v2/bakery"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
 
+	"github.com/CanonicalLtd/candid/idp/idputil/secret"
 	"github.com/CanonicalLtd/candid/store"
 )
 
@@ -58,8 +59,9 @@ type InitParams struct {
 	// provider to mint new macaroons.
 	Oven *bakery.Oven
 
-	// Key contains the identity server's public/private key pair.
-	Key *bakery.KeyPair
+	// Codec contains the codec used to encode/decode session cookies
+	// in the login flow.
+	Codec *secret.Codec
 
 	// URLPrefix contains the prefix of all requests to the Handle
 	// method. The URL.Path parameter in the request passed to handle
@@ -107,10 +109,12 @@ type IdentityProvider interface {
 
 	// URL returns the URL to use to attempt a login with this
 	// identity provider. If the identity provider is interactive
-	// then the user will be automatically redirected to the URL.
-	// Otherwise the URL is returned in the response to a
-	// request for login methods.
-	URL(dischargeID string) string
+	// then the user will be redirected to the URL. Otherwise the URL
+	// is returned in the response to a request for login methods.
+	// The given state value should be round-tripped through the
+	// login interaction and used to verify the login when it
+	// completes.
+	URL(state string) string
 
 	// SetInteraction adds interaction information for this identity
 	// provider to the given interaction required error.

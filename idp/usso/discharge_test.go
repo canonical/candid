@@ -4,12 +4,9 @@
 package usso_test
 
 import (
-	"net/http"
-	"net/url"
 	"testing"
 
 	qt "github.com/frankban/quicktest"
-	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
 
 	"github.com/CanonicalLtd/candid/idp"
@@ -46,24 +43,6 @@ func TestInteractiveDischarge(t *testing.T) {
 	})
 	ussoSrv.MockUSSO.SetLoginUser("test")
 	dischargeCreator.AssertDischarge(c, httpbakery.WebBrowserInteractor{
-		OpenWebBrowser: visitWebPage(c),
+		OpenWebBrowser: candidtest.OpenWebBrowser(c, candidtest.SelectInteractiveLogin(nil)),
 	})
-}
-
-func visitWebPage(c *qt.C) func(u *url.URL) error {
-	return func(u *url.URL) error {
-		c.Logf("visiting %s", u)
-		client := http.Client{}
-		resp, err := client.Get(u.String())
-		if err != nil {
-			c.Logf("error: %s", err)
-			return err
-		}
-		defer resp.Body.Close()
-		c.Logf("status %s", resp.Status)
-		if resp.StatusCode != http.StatusOK {
-			return errgo.Newf("bad status %q", resp.Status)
-		}
-		return nil
-	}
 }

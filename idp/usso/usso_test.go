@@ -9,8 +9,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"strings"
 	"testing"
+	"time"
 
 	qt "github.com/frankban/quicktest"
 	"github.com/frankban/quicktest/qtsuite"
@@ -29,18 +29,19 @@ import (
 
 type ussoSuite struct {
 	idptest *idptest.Fixture
-
-	idp idp.IdentityProvider
+	idp     idp.IdentityProvider
 }
 
 func TestUSSO(t *testing.T) {
 	qtsuite.Run(qt.New(t), &ussoSuite{})
 }
 
+const idpPrefix = "http://idp.example.com"
+
 func (s *ussoSuite) Init(c *qt.C) {
 	s.idptest = idptest.NewFixture(c, candidtest.NewStore())
 	s.idp = usso.NewIdentityProvider(usso.Params{})
-	err := s.idp.Init(s.idptest.Ctx, s.idptest.InitParams(c, "https://idp.test"))
+	err := s.idp.Init(s.idptest.Ctx, s.idptest.InitParams(c, idpPrefix))
 	c.Assert(err, qt.Equals, nil)
 }
 
@@ -73,22 +74,22 @@ func (s *ussoSuite) TestInteractive(c *qt.C) {
 }
 
 func (s *ussoSuite) TestURL(c *qt.C) {
-	c.Assert(s.idp.URL("1"), qt.Equals, "https://idp.test/login?id=1")
+	c.Assert(s.idp.URL("1"), qt.Equals, "http://idp.example.com/login?state=1")
 }
 
 func (s *ussoSuite) TestRedirect(c *qt.C) {
-	u, err := url.Parse(s.ussoURL(c, s.idptest.Ctx, "1"))
-	c.Assert(err, qt.Equals, nil)
+	u := s.getRedirectURL(c, "/login")
 	c.Assert(u.Host, qt.Equals, "login.ubuntu.com")
 	c.Assert(u.Path, qt.Equals, "/+openid")
 	q := u.Query()
+	c.Assert(q.Get("openid.return_to"), qt.Matches, "http://idp.example.com/callback\\?state=[-_0-9A-Za-z]+")
+	delete(q, "openid.return_to")
 	c.Assert(q, qt.DeepEquals, url.Values{
 		"openid.ns":            []string{"http://specs.openid.net/auth/2.0"},
 		"openid.claimed_id":    []string{"http://specs.openid.net/auth/2.0/identifier_select"},
 		"openid.identity":      []string{"http://specs.openid.net/auth/2.0/identifier_select"},
 		"openid.mode":          []string{"checkid_setup"},
-		"openid.realm":         []string{"https://idp.test/callback"},
-		"openid.return_to":     []string{"https://idp.test/callback?id=1"},
+		"openid.realm":         []string{"http://idp.example.com/callback"},
 		"openid.ns.sreg":       []string{"http://openid.net/extensions/sreg/1.1"},
 		"openid.sreg.required": []string{"email,fullname,nickname"},
 	})
@@ -96,25 +97,42 @@ func (s *ussoSuite) TestRedirect(c *qt.C) {
 
 func (s *ussoSuite) TestRedirectWithLaunchpadTeams(c *qt.C) {
 	s.idp = usso.NewIdentityProvider(usso.Params{LaunchpadTeams: []string{"myteam1", "myteam2"}})
-	err := s.idp.Init(s.idptest.Ctx, s.idptest.InitParams(c, "https://idp.test"))
+	err := s.idp.Init(s.idptest.Ctx, s.idptest.InitParams(c, "http://idp.example.com"))
 	c.Assert(err, qt.Equals, nil)
-	u, err := url.Parse(s.ussoURL(c, s.idptest.Ctx, "1"))
-	c.Assert(err, qt.Equals, nil)
+
+	u := s.getRedirectURL(c, "/login")
 	c.Assert(u.Host, qt.Equals, "login.ubuntu.com")
 	c.Assert(u.Path, qt.Equals, "/+openid")
 	q := u.Query()
+	c.Assert(q.Get("openid.return_to"), qt.Matches, "http://idp.example.com/callback\\?state=[-_0-9A-Za-z]+")
+	delete(q, "openid.return_to")
 	c.Assert(q, qt.DeepEquals, url.Values{
 		"openid.ns":                  []string{"http://specs.openid.net/auth/2.0"},
 		"openid.claimed_id":          []string{"http://specs.openid.net/auth/2.0/identifier_select"},
 		"openid.identity":            []string{"http://specs.openid.net/auth/2.0/identifier_select"},
 		"openid.mode":                []string{"checkid_setup"},
-		"openid.realm":               []string{"https://idp.test/callback"},
-		"openid.return_to":           []string{"https://idp.test/callback?id=1"},
+		"openid.realm":               []string{"http://idp.example.com/callback"},
 		"openid.ns.lp":               []string{"http://ns.launchpad.net/2007/openid-teams"},
 		"openid.lp.query_membership": []string{"myteam1,myteam2"},
 		"openid.ns.sreg":             []string{"http://openid.net/extensions/sreg/1.1"},
 		"openid.sreg.required":       []string{"email,fullname,nickname"},
 	})
+}
+
+func (s *ussoSuite) getRedirectURL(c *qt.C, path string) *url.URL {
+	client := idptest.NewClient(s.idp, s.idptest.Codec)
+	client.SetLoginState(idputil.LoginState{
+		ReturnTo: "http://result.example.com",
+		State:    "1234",
+		Expires:  time.Now().Add(10 * time.Minute),
+	})
+	resp, err := client.Get("/login")
+	c.Assert(err, qt.Equals, nil)
+	defer resp.Body.Close()
+	c.Assert(resp.StatusCode, qt.Equals, http.StatusFound)
+	u, err := url.Parse(resp.Header.Get("Location"))
+	c.Assert(err, qt.Equals, nil)
+	return u
 }
 
 func (s *ussoSuite) TestHandleSuccess(c *qt.C) {
@@ -127,10 +145,15 @@ func (s *ussoSuite) TestHandleSuccess(c *qt.C) {
 		Email:    "test@example.com",
 	})
 	ussoSrv.MockUSSO.SetLoginUser("test")
-	resp := s.roundTrip(c, s.ussoURL(c, s.idptest.Ctx, "2"))
-	defer resp.Body.Close()
-	s.get(c, s.idptest.Ctx, resp.Header.Get("Location"))
-	s.idptest.AssertLoginSuccess(c, "test")
+
+	id, err := s.idptest.DoInteractiveLogin(c, s.idp, idpPrefix+"/login", nil)
+	c.Assert(err, qt.Equals, nil)
+	candidtest.AssertEqualIdentity(c, id, &store.Identity{
+		ProviderID: "usso:https://login.ubuntu.com/+id/test",
+		Username:   "test",
+		Name:       "Test User",
+		Email:      "test@example.com",
+	})
 }
 
 func (s *ussoSuite) TestHandleSuccessNoExtensions(c *qt.C) {
@@ -159,10 +182,15 @@ func (s *ussoSuite) TestHandleSuccessNoExtensions(c *qt.C) {
 	})
 	ussoSrv.MockUSSO.SetLoginUser("test")
 	ussoSrv.MockUSSO.ExcludeExtensions()
-	resp := s.roundTrip(c, s.ussoURL(c, s.idptest.Ctx, "3"))
-	defer resp.Body.Close()
-	s.get(c, s.idptest.Ctx, resp.Header.Get("Location"))
-	s.idptest.AssertLoginSuccess(c, "test")
+
+	id, err := s.idptest.DoInteractiveLogin(c, s.idp, idpPrefix+"/login", nil)
+	c.Assert(err, qt.Equals, nil)
+	candidtest.AssertEqualIdentity(c, id, &store.Identity{
+		ProviderID: "usso:https://login.ubuntu.com/+id/test",
+		Username:   "test",
+		Name:       "Test User",
+		Email:      "test@example.com",
+	})
 }
 
 func (s *ussoSuite) TestHandleNoExtensionsNotFound(c *qt.C) {
@@ -176,18 +204,18 @@ func (s *ussoSuite) TestHandleNoExtensionsNotFound(c *qt.C) {
 	})
 	ussoSrv.MockUSSO.SetLoginUser("test")
 	ussoSrv.MockUSSO.ExcludeExtensions()
-	resp := s.roundTrip(c, s.ussoURL(c, s.idptest.Ctx, "4"))
-	defer resp.Body.Close()
-	s.get(c, s.idptest.Ctx, resp.Header.Get("Location"))
-	s.idptest.AssertLoginFailureMatches(c, `invalid user: username not specified`)
+
+	id, err := s.idptest.DoInteractiveLogin(c, s.idp, idpPrefix+"/login", nil)
+	c.Assert(err, qt.ErrorMatches, `invalid user: username not specified`)
+	c.Assert(id, qt.IsNil)
 }
 
 func (s *ussoSuite) TestInteractiveLoginFromDifferentProvider(c *qt.C) {
-	mockUSSO := mockusso.New("https://login.badplace.com")
+	mockUSSO := mockusso.New("https://badplace.example.com")
 	server := httptest.NewServer(mockUSSO)
 	defer server.Close()
 	c.Patch(&http.DefaultTransport, qthttptest.URLRewritingTransport{
-		MatchPrefix:  "https://login.badplace.com",
+		MatchPrefix:  "https://badplace.example.com",
 		Replace:      server.URL,
 		RoundTripper: http.DefaultTransport,
 	})
@@ -198,24 +226,42 @@ func (s *ussoSuite) TestInteractiveLoginFromDifferentProvider(c *qt.C) {
 		Email:    "test@example.com",
 		Groups:   []string{"test1", "test2"},
 	})
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		req.ParseForm()
+		s.idp.Handle(req.Context(), w, req)
+	}))
+	defer srv.Close()
+
+	client := s.idptest.Client(c, idpPrefix, srv.URL, "https://result.example.com")
+	cookie, state := s.idptest.LoginState(c, idputil.LoginState{
+		ReturnTo: "https://result.example.com",
+		State:    "1234",
+		Expires:  time.Now().Add(10 * time.Minute),
+	})
+	u, err := url.Parse(idpPrefix)
+	c.Assert(err, qt.Equals, nil)
+	client.Jar.SetCookies(u, []*http.Cookie{cookie})
+
 	mockUSSO.SetLoginUser("test")
 	v := url.Values{}
 	v.Set("openid.ns", "http://specs.openid.net/auth/2.0")
 	v.Set("openid.mode", "checkid_setup")
-	v.Set("openid.claimed_id", "https://login.badplace.com")
+	v.Set("openid.claimed_id", "http://specs.openid.net/auth/2.0/identifier_select")
 	v.Set("openid.identity", "http://specs.openid.net/auth/2.0/identifier_select")
-	v.Set("openid.return_to", "https://idp.test/callback")
-	v.Set("openid.realm", "https://idp.test/callback")
-	u := &url.URL{
+	v.Set("openid.return_to", idpPrefix+"/callback?state="+state)
+	v.Set("openid.realm", idpPrefix+"/callback")
+	u = &url.URL{
 		Scheme:   "https",
-		Host:     "login.badplace.com",
+		Host:     "badplace.example.com",
 		Path:     "/+openid",
 		RawQuery: v.Encode(),
 	}
-	resp := s.roundTrip(c, u.String())
+	resp, err := client.Get(u.String())
+	c.Assert(err, qt.Equals, nil)
 	defer resp.Body.Close()
-	s.get(c, s.idptest.Ctx, resp.Header.Get("Location"))
-	s.idptest.AssertLoginFailureMatches(c, `.*OpenID response from unexpected endpoint "https://login.badplace.com/\+openid"`)
+	id, err := s.idptest.ParseResponse(c, resp)
+	c.Assert(err, qt.ErrorMatches, `OpenID response from unexpected endpoint "https://badplace.example.com/\+openid"`)
+	c.Assert(id, qt.IsNil)
 }
 
 func (s *ussoSuite) TestHandleUpdateUserError(c *qt.C) {
@@ -228,104 +274,22 @@ func (s *ussoSuite) TestHandleUpdateUserError(c *qt.C) {
 		Email:    "test@example.com",
 	})
 	ussoSrv.MockUSSO.SetLoginUser("test")
-	resp := s.roundTrip(c, s.ussoURL(c, s.idptest.Ctx, "5"))
-	defer resp.Body.Close()
-	s.get(c, s.idptest.Ctx, resp.Header.Get("Location"))
-	s.idptest.AssertLoginFailureMatches(c, `invalid user: invalid username "test-"`)
+
+	id, err := s.idptest.DoInteractiveLogin(c, s.idp, idpPrefix+"/login", nil)
+	c.Assert(err, qt.ErrorMatches, `invalid user: invalid username "test-"`)
+	c.Assert(id, qt.IsNil)
 }
 
-func (s *ussoSuite) TestRedirectFlowLogin(c *qt.C) {
-	ussoSrv := mockusso.NewServer()
-	defer ussoSrv.Close()
-	ussoSrv.MockUSSO.AddUser(&mockusso.User{
-		ID:       "test",
-		NickName: "test",
-		FullName: "Test User",
-		Email:    "test@example.com",
-	})
-	ussoSrv.MockUSSO.SetLoginUser("test")
-	resp := s.get(c, context.Background(), "/?return_to=http://example.com/callback&state=1234")
+func (s *ussoSuite) TestInvalidCookie(c *qt.C) {
+	client := idptest.NewClient(s.idp, s.idptest.Codec)
+	resp, err := client.Get("/callback")
+	c.Assert(err, qt.Equals, nil)
 	defer resp.Body.Close()
-	cookies := resp.Cookies()
-	c.Assert(cookies, qt.HasLen, 1)
-	c.Assert(cookies[0].Name, qt.Equals, idputil.RedirectCookieName)
-	loc, err := resp.Location()
-	c.Assert(err, qt.Equals, nil)
-	resp = s.roundTrip(c, loc.String())
-	defer resp.Body.Close()
-	loc, err = resp.Location()
-	c.Assert(err, qt.Equals, nil)
-	loc.Scheme = ""
-	loc.Host = ""
-	req, err := http.NewRequest("GET", loc.String(), nil)
-	c.Assert(err, qt.Equals, nil)
-	req.AddCookie(cookies[0])
-	s.do(context.Background(), req)
-	s.idptest.AssertLoginSuccess(c, "test")
-}
-
-func (s *ussoSuite) TestRedirectFlowLoginInvalidCookie(c *qt.C) {
-	ussoSrv := mockusso.NewServer()
-	defer ussoSrv.Close()
-	ussoSrv.MockUSSO.AddUser(&mockusso.User{
-		ID:       "test",
-		NickName: "test",
-		FullName: "Test User",
-		Email:    "test@example.com",
-	})
-	ussoSrv.MockUSSO.SetLoginUser("test")
-	resp := s.get(c, context.Background(), "/?return_to=http://example.com/callback&state=1234")
-	defer resp.Body.Close()
-	cookies := resp.Cookies()
-	c.Assert(cookies, qt.HasLen, 1)
-	c.Assert(cookies[0].Name, qt.Equals, idputil.RedirectCookieName)
-	loc, err := resp.Location()
-	c.Assert(err, qt.Equals, nil)
-	resp = s.roundTrip(c, loc.String())
-	defer resp.Body.Close()
-	loc, err = resp.Location()
-	c.Assert(err, qt.Equals, nil)
-	loc.Scheme = ""
-	loc.Host = ""
-	req, err := http.NewRequest("GET", loc.String(), nil)
-	c.Assert(err, qt.Equals, nil)
-	s.do(context.Background(), req)
-	s.idptest.AssertLoginFailureMatches(c, "invalid cookie: http: named cookie not present")
-}
-
-func (s *ussoSuite) TestRedirectFlowLoginUserError(c *qt.C) {
-	ussoSrv := mockusso.NewServer()
-	defer ussoSrv.Close()
-	ussoSrv.MockUSSO.AddUser(&mockusso.User{
-		ID:       "test",
-		NickName: "test-",
-		FullName: "Test User",
-		Email:    "test@example.com",
-	})
-	ussoSrv.MockUSSO.SetLoginUser("test")
-	resp := s.get(c, context.Background(), "/?return_to=http://example.com/callback&state=1234")
-	defer resp.Body.Close()
-	cookies := resp.Cookies()
-	c.Assert(cookies, qt.HasLen, 1)
-	c.Assert(cookies[0].Name, qt.Equals, idputil.RedirectCookieName)
-	loc, err := resp.Location()
-	c.Assert(err, qt.Equals, nil)
-	resp = s.roundTrip(c, loc.String())
-	defer resp.Body.Close()
-	loc, err = resp.Location()
-	c.Assert(err, qt.Equals, nil)
-	loc.Scheme = ""
-	loc.Host = ""
-	req, err := http.NewRequest("GET", loc.String(), nil)
-	c.Assert(err, qt.Equals, nil)
-	req.AddCookie(cookies[0])
-	s.do(context.Background(), req)
-	s.idptest.AssertLoginFailureMatches(c, `invalid user: invalid username "test-"`)
+	c.Assert(resp.StatusCode, qt.Equals, http.StatusBadRequest)
 }
 
 func (s *ussoSuite) TestGetGroups(c *qt.C) {
-	var lp *httptest.Server
-	lp = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	lp := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		c.Logf("path: %s", r.URL.Path)
 		switch r.URL.Path {
 		case "/people":
@@ -359,46 +323,11 @@ func (s *ussoSuite) TestGetGroups(c *qt.C) {
 	c.Assert(groups, qt.DeepEquals, []string{"test1", "test2"})
 }
 
-// ussoURL gets a request addressed to the MockUSSO server with the given wait ID.
-func (s *ussoSuite) ussoURL(c *qt.C, ctx context.Context, dischargeID string) string {
-	resp := s.get(c, ctx, "/?id="+dischargeID)
-	c.Assert(resp.StatusCode, qt.Equals, http.StatusFound)
-	loc, err := resp.Location()
-	c.Assert(err, qt.Equals, nil)
-	return loc.String()
-}
-
-// get performs a "GET" requests on the idp's Handle method with the
-// given path.
-func (s *ussoSuite) get(c *qt.C, ctx context.Context, path string) *http.Response {
-	path = strings.TrimPrefix(path, "https://idp.test")
-	req, err := http.NewRequest("GET", path, nil)
-	c.Assert(err, qt.Equals, nil)
-	return s.do(ctx, req)
-}
-
-func (s *ussoSuite) do(ctx context.Context, req *http.Request) *http.Response {
-	rr := httptest.NewRecorder()
-	req.ParseForm()
-	s.idp.Handle(ctx, rr, req)
-	return rr.Result()
-}
-
-// roundTrip uses http.DefaultTransport to perform a GET request as a
-// single round trip to the given URL.
-func (s *ussoSuite) roundTrip(c *qt.C, url string) *http.Response {
-	req, err := http.NewRequest("GET", url, nil)
-	c.Assert(err, qt.Equals, nil)
-	resp, err := http.DefaultTransport.RoundTrip(req)
-	c.Assert(err, qt.Equals, nil)
-	return resp
-}
-
 func (s *ussoSuite) TestWithDomain(c *qt.C) {
 	s.idp = usso.NewIdentityProvider(usso.Params{
 		Domain: "test1",
 	})
-	err := s.idp.Init(s.idptest.Ctx, s.idptest.InitParams(c, "https://idp.test"))
+	err := s.idp.Init(s.idptest.Ctx, s.idptest.InitParams(c, idpPrefix))
 	c.Assert(err, qt.Equals, nil)
 
 	c.Assert(s.idp.Domain(), qt.Equals, "test1")
@@ -412,8 +341,13 @@ func (s *ussoSuite) TestWithDomain(c *qt.C) {
 		Email:    "test@example.com",
 	})
 	ussoSrv.MockUSSO.SetLoginUser("test")
-	resp := s.roundTrip(c, s.ussoURL(c, s.idptest.Ctx, "2"))
-	defer resp.Body.Close()
-	s.get(c, s.idptest.Ctx, resp.Header.Get("Location"))
-	s.idptest.AssertLoginSuccess(c, "test@test1")
+
+	id, err := s.idptest.DoInteractiveLogin(c, s.idp, idpPrefix+"/login", nil)
+	c.Assert(err, qt.Equals, nil)
+	candidtest.AssertEqualIdentity(c, id, &store.Identity{
+		ProviderID: "usso:https://login.ubuntu.com/+id/test",
+		Username:   "test@test1",
+		Name:       "Test User",
+		Email:      "test@example.com",
+	})
 }

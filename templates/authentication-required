@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Authentication Required</title>
+</head>
+<body>
+  <h1>Authentication Required</h1>
+  <p>Please authenticate using one of the following:</p>
+  <ul>
+{{ range .IDPs }}
+    <li><a href="{{.URL}}">{{.Description}}</a></li>
+{{ end }}
+  </ul>
+</body>
+</html>

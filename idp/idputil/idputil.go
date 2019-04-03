@@ -7,13 +7,17 @@ package idputil
 
 import (
 	"context"
+	"fmt"
 	"html/template"
 	"net/http"
 	"net/url"
+	"time"
 
 	"github.com/juju/loggo"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/httprequest.v1"
+
+	"github.com/CanonicalLtd/candid/store"
 )
 
 var logger = loggo.GetLogger("candid.idp.idputil")
@@ -52,12 +56,6 @@ func DischargeID(req *http.Request) string {
 	return req.Form.Get("id")
 }
 
-// RedirectParams gets the return_to and state parameters from the
-// request.
-func RedirectParams(req *http.Request) (returnTo, state string) {
-	return req.Form.Get("return_to"), req.Form.Get("state")
-}
-
 // URL creates a URL addressed to the given path within the IDP handler
 // and adds the given dischargeID (when specified).
 func URL(prefix, path, dischargeID string) string {
@@ -70,6 +68,21 @@ func URL(prefix, path, dischargeID string) string {
 		callback += "?" + v.Encode()
 	}
 	return callback
+}
+
+// State gets the state from the given request using the standard form
+// value.
+func State(req *http.Request) string {
+	return req.Form.Get("state")
+}
+
+// RedirectURL creates a URL addressed to the given path within the IDP handler
+// and adds the given state.
+func RedirectURL(prefix, path, state string) string {
+	v := url.Values{
+		"state": {state},
+	}
+	return prefix + path + "?" + v.Encode()
 }
 
 type RegistrationParams struct {
@@ -121,14 +134,34 @@ func NameWithDomain(name, domain string) string {
 	return name + "@" + domain
 }
 
-// RedirectCookieName is the name of the cookie used to store
-// RedirectState whilst a login is being processed by a third-party
-// server.
-const RedirectCookieName = "candid-redirect"
+// LoginCookieName is the name of the cookie used to store LoginState
+// whilst a login is being processed.
+const LoginCookieName = "candid-login"
 
-// RedirectState holds the incoming return address and state in a
-// redirect based login.
-type RedirectState struct {
+// LoginState holds the state of the current loging process.
+type LoginState struct {
+	// ReturnTo holds the address to return to after the login has
+	// completed.
 	ReturnTo string
-	State    string
+
+	// State holds an opaque value from the original requesing server
+	// that will be sent back to the ReturnTo URL when the login
+	// attempt completes.
+	State string
+
+	// Expires holds the time that this login attempt should expire.
+	Expires time.Time
+
+	// ProvideID holds the ProviderID of an authenticated user. It is
+	// only used when the user that has authenticaated requires
+	// registration.
+	ProviderID store.ProviderIdentity
+}
+
+// BadRequestf writes the given bad request message to the given
+// ResponseWriter. It should be used by IDPs when they do not have enough
+// state to pass the error message along to the initiating page.
+func BadRequestf(w http.ResponseWriter, f string, args ...interface{}) {
+	w.WriteHeader(http.StatusBadRequest)
+	fmt.Fprintf(w, f, args...)
 }

@@ -5,10 +5,6 @@ package ldap_test
 
 import (
 	"context"
-	"net/http"
-	"net/http/httptest"
-	"net/url"
-	"strings"
 	"testing"
 
 	qt "github.com/frankban/quicktest"
@@ -20,6 +16,8 @@ import (
 	"github.com/CanonicalLtd/candid/internal/candidtest"
 	"github.com/CanonicalLtd/candid/store"
 )
+
+const idpPrefix = "http://idp.example.com"
 
 type ldapSuite struct {
 	idptest *idptest.Fixture
@@ -159,25 +157,8 @@ func (s *ldapSuite) setupIdp(c *qt.C, params ldap.Params, db ldapDB) idp.Identit
 	i, err := ldap.NewIdentityProvider(params)
 	c.Assert(err, qt.Equals, nil)
 	ldap.SetLDAP(i, newMockLDAPDialer(db).Dial)
-	i.Init(context.TODO(), s.idptest.InitParams(c, "https://example.com/test"))
+	i.Init(context.TODO(), s.idptest.InitParams(c, idpPrefix))
 	return i
-}
-
-func (s *ldapSuite) makeLoginRequest(c *qt.C, i idp.IdentityProvider, username, password string) *httptest.ResponseRecorder {
-	req, err := http.NewRequest("POST", "/login",
-		strings.NewReader(
-			url.Values{
-				"username": {username},
-				"password": {password},
-			}.Encode(),
-		),
-	)
-	c.Assert(err, qt.Equals, nil)
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req.ParseForm()
-	rr := httptest.NewRecorder()
-	i.Handle(context.TODO(), rr, req)
-	return rr
 }
 
 func (s *ldapSuite) TestNewIdentityProvider(c *qt.C) {
@@ -227,17 +208,18 @@ func (s *ldapSuite) TestURL(c *qt.C) {
 	i, err := ldap.NewIdentityProvider(getSampleParams())
 	c.Assert(err, qt.Equals, nil)
 	i.Init(context.Background(), idp.InitParams{
-		URLPrefix: "https://example.com/test",
+		URLPrefix: idpPrefix,
 	})
-	c.Assert(i.URL("1"), qt.Equals, "https://example.com/test/login?id=1")
+	c.Assert(i.URL("1"), qt.Equals, idpPrefix+"/login?state=1")
 }
 
 func (s *ldapSuite) TestHandle(c *qt.C) {
 	params := getSampleParams()
 	params.Domain = "ldap"
 	i := s.setupIdp(c, params, getSampleLdapDB())
-	s.makeLoginRequest(c, i, "user1", "pass1")
-	s.idptest.AssertLoginSuccess(c, "user1@ldap")
+	id, err := s.idptest.DoInteractiveLogin(c, i, idpPrefix+"/login", candidtest.PostLoginForm("user1", "pass1"))
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(id.Username, qt.Equals, "user1@ldap")
 	s.idptest.Store.AssertUser(c, &store.Identity{
 		ProviderID: store.MakeProviderIdentity(
 			"test", "uid=user1,ou=users,dc=example,dc=com"),
@@ -252,8 +234,9 @@ func (s *ldapSuite) TestHandleCustomUserFilter(c *qt.C) {
 	sampleDB[1]["objectClass"] = []string{"ignored"}
 	sampleDB[1]["customAttr"] = []string{"customValue"}
 	i := s.setupIdp(c, params, sampleDB)
-	s.makeLoginRequest(c, i, "user1", "pass1")
-	s.idptest.AssertLoginSuccess(c, "user1")
+	id, err := s.idptest.DoInteractiveLogin(c, i, idpPrefix+"/login", candidtest.PostLoginForm("user1", "pass1"))
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(id.Username, qt.Equals, "user1")
 	s.idptest.Store.AssertUser(c, &store.Identity{
 		ProviderID: store.MakeProviderIdentity(
 			"test", "uid=user1,ou=users,dc=example,dc=com"),
@@ -269,8 +252,9 @@ func (s *ldapSuite) TestHandleUserDetails(c *qt.C) {
 	sampleDB[1]["mail"] = []string{"user1@example.com"}
 	sampleDB[1]["displayName"] = []string{"User One"}
 	i := s.setupIdp(c, params, sampleDB)
-	s.makeLoginRequest(c, i, "user1", "pass1")
-	s.idptest.AssertLoginSuccess(c, "user1")
+	id, err := s.idptest.DoInteractiveLogin(c, i, idpPrefix+"/login", candidtest.PostLoginForm("user1", "pass1"))
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(id.Username, qt.Equals, "user1")
 	s.idptest.Store.AssertUser(c, &store.Identity{
 		ProviderID: store.MakeProviderIdentity(
 			"test", "uid=user1,ou=users,dc=example,dc=com"),
@@ -287,8 +271,9 @@ func (s *ldapSuite) TestHandleUserDetailsCustomIDAttr(c *qt.C) {
 	sampleDB[1]["uid"] = []string{"ignored"}
 	sampleDB[1]["myId"] = []string{"user1"}
 	i := s.setupIdp(c, params, sampleDB)
-	s.makeLoginRequest(c, i, "user1", "pass1")
-	s.idptest.AssertLoginSuccess(c, "user1")
+	id, err := s.idptest.DoInteractiveLogin(c, i, idpPrefix+"/login", candidtest.PostLoginForm("user1", "pass1"))
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(id.Username, qt.Equals, "user1")
 	s.idptest.Store.AssertUser(c, &store.Identity{
 		ProviderID: store.MakeProviderIdentity(
 			"test", "uid=user1,ou=users,dc=example,dc=com"),
@@ -313,8 +298,9 @@ func (s *ldapSuite) TestHandleWithGroups(c *qt.C) {
 	}}
 	sampleDB := append(getSampleLdapDB(), docs...)
 	i := s.setupIdp(c, getSampleParams(), sampleDB)
-	s.makeLoginRequest(c, i, "user1", "pass1")
-	s.idptest.AssertLoginSuccess(c, "user1")
+	id, err := s.idptest.DoInteractiveLogin(c, i, idpPrefix+"/login", candidtest.PostLoginForm("user1", "pass1"))
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(id.Username, qt.Equals, "user1")
 	identity := s.idptest.Store.AssertUser(c, &store.Identity{
 		ProviderID: store.MakeProviderIdentity(
 			"test", "uid=user1,ou=users,dc=example,dc=com"),
@@ -344,8 +330,9 @@ func (s *ldapSuite) TestHandleCustomGroupFilter(c *qt.C) {
 	}}
 	sampleDB := append(getSampleLdapDB(), docs...)
 	i := s.setupIdp(c, params, sampleDB)
-	s.makeLoginRequest(c, i, "user1", "pass1")
-	s.idptest.AssertLoginSuccess(c, "user1")
+	id, err := s.idptest.DoInteractiveLogin(c, i, idpPrefix+"/login", candidtest.PostLoginForm("user1", "pass1"))
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(id.Username, qt.Equals, "user1")
 	identity := s.idptest.Store.AssertUser(c, &store.Identity{
 		ProviderID: store.MakeProviderIdentity(
 			"test", "uid=user1,ou=users,dc=example,dc=com"),
@@ -358,8 +345,8 @@ func (s *ldapSuite) TestHandleCustomGroupFilter(c *qt.C) {
 
 func (s *ldapSuite) TestHandleFailedLogin(c *qt.C) {
 	i := s.setupIdp(c, getSampleParams(), getSampleLdapDB())
-	s.makeLoginRequest(c, i, "user1", "wrong")
-	s.idptest.AssertLoginFailureMatches(c, `Login failure`)
+	_, err := s.idptest.DoInteractiveLogin(c, i, idpPrefix+"/login", candidtest.PostLoginForm("user1", "wrong"))
+	c.Assert(err, qt.ErrorMatches, `Login failure`)
 }
 
 func (s *ldapSuite) TestHandleUserFilterNoMatch(c *qt.C) {
@@ -369,6 +356,6 @@ func (s *ldapSuite) TestHandleUserFilterNoMatch(c *qt.C) {
 	sampleDB[1]["objectClass"] = []string{"ignored"}
 	sampleDB[1]["customAttr"] = []string{"customValue2"}
 	i := s.setupIdp(c, params, sampleDB)
-	s.makeLoginRequest(c, i, "user1", "pass1")
-	s.idptest.AssertLoginFailureMatches(c, `user "user1" not found: not found`)
+	_, err := s.idptest.DoInteractiveLogin(c, i, idpPrefix+"/login", candidtest.PostLoginForm("user1", "pass1"))
+	c.Assert(err, qt.ErrorMatches, `user "user1" not found: not found`)
 }
