@@ -362,6 +362,7 @@ to find group memberships.
 - type: static
   name: static
   domain: mydomain
+  description: Static Identity Provider
   users:
     user1:
       name: User One
@@ -379,8 +380,21 @@ The `static` identity provider is meant for testing and allows defining a set of
 users that can authenticate, along with their passwords and a list of groups
 they are part of.
 
-Note that this provide is *not meant for production use* as it's insecure.
+Note that this provider is *not meant for production use* as it's insecure.
 
+`name` is the name to use for the LDAP IDP instance. It is possible
+to configure more than one LDAP IDP on a given candid server and this
+allows them to be identified. The name will be used in the login URL.
+
+`domain` (optional) is the domain in which all identities will be
+created. If this is not set then no domain is used.
+
+`description` (optional) provides a human readable description of the
+identity provider. If it is not set it will default to the value of
+`name`.
+
+`users` contains a static mapping of username to user entries for all
+of the users defined by the identity provider.
 
 Charm Configuration
 -------------------
