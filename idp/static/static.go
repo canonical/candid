@@ -40,6 +40,10 @@ type Params struct {
 	// Name is the name that will be given to the identity provider.
 	Name string `yaml:"name"`
 
+	// Description is the description of the IDP shown to the user on
+	// the IDP selection page.
+	Description string `yaml:"description"`
+
 	// Domain is the domain with which all identities created by this
 	// identity provider will be tagged (not including the @ separator).
 	Domain string `yaml:"domain"`
@@ -62,6 +66,9 @@ type UserInfo struct {
 
 // NewIdentityProvider creates a new static identity provider.
 func NewIdentityProvider(p Params) idp.IdentityProvider {
+	if p.Description == "" {
+		p.Description = p.Name
+	}
 	return &identityProvider{params: p}
 
 }
@@ -83,7 +90,7 @@ func (idp *identityProvider) Domain() string {
 
 // Description implements idp.IdentityProvider.Description.
 func (idp *identityProvider) Description() string {
-	return "Static identity provider"
+	return idp.params.Description
 }
 
 // Interactive implements idp.IdentityProvider.Interactive.

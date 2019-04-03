@@ -63,6 +63,17 @@ func (s *staticSuite) TestDomain(c *qt.C) {
 	c.Assert(idp.Domain(), qt.Equals, "domain")
 }
 
+func (s *staticSuite) TestDescription(c *qt.C) {
+	params := getSampleParams()
+	params.Description = "test IDP description"
+	idp := static.NewIdentityProvider(params)
+	c.Assert(idp.Description(), qt.Equals, "test IDP description")
+
+	params.Description = ""
+	idp = static.NewIdentityProvider(params)
+	c.Assert(idp.Description(), qt.Equals, params.Name)
+}
+
 func (s *staticSuite) TestInteractive(c *qt.C) {
 	idp := static.NewIdentityProvider(getSampleParams())
 	c.Assert(idp.Interactive(), qt.Equals, true)
