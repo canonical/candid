@@ -8,7 +8,7 @@
   <p>Please authenticate using one of the following:</p>
   <ul>
 {{ range .IDPs }}
-    <li><a href="{{.URL}}">{{.Description}}</a></li>
+    <li><a href="{{.URL}}" data-idp-name="{{.Name}}" data-idp-domain="{{.Domain}}">{{.Description}}</a></li>
 {{ end }}
   </ul>
 </body>

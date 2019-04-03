@@ -130,9 +130,10 @@ func (h *handler) RedirectLogin(p httprequest.Params, req *redirectLoginRequest)
 			continue
 		}
 		context := idpContext{
-			URL:         idp.URL(state),
+			Name:        idp.Name(),
 			Domain:      idp.Domain(),
 			Description: idp.Description(),
+			URL:         idp.URL(state),
 		}
 		allIDPs = append(allIDPs, context)
 		if req.Domain != "" && idp.Domain() == req.Domain {
@@ -154,9 +155,10 @@ func (h *handler) RedirectLogin(p httprequest.Params, req *redirectLoginRequest)
 // idpContext contains the context for an IDP which is sent to the
 // authentication-required template.
 type idpContext struct {
-	URL         string
 	Domain      string
 	Description string
+	Name        string
+	URL         string
 }
 
 // idpParams contains the template parameters sent to the

@@ -36,7 +36,7 @@ simplify:
 
 # Run the candid server.
 server: install
-	candidsrv -logging-config INFO cmd/candidsrv/config.yaml
+	candidsrv cmd/candidsrv/config.yaml
 
 # Generate version information
 version/init.go: version/init.go.tmpl FORCE
