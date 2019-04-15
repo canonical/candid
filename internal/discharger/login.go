@@ -146,6 +146,19 @@ func (h *handler) RedirectLogin(p httprequest.Params, req *redirectLoginRequest)
 	if len(idps) == 0 {
 		idps = allIDPs
 	}
+	if p.Request.Header.Get("Accept") == "application/json" {
+		idpDetails := []params.IDPChoiceDetails{}
+		for _, idp := range idps {
+			idpDetails = append(idpDetails, params.IDPChoiceDetails{
+				Name:        idp.Name,
+				Domain:      idp.Domain,
+				Description: idp.Description,
+				URL:         idp.URL,
+			})
+		}
+		httprequest.WriteJSON(p.Response, http.StatusOK, params.IDPChoice{IDPs: idpDetails})
+		return nil
+	}
 	if err := h.params.Template.ExecuteTemplate(p.Response, "authentication-required", idpParams{idps}); err != nil {
 		return errgo.Mask(err)
 	}

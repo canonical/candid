@@ -45,7 +45,7 @@ require (
 	golang.org/x/net v0.0.0-20181017193950-04a2e542c03f
 	golang.org/x/oauth2 v0.0.0-20161219192954-314dd2c0bf3e
 	google.golang.org/appengine v1.2.0 // indirect
-	gopkg.in/CanonicalLtd/candidclient.v1 v1.0.0
+	gopkg.in/CanonicalLtd/candidclient.v1 v1.0.1-0.20190415103826-8244cb2283c0
 	gopkg.in/asn1-ber.v1 v1.0.0-20170511165959-379148ca0225
 	gopkg.in/errgo.v1 v1.0.0
 	gopkg.in/goose.v1 v1.0.0-20161130145116-8f055ce635d6
