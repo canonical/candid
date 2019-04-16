@@ -123,21 +123,21 @@ func (h *handler) RedirectLogin(p httprequest.Params, req *redirectLoginRequest)
 	}
 
 	// Find all the possible login methods.
-	var allIDPs []idpContext
-	var idps []idpContext
+	var allIDPs []params.IDPChoiceDetails
+	var idps []params.IDPChoiceDetails
 	for _, idp := range h.params.IdentityProviders {
 		if !idp.Interactive() {
 			continue
 		}
-		context := idpContext{
+		choice := params.IDPChoiceDetails{
 			Name:        idp.Name(),
 			Domain:      idp.Domain(),
 			Description: idp.Description(),
 			URL:         idp.URL(state),
 		}
-		allIDPs = append(allIDPs, context)
+		allIDPs = append(allIDPs, choice)
 		if req.Domain != "" && idp.Domain() == req.Domain {
-			idps = append(idps, context)
+			idps = append(idps, choice)
 		}
 	}
 	if len(allIDPs) == 0 {
@@ -146,25 +146,15 @@ func (h *handler) RedirectLogin(p httprequest.Params, req *redirectLoginRequest)
 	if len(idps) == 0 {
 		idps = allIDPs
 	}
-	if err := h.params.Template.ExecuteTemplate(p.Response, "authentication-required", idpParams{idps}); err != nil {
+	idpChoices := params.IDPChoice{IDPs: idps}
+	if p.Request.Header.Get("Accept") == "application/json" {
+		httprequest.WriteJSON(p.Response, http.StatusOK, idpChoices)
+		return nil
+	}
+	if err := h.params.Template.ExecuteTemplate(p.Response, "authentication-required", idpChoices); err != nil {
 		return errgo.Mask(err)
 	}
 	return nil
-}
-
-// idpContext contains the context for an IDP which is sent to the
-// authentication-required template.
-type idpContext struct {
-	Domain      string
-	Description string
-	Name        string
-	URL         string
-}
-
-// idpParams contains the template parameters sent to the
-// authentication-required template.
-type idpParams struct {
-	IDPs []idpContext
 }
 
 // loginCompleteRequest is a request that completes a login attempt.

@@ -20,6 +20,7 @@ import (
 	qt "github.com/frankban/quicktest"
 	"github.com/frankban/quicktest/qtsuite"
 	"github.com/juju/qthttptest"
+	"gopkg.in/CanonicalLtd/candidclient.v1/params"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/httprequest.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery"
@@ -123,6 +124,31 @@ func (s *dischargeSuite) TestInteractiveDischargeWithOldClientCaveat(c *qt.C) {
 	ms, err := s.dischargeCreator.Discharge(c, "<is-authenticated-user", s.srv.Client(s.interactor))
 	c.Assert(err, qt.Equals, nil)
 	_, err = s.dischargeCreator.Bakery.Checker.Auth(ms).Allow(context.Background(), identchecker.LoginOp)
+	c.Assert(err, qt.Equals, nil)
+}
+
+func (s *dischargeSuite) TestInteractiveDischargeJSON(c *qt.C) {
+	openWebBrowser := func(u *url.URL) error {
+		req, err := http.NewRequest("GET", u.String(), nil)
+		if err != nil {
+			return err
+		}
+		req.Header.Add("Accept", "application/json")
+		resp, err := s.srv.Client(nil).Do(req)
+		if err != nil {
+			return err
+		}
+		payload := &params.IDPChoice{}
+		err = httprequest.UnmarshalJSONResponse(resp, payload)
+		c.Assert(resp.Header.Get("Content-Type"), qt.Equals, "application/json")
+		c.Assert(len(payload.IDPs) > 1, qt.Equals, true)
+		// do normal interactive login
+		return s.interactor.OpenWebBrowser(u)
+	}
+	client := s.srv.Client(httpbakery.WebBrowserInteractor{
+		OpenWebBrowser: openWebBrowser,
+	})
+	_, err := s.dischargeCreator.Discharge(c, "is-authenticated-user", client)
 	c.Assert(err, qt.Equals, nil)
 }
 
