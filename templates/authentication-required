@@ -1,15 +1,52 @@
 <!DOCTYPE html>
-<html>
-<head>
-  <title>Authentication Required</title>
-</head>
-<body>
-  <h1>Authentication Required</h1>
-  <p>Please authenticate using one of the following:</p>
-  <ul>
+<html dir="ltr" lang="en"><head>
+<!-- !IE will be true for all non-IE browsers and IE10 since it does not
+ recognize conditional flags. -->
+<!--[if !IE]><!--><script>
+if (/*@cc_on!@*/false) {
+  // Only IE10 has cc_on as false.
+  document.documentElement.className+=' ie10';
+}
+</script><!--<![endif]-->
+  <head>
+    <title>Candid - Authentication Required</title>
+    
+    <meta http-equiv="x-ua-compatible" content="IE=edge">
+    <meta charset="utf-8">
+
+
+    <meta name="viewport" content="width=device-width,initial-scale=1.0 maximum-scale=1.0, user-scalable=no">
+    <meta name="description" content="">
+    <meta name="author" content="Juju team">
+    <link rel="shortcut icon" href="static/favicon.ico">
+    <link rel="stylesheet" href="static/css/style.css">
+
+    
+  </head>
+
+  <body cz-shortcut-listen="true">
+
+    <div class="full-screen-mask">
+      <div id="login-container">
+        <div class="login">
+          <div class="login__full-form">
+            <div class="login__env-name">Authentication Required</div>
+            <div class="button-row">Please authenticate using one of the following:</div>
 {{ range .IDPs }}
-    <li><a href="{{.URL}}" data-idp-name="{{.Name}}" data-idp-domain="{{.Domain}}">{{.Description}}</a></li>
+            <div class="button-row">
+              <a href="{{.URL}}" class="button--inline-neutral" data-idp-name="{{.Name}}" data-idp-domain="{{.Domain}}">{{.Description}}</a>
+            </div>
 {{ end }}
-  </ul>
+            <style>
+              .button--inline-neutral {
+                background-color: #fff;
+                border:1px solid #cdcdcd;
+                color: #111;
+              }
+            </style>
+          </div>
+        </div>
+      </div>
+    </div>
 </body>
 </html>
