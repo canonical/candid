@@ -17,7 +17,7 @@ if (/*@cc_on!@*/false) {
     <meta charset="utf-8">
     <!-- Copyright (C) 2017-2018 Canonical Ltd. -->
     <meta name="viewport" content="width=device-width,initial-scale=1.0 maximum-scale=1.0, user-scalable=no">
-    <link rel="stylesheet" href="../../static/css/style.css">
+    <link rel="stylesheet" href="static/css/style.css">
 
     <!--[if lt IE 9]>
     <script src="http://html5shim.googlecode.com/svn/trunk/html5.js"></script>
