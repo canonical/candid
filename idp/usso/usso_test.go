@@ -323,6 +323,47 @@ func (s *ussoSuite) TestGetGroups(c *qt.C) {
 	c.Assert(groups, qt.DeepEquals, []string{"test1", "test2"})
 }
 
+func (s *ussoSuite) TestGetGroupsReturnsNewSlice(c *qt.C) {
+	lp := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		c.Logf("path: %s", r.URL.Path)
+		switch r.URL.Path {
+		case "/people":
+			r.ParseForm()
+			c.Check(r.Form.Get("ws.op"), qt.Equals, "getByOpenIDIdentifier")
+			c.Check(r.Form.Get("identifier"), qt.Equals, "https://login.launchpad.net/+id/test")
+			w.Header().Set("Content-Type", "application/json")
+			fmt.Fprintf(w, `{"name": "test", "super_teams_collection_link": "https://api.launchpad.net/devel/test/super_teams"}`)
+		case "/test/super_teams":
+			w.Header().Set("Content-Type", "application/json")
+			fmt.Fprintf(w, `{"total_size":3,"start":0,"entries": [{"name": "test1"},{"name":"test2"}]}`)
+		}
+	}))
+	defer lp.Close()
+
+	rt := qthttptest.URLRewritingTransport{
+		MatchPrefix:  "https://api.launchpad.net/devel",
+		Replace:      lp.URL,
+		RoundTripper: http.DefaultTransport,
+	}
+	savedTransport := http.DefaultTransport
+	defer func() {
+		http.DefaultTransport = savedTransport
+	}()
+	http.DefaultTransport = rt
+
+	groups, err := s.idp.GetGroups(context.Background(), &store.Identity{
+		ProviderID: store.MakeProviderIdentity("usso", "https://login.ubuntu.com/+id/test"),
+	})
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(groups, qt.DeepEquals, []string{"test1", "test2"})
+	groups[0] = "test1@domain"
+	groups, err = s.idp.GetGroups(s.idptest.Ctx, &store.Identity{
+		ProviderID: store.MakeProviderIdentity("usso", "https://login.ubuntu.com/+id/test"),
+	})
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(groups, qt.DeepEquals, []string{"test1", "test2"})
+}
+
 func (s *ussoSuite) TestWithDomain(c *qt.C) {
 	s.idp = usso.NewIdentityProvider(usso.Params{
 		Domain: "test1",

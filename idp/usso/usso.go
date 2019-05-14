@@ -228,13 +228,7 @@ func (idp *identityProvider) GetGroups(_ context.Context, id *store.Identity) ([
 		return nil, errgo.Mask(err)
 	}
 	groups := groups0.([]string)
-	if len(groups) == 0 {
-		return id.ProviderInfo["groups"], nil
-	}
 	privateGroups := id.ProviderInfo["groups"]
-	if len(privateGroups) == 0 {
-		return groups, nil
-	}
 	allGroups := make([]string, len(groups)+len(privateGroups))
 	copy(allGroups, groups)
 	copy(allGroups[len(groups):], privateGroups)
