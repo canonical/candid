@@ -34,9 +34,12 @@ format:
 simplify:
 	gofmt -w -l -s .
 
+candidsrv: version/init.go
+	go build ./cmd/candidsrv
+
 # Run the candid server.
-server: install
-	candidsrv cmd/candidsrv/config.yaml
+server: candidsrv
+	./candidsrv cmd/candidsrv/config.yaml
 
 # Generate version information
 version/init.go: version/init.go.tmpl FORCE
