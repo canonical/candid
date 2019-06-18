@@ -1,0 +1,24 @@
+/*
+  Import Vanilla framework:
+  https://docs.vanillaframework.io/
+*/
+@import 'vanilla-framework-version-2.0.1.min.css';
+
+html {
+  overflow-y: hidden;
+  height: 100%;
+}
+
+body {
+  overflow: hidden;
+  overflow-y: scroll;
+  height: 1vh;
+  background: #f7f7f7;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  height: 100%;
+  color: #333;
+  font-family: Ubuntu, Arial, 'libra sans', sans-serif;
+  font-size: 16px;
+  font-weight: 300;
+}
