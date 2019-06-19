@@ -1,5 +1,6 @@
 access.log
 cmd/idserver/idserver
+/candidsrv
 version/init.go
 candid-*.tar.xz
 candid_source.tar.bz2
