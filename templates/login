@@ -1,42 +1,38 @@
 <!DOCTYPE html>
-<html lang="en" dir="ltr">
-<!-- !IE will be true for all non-IE browsers and IE10 since it does not
- recognize conditional flags. -->
-<!--[if !IE]><!--><script>
-if (/*@cc_on!@*/false) {
-  // Only IE10 has cc_on as false.
-  document.documentElement.className+=' ie10';
-}
-</script><!--<![endif]-->
-  <head>
-    <title>Candid - login</title>
-    <!-- Disable backwards compatible mode for IE on an intranet.
-         For an explanation see http://bit.ly/14VytlD
-         Also note this must be the first <meta> to appear. -->
-    <meta http-equiv="x-ua-compatible" content="IE=edge">
-    <meta charset="utf-8">
-    <!-- Copyright (C) 2017-2018 Canonical Ltd. -->
-    <meta name="viewport" content="width=device-width,initial-scale=1.0 maximum-scale=1.0, user-scalable=no">
-    <link rel="stylesheet" href="static/css/style.css">
+<html dir="ltr" lang="en">
+<head>
+  <title>Candid - Login</title>
 
-    <!--[if lt IE 9]>
-    <script src="http://html5shim.googlecode.com/svn/trunk/html5.js"></script>
-    <![endif]-->
-  </head>
+  <meta http-equiv="x-ua-compatible" content="IE=edge">
+  <meta charset="utf-8">
 
-  <body>
-    <div class="full-screen-mask">
-      <div id="login-container">
-        <div class="login">
-          <div class="login__full-form">
-            <div class="login__env-name">You're logged in as {{.Username}}</div>
-            <div class="button-row">
-              You can now close this window.
-            </div>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="">
+  <meta name="author" content="Juju team">
+  <link rel="shortcut icon" href="../../static/favicon.ico">
+  <link rel="stylesheet" href="../../static/css/vanilla.css">
+</head>
+
+<body>
+  <div class="p-strip">
+    <div class="row">
+      <div class="col-2 col-start-large-6 col-small-2 col-medium-3">
+        <img src="../../static/images/logo-canonical-aubergine.svg" alt="Canonical" />
+      </div>
+    </div>
+  </div>
+  <div class="p-strip">
+    <div class="row">
+      <div class="col-6 col-start-large-4">
+        <div class="p-card--highlighted">
+          <div class="p-card__thumbnail">
+            <h1 class="p-heading--four">You're logged in as {{.Username}}</h1>
           </div>
-          <div class="login__message"></div>
+          <hr class="u-sv1">
+          <p>You can now close this window.</p>
         </div>
       </div>
     </div>
-  </body>
+  </div>
+</body>
 </html>

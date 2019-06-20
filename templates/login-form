@@ -1,51 +1,54 @@
 <!DOCTYPE html>
-<html lang="en" dir="ltr">
-<!-- !IE will be true for all non-IE browsers and IE10 since it does not
- recognize conditional flags. -->
-<!--[if !IE]><!--><script>
-if (/*@cc_on!@*/false) {
-  // Only IE10 has cc_on as false.
-  document.documentElement.className+=' ie10';
-}
-</script><!--<![endif]-->
-  <head>
-    <title>Candid - login</title>
-    <!-- Disable backwards compatible mode for IE on an intranet.
-         For an explanation see http://bit.ly/14VytlD
-         Also note this must be the first <meta> to appear. -->
-    <meta http-equiv="x-ua-compatible" content="IE=edge">
-    <meta charset="utf-8">
-    <!-- Copyright (C) 2017-2018 Canonical Ltd. -->
-    <meta name="viewport" content="width=device-width,initial-scale=1.0 maximum-scale=1.0, user-scalable=no">
-    <link rel="stylesheet" href="../../static/css/style.css">
+<html dir="ltr" lang="en">
+<head>
+  <title>Candid - Login</title>
 
-    <!--[if lt IE 9]>
-    <script src="http://html5shim.googlecode.com/svn/trunk/html5.js"></script>
-    <![endif]-->
-  </head>
+  <meta http-equiv="x-ua-compatible" content="IE=edge">
+  <meta charset="utf-8">
 
-  <body>
-    <div class="full-screen-mask">
-      <div id="login-container">
-        <div class="login">
-          <div class="login__full-form">
-            <div class="login__env-name">Login</div>{{if .Error}}
-            <div class="login__failure-message">{{.Error}}</div>{{end}}
-            <form class="login__form" method="post" action="{{.Action}}">
-              <label class="login__label">
-                  Username
-                  <input type="text" class="login__input js_username_input" name="username" autocomplete="off" style="background-image: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAASCAYAAABSO15qAAAAAXNSR0IArs4c6QAAAPhJREFUOBHlU70KgzAQPlMhEvoQTg6OPoOjT+JWOnRqkUKHgqWP4OQbOPokTk6OTkVULNSLVc62oJmbIdzd95NcuGjX2/3YVI/Ts+t0WLE2ut5xsQ0O+90F6UxFjAI8qNcEGONia08e6MNONYwCS7EQAizLmtGUDEzTBNd1fxsYhjEBnHPQNG3KKTYV34F8ec/zwHEciOMYyrIE3/ehKAqIoggo9inGXKmFXwbyBkmSQJqmUNe15IRhCG3byphitm1/eUzDM4qR0TTNjEixGdAnSi3keS5vSk2UDKqqgizLqB4YzvassiKhGtZ/jDMtLOnHz7TE+yf8BaDZXA509yeBAAAAAElFTkSuQmCC'); background-repeat: no-repeat; background-attachment: scroll; background-size: 16px 18px; background-position: 98% 50%;" />
-              </label>
-              <label class="login__label">
-                  Password
-                  <input type="password" class="login__input" name="password" autocomplete="off" style="background-image: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAASCAYAAABSO15qAAAAAXNSR0IArs4c6QAAAPhJREFUOBHlU70KgzAQPlMhEvoQTg6OPoOjT+JWOnRqkUKHgqWP4OQbOPokTk6OTkVULNSLVc62oJmbIdzd95NcuGjX2/3YVI/Ts+t0WLE2ut5xsQ0O+90F6UxFjAI8qNcEGONia08e6MNONYwCS7EQAizLmtGUDEzTBNd1fxsYhjEBnHPQNG3KKTYV34F8ec/zwHEciOMYyrIE3/ehKAqIoggo9inGXKmFXwbyBkmSQJqmUNe15IRhCG3byphitm1/eUzDM4qR0TTNjEixGdAnSi3keS5vSk2UDKqqgizLqB4YzvassiKhGtZ/jDMtLOnHz7TE+yf8BaDZXA509yeBAAAAAElFTkSuQmCC'); background-repeat: no-repeat; background-attachment: scroll; background-size: 16px 18px; background-position: 98% 50%;" />
-              </label>
-              <button class="button--positive" type="submit">Login</button>
-            </form>
-          </div>
-          <div class="login__message"></div>
-        </div>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="">
+  <meta name="author" content="Juju team">
+  <link rel="shortcut icon" href="../../static/favicon.ico">
+  <link rel="stylesheet" href="../../static/css/vanilla.css">
+</head>
+
+<body>
+  <div class="p-strip">
+    <div class="row">
+      <div class="col-2 col-start-large-6 col-small-2 col-medium-3">
+        <img src="../../static/images/logo-canonical-aubergine.svg" alt="Canonical" />
       </div>
     </div>
-  </body>
+  </div>
+  <div class="p-strip">
+    <div class="row">
+      <div class="col-6 col-start-large-4">
+        <div class="p-card--highlighted">
+          <div class="p-card__thumbnail">
+            <h1 class="p-heading--four">Login</h1>
+          </div>
+          <hr class="u-sv1">
+          {{if .Error}}
+            <div class="p-notification--negative">
+              <p class="p-notification__response">
+                <span class="p-notification__status">Error:</span>{{.Error}}
+              </p>
+            </div>
+          {{end}}
+          <form class="p-form" method="post" action="{{.Action}}">
+            <label for="username">Username</label>
+            <input type="text" id="username" name="username" autocomplete="off">
+            <label for="password">Password</label>
+            <input type="text" id="password" name="password" autocomplete="off">
+            <br /><br />
+            <a href="/login" class="p-button--neutral u-float-left u-no-margin--bottom">Back</a>
+            <button type="submit" class="p-button--positive u-float-right u-no-margin--bottom">Login</button>
+          </form>
+        </div>
+        <div class="login__message"></div>
+      </div>
+    </div>
+  </div>
+</body>
 </html>

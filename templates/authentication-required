@@ -9,15 +9,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="description" content="">
   <meta name="author" content="Juju team">
-  <link rel="shortcut icon" href="static/favicon.ico">
-  <link rel="stylesheet" href="static/css/vanilla.css">
+  <link rel="shortcut icon" href="../../static/favicon.ico">
+  <link rel="stylesheet" href="../../static/css/vanilla.css">
 </head>
 
 <body cz-shortcut-listen="true">
   <div class="p-strip">
     <div class="row">
       <div class="col-2 col-start-large-6 col-small-2 col-medium-3">
-      <img src="static/images/logo-canonical-aubergine.svg" alt="Canonical" />
+        <img src="../../static/images/logo-canonical-aubergine.svg" alt="Canonical" />
+      </div>
     </div>
   </div>
   <div class="p-strip">
