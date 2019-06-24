@@ -162,9 +162,16 @@ func (idp *identityProvider) Handle(ctx context.Context, w http.ResponseWriter, 
 		idp.initParams.VisitCompleter.RedirectFailure(ctx, w, req, ls.ReturnTo, ls.State, errgo.New("cannot load login template"))
 		return
 	}
-	err := loginTemplate.Execute(w, map[string]string{
-		"Action": idp.URL(idputil.State(req)),
-	})
+	data := idputil.LoginFormParams{
+		IDPChoiceDetails: params.IDPChoiceDetails{
+			Domain:      idp.params.Domain,
+			Description: idp.params.Description,
+			Name:        idp.params.Name,
+			URL:         idp.URL(req.Form.Get("state")),
+		},
+		Action: idp.URL(req.Form.Get("state")),
+	}
+	err := loginTemplate.Execute(w, data)
 	if err != nil {
 		// The template failed part way through rendering.
 		logger.Errorf("cannot render login template: %s", err)

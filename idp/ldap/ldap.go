@@ -288,7 +288,16 @@ func (idp *identityProvider) handleLogin(ctx context.Context, w http.ResponseWri
 	default:
 		return errgo.WithCausef(nil, params.ErrBadRequest, "unsupported method %q", req.Method)
 	case "GET":
-		return errgo.Mask(idp.initParams.Template.ExecuteTemplate(w, "login-form", nil))
+		data := idputil.LoginFormParams{
+			IDPChoiceDetails: params.IDPChoiceDetails{
+				Domain:      idp.params.Domain,
+				Description: idp.params.Description,
+				Name:        idp.params.Name,
+				URL:         idp.URL(req.Form.Get("state")),
+			},
+			Action: idp.URL(req.Form.Get("state")),
+		}
+		return errgo.Mask(idp.initParams.Template.ExecuteTemplate(w, "login-form", data))
 	case "POST":
 		id, err := idp.loginUser(ctx, req.Form.Get("username"), req.Form.Get("password"))
 		if err != nil {

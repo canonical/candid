@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/juju/loggo"
+	"gopkg.in/CanonicalLtd/candidclient.v1/params"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/httprequest.v1"
 
@@ -164,4 +165,17 @@ type LoginState struct {
 func BadRequestf(w http.ResponseWriter, f string, args ...interface{}) {
 	w.WriteHeader(http.StatusBadRequest)
 	fmt.Fprintf(w, f, args...)
+}
+
+// LoginFormParams contains the parameters sent to the login-form
+// template.
+type LoginFormParams struct {
+	params.IDPChoiceDetails
+
+	// Action contains the action parameter for the form.
+	Action string
+
+	// Error contains an error message from the previous, failed,
+	// login attempt.
+	Error string
 }
