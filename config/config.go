@@ -91,6 +91,11 @@ type Config struct {
 	// NoProxy holds which hosts not to use the HTTProxy for,
 	// in the same form as the NO_PROXY environment variable.
 	NoProxy string `yaml:"no-proxy"`
+
+	// RedirectLoginWhitelist contains a list of URLs that are
+	// trusted to be used as return_to URLs during an interactive
+	// login.
+	RedirectLoginWhitelist []string `yaml:"redirect-login-whitelist"`
 }
 
 // TLSConfig returns a TLS configuration to be used for serving

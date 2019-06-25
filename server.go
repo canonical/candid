@@ -110,6 +110,11 @@ type ServerParams struct {
 
 	// ACLStore holds the ACLStore for the identity server.
 	ACLStore aclstore.ACLStore
+
+	// RedirectLoginWhitelist contains a list of URLs that are
+	// trusted to be used as return_to URLs during an interactive
+	// login.
+	RedirectLoginWhitelist []string
 }
 
 // NewServer returns a new handler that handles identity service requests and

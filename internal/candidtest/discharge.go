@@ -57,7 +57,7 @@ func NewDischargeCreator(server *Server) *DischargeCreator {
 // interaction using the specified visitor.
 func (s *DischargeCreator) AssertDischarge(c *qt.C, i httpbakery.Interactor) {
 	ms, err := s.Discharge(c, "is-authenticated-user", BakeryClient(i))
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.Equals, nil, qt.Commentf("%s", errgo.Details(err)))
 	_, err = s.Bakery.Checker.Auth(ms).Allow(context.Background(), identchecker.LoginOp)
 	c.Assert(err, qt.Equals, nil)
 }

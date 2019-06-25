@@ -11,6 +11,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"net/http/cookiejar"
 	"net/url"
 	"path"
 	"strings"
@@ -34,6 +35,7 @@ import (
 	"github.com/CanonicalLtd/candid/internal/auth"
 	"github.com/CanonicalLtd/candid/internal/candidtest"
 	"github.com/CanonicalLtd/candid/internal/discharger"
+	"github.com/CanonicalLtd/candid/internal/discharger/redirect"
 	"github.com/CanonicalLtd/candid/internal/identity"
 	"github.com/CanonicalLtd/candid/store"
 )
@@ -101,6 +103,9 @@ func (s *dischargeSuite) Init(c *qt.C) {
 				},
 			},
 		}),
+	}
+	sp.RedirectLoginWhitelist = []string{
+		"https://www.example.com/callback",
 	}
 	s.srv = candidtest.NewServer(c, sp, map[string]identity.NewAPIHandlerFunc{
 		"discharger": discharger.NewAPIHandler,
@@ -802,4 +807,79 @@ type valueSavingOpenWebBrowser struct {
 func (v *valueSavingOpenWebBrowser) OpenWebBrowser(u *url.URL) error {
 	v.url = u
 	return v.openWebBrowser(u)
+}
+
+func (s *dischargeSuite) TestDischargeBrowserRedirectLogin(c *qt.C) {
+	interactor := new(redirect.Interactor)
+	_, err := s.dischargeCreator.Discharge(c, "is-authenticated-user", s.srv.Client(interactor))
+	c.Assert(httpbakery.IsInteractionError(errgo.Cause(err)), qt.Equals, true, qt.Commentf("%v", errgo.Details(errgo.Cause(err))))
+	ierr := errgo.Cause(err).(*httpbakery.InteractionError)
+	c.Assert(redirect.IsRedirectRequiredError(errgo.Cause(ierr.Reason)), qt.Equals, true)
+	rerr := errgo.Cause(ierr.Reason).(*redirect.RedirectRequiredError)
+
+	jar, err := cookiejar.New(nil)
+	c.Assert(err, qt.Equals, nil)
+	client := &http.Client{
+		Jar: jar,
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			if req.URL.Host == "www.example.com" {
+				return http.ErrUseLastResponse
+			}
+			return nil
+		},
+	}
+	resp, err := client.Get(rerr.InteractionInfo.RedirectURL("https://www.example.com/callback", "123456"))
+	c.Assert(err, qt.Equals, nil)
+
+	f := candidtest.SelectInteractiveLogin(candidtest.PostLoginForm("test", "password"))
+	resp, err = f(client, resp)
+	c.Assert(err, qt.Equals, nil)
+	defer resp.Body.Close()
+
+	c.Assert(resp.StatusCode, qt.Equals, http.StatusSeeOther, qt.Commentf("unexpected response %q", resp.Status))
+	state, code, err := redirect.ParseLoginResult(resp.Header.Get("Location"))
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(state, qt.Equals, "123456")
+
+	dt, err := rerr.InteractionInfo.GetDischargeToken(context.Background(), code)
+	c.Assert(err, qt.Equals, nil)
+
+	interactor.SetDischargeToken(rerr.InteractionInfo.LoginURL, dt)
+	ms, err := s.dischargeCreator.Discharge(c, "is-authenticated-user", s.srv.Client(interactor))
+	c.Assert(err, qt.Equals, nil)
+	s.dischargeCreator.AssertMacaroon(c, ms, identchecker.LoginOp, "")
+}
+
+func (s *dischargeSuite) TestDischargeBrowserRedirectLoginNotWhitelisted(c *qt.C) {
+	interactor := new(redirect.Interactor)
+	_, err := s.dischargeCreator.Discharge(c, "is-authenticated-user", s.srv.Client(interactor))
+	c.Assert(httpbakery.IsInteractionError(errgo.Cause(err)), qt.Equals, true, qt.Commentf("%v", errgo.Details(errgo.Cause(err))))
+	ierr := errgo.Cause(err).(*httpbakery.InteractionError)
+	c.Assert(redirect.IsRedirectRequiredError(errgo.Cause(ierr.Reason)), qt.Equals, true)
+	rerr := errgo.Cause(ierr.Reason).(*redirect.RedirectRequiredError)
+
+	jar, err := cookiejar.New(nil)
+	c.Assert(err, qt.Equals, nil)
+	client := &http.Client{
+		Jar: jar,
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			if req.URL.Host == "www.example.com" {
+				return http.ErrUseLastResponse
+			}
+			return nil
+		},
+	}
+	resp, err := client.Get(rerr.InteractionInfo.RedirectURL("https://www.example.com/callback2", "123456"))
+	c.Assert(err, qt.Equals, nil)
+
+	f := candidtest.SelectInteractiveLogin(candidtest.PostLoginForm("test", "password"))
+	resp, err = f(client, resp)
+	c.Assert(err, qt.Equals, nil)
+	defer resp.Body.Close()
+
+	c.Assert(resp.StatusCode, qt.Equals, http.StatusBadRequest, qt.Commentf("unexpected response %q", resp.Status))
+	var perr params.Error
+	err = httprequest.UnmarshalJSONResponse(resp, &perr)
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(&perr, qt.ErrorMatches, "invalid return_to")
 }

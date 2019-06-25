@@ -179,6 +179,23 @@ func (s *idpSuite) TestLoginRedirectSuccessInvalidReturnTo(c *qt.C) {
 	})
 }
 
+func (s *idpSuite) TestLoginRedirectSuccessReturnToNotInWhitelist(c *qt.C) {
+	req, err := http.NewRequest("GET", "", nil)
+	c.Assert(err, qt.Equals, nil)
+	rr := httptest.NewRecorder()
+	s.vc.RedirectSuccess(context.Background(), rr, req, "https://example.com", "1234", &store.Identity{
+		Username: "test-user",
+	})
+	c.Assert(rr.Code, qt.Equals, http.StatusBadRequest)
+	var perr params.Error
+	err = json.Unmarshal(rr.Body.Bytes(), &perr)
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(perr, qt.DeepEquals, params.Error{
+		Code:    params.ErrBadRequest,
+		Message: `invalid return_to`,
+	})
+}
+
 func (s *idpSuite) TestLoginRedirectFailureInvalidReturnTo(c *qt.C) {
 	req, err := http.NewRequest("GET", "", nil)
 	c.Assert(err, qt.Equals, nil)
