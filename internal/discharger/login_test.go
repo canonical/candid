@@ -12,6 +12,7 @@ import (
 	qt "github.com/frankban/quicktest"
 	"github.com/frankban/quicktest/qtsuite"
 	"gopkg.in/CanonicalLtd/candidclient.v1/params"
+	errgo "gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
 
@@ -81,11 +82,11 @@ func (s *loginSuite) TestLegacyNonInteractiveLogin(c *qt.C) {
 
 func (s *loginSuite) TestLegacyLoginFailure(c *qt.C) {
 	client := s.srv.Client(httpbakery.WebBrowserInteractor{
-		OpenWebBrowser: candidtest.PasswordLogin(c, "test", "badpassword"),
+		OpenWebBrowser: candidtest.OpenWebBrowser(c, candidtest.SelectInteractiveLogin(badLoginFormRequestMethod)),
 	})
 	// Use "<is-authenticated-user" to force legacy interaction
 	_, err := s.dischargeCreator.Discharge(c, "<is-authenticated-user", client)
-	c.Assert(err, qt.ErrorMatches, `cannot get discharge from ".*": failed to acquire macaroon after waiting: third party refused discharge: authentication failed for user "test"`)
+	c.Assert(err, qt.ErrorMatches, `cannot get discharge from ".*": failed to acquire macaroon after waiting: third party refused discharge: unsupported method "PUT"`)
 }
 
 func (s *loginSuite) TestInteractiveLogin(c *qt.C) {
@@ -104,10 +105,10 @@ func (s *loginSuite) TestNonInteractiveLogin(c *qt.C) {
 
 func (s *loginSuite) TestLoginFailure(c *qt.C) {
 	client := s.srv.Client(httpbakery.WebBrowserInteractor{
-		OpenWebBrowser: candidtest.PasswordLogin(c, "test", "badpassword"),
+		OpenWebBrowser: candidtest.OpenWebBrowser(c, candidtest.SelectInteractiveLogin(badLoginFormRequestMethod)),
 	})
 	_, err := s.dischargeCreator.Discharge(c, "is-authenticated-user", client)
-	c.Assert(err, qt.ErrorMatches, `cannot get discharge from ".*": cannot acquire discharge token: authentication failed for user "test"`)
+	c.Assert(err, qt.ErrorMatches, `cannot get discharge from ".*": cannot acquire discharge token: unsupported method "PUT"`)
 }
 
 func (s *loginSuite) TestLoginMethodsIncludesAgent(c *qt.C) {
@@ -123,4 +124,18 @@ func (s *loginSuite) TestLoginMethodsIncludesAgent(c *qt.C) {
 	err = json.Unmarshal(buf, &lm)
 	c.Assert(err, qt.Equals, nil)
 	c.Assert(lm.Agent, qt.Equals, s.srv.URL+"/login/legacy-agent")
+}
+
+func badLoginFormRequestMethod(client *http.Client, resp *http.Response) (*http.Response, error) {
+	defer resp.Body.Close()
+	purl, err := candidtest.LoginFormAction(resp)
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
+	req, err := http.NewRequest("PUT", purl, nil)
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
+	resp, err = client.Do(req)
+	return resp, errgo.Mask(err, errgo.Any)
 }

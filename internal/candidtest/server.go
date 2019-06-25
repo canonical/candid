@@ -37,7 +37,7 @@ const (
 	// This format is interpretted by SelectInteractiveLogin.
 	authenticationRequiredTemplate = "{{range .IDPs}}{{.URL}}\n{{end}}"
 	loginTemplate                  = "login successful as user {{.Username}}\n"
-	loginFormTemplate              = "{{.Action}}\n"
+	loginFormTemplate              = "{{.Action}}\n{{.Error}}\n"
 )
 
 // Server implements a test fixture that contains a candid server.

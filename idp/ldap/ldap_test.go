@@ -357,5 +357,5 @@ func (s *ldapSuite) TestHandleUserFilterNoMatch(c *qt.C) {
 	sampleDB[1]["customAttr"] = []string{"customValue2"}
 	i := s.setupIdp(c, params, sampleDB)
 	_, err := s.idptest.DoInteractiveLogin(c, i, idpPrefix+"/login", candidtest.PostLoginForm("user1", "pass1"))
-	c.Assert(err, qt.ErrorMatches, `user "user1" not found: not found`)
+	c.Assert(err, qt.ErrorMatches, `user &#34;user1&#34; not found: not found`)
 }

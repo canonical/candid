@@ -179,3 +179,32 @@ type LoginFormParams struct {
 	// login attempt.
 	Error string
 }
+
+// HandleLoginForm is a handler that displays and process a standard login form.
+func HandleLoginForm(
+	ctx context.Context,
+	w http.ResponseWriter,
+	req *http.Request,
+	idpChoice params.IDPChoiceDetails,
+	tmpl *template.Template,
+	loginUser func(ctx context.Context, username, password string) (*store.Identity, error),
+) (*store.Identity, error) {
+	var errorMessage string
+	switch req.Method {
+	default:
+		return nil, errgo.WithCausef(nil, params.ErrBadRequest, "unsupported method %q", req.Method)
+	case "POST":
+		id, err := loginUser(ctx, req.Form.Get("username"), req.Form.Get("password"))
+		if err == nil {
+			return id, nil
+		}
+		errorMessage = err.Error()
+	case "GET":
+	}
+	data := LoginFormParams{
+		IDPChoiceDetails: idpChoice,
+		Action:           idpChoice.URL,
+		Error:            errorMessage,
+	}
+	return nil, errgo.Mask(tmpl.ExecuteTemplate(w, "login-form", data))
+}

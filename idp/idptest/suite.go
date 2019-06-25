@@ -4,10 +4,12 @@
 package idptest
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/base64"
 	"html/template"
+	"io/ioutil"
 	"net/http"
 	"net/http/cookiejar"
 	"net/http/httptest"
@@ -138,18 +140,29 @@ func (s *Fixture) Client(c *qt.C, prefix, replacement, stopPrefix string) *http.
 
 // ParseResponse parses a store.Identity from the given HTTP response.
 func (s *Fixture) ParseResponse(c *qt.C, resp *http.Response) (*store.Identity, error) {
-	c.Assert(resp.StatusCode, qt.Equals, http.StatusSeeOther)
-	ru, err := url.Parse(resp.Header.Get("Location"))
-	c.Assert(err, qt.Equals, nil)
-	rv := ru.Query()
-	if msg := rv.Get("error"); msg != "" {
-		if code := rv.Get("error_code"); code != "" {
-			return nil, errgo.WithCausef(nil, params.ErrorCode(code), "%s", msg)
+	switch resp.StatusCode {
+	case http.StatusOK:
+		buf, err := ioutil.ReadAll(resp.Body)
+		c.Assert(err, qt.Equals, nil)
+		parts := bytes.Split(buf, []byte("\n"))
+		if len(parts) > 1 && len(parts[1]) > 0 {
+			return nil, errgo.New(string(parts[1]))
 		}
-		return nil, errgo.New(msg)
+	case http.StatusSeeOther:
+		ru, err := url.Parse(resp.Header.Get("Location"))
+		c.Assert(err, qt.Equals, nil)
+		rv := ru.Query()
+		if msg := rv.Get("error"); msg != "" {
+			if code := rv.Get("error_code"); code != "" {
+				return nil, errgo.WithCausef(nil, params.ErrorCode(code), "%s", msg)
+			}
+			return nil, errgo.New(msg)
+		}
+		c.Assert(rv.Get("code"), qt.Equals, "6789")
+		return s.visitCompleter.id, nil
 	}
-	c.Assert(rv.Get("code"), qt.Equals, "6789")
-	return s.visitCompleter.id, nil
+	c.Fatalf("unexpect response type")
+	return nil, nil
 }
 
 // DoInteractiveLogin performs a full interactive login cycle with the

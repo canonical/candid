@@ -8,6 +8,7 @@ package keystone
 import (
 	"context"
 	"net/http"
+	"strings"
 
 	"github.com/juju/loggo"
 	"gopkg.in/CanonicalLtd/candidclient.v1/params"
@@ -142,40 +143,32 @@ func (idp *identityProvider) Handle(ctx context.Context, w http.ResponseWriter, 
 		idputil.BadRequestf(w, "Login failed: invalid login state")
 		return
 	}
-	if req.Form.Get("username") != "" {
-		user, err := idp.doLogin(ctx, keystone.Auth{
-			PasswordCredentials: &keystone.PasswordCredentials{
-				Username: req.Form.Get("username"),
-				Password: req.Form.Get("password"),
-			},
-		})
-		if err != nil {
-			idp.initParams.VisitCompleter.RedirectFailure(ctx, w, req, ls.ReturnTo, ls.State, err)
-			return
-		}
-		idp.initParams.VisitCompleter.RedirectSuccess(ctx, w, req, ls.ReturnTo, ls.State, user)
-		return
-	}
-	w.Header().Set("Content-Type", "text/html;charset=UTF-8")
-	loginTemplate := idp.initParams.Template.Lookup("login-form")
-	if loginTemplate == nil {
-		idp.initParams.VisitCompleter.RedirectFailure(ctx, w, req, ls.ReturnTo, ls.State, errgo.New("cannot load login template"))
-		return
-	}
-	data := idputil.LoginFormParams{
-		IDPChoiceDetails: params.IDPChoiceDetails{
+
+	switch strings.TrimPrefix(req.URL.Path, idp.initParams.URLPrefix) {
+	case "/login":
+		idpChoice := params.IDPChoiceDetails{
 			Domain:      idp.params.Domain,
 			Description: idp.params.Description,
 			Name:        idp.params.Name,
 			URL:         idp.URL(req.Form.Get("state")),
+		}
+		id, err := idputil.HandleLoginForm(ctx, w, req, idpChoice, idp.initParams.Template, idp.loginUser)
+		if err != nil {
+			idp.initParams.VisitCompleter.RedirectFailure(ctx, w, req, ls.ReturnTo, ls.State, err)
+		}
+		if id != nil {
+			idp.initParams.VisitCompleter.RedirectSuccess(ctx, w, req, ls.ReturnTo, ls.State, id)
+		}
+	}
+}
+
+func (idp *identityProvider) loginUser(ctx context.Context, username, password string) (*store.Identity, error) {
+	return idp.doLogin(ctx, keystone.Auth{
+		PasswordCredentials: &keystone.PasswordCredentials{
+			Username: username,
+			Password: password,
 		},
-		Action: idp.URL(req.Form.Get("state")),
-	}
-	err := loginTemplate.Execute(w, data)
-	if err != nil {
-		// The template failed part way through rendering.
-		logger.Errorf("cannot render login template: %s", err)
-	}
+	})
 }
 
 // doLogin performs the login with the keystone server.
