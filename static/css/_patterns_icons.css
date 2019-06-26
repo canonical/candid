@@ -1,0 +1,15 @@
+.p-icon {
+  padding: 20px 20px 20px 70px;
+  background-image: url('../images/icons/default.svg');
+  background-repeat: no-repeat;
+  background-position: 10px center;
+  text-align: left;
+}
+
+.p-icon--static {
+  background-image: url('../images/icons/static.svg');
+}
+
+.p-icon--static-domain {
+  background-image: url('../images/icons/static-domain.svg');
+}

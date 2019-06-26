@@ -3,6 +3,7 @@
   https://docs.vanillaframework.io/
 */
 @import 'vanilla-framework-version-2.0.1.min.css';
+@import '_patterns_icons.css';
 
 html {
   overflow-y: hidden;

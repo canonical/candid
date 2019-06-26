@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="48px" height="48px" viewBox="0 0 48 48" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <!-- Generator: Sketch 55.2 (78181) - https://sketchapp.com -->
+    <title>LOGO-LDAP</title>
+    <desc>Created with Sketch.</desc>
+    <g id="Candid" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="Group-2" transform="translate(-291.000000, -56.000000)">
+            <g id="LOGO-LDAP" transform="translate(291.000000, 56.000000)">
+                <circle id="Oval" stroke="#E5E5E5" fill="#FFFFFF" cx="24" cy="24" r="23.5"></circle>
+                <g id="Group" transform="translate(8.000000, 13.000000)" fill="#CC1E1A" stroke="#FFFFFF">
+                    <path d="M23.60164,4.18641502 L16.8510354,16.3 L31.1023118,16.3 L23.60164,4.18641502 Z" id="Triangle"></path>
+                    <path d="M13.4963768,0.986415019 L6.74577221,13.1 L20.9970487,13.1 L13.4963768,0.986415019 Z" id="Triangle"></path>
+                    <path d="M7.60164,4.18641502 L0.851035366,16.3 L15.1023118,16.3 L7.60164,4.18641502 Z" id="Triangle"></path>
+                    <path d="M17.7069032,5.78641502 L10.9562985,17.9 L25.207575,17.9 L17.7069032,5.78641502 Z" id="Triangle"></path>
+                </g>
+            </g>
+        </g>
+    </g>
+</svg>
