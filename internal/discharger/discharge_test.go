@@ -74,6 +74,7 @@ func (s *dischargeSuite) Init(c *qt.C) {
 					Email:    "test2@example.com",
 				},
 			},
+			Icon: "/static/idp.pcx",
 		}),
 		static.NewIdentityProvider(static.Params{
 			Name:   "test-domain",
@@ -86,6 +87,7 @@ func (s *dischargeSuite) Init(c *qt.C) {
 					Groups:   []string{"test1", "test2"},
 				},
 			},
+			Icon: "/static/idp-test-domain.pcx",
 		}),
 		static.NewIdentityProvider(static.Params{
 			Name:   "test-cookie-domain",

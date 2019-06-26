@@ -29,6 +29,20 @@ func init() {
 }
 
 type Params struct {
+	// Name is the name that will be given to the identity provider.
+	Name string `yaml:"name"`
+
+	// Description is the description that will be used with the
+	// identity provider. If this is not set then Name will be used.
+	Description string `yaml:"description"`
+
+	// Icon contains the URL or path of an icon.
+	Icon string `yaml:"icon"`
+
+	// Domain is the domain with which all identities created by this
+	// identity provider will be tagged (not including the @ separator).
+	Domain string `yaml:"domain"`
+
 	// ClientID contains the Application Id for the application
 	// registered at
 	// https://console.developers.google.com/apis/credentials.
@@ -43,10 +57,18 @@ type Params struct {
 // NewIdentityProvider creates a google identity provider with the
 // configuration defined by p.
 func NewIdentityProvider(p Params) idp.IdentityProvider {
+	if p.Name == "" {
+		p.Name = "google"
+	}
+	if p.Domain == "" {
+		p.Domain = "google"
+	}
 	return openid.NewOpenIDConnectIdentityProvider(openid.OpenIDConnectParams{
-		Name:         "google",
+		Name:         p.Name,
 		Issuer:       "https://accounts.google.com",
-		Domain:       "google",
+		Domain:       p.Domain,
+		Description:  p.Description,
+		Icon:         p.Icon,
 		Scopes:       []string{oidc.ScopeOpenID, "email"},
 		ClientID:     p.ClientID,
 		ClientSecret: p.ClientSecret,

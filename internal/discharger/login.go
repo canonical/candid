@@ -133,6 +133,7 @@ func (h *handler) RedirectLogin(p httprequest.Params, req *redirectLoginRequest)
 			Name:        idp.Name(),
 			Domain:      idp.Domain(),
 			Description: idp.Description(),
+			Icon:        idp.IconURL(),
 			URL:         idp.URL(state),
 		}
 		allIDPs = append(allIDPs, choice)

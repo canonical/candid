@@ -11,6 +11,7 @@ import (
 	"html/template"
 	"net/http"
 	"net/url"
+	"path"
 	"time"
 
 	"github.com/juju/loggo"
@@ -207,4 +208,31 @@ func HandleLoginForm(
 		Error:            errorMessage,
 	}
 	return nil, errgo.Mask(tmpl.ExecuteTemplate(w, "login-form", data))
+}
+
+// ServiceURL determines the URL within the specified location. If the
+// given dest is a relative URL then a new url is calculated relative to
+// location, otherwise it is returned unchanged.
+func ServiceURL(location, dest string) string {
+	if dest == "" {
+		return ""
+	}
+	u, err := url.Parse(dest)
+	if err != nil {
+		// dest doesn't parse as a URL, assume the user knows
+		// what they're doing and return if unchanged
+		return dest
+	}
+	if u.Scheme != "" {
+		// The dest URL is fully formed so don't modify it.
+		return dest
+	}
+	lu, err := url.Parse(location)
+	if err != nil {
+		// The location doesn't parse as a URL, so we cannot be
+		// realtive to it. Return the dest unchanged.
+		return dest
+	}
+	lu.Path = path.Join(lu.Path, u.Path)
+	return lu.String()
 }

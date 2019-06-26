@@ -62,6 +62,9 @@ type Params struct {
 	// if a list of providers is shown for a user to choose.
 	Description string `yaml:"description"`
 
+	// Icon contains the URL or path of an icon.
+	Icon string `yaml:"icon"`
+
 	// URL is the address of the keystone server.
 	URL string `yaml:"url"`
 }
@@ -106,6 +109,11 @@ func (idp *identityProvider) Domain() string {
 // Description implements idp.IdentityProvider.Description.
 func (idp *identityProvider) Description() string {
 	return idp.params.Description
+}
+
+// IconURL returns the URL of an icon for the identity provider.
+func (idp *identityProvider) IconURL() string {
+	return idputil.ServiceURL(idp.initParams.Location, idp.params.Icon)
 }
 
 // Interactive implements idp.IdentityProvider.Interactive.

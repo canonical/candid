@@ -63,6 +63,9 @@ type InitParams struct {
 	// in the login flow.
 	Codec *secret.Codec
 
+	// Location contains the root location of the candid server.
+	Location string
+
 	// URLPrefix contains the prefix of all requests to the Handle
 	// method. The URL.Path parameter in the request passed to handle
 	// will contain only the part after this prefix.
@@ -93,6 +96,10 @@ type IdentityProvider interface {
 	// Description is a name for the identity provider used to show
 	// end users.
 	Description() string
+
+	// IconURL returns the URL of an icon image that represents the
+	// identity provider.
+	IconURL() string
 
 	// Interactive indicates whether login is provided by the end
 	// user interacting directly with the identity provider (usually

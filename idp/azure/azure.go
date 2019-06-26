@@ -29,6 +29,20 @@ func init() {
 }
 
 type Params struct {
+	// Name is the name that will be given to the identity provider.
+	Name string `yaml:"name"`
+
+	// Description is the description that will be used with the
+	// identity provider. If this is not set then Name will be used.
+	Description string `yaml:"description"`
+
+	// Icon contains the URL or path of an icon.
+	Icon string `yaml:"icon"`
+
+	// Domain is the domain with which all identities created by this
+	// identity provider will be tagged (not including the @ separator).
+	Domain string `yaml:"domain"`
+
 	// ClientID contains the Application Id for the application
 	// registered at https://apps.dev.microsoft.com.
 	ClientID string `yaml:"client-id"`
@@ -42,10 +56,19 @@ type Params struct {
 // NewIdentityProvider creates an azure identity provider with the
 // configuration defined by p.
 func NewIdentityProvider(p Params) idp.IdentityProvider {
+	if p.Name == "" {
+		p.Name = "azure"
+	}
+	if p.Domain == "" {
+		p.Domain = "azure"
+	}
+
 	return openid.NewOpenIDConnectIdentityProvider(openid.OpenIDConnectParams{
-		Name:         "azure",
+		Name:         p.Name,
 		Issuer:       "https://login.live.com",
-		Domain:       "azure",
+		Description:  p.Description,
+		Icon:         p.Icon,
+		Domain:       p.Domain,
 		Scopes:       []string{oidc.ScopeOpenID, "profile"},
 		ClientID:     p.ClientID,
 		ClientSecret: p.ClientSecret,

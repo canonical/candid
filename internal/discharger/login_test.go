@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"testing"
 
 	qt "github.com/frankban/quicktest"
@@ -49,10 +50,12 @@ func (s *loginSuite) Init(c *qt.C) {
 					Groups:   []string{"test1", "test2"},
 				},
 			},
+			Icon: "/static/static1.bmp",
 		}),
 		static.NewIdentityProvider(static.Params{
 			Name:   "test2",
 			Domain: "test2",
+			Icon:   "/static/static2.bmp",
 		}),
 	}
 	s.srv = candidtest.NewServer(c, sp, map[string]identity.NewAPIHandlerFunc{
@@ -138,4 +141,39 @@ func badLoginFormRequestMethod(client *http.Client, resp *http.Response) (*http.
 	}
 	resp, err = client.Do(req)
 	return resp, errgo.Mask(err, errgo.Any)
+}
+
+func (s *loginSuite) TestLoginIDPChoice(c *qt.C) {
+	req, err := http.NewRequest("GET", "/login", nil)
+	c.Assert(err, qt.Equals, nil)
+	req.Header.Set("Accept", "application/json")
+	resp := s.srv.Do(c, req)
+	defer resp.Body.Close()
+	c.Assert(resp.StatusCode, qt.Equals, http.StatusOK)
+	buf, err := ioutil.ReadAll(resp.Body)
+	c.Assert(err, qt.Equals, nil)
+	var choice params.IDPChoice
+	err = json.Unmarshal(buf, &choice)
+	c.Assert(err, qt.Equals, nil)
+	for i, ch := range choice.IDPs {
+		u, err := url.Parse(ch.URL)
+		c.Assert(err, qt.Equals, nil)
+		c.Assert(u.Query().Get("state"), qt.Not(qt.Equals), "")
+		u.RawQuery = ""
+		choice.IDPs[i].URL = u.String()
+	}
+	c.Assert(choice, qt.DeepEquals, params.IDPChoice{
+		IDPs: []params.IDPChoiceDetails{{
+			Description: "test",
+			Icon:        s.srv.URL + "/static/static1.bmp",
+			Name:        "test",
+			URL:         s.srv.URL + "/login/test/login",
+		}, {
+			Domain:      "test2",
+			Description: "test2",
+			Icon:        s.srv.URL + "/static/static2.bmp",
+			Name:        "test2",
+			URL:         s.srv.URL + "/login/test2/login",
+		}},
+	})
 }
