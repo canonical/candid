@@ -158,11 +158,11 @@ func (s *staticSuite) TestGetGroupsReturnsNewSlice(c *qt.C) {
 func (s *staticSuite) TestHandleFailedLoginWrongPassword(c *qt.C) {
 	i := s.setupIdp(c, getSampleParams())
 	_, err := s.idptest.DoInteractiveLogin(c, i, idpPrefix+"/login", candidtest.PostLoginForm("user1", "wrong-pass"))
-	c.Assert(err, qt.ErrorMatches, `authentication failed for user "user1"`)
+	c.Assert(err, qt.ErrorMatches, `authentication failed for user &#34;user1&#34;`)
 }
 
 func (s *staticSuite) TestHandleFailedLoginUnknownUser(c *qt.C) {
 	i := s.setupIdp(c, getSampleParams())
 	_, err := s.idptest.DoInteractiveLogin(c, i, idpPrefix+"/login", candidtest.PostLoginForm("unknown", "pass"))
-	c.Assert(err, qt.ErrorMatches, `authentication failed for user "unknown"`)
+	c.Assert(err, qt.ErrorMatches, `authentication failed for user &#34;unknown&#34;`)
 }

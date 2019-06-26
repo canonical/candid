@@ -63,3 +63,5 @@ require (
 	gopkg.in/yaml.v2 v2.2.1
 	launchpad.net/lpad v0.0.0-20131113112110-000000000065
 )
+
+go 1.12

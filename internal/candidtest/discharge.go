@@ -157,18 +157,9 @@ func OpenWebBrowser(c *qt.C, rh ResponseHandler) func(u *url.URL) error {
 func PostLoginForm(username, password string) ResponseHandler {
 	return func(client *http.Client, resp *http.Response) (*http.Response, error) {
 		defer resp.Body.Close()
-		buf, err := ioutil.ReadAll(resp.Body)
+		purl, err := LoginFormAction(resp)
 		if err != nil {
-			return nil, errgo.Mask(err, errgo.Any)
-		}
-		// It is expected that the "login-form" template in this
-		// package will have been used to generate the response.
-		// This puts the "Action" (POST URL) parameter on the
-		// first line by itself.
-		parts := bytes.Split(buf, []byte("\n"))
-		purl := string(parts[0])
-		if len(purl) == 0 {
-			purl = resp.Request.URL.String()
+			return nil, errgo.Mask(err)
 		}
 		resp, err = client.PostForm(purl, url.Values{
 			"username": {username},
@@ -220,6 +211,24 @@ func SelectInteractiveLogin(rh ResponseHandler) ResponseHandler {
 		}
 		return resp, errgo.Mask(err, errgo.Any)
 	}
+}
+
+// LoginFormAction gets the action parameter (POST URL) of a login form.
+func LoginFormAction(resp *http.Response) (string, error) {
+	buf, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return "", errgo.Mask(err, errgo.Any)
+	}
+	// It is expected that the "login-form" template in this
+	// package will have been used to generate the response.
+	// This puts the "Action" (POST URL) parameter on the
+	// first line by itself.
+	parts := bytes.Split(buf, []byte("\n"))
+	purl := string(parts[0])
+	if len(purl) == 0 {
+		purl = resp.Request.URL.String()
+	}
+	return purl, nil
 }
 
 // PasswordLogin return a function that can be used with

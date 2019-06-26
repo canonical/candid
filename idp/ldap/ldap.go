@@ -277,34 +277,19 @@ func (idp *identityProvider) Handle(ctx context.Context, w http.ResponseWriter, 
 	}
 	switch strings.TrimPrefix(req.URL.Path, idp.initParams.URLPrefix) {
 	case "/login":
-		if err := idp.handleLogin(ctx, w, req, ls); err != nil {
+		idpChoice := params.IDPChoiceDetails{
+			Domain:      idp.params.Domain,
+			Description: idp.params.Description,
+			Name:        idp.params.Name,
+			URL:         idp.URL(req.Form.Get("state")),
+		}
+		id, err := idputil.HandleLoginForm(ctx, w, req, idpChoice, idp.initParams.Template, idp.loginUser)
+		if err != nil {
 			idp.initParams.VisitCompleter.RedirectFailure(ctx, w, req, ls.ReturnTo, ls.State, err)
 		}
-	}
-}
-
-func (idp *identityProvider) handleLogin(ctx context.Context, w http.ResponseWriter, req *http.Request, ls idputil.LoginState) error {
-	switch req.Method {
-	default:
-		return errgo.WithCausef(nil, params.ErrBadRequest, "unsupported method %q", req.Method)
-	case "GET":
-		data := idputil.LoginFormParams{
-			IDPChoiceDetails: params.IDPChoiceDetails{
-				Domain:      idp.params.Domain,
-				Description: idp.params.Description,
-				Name:        idp.params.Name,
-				URL:         idp.URL(req.Form.Get("state")),
-			},
-			Action: idp.URL(req.Form.Get("state")),
+		if id != nil {
+			idp.initParams.VisitCompleter.RedirectSuccess(ctx, w, req, ls.ReturnTo, ls.State, id)
 		}
-		return errgo.Mask(idp.initParams.Template.ExecuteTemplate(w, "login-form", data))
-	case "POST":
-		id, err := idp.loginUser(ctx, req.Form.Get("username"), req.Form.Get("password"))
-		if err != nil {
-			return err
-		}
-		idp.initParams.VisitCompleter.RedirectSuccess(ctx, w, req, ls.ReturnTo, ls.State, id)
-		return nil
 	}
 }
 
