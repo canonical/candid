@@ -31,7 +31,7 @@
           <hr class="u-sv1">
   {{ range .IDPs }}
           <div>
-            <a href="{{.URL}}" class="p-button--neutral p-icon p-icon--{{.Name}}" data-idp-name="{{.Name}}" data-idp-domain="{{.Domain}}" style="width: 100%">{{.Description}}</a>
+            <a href="{{.URL}}" class="p-button--neutral" data-idp-name="{{.Name}}" data-idp-domain="{{.Domain}}" style="width: 100%">{{.Description}}</a>
           </div>
   {{ end }}
         </div>
