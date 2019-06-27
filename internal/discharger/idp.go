@@ -58,6 +58,7 @@ func initIDPs(ctx context.Context, params initIDPParams) error {
 			KeyValueStore:         kvStore,
 			Oven:                  params.Oven,
 			Codec:                 params.Codec,
+			Location:              params.Location,
 			URLPrefix:             params.Location + "/login/" + ip.Name(),
 			DischargeTokenCreator: params.DischargeTokenCreator,
 			VisitCompleter:        params.VisitCompleter,

@@ -61,6 +61,10 @@ func (s *ussooauthSuite) TestDescription(c *qt.C) {
 	c.Assert(s.idp.Description(), qt.Equals, "Ubuntu SSO OAuth")
 }
 
+func (s *ussooauthSuite) TestIconURL(c *qt.C) {
+	c.Assert(s.idp.IconURL(), qt.Equals, "")
+}
+
 func (s *ussooauthSuite) TestInteractive(c *qt.C) {
 	c.Assert(s.idp.Interactive(), qt.Equals, false)
 }

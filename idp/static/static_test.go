@@ -74,6 +74,29 @@ func (s *staticSuite) TestDescription(c *qt.C) {
 	c.Assert(idp.Description(), qt.Equals, params.Name)
 }
 
+func (s *staticSuite) TestIconURL(c *qt.C) {
+	idp := static.NewIdentityProvider(getSampleParams())
+	c.Assert(idp.IconURL(), qt.Equals, "")
+}
+
+func (s *staticSuite) TestAbsoluteIconURL(c *qt.C) {
+	params := getSampleParams()
+	params.Icon = "https://www.example.com/icon.bmp"
+	idp := static.NewIdentityProvider(params)
+	c.Assert(idp.IconURL(), qt.Equals, "https://www.example.com/icon.bmp")
+}
+
+func (s *staticSuite) TestRelativeIconURL(c *qt.C) {
+	params := getSampleParams()
+	params.Icon = "/static/icon.bmp"
+	i := static.NewIdentityProvider(params)
+	err := i.Init(context.Background(), idp.InitParams{
+		Location: "https://www.example.com/candid",
+	})
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(i.IconURL(), qt.Equals, "https://www.example.com/candid/static/icon.bmp")
+}
+
 func (s *staticSuite) TestInteractive(c *qt.C) {
 	idp := static.NewIdentityProvider(getSampleParams())
 	c.Assert(idp.Interactive(), qt.Equals, true)

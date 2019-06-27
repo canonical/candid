@@ -44,6 +44,9 @@ type Params struct {
 	// the IDP selection page.
 	Description string `yaml:"description"`
 
+	// Icon contains the URL or path of an icon.
+	Icon string `yaml:"icon"`
+
 	// Domain is the domain with which all identities created by this
 	// identity provider will be tagged (not including the @ separator).
 	Domain string `yaml:"domain"`
@@ -91,6 +94,11 @@ func (idp *identityProvider) Domain() string {
 // Description implements idp.IdentityProvider.Description.
 func (idp *identityProvider) Description() string {
 	return idp.params.Description
+}
+
+// IconURL returns the URL of an icon for the identity provider.
+func (idp *identityProvider) IconURL() string {
+	return idputil.ServiceURL(idp.initParams.Location, idp.params.Icon)
 }
 
 // Interactive implements idp.IdentityProvider.Interactive.

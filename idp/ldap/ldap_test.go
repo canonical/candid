@@ -190,6 +190,32 @@ func (s *ldapSuite) TestDescription(c *qt.C) {
 	c.Assert(idp.Description(), qt.Equals, "test description")
 }
 
+func (s *ldapSuite) TestIconURL(c *qt.C) {
+	idp, err := ldap.NewIdentityProvider(getSampleParams())
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(idp.IconURL(), qt.Equals, "")
+}
+
+func (s *ldapSuite) TestAbsoluteIconURL(c *qt.C) {
+	params := getSampleParams()
+	params.Icon = "https://www.example.com/icon.bmp"
+	idp, err := ldap.NewIdentityProvider(params)
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(idp.IconURL(), qt.Equals, "https://www.example.com/icon.bmp")
+}
+
+func (s *ldapSuite) TestRelativeIconURL(c *qt.C) {
+	params := getSampleParams()
+	params.Icon = "/static/icon.bmp"
+	i, err := ldap.NewIdentityProvider(params)
+	c.Assert(err, qt.Equals, nil)
+	err = i.Init(context.Background(), idp.InitParams{
+		Location: "https://www.example.com/candid",
+	})
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(i.IconURL(), qt.Equals, "https://www.example.com/candid/static/icon.bmp")
+}
+
 func (s *ldapSuite) TestDomain(c *qt.C) {
 	params := getSampleParams()
 	params.Domain = "test domain"

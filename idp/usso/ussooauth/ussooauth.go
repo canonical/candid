@@ -61,6 +61,11 @@ func (*identityProvider) Description() string {
 	return "Ubuntu SSO OAuth"
 }
 
+// IconURL returns the URL of an icon for the identity provider.
+func (*identityProvider) IconURL() string {
+	return ""
+}
+
 // Interactive specifies that this identity provider is not interactive.
 func (*identityProvider) Interactive() bool {
 	return false

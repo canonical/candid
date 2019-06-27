@@ -54,6 +54,9 @@ type OpenIDConnectParams struct {
 	// identity provider. If this is not set then Name will be used.
 	Description string `yaml:"description"`
 
+	// Icon contains the URL or path of an icon.
+	Icon string `yaml:"icon"`
+
 	// Domain is the domain with which all identities created by this
 	// identity provider will be tagged (not including the @ separator).
 	Domain string `yaml:"domain"`
@@ -106,6 +109,11 @@ func (idp *openidConnectIdentityProvider) Domain() string {
 // Description implements idp.IdentityProvider.Description.
 func (idp *openidConnectIdentityProvider) Description() string {
 	return idp.params.Description
+}
+
+// IconURL returns the URL of an icon for the identity provider.
+func (idp *openidConnectIdentityProvider) IconURL() string {
+	return idputil.ServiceURL(idp.initParams.Location, idp.params.Icon)
 }
 
 // Interactive implements idp.IdentityProvider.Interactive.

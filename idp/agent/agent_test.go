@@ -37,6 +37,11 @@ func TestDescription(t *testing.T) {
 	c.Assert(agent.IdentityProvider.Description(), qt.Equals, "")
 }
 
+func TestIconURL(t *testing.T) {
+	c := qt.New(t)
+	c.Assert(agent.IdentityProvider.IconURL(), qt.Equals, "")
+}
+
 func TestInteractive(t *testing.T) {
 	c := qt.New(t)
 	c.Assert(agent.IdentityProvider.Interactive(), qt.Equals, false)

@@ -69,6 +69,30 @@ func (s *ussoSuite) TestDescription(c *qt.C) {
 	c.Assert(s.idp.Description(), qt.Equals, "Ubuntu SSO")
 }
 
+func (s *ussoSuite) TestIconURL(c *qt.C) {
+	c.Assert(s.idp.IconURL(), qt.Equals, "")
+}
+
+func (s *ussoSuite) TestAbsoluteIconURL(c *qt.C) {
+	idp := usso.NewIdentityProvider(usso.Params{
+		Icon: "https://www.example.com/icon.bmp",
+	})
+	err := idp.Init(s.idptest.Ctx, s.idptest.InitParams(c, idpPrefix))
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(idp.IconURL(), qt.Equals, "https://www.example.com/icon.bmp")
+}
+
+func (s *ussoSuite) TestRelativeIconURL(c *qt.C) {
+	idp := usso.NewIdentityProvider(usso.Params{
+		Icon: "/static/icon.bmp",
+	})
+	params := s.idptest.InitParams(c, idpPrefix)
+	params.Location = "https://www.example.com/candid"
+	err := idp.Init(s.idptest.Ctx, params)
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(idp.IconURL(), qt.Equals, "https://www.example.com/candid/static/icon.bmp")
+}
+
 func (s *ussoSuite) TestInteractive(c *qt.C) {
 	c.Assert(s.idp.Interactive(), qt.Equals, true)
 }

@@ -46,6 +46,9 @@ type Params struct {
 
 	// Domain contains the domain that the identities are created in.
 	Domain string
+
+	// Icon contains the URL or path of an icon.
+	Icon string `yaml:"icon"`
 }
 
 // NewIdentityProvider creates a new LDAP identity provider.
@@ -58,8 +61,7 @@ func NewIdentityProvider(p Params) idp.IdentityProvider {
 			Name:      "get_launchpad_groups",
 			Help:      "The duration of launchpad login, /people, and super_teams_collection_link requests.",
 		}),
-		launchpadTeams: p.LaunchpadTeams,
-		domain:         p.Domain,
+		params: p,
 	}
 }
 
@@ -69,9 +71,7 @@ type identityProvider struct {
 	initParams   idp.InitParams
 	groupCache   *cache.Cache
 	groupMonitor prometheus.Summary
-	// launchpadTeams contains any private teams that the system needs to know about.
-	launchpadTeams []string
-	domain         string
+	params       Params
 }
 
 // Name gives the name of the identity provider (usso).
@@ -81,12 +81,17 @@ func (*identityProvider) Name() string {
 
 // Domain implements idp.IdentityProvider.Domain.
 func (idp *identityProvider) Domain() string {
-	return idp.domain
+	return idp.params.Domain
 }
 
 // Description gives a description of the identity provider.
 func (*identityProvider) Description() string {
 	return "Ubuntu SSO"
+}
+
+// IconURL returns the URL of an icon for the identity provider.
+func (idp *identityProvider) IconURL() string {
+	return idputil.ServiceURL(idp.initParams.Location, idp.params.Icon)
 }
 
 // Interactive specifies that this identity provider is interactive.
@@ -131,7 +136,7 @@ func (idp *identityProvider) login(ctx context.Context, w http.ResponseWriter, r
 	url := idp.client.RedirectURL(&openid.Request{
 		ReturnTo:     callback,
 		Realm:        realm,
-		Teams:        idp.launchpadTeams,
+		Teams:        idp.params.LaunchpadTeams,
 		SRegRequired: []string{openid.SRegEmail, openid.SRegFullName, openid.SRegNickname},
 	})
 	http.Redirect(w, req, url, http.StatusFound)
@@ -166,7 +171,7 @@ func (idp *identityProvider) callback(ctx context.Context, w http.ResponseWriter
 	username := resp.SReg[openid.SRegNickname]
 	identity := store.Identity{
 		ProviderID: store.MakeProviderIdentity("usso", resp.ID),
-		Username:   idputil.NameWithDomain(username, idp.domain),
+		Username:   idputil.NameWithDomain(username, idp.params.Domain),
 		Email:      resp.SReg[openid.SRegEmail],
 		Name:       resp.SReg[openid.SRegFullName],
 		ProviderInfo: map[string][]string{

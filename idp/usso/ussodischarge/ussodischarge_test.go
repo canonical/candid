@@ -102,6 +102,10 @@ func (s *ussoMacaroonSuite) TestDescription(c *qt.C) {
 	c.Assert(s.idp.Description(), qt.Equals, "Ubuntu SSO macaroon discharge authentication")
 }
 
+func (s *ussoMacaroonSuite) TestIconURL(c *qt.C) {
+	c.Assert(s.idp.IconURL(), qt.Equals, "")
+}
+
 func (s *ussoMacaroonSuite) TestInteractive(c *qt.C) {
 	c.Assert(s.idp.Interactive(), qt.Equals, false)
 }
