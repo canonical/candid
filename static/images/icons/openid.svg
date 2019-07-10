@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="48px" height="48px" viewBox="0 0 48 48" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <!-- Generator: Sketch 55.2 (78181) - https://sketchapp.com -->
+    <title>LOGO-OPENID</title>
+    <desc>Created with Sketch.</desc>
+    <g id="Candid" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="Group-2" transform="translate(-291.000000, 0.000000)">
+            <g id="LOGO-OPENID" transform="translate(291.000000, 0.000000)">
+                <circle id="Oval" stroke="#E5E5E5" fill="#FFFFFF" cx="24" cy="24" r="23.5"></circle>
+                <g id="OPENID" transform="translate(10.000000, 11.000000)">
+                    <polygon id="Fill-1" fill="#F8941C" points="12.6792453 2.06473585 12.6792453 23.1887679 12.6792453 25.8383208 16.9056604 23.8491453 16.9056604 0"></polygon>
+                    <polyline id="Fill-2" fill="#BCBEC0" points="27.3161528 9.03829434 27.8995302 15.0958038 19.7263038 13.3175396"></polyline>
+                    <path d="M4.22641509,16.7901208 C4.22641509,13.7954415 7.48960377,11.2734604 11.9373774,10.5035925 L11.9373774,7.81915849 C5.13416981,8.64146038 0,12.3449887 0,16.7901208 C0,21.3954604 5.51084906,25.204517 12.6792453,25.8383472 L12.6792453,23.1887811 C7.85637736,22.5841396 4.22641509,19.949234 4.22641509,16.7901208 M17.6475283,7.82021509 L17.6475283,10.5035925 C19.4172075,10.8098755 21.0002642,11.3920642 22.2637113,12.1730264 L25.2521698,10.326083 C23.215566,9.0672717 20.587,8.17549811 17.6475283,7.82021509" id="Fill-3" fill="#BCBEC0"></path>
+                </g>
+            </g>
+        </g>
+    </g>
+</svg>
