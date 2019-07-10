@@ -40,7 +40,7 @@
             <label for="username">Username</label>
             <input type="text" id="username" name="username" autocomplete="off">
             <label for="password">Password</label>
-            <input type="text" id="password" name="password" autocomplete="off">
+            <input type="password" id="password" name="password" autocomplete="off">
             <br /><br />
             <a href="/login" class="p-button--neutral u-float-left u-no-margin--bottom">Back</a>
             <button type="submit" class="p-button--positive u-float-right u-no-margin--bottom">Login</button>
