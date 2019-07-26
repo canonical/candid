@@ -253,6 +253,7 @@ func (idp *identityProvider) GetGroups(ctx context.Context, identity *store.Iden
 		return nil, errgo.Mask(err)
 	}
 
+	logger.Tracef("LDAP groups search: basedn=%s scope=sub deref_aliases=never filter=%s attributes=[\"cn\"]", idp.baseDN, filter)
 	req := &ldap.SearchRequest{
 		BaseDN:       idp.baseDN,
 		Scope:        ldap.ScopeWholeSubtree,
@@ -262,8 +263,10 @@ func (idp *identityProvider) GetGroups(ctx context.Context, identity *store.Iden
 	}
 	res, err := conn.Search(req)
 	if err != nil {
+		logger.Tracef("LDAP search error: %s", err)
 		return nil, errgo.Mask(err)
 	}
+	logResults(res)
 
 	groups := []string{}
 	for _, entry := range res.Entries {
@@ -326,6 +329,7 @@ func (idp *identityProvider) loginDN(ctx context.Context, conn ldapConn, dn, pas
 	if err := conn.Bind(dn, password); err != nil {
 		return nil, errgo.Mask(err)
 	}
+	logger.Tracef("LDAP user search: basedn=%s scope=base deref_aliases=never filter=%s attributes=%s", dn, idp.params.UserQueryFilter, idp.userQueryAttrs)
 	req := &ldap.SearchRequest{
 		BaseDN:       dn,
 		Scope:        ldap.ScopeBaseObject,
@@ -336,8 +340,10 @@ func (idp *identityProvider) loginDN(ctx context.Context, conn ldapConn, dn, pas
 	}
 	res, err := conn.Search(req)
 	if err != nil {
+		logger.Tracef("LDAP search error: %s", err)
 		return nil, errgo.Mask(err)
 	}
+	logResults(res)
 	if len(res.Entries) == 0 {
 		return nil, errgo.WithCausef(nil, params.ErrNotFound, "")
 	}
@@ -372,18 +378,21 @@ func (idp *identityProvider) loginDN(ctx context.Context, conn ldapConn, dn, pas
 
 // resolveUsername returns the DN for a username
 func (idp *identityProvider) resolveUsername(conn ldapConn, username string) (string, error) {
+	filter := fmt.Sprintf("(%s=%s)", idp.params.UserQueryAttrs.ID, ldap.EscapeFilter(username))
+	logger.Tracef("LDAP user search: basedn=%s scope=base deref_aliases=never filter=%s", idp.baseDN, filter)
 	req := &ldap.SearchRequest{
 		BaseDN:       idp.baseDN,
 		Scope:        ldap.ScopeWholeSubtree,
 		DerefAliases: ldap.NeverDerefAliases,
 		SizeLimit:    1,
-		Filter: fmt.Sprintf(
-			"(%s=%s)", idp.params.UserQueryAttrs.ID, ldap.EscapeFilter(username)),
+		Filter:       filter,
 	}
 	res, err := conn.Search(req)
 	if err != nil {
+		logger.Tracef("LDAP search error: %s", err)
 		return "", errgo.Mask(err)
 	}
+	logResults(res)
 	if len(res.Entries) < 1 {
 		return "", errgo.Newf("user %q not found", username)
 	}
@@ -431,4 +440,18 @@ type ldapConn interface {
 	Bind(username, password string) error
 	Search(searchRequest *ldap.SearchRequest) (*ldap.SearchResult, error)
 	Close()
+}
+
+func logResults(res *ldap.SearchResult) {
+	if logger.EffectiveLogLevel() > loggo.TRACE {
+		return
+	}
+	logger.Tracef("LDAP search results:")
+	for _, e := range res.Entries {
+		logger.Tracef("\tDN=%s", e.DN)
+		logger.Tracef("\tAttributes:")
+		for _, a := range e.Attributes {
+			logger.Tracef("\t\t%s=%s", a.Name, strings.Join(a.Values, ","))
+		}
+	}
 }
