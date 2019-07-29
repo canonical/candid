@@ -326,9 +326,13 @@ func (idp *identityProvider) loginUser(ctx context.Context, username, password s
 }
 
 func (idp *identityProvider) loginDN(ctx context.Context, conn ldapConn, dn, password string) (*store.Identity, error) {
+	logger.Tracef("LDAP bind: dn=%s", dn)
 	if err := conn.Bind(dn, password); err != nil {
+		logger.Tracef("LDAP bind error: %s", err)
 		return nil, errgo.Mask(err)
 	}
+	logger.Tracef("LDAP bind success")
+
 	logger.Tracef("LDAP user search: basedn=%s scope=base deref_aliases=never filter=%s attributes=%s", dn, idp.params.UserQueryFilter, idp.userQueryAttrs)
 	req := &ldap.SearchRequest{
 		BaseDN:       dn,
@@ -379,7 +383,7 @@ func (idp *identityProvider) loginDN(ctx context.Context, conn ldapConn, dn, pas
 // resolveUsername returns the DN for a username
 func (idp *identityProvider) resolveUsername(conn ldapConn, username string) (string, error) {
 	filter := fmt.Sprintf("(%s=%s)", idp.params.UserQueryAttrs.ID, ldap.EscapeFilter(username))
-	logger.Tracef("LDAP user search: basedn=%s scope=base deref_aliases=never filter=%s", idp.baseDN, filter)
+	logger.Tracef("LDAP user search: basedn=%s scope=sub deref_aliases=never filter=%s", idp.baseDN, filter)
 	req := &ldap.SearchRequest{
 		BaseDN:       idp.baseDN,
 		Scope:        ldap.ScopeWholeSubtree,
@@ -410,9 +414,12 @@ func (idp *identityProvider) dial() (ldapConn, error) {
 		return nil, errgo.Mask(err)
 	}
 	if idp.params.DN != "" {
+		logger.Tracef("LDAP bind: dn=%s", idp.params.DN)
 		if err := conn.Bind(idp.params.DN, idp.params.Password); err != nil {
+			logger.Tracef("LDAP bind error: %s", err)
 			return nil, errgo.Mask(err)
 		}
+		logger.Tracef("LDAP bind success", err)
 	}
 	return conn, nil
 }
