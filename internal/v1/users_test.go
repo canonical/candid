@@ -84,6 +84,25 @@ func (s *usersSuite) TestRoundTripUser(c *qt.C) {
 	s.assertUser(c, *resp, user)
 }
 
+func (s *usersSuite) TestUsernameContainingUnderscore(c *qt.C) {
+	user := params.User{
+		Username:   "jbloggs_TEST",
+		ExternalID: "test:http://example.com/jbloggs",
+		FullName:   "Joe Bloggs",
+		Email:      "jbloggs@example.com",
+		IDPGroups: []string{
+			"test",
+		},
+	}
+	s.addUser(c, user)
+
+	resp, err := s.adminClient.User(s.srv.Ctx, &params.UserRequest{
+		Username: user.Username,
+	})
+	c.Assert(err, qt.Equals, nil)
+	s.assertUser(c, *resp, user)
+}
+
 var userErrorTests = []struct {
 	about       string
 	username    params.Username
@@ -94,8 +113,8 @@ var userErrorTests = []struct {
 	expectError: `Get .*/v1/u/not-there: user not-there not found`,
 }, {
 	about:       "bad username",
-	username:    "bad-name-",
-	expectError: `Get .*/v1/u/bad-name-: cannot unmarshal parameters: cannot unmarshal into field Username: illegal username "bad-name-"`,
+	username:    "verylongname_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+	expectError: `Get .*/v1/u/verylongname_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA: cannot unmarshal parameters: cannot unmarshal into field Username: username longer than 256 characters`,
 }}
 
 func (s *usersSuite) TestUserErrors(c *qt.C) {

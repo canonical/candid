@@ -135,6 +135,8 @@ google.golang.org/appengine v1.2.0 h1:S0iUepdCWODXRvtE+gcRDd15L+k+k1AiHlMiMjefH2
 google.golang.org/appengine v1.2.0/go.mod h1:xpcJRLb0r/rnEns0DIKYYv+WjYCduHsrkT7/EB5XEv4=
 gopkg.in/CanonicalLtd/candidclient.v1 v1.1.0 h1:FpWlT+NgZM8o76/PYHpTykuFUpI51NQn+XsDctsTsFU=
 gopkg.in/CanonicalLtd/candidclient.v1 v1.1.0/go.mod h1:jRYthByBMPbSI2ArLfEZjdiwWaBzAUhYsq4eWfpsv+c=
+gopkg.in/CanonicalLtd/candidclient.v1 v1.1.1 h1:g6wOlJF+fyqACNdCCsXovMx36CiNg/4bwFYIwOFvI9I=
+gopkg.in/CanonicalLtd/candidclient.v1 v1.1.1/go.mod h1:9vL+i6NeWLg0EkUCEhfRr/kResAYVOjDXFGYZZUhCDQ=
 gopkg.in/asn1-ber.v1 v1.0.0-20170511165959-379148ca0225 h1:JBwmEvLfCqgPcIq8MjVMQxsF3LVL4XG/HH0qiG0+IFY=
 gopkg.in/asn1-ber.v1 v1.0.0-20170511165959-379148ca0225/go.mod h1:cuepJuh7vyXfUyUwEgHQXw849cJrilpS5NeIjOWESAw=
 gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=
