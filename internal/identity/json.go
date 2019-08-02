@@ -28,7 +28,9 @@ func errToResp(ctx context.Context, err error) (int, interface{}) {
 	// Allow bakery errors to be returned as the bakery would
 	// like them, so that httpbakery.Client.Do will work.
 	if err, ok := errgo.Cause(err).(*httpbakery.Error); ok {
-		return httpbakery.ErrorToResponse(ctx, err)
+		status, body := httpbakery.ErrorToResponse(ctx, err)
+		logger.Debugf("API error response (bakery): %d (%s) %s", status, http.StatusText(status), err)
+		return status, body
 	}
 	errorBody := errorResponseBody(err)
 	status := http.StatusInternalServerError
@@ -53,6 +55,7 @@ func errToResp(ctx context.Context, err error) (int, interface{}) {
 		logger.Errorf("Internal Server Error: %s (%s)", err, errgo.Details(err))
 	}
 
+	logger.Debugf("API error response: %d (%s) %s", status, http.StatusText(status), err)
 	return status, errorBody
 }
 
