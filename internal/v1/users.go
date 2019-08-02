@@ -35,6 +35,7 @@ var blacklistUsernames = map[params.Username]bool{
 // QueryUsers filters the user database for users that match the given
 // request. If no filters are requested all usernames will be returned.
 func (h *handler) QueryUsers(p httprequest.Params, r *params.QueryUsersRequest) ([]string, error) {
+	logger.Tracef("QueryUsers %#v", r)
 	var identity store.Identity
 	var filter store.Filter
 	if r.ExternalID != "" {
@@ -87,11 +88,13 @@ func (h *handler) QueryUsers(p httprequest.Params, r *params.QueryUsersRequest) 
 	for i, id := range identities {
 		usernames[i] = id.Username
 	}
+	logger.Tracef("QueryUsers response %#v", usernames)
 	return usernames, nil
 }
 
 // User returns the user information for the request user.
 func (h *handler) User(p httprequest.Params, r *params.UserRequest) (*params.User, error) {
+	logger.Tracef("User %#v", r)
 	id := store.Identity{
 		Username: string(r.Username),
 	}
@@ -99,12 +102,18 @@ func (h *handler) User(p httprequest.Params, r *params.UserRequest) (*params.Use
 	if err != nil {
 		return nil, translateStoreError(err)
 	}
-	return h.userFromIdentity(p.Context, &id)
+	u, err := h.userFromIdentity(p.Context, &id)
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
+	logger.Tracef("User response %#v", u)
+	return u, nil
 }
 
 // CreateAgent creates a new agent and returns the newly chosen username
 // for the agent.
 func (h *handler) CreateAgent(p httprequest.Params, u *params.CreateAgentRequest) (*params.CreateAgentResponse, error) {
+	logger.Tracef("CreateAgent %#v", u)
 	ctx := p.Context
 	pks, err := publicKeys(u.PublicKeys)
 	if err != nil {
@@ -170,9 +179,11 @@ func (h *handler) CreateAgent(p httprequest.Params, u *params.CreateAgentRequest
 	if err := h.params.Store.UpdateIdentity(p.Context, identity, update); err != nil {
 		return nil, translateStoreError(err)
 	}
-	return &params.CreateAgentResponse{
+	resp := &params.CreateAgentResponse{
 		Username: params.Username(identity.Username),
-	}, nil
+	}
+	logger.Tracef("CreateAgent response %#v", resp)
+	return resp, nil
 }
 
 // SetUserDeprecated creates or updates the user with the given username. If the
@@ -187,19 +198,23 @@ func (h *handler) SetUserDeprecated(p httprequest.Params, u *params.SetUserReque
 
 // WhoAmI returns details of the authenticated user.
 func (h *handler) WhoAmI(p httprequest.Params, arg *params.WhoAmIRequest) (params.WhoAmIResponse, error) {
+	logger.Tracef("WhoAmI")
 	id := identityFromContext(p.Context)
 	if id == nil || id.Id() == "" {
 		// Should never happen, as the endpoint should require authentication.
 		return params.WhoAmIResponse{}, errgo.Newf("no identity")
 	}
-	return params.WhoAmIResponse{
+	resp := params.WhoAmIResponse{
 		User: string(id.Id()),
-	}, nil
+	}
+	logger.Tracef("WhoAmI response %#v", resp)
+	return resp, nil
 }
 
 // UserGroups returns the list of groups associated with the requested
 // user.
 func (h *handler) UserGroups(p httprequest.Params, r *params.UserGroupsRequest) ([]string, error) {
+	logger.Tracef("UserGroups %#v", r)
 	id, err := h.params.Authorizer.Identity(p.Context, string(r.Username))
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
@@ -211,6 +226,7 @@ func (h *handler) UserGroups(p httprequest.Params, r *params.UserGroupsRequest) 
 	if groups == nil {
 		groups = []string{}
 	}
+	logger.Tracef("UserGroups response %#v", groups)
 	return groups, nil
 }
 
@@ -225,17 +241,24 @@ func (h *handler) UserIDPGroups(p httprequest.Params, r *params.UserIDPGroupsReq
 // SetUserGroups updates the groups stored for the given user to the
 // given value.
 func (h *handler) SetUserGroups(p httprequest.Params, r *params.SetUserGroupsRequest) error {
+	logger.Tracef("SetUserGroups %#v", r)
 	identity := store.Identity{
 		Username: string(r.Username),
 		Groups:   r.Groups.Groups,
 	}
-	return translateStoreError(h.params.Store.UpdateIdentity(p.Context, &identity, store.Update{store.Groups: store.Set}))
+	err := h.params.Store.UpdateIdentity(p.Context, &identity, store.Update{store.Groups: store.Set})
+	if err != nil {
+		return translateStoreError(err)
+	}
+	logger.Tracef("SetUserGroups complete")
+	return nil
 }
 
 // ModifyUserGroups updates the groups stored for the given user. Groups
 // can be either added or removed in a single query. It is an error to
 // try and both add and remove groups at the same time.
 func (h *handler) ModifyUserGroups(p httprequest.Params, r *params.ModifyUserGroupsRequest) error {
+	logger.Tracef("ModifyUserGroups %#v", r)
 	identity := store.Identity{
 		Username: string(r.Username),
 	}
@@ -250,26 +273,35 @@ func (h *handler) ModifyUserGroups(p httprequest.Params, r *params.ModifyUserGro
 		identity.Groups = r.Groups.Remove
 		update[store.Groups] = store.Pull
 	}
-	return translateStoreError(h.params.Store.UpdateIdentity(p.Context, &identity, update))
+	err := h.params.Store.UpdateIdentity(p.Context, &identity, update)
+	if err != nil {
+		return translateStoreError(err)
+	}
+	logger.Tracef("SetUserGroups complete")
+	return nil
 }
 
 // GetSSHKeys returns any SSH keys stored for the given user.
 func (h *handler) GetSSHKeys(p httprequest.Params, r *params.SSHKeysRequest) (params.SSHKeysResponse, error) {
+	logger.Tracef("GetSSHKeys %#v", r)
 	id := store.Identity{
 		Username: string(r.Username),
 	}
 	if err := h.params.Store.Identity(p.Context, &id); err != nil {
 		return params.SSHKeysResponse{}, translateStoreError(err)
 	}
-	return params.SSHKeysResponse{
+	resp := params.SSHKeysResponse{
 		SSHKeys: id.ExtraInfo["sshkeys"],
-	}, nil
+	}
+	logger.Tracef("GetSSHKeys response %#v", resp)
+	return resp, nil
 }
 
 // PutSSHKeys updates the set of SSH keys stored for the given user. If
 // the add parameter is set to true then keys that are already stored
 // will be added to, otherwise they will be replaced.
 func (h *handler) PutSSHKeys(p httprequest.Params, r *params.PutSSHKeysRequest) error {
+	logger.Tracef("PutSSHKeys %#v", r)
 	id := store.Identity{
 		Username: string(r.Username),
 		ExtraInfo: map[string][]string{
@@ -279,13 +311,19 @@ func (h *handler) PutSSHKeys(p httprequest.Params, r *params.PutSSHKeysRequest) 
 	update := store.Update{
 		store.ExtraInfo: store.Push,
 	}
-	return translateStoreError(h.params.Store.UpdateIdentity(p.Context, &id, update))
+	err := h.params.Store.UpdateIdentity(p.Context, &id, update)
+	if err != nil {
+		return translateStoreError(err)
+	}
+	logger.Tracef("PutSSHKeys complete")
+	return nil
 }
 
 // DeleteSSHKeys removes all of the ssh keys specified from the keys
 // stored for the given user. It is not an error to attempt to remove a
 // key that is not associated with the user.
 func (h *handler) DeleteSSHKeys(p httprequest.Params, r *params.DeleteSSHKeysRequest) error {
+	logger.Tracef("DeleteSSHKeys %#v", r)
 	id := store.Identity{
 		Username: string(r.Username),
 		ExtraInfo: map[string][]string{
@@ -295,12 +333,18 @@ func (h *handler) DeleteSSHKeys(p httprequest.Params, r *params.DeleteSSHKeysReq
 	update := store.Update{
 		store.ExtraInfo: store.Pull,
 	}
-	return translateStoreError(h.params.Store.UpdateIdentity(p.Context, &id, update))
+	err := h.params.Store.UpdateIdentity(p.Context, &id, update)
+	if err != nil {
+		return translateStoreError(err)
+	}
+	logger.Tracef("DeleteSSHKeys complete")
+	return nil
 }
 
 // UserToken returns a token, in the form of a macaroon, identifying
 // the user. This token can only be generated by an administrator.
 func (h *handler) UserToken(p httprequest.Params, r *params.UserTokenRequest) (*bakery.Macaroon, error) {
+	logger.Tracef("UserToken %#v", r)
 	id, err := h.params.Authorizer.Identity(p.Context, string(r.Username))
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
@@ -317,24 +361,29 @@ func (h *handler) UserToken(p httprequest.Params, r *params.UserTokenRequest) (*
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot mint macaroon")
 	}
+	logger.Tracef("UserToken response %#v", m)
 	return m, nil
 }
 
 // VerifyToken verifies that the given token is a macaroon generated by
 // this service and returns any declared values.
 func (h *handler) VerifyToken(p httprequest.Params, r *params.VerifyTokenRequest) (map[string]string, error) {
+	logger.Tracef("VerifyToken %#v", r)
 	authInfo, err := h.params.Authorizer.Auth(p.Context, []macaroon.Slice{r.Macaroons}, identchecker.LoginOp)
 	if err != nil {
 		// TODO only return ErrForbidden when the error is because of bad macaroons.
 		return nil, errgo.WithCausef(err, params.ErrForbidden, `verification failure`)
 	}
-	return map[string]string{
+	resp := map[string]string{
 		"username": authInfo.Identity.Id(),
-	}, nil
+	}
+	logger.Tracef("VerifyToken response %#v", resp)
+	return resp, nil
 }
 
 // UserExtraInfo returns any stored extra-info for the given user.
 func (h *handler) UserExtraInfo(p httprequest.Params, r *params.UserExtraInfoRequest) (map[string]interface{}, error) {
+	logger.Tracef("UserExtraInfo %#v", r)
 	id := store.Identity{
 		Username: string(r.Username),
 	}
@@ -349,6 +398,7 @@ func (h *handler) UserExtraInfo(p httprequest.Params, r *params.UserExtraInfoReq
 		jmsg := json.RawMessage(v[0])
 		res[k] = &jmsg
 	}
+	logger.Tracef("UserExtraInfo response %#v", res)
 	return res, nil
 }
 
@@ -356,6 +406,7 @@ func (h *handler) UserExtraInfo(p httprequest.Params, r *params.UserExtraInfoReq
 // specified extra-info field the stored values will be updated to be the
 // specified value. All other values will remain unchanged.
 func (h *handler) SetUserExtraInfo(p httprequest.Params, r *params.SetUserExtraInfoRequest) error {
+	logger.Tracef("SetUserExtraInfo %#v", r)
 	id := store.Identity{
 		Username:  string(r.Username),
 		ExtraInfo: make(map[string][]string, len(r.ExtraInfo)),
@@ -371,12 +422,18 @@ func (h *handler) SetUserExtraInfo(p httprequest.Params, r *params.SetUserExtraI
 		}
 		id.ExtraInfo[k] = []string{string(buf)}
 	}
-	return translateStoreError(h.params.Store.UpdateIdentity(p.Context, &id, store.Update{store.ExtraInfo: store.Set}))
+	err := h.params.Store.UpdateIdentity(p.Context, &id, store.Update{store.ExtraInfo: store.Set})
+	if err != nil {
+		return translateStoreError(err)
+	}
+	logger.Tracef("SetUserExtraInfo complete")
+	return nil
 }
 
-// UserExtraInfo returns any stored extra-info item with the given key
-// for the given user.
+// UserExtraInfoItem returns any stored extra-info item with the given
+// key for the given user.
 func (h *handler) UserExtraInfoItem(p httprequest.Params, r *params.UserExtraInfoItemRequest) (interface{}, error) {
+	logger.Tracef("UserExtraInfoItem %#v", r)
 	id := store.Identity{
 		Username: string(r.Username),
 	}
@@ -392,12 +449,14 @@ func (h *handler) UserExtraInfoItem(p httprequest.Params, r *params.UserExtraInf
 		// the first place, so it probably doesn't matter.
 		return nil, nil
 	}
+	logger.Tracef("UserExtraInfoItem response %#v", v)
 	return v, nil
 }
 
 // SetUserExtraInfoItem updates the stored extra-info item with the given
 // key for the given user.
 func (h *handler) SetUserExtraInfoItem(p httprequest.Params, r *params.SetUserExtraInfoItemRequest) error {
+	logger.Tracef("SetUserExtraInfoItem %#v", r)
 	id := store.Identity{
 		Username: string(r.Username),
 	}
@@ -410,7 +469,12 @@ func (h *handler) SetUserExtraInfoItem(p httprequest.Params, r *params.SetUserEx
 		panic(err)
 	}
 	id.ExtraInfo = map[string][]string{r.Item: {string(buf)}}
-	return translateStoreError(h.params.Store.UpdateIdentity(p.Context, &id, store.Update{store.ExtraInfo: store.Set}))
+	err = h.params.Store.UpdateIdentity(p.Context, &id, store.Update{store.ExtraInfo: store.Set})
+	if err != nil {
+		return translateStoreError(err)
+	}
+	logger.Tracef("SetUserExtraInfoItem complete")
+	return nil
 }
 
 func checkExtraInfoKey(key string) error {
@@ -535,6 +599,7 @@ const (
 // DischargeTokenForUser allows an administrator to create a discharge
 // token for the specified user.
 func (h *handler) DischargeTokenForUser(p httprequest.Params, req *params.DischargeTokenForUserRequest) (params.DischargeTokenForUserResponse, error) {
+	logger.Tracef("DischargeTokenForUser %#v", req)
 	err := h.params.Store.Identity(p.Context, &store.Identity{
 		Username: string(req.Username),
 	})
@@ -553,9 +618,12 @@ func (h *handler) DischargeTokenForUser(p httprequest.Params, req *params.Discha
 	if err != nil {
 		return params.DischargeTokenForUserResponse{}, errgo.NoteMask(err, "cannot create discharge token", errgo.Any)
 	}
-	return params.DischargeTokenForUserResponse{
+
+	resp := params.DischargeTokenForUserResponse{
 		DischargeToken: m,
-	}, nil
+	}
+	logger.Tracef("DischargeTokenForUser response %#v", resp)
+	return resp, nil
 }
 
 // checkAuthIdentityIsMemberOf checks that the given identity is a member
