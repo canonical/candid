@@ -126,6 +126,7 @@ func serveIdentity(conf *config.Config, params candid.ServerParams) error {
 	params.Location = conf.Location
 	params.PrivateAddr = conf.PrivateAddr
 	params.AdminAgentPublicKey = conf.AdminAgentPublicKey
+	params.RedirectLoginWhitelist = conf.RedirectLoginWhitelist
 	srv, err := candid.NewServer(
 		params,
 		candid.V1,

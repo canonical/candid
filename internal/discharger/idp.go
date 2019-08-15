@@ -220,12 +220,23 @@ func (c *visitCompleter) RedirectFailure(ctx context.Context, w http.ResponseWri
 // will be because the returnTo address is invalid and therefore it will
 // not be possible to redirect to it.
 func (c *visitCompleter) redirect(w http.ResponseWriter, req *http.Request, returnTo string, query url.Values) error {
+	// Check the return to is a whitelisted address, and is a valid URL.
+	var validReturnTo bool
+	if returnTo == c.params.Location+"/login-complete" {
+		validReturnTo = true
+	} else {
+		for _, rurl := range c.params.RedirectLoginWhitelist {
+			if returnTo == rurl {
+				validReturnTo = true
+				break
+			}
+		}
+	}
 	u, err := url.Parse(returnTo)
-	// We only support logins from ourselves for now, so only allow a
-	// redirect if it returns back to ourselves.
-	if !strings.HasPrefix(returnTo, c.params.Location) || err != nil {
+	if !validReturnTo || err != nil {
 		return errgo.WithCausef(err, params.ErrBadRequest, "invalid return_to")
 	}
+
 	q := u.Query()
 	for k, v := range query {
 		q[k] = append(q[k], v...)

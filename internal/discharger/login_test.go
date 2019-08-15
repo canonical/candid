@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"strings"
 	"testing"
 
 	qt "github.com/frankban/quicktest"
@@ -39,6 +40,9 @@ type loginSuite struct {
 func (s *loginSuite) Init(c *qt.C) {
 	s.store = candidtest.NewStore()
 	sp := s.store.ServerParams()
+	sp.RedirectLoginWhitelist = []string{
+		"https://example.com/callback",
+	}
 	sp.IdentityProviders = []idp.IdentityProvider{
 		static.NewIdentityProvider(static.Params{
 			Name: "test",
@@ -176,4 +180,76 @@ func (s *loginSuite) TestLoginIDPChoice(c *qt.C) {
 			URL:         s.srv.URL + "/login/test2/login",
 		}},
 	})
+}
+
+func (s *loginSuite) TestLoginRedirectNotWhitelisted(c *qt.C) {
+	req, err := http.NewRequest("GET", "/login-redirect?return_to=https://example.com/bad-callback&state=12345", nil)
+	c.Assert(err, qt.Equals, nil)
+	req.Header.Set("Accept", "application/json")
+	resp := s.srv.Do(c, req)
+	defer resp.Body.Close()
+	c.Assert(resp.StatusCode, qt.Equals, http.StatusOK)
+	buf, err := ioutil.ReadAll(resp.Body)
+	c.Assert(err, qt.Equals, nil)
+	var choice params.IDPChoice
+	err = json.Unmarshal(buf, &choice)
+	c.Assert(err, qt.Equals, nil)
+
+	body := strings.NewReader("username=test&password=testpassword")
+	req, err = http.NewRequest("POST", choice.IDPs[0].URL, body)
+	c.Assert(err, qt.Equals, nil)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	for _, cookie := range resp.Cookies() {
+		req.AddCookie(cookie)
+	}
+	req.ParseForm()
+	resp = s.srv.Do(c, req)
+	defer resp.Body.Close()
+	buf, err = ioutil.ReadAll(resp.Body)
+	c.Assert(err, qt.Equals, nil)
+
+	c.Assert(resp.StatusCode, qt.Equals, http.StatusBadRequest, qt.Commentf("unexpected status code %s: %q", resp.Status, buf))
+	var perr params.Error
+	err = json.Unmarshal(buf, &perr)
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(perr, qt.Equals, params.Error{
+		Code:    "bad request",
+		Message: "invalid return_to",
+	})
+}
+
+func (s *loginSuite) TestLoginRedirect(c *qt.C) {
+	req, err := http.NewRequest("GET", "/login-redirect?return_to=https://example.com/callback&state=12345", nil)
+	c.Assert(err, qt.Equals, nil)
+	req.Header.Set("Accept", "application/json")
+	resp := s.srv.Do(c, req)
+	defer resp.Body.Close()
+	c.Assert(resp.StatusCode, qt.Equals, http.StatusOK)
+	buf, err := ioutil.ReadAll(resp.Body)
+	c.Assert(err, qt.Equals, nil)
+	var choice params.IDPChoice
+	err = json.Unmarshal(buf, &choice)
+	c.Assert(err, qt.Equals, nil)
+
+	body := strings.NewReader("username=test&password=testpassword")
+	req, err = http.NewRequest("POST", choice.IDPs[0].URL, body)
+	c.Assert(err, qt.Equals, nil)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	for _, cookie := range resp.Cookies() {
+		req.AddCookie(cookie)
+	}
+	req.ParseForm()
+	resp = s.srv.RoundTrip(c, req)
+	defer resp.Body.Close()
+	buf, err = ioutil.ReadAll(resp.Body)
+	c.Assert(err, qt.Equals, nil)
+
+	c.Assert(resp.StatusCode, qt.Equals, http.StatusSeeOther, qt.Commentf("unexpected status code %s: %q", resp.Status, buf))
+	u, err := url.Parse(resp.Header.Get("Location"))
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(u.Host, qt.Equals, "example.com")
+	c.Assert(u.Path, qt.Equals, "/callback")
+	q := u.Query()
+	c.Assert(q.Get("state"), qt.Equals, "12345")
+	c.Assert(q.Get("code"), qt.Not(qt.Equals), "")
 }

@@ -27,6 +27,7 @@ import (
 
 	"github.com/CanonicalLtd/candid/internal/auth"
 	"github.com/CanonicalLtd/candid/internal/auth/httpauth"
+	"github.com/CanonicalLtd/candid/internal/discharger/redirect"
 	"github.com/CanonicalLtd/candid/internal/identity"
 	"github.com/CanonicalLtd/candid/store"
 )
@@ -218,12 +219,16 @@ func (c *thirdPartyCaveatChecker) interactionRequiredError(ctx context.Context, 
 		idp.SetInteraction(ierr, dischargeID)
 	}
 	visitParams := "?did=" + dischargeID
+	redirectVisitParams := ""
 	if p.domain != "" {
 		visitParams += "&domain=" + url.QueryEscape(p.domain)
+		redirectVisitParams = "?domain=" + url.QueryEscape(p.domain)
 	}
 	visitURL := c.params.Location + "/login" + visitParams
 	waitTokenURL := c.params.Location + "/wait-token?did=" + dischargeID
 	httpbakery.SetWebBrowserInteraction(ierr, visitURL, waitTokenURL)
+
+	redirect.SetInteraction(ierr, c.params.Location+"/login-redirect"+redirectVisitParams, c.params.Location+"/discharge-token")
 
 	// Set the URLs used by old clients for backward compatibility.
 	legacyVisitURL := c.params.Location + "/login-legacy" + visitParams
@@ -254,20 +259,12 @@ func newDischargeID() (string, error) {
 
 type dischargeTokenRequest struct {
 	httprequest.Route `httprequest:"POST /discharge-token"`
-	Body              dischargeTokenRequestBody `httprequest:",body"`
-}
-
-type dischargeTokenRequestBody struct {
-	Code string `json:"code"`
-}
-
-type dischargeTokenResponse struct {
-	DischargeToken *httpbakery.DischargeToken `json:"token,omitempty"`
+	redirect.DischargeTokenRequest
 }
 
 // DischargeToken is used to collect a DischargeToken when redirect based
 // login is being used.
-func (h *handler) DischargeToken(p httprequest.Params, req *dischargeTokenRequest) (*dischargeTokenResponse, error) {
+func (h *handler) DischargeToken(p httprequest.Params, req *dischargeTokenRequest) (*redirect.DischargeTokenResponse, error) {
 	dt, err := h.params.dischargeTokenStore.Get(p.Context, req.Body.Code)
 	if err != nil {
 		if errgo.Cause(err) == store.ErrNotFound {
@@ -275,5 +272,5 @@ func (h *handler) DischargeToken(p httprequest.Params, req *dischargeTokenReques
 		}
 		return nil, errgo.Mask(err)
 	}
-	return &dischargeTokenResponse{DischargeToken: dt}, nil
+	return &redirect.DischargeTokenResponse{DischargeToken: dt}, nil
 }

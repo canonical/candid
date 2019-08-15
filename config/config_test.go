@@ -88,6 +88,9 @@ tls-key: |
 resource-path: /resources
 http-proxy: http://proxy.example.com:3128
 no-proxy: localhost,.example.com
+redirect-login-whitelist:
+- https://example.com/1
+- https://example.com/2
 `
 
 func readConfig(c *qt.C, content string) (*config.Config, error) {
@@ -160,6 +163,10 @@ func TestRead(t *testing.T) {
 		ResourcePath:        "/resources",
 		HTTPProxy:           "http://proxy.example.com:3128",
 		NoProxy:             "localhost,.example.com",
+		RedirectLoginWhitelist: []string{
+			"https://example.com/1",
+			"https://example.com/2",
+		},
 	})
 }
 
