@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	"gopkg.in/asn1-ber.v1"
+	errgo "gopkg.in/errgo.v1"
 	"gopkg.in/ldap.v2"
 
 	idpldap "github.com/CanonicalLtd/candid/idp/ldap"
@@ -100,7 +101,7 @@ func (c *mockLDAPConn) Bind(username, password string) error {
 			return nil
 		}
 	}
-	return fmt.Errorf("Login failure")
+	return ldap.NewError(ldap.LDAPResultInvalidCredentials, errgo.New("invalid credentials"))
 }
 
 func (c *mockLDAPConn) Close() {

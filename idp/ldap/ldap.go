@@ -329,7 +329,10 @@ func (idp *identityProvider) loginDN(ctx context.Context, conn ldapConn, dn, pas
 	logger.Tracef("LDAP bind: dn=%s", dn)
 	if err := conn.Bind(dn, password); err != nil {
 		logger.Tracef("LDAP bind error: %s", err)
-		return nil, errgo.Mask(err)
+		// Assume all bind errors represent invalid credentials,
+		// other errors will have most likely been picked up
+		// resolving the username.
+		return nil, errgo.New("invalid username or password")
 	}
 	logger.Tracef("LDAP bind success")
 
@@ -398,7 +401,7 @@ func (idp *identityProvider) resolveUsername(conn ldapConn, username string) (st
 	}
 	logResults(res)
 	if len(res.Entries) < 1 {
-		return "", errgo.Newf("user %q not found", username)
+		return "", errgo.New("invalid username or password")
 	}
 	return res.Entries[0].DN, nil
 }
