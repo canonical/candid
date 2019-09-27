@@ -1,0 +1,10 @@
+dn: cn=User Two,dc=example,dc=com
+objectClass: inetOrgPerson
+cn: User Two
+sn: Two
+givenName: User
+uid: user2
+userPassword: {SSHA}MpwAaXexjx3AMpCIchf9RlcF3LP6gTXB
+mail: user2@example.com
+displayName: User Two
+

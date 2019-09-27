@@ -1,0 +1,7 @@
+dn: cn=config
+objectClass: olcGlobal
+cn: config
+olcIdleTimeout: 30
+olcLogLevel: Stats
+olcTLSCertificateFile: /srv/ldap/certs/cert.pem
+olcTLSCertificateKeyFile: /srv/ldap/certs/key.pem
