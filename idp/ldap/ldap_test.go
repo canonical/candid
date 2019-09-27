@@ -53,7 +53,7 @@ var newTests = []struct {
 		UserQueryAttrs:   ldap.UserQueryAttrs{ID: "uid"},
 		GroupQueryFilter: "(groupAttr=val)",
 	},
-	expectError: `cannot parse URL: parse ://: missing protocol scheme`,
+	expectError: `cannot parse URL: parse "?://"?: missing protocol scheme`,
 }, {
 	about: "unsupported scheme",
 	params: ldap.Params{
@@ -369,10 +369,16 @@ func (s *ldapSuite) TestHandleCustomGroupFilter(c *qt.C) {
 	c.Assert(groups, qt.DeepEquals, []string{"group1", "group2"})
 }
 
+func (s *ldapSuite) TestHandleIncorrectUsername(c *qt.C) {
+	i := s.setupIdp(c, getSampleParams(), getSampleLdapDB())
+	_, err := s.idptest.DoInteractiveLogin(c, i, idpPrefix+"/login", candidtest.PostLoginForm("user-not-there", "wrong"))
+	c.Assert(err, qt.ErrorMatches, `invalid username or password`)
+}
+
 func (s *ldapSuite) TestHandleFailedLogin(c *qt.C) {
 	i := s.setupIdp(c, getSampleParams(), getSampleLdapDB())
 	_, err := s.idptest.DoInteractiveLogin(c, i, idpPrefix+"/login", candidtest.PostLoginForm("user1", "wrong"))
-	c.Assert(err, qt.ErrorMatches, `Login failure`)
+	c.Assert(err, qt.ErrorMatches, `invalid username or password`)
 }
 
 func (s *ldapSuite) TestHandleUserFilterNoMatch(c *qt.C) {
