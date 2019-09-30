@@ -1,0 +1,66 @@
+LDAP QA Environment
+===================
+
+This directory contains the required configuration to bring up a working
+OpenLDAP deployment running in a container that can be used to QA the
+LDAP IDP.
+
+To bring up the QA environment simply run:
+
+    docker-compose up
+
+This will run a TLS enabled LDAP server in a container listening on
+localhost port 389.
+
+To connect to the LDAP server add the following IDP definition to
+candidsrv's configuration:
+
+    identity-providers:
+    - type: ldap
+      name: ldap
+      domain: ldap
+      url: ldap://localhost/dc=example,dc=com
+      dn: cn=admin,dc=example,dc=com
+      password: admin
+      ca-cert: |
+        -----BEGIN CERTIFICATE-----
+        MIIC8jCCAdqgAwIBAgIUf56w/e4L0Qn7PwHIOs8wDftHC24wDQYJKoZIhvcNAQEL
+        BQAwGTEXMBUGA1UEAxMOY2FuZGlkIHRlc3QgY2EwHhcNMTkwOTI3MTI1MTEzWhcN
+        MzkxMjMxMTI1MTEzWjAZMRcwFQYDVQQDEw5jYW5kaWQgdGVzdCBjYTCCASIwDQYJ
+        KoZIhvcNAQEBBQADggEPADCCAQoCggEBANjvTTKgQCAKgOhppLP8FwZX4uB/9Pgs
+        Np9euwmGGeQn1IMK94N1Q9CnxAgFrHPLen76VT/2/7AqRX1gkmeCG1D5Rv3xhNC1
+        LLH2mn4p2Vp8uSMhNyovwkuhNjH4q23rfleU1NZKijBYoPWIuoGQDVE/bztAI2Gm
+        PbOtQCGag0Ta6ws1U5Fva4jlmqXnN4NQCNZ1jku+GdV0E3kxeRedhYfl6101tViZ
+        sbILjHHvHkuvjYYwA0yYXHsQbudCzdsb0cUyNOBA/83NgGtCu/zbL6Cfe6yT5PrO
+        NPAkX903qxYhKulcjMKQltgo6/EoULG/5P0GZ0zO3UGG7NtFGLr0ZHECAwEAAaMy
+        MDAwDwYDVR0TAQH/BAUwAwEB/zAdBgNVHQ4EFgQUiuUSWDgDSC5Qz6YpPHW6WM+l
+        K7wwDQYJKoZIhvcNAQELBQADggEBAJl+DGvoVP3CW2vLiaLB/pLqnoUxmU0W6Bup
+        DWj6S6AJSnQdxT5Nidgdna22NIATHC18ymr5DS36zC/eG9lZRwOg0jyGjBdIGtpq
+        1G9kC42sOq6o4pjWTu0WFWVo91FZNz1RLfVt2MYvVVn/fMJJISW2VxjYaC/jouIb
+        ACU0gSgkckXUuhKiU1yBKpZ5dyRGaa7AtS8VzTefqLovfzPjyEc7dIO8IAXOokRx
+        mhVZPUjSZ5YcbNufHvrjpcnvdYBpCrXx1XywdC3O0lw9Oiv9OWPbasEqb6ysRfQn
+        LWSniske134cFVziC8wI5js3inQr+7zPPmfa1CRq8NyoqKuOVTQ=
+        -----END CERTIFICATE-----
+      user-query-filter: (objectClass=inetOrgPerson)
+      user-query-attrs:
+        id: uid
+        email: mail
+        display-name: displayName
+      group-query-filter: (&(objectClass=groupOfNames)(member={{.User}}))
+
+The LDAP server is configured with the following users:
+
+    - name: User One
+      username: user1
+      password: password1
+      email: user1@example.com
+      groups:
+      - group1
+      - group3
+    - name: User Two
+      username: user2
+      password: password2
+      email: user2@example.com
+      groups:
+      - group2
+      - group3
