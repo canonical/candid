@@ -354,7 +354,7 @@ func (h *handler) UserToken(p httprequest.Params, r *params.UserTokenRequest) (*
 		httpbakery.RequestVersion(p.Request),
 		[]checkers.Caveat{
 			candidclient.UserDeclaration(id.Id()),
-			checkers.TimeBeforeCaveat(time.Now().Add(24 * time.Hour)),
+			checkers.TimeBeforeCaveat(time.Now().Add(h.params.APIMacaroonTimeout)),
 		},
 		identchecker.LoginOp,
 	)
@@ -590,12 +590,6 @@ func translateStoreError(err error) error {
 	return err1
 }
 
-const (
-	// dischargeTokenDuration is the length of time for which a
-	// discharge token is valid.
-	dischargeTokenDuration = 6 * time.Hour
-)
-
 // DischargeTokenForUser allows an administrator to create a discharge
 // token for the specified user.
 func (h *handler) DischargeTokenForUser(p httprequest.Params, req *params.DischargeTokenForUserRequest) (params.DischargeTokenForUserResponse, error) {
@@ -610,7 +604,7 @@ func (h *handler) DischargeTokenForUser(p httprequest.Params, req *params.Discha
 		p.Context,
 		httpbakery.RequestVersion(p.Request),
 		[]checkers.Caveat{
-			checkers.TimeBeforeCaveat(time.Now().Add(dischargeTokenDuration)),
+			checkers.TimeBeforeCaveat(time.Now().Add(h.params.DischargeTokenTimeout)),
 			candidclient.UserDeclaration(string(req.Username)),
 		},
 		identchecker.LoginOp,

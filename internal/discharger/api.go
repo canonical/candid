@@ -26,7 +26,7 @@ var logger = loggo.GetLogger("candid.internal.discharger")
 
 // NewAPIHandler is an identity.NewAPIHandlerFunc.
 func NewAPIHandler(params identity.HandlerParams) ([]httprequest.Handler, error) {
-	reqAuth := httpauth.New(params.Oven, params.Authorizer)
+	reqAuth := httpauth.New(params.Oven, params.Authorizer, params.APIMacaroonTimeout)
 	place := &place{params.MeetingPlace}
 	dt := &dischargeTokenCreator{
 		params: params,

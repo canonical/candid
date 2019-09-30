@@ -63,6 +63,23 @@ configuration. See below for the supported identity providers. If this
 is not configured then a default set of providers will be used
 containing the Ubuntu SSO and Agent identity providers.
 
+### api-macaroon-timeout
+This is the maximum time a login to the /v1 API will remain logged
+in for. As candid uses itself as it's authentication provider,
+for all practical purpose the login time will be the minimum of
+`api-macaroon-timeout` and `discharge-macaroon-timeout`. The default
+value is 24 hours.
+
+### discharge-macaroon-timeout
+This is the maximum time the discharge macaroon will be valid for on
+the target service. This is the maximum time the client will be able to
+access the target service without requiring re-authentication. Note that
+the target service may also have it's own maximum time.
+
+### discharge-token-timeout
+This is the maximum time that the discharge token issued to the client
+can be used to discharge tokens without requiring re-authentication.
+
 Storage Backends
 -----------
 

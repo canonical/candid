@@ -115,6 +115,17 @@ type ServerParams struct {
 	// trusted to be used as return_to URLs during an interactive
 	// login.
 	RedirectLoginWhitelist []string
+
+	// APIMacaroonTimeout is the maximum life of an API macaroon.
+	APIMacaroonTimeout time.Duration
+
+	// DischargeMacaroonTimeout is the maximum life of a Discharge
+	// macaroon.
+	DischargeMacaroonTimeout time.Duration
+
+	// DischargeTokenTimeout is the maximum life of a Discharge
+	// token.
+	DischargeTokenTimeout time.Duration
 }
 
 // NewServer returns a new handler that handles identity service requests and

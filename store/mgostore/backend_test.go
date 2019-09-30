@@ -3,6 +3,7 @@ package mgostore_test
 import (
 	"context"
 	"testing"
+	"time"
 
 	qt "github.com/frankban/quicktest"
 	"github.com/juju/mgotest"
@@ -22,6 +23,9 @@ func TestNewBackend(t *testing.T) {
 	}
 	c.Assert(err, qt.Equals, nil)
 	defer db.Close()
+	// mgotest sets the SocketTimout to 1s. Restore it back to the
+	// default value.
+	db.Session.SetSocketTimeout(time.Minute)
 
 	testdb := db.Database
 	s := testdb.Session.Copy()

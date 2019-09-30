@@ -22,15 +22,17 @@ import (
 type Authorizer struct {
 	authorizer *auth.Authorizer
 	oven       *bakery.Oven
+	timeout    time.Duration
 }
 
 // New creates a new Authorizer for authorizing HTTP requests made to the
 // identity server. The given oven is used to make new macaroons; the
 // given authorizer is used as the underlying authorizer.
-func New(o *bakery.Oven, a *auth.Authorizer) *Authorizer {
+func New(o *bakery.Oven, a *auth.Authorizer, timeout time.Duration) *Authorizer {
 	return &Authorizer{
 		authorizer: a,
 		oven:       o,
+		timeout:    timeout,
 	}
 }
 
@@ -51,7 +53,7 @@ func (a *Authorizer) Auth(ctx context.Context, req *http.Request, ops ...bakery.
 	if !ok {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrUnauthorized))
 	}
-	caveats := append(derr.Caveats, checkers.TimeBeforeCaveat(time.Now().Add(365*24*time.Hour)))
+	caveats := append(derr.Caveats, checkers.TimeBeforeCaveat(time.Now().Add(a.timeout)))
 	m, err := a.oven.NewMacaroon(
 		ctx,
 		httpbakery.RequestVersion(req),

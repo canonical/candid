@@ -100,7 +100,7 @@ func (s *authSuite) TestAuthorizeWithAdminCredentials(c *qt.C) {
 				MacaroonVerifier: s.oven,
 				ACLManager:       s.aclManager,
 			})
-			httpAuthorizer := httpauth.New(s.oven, authorizer)
+			httpAuthorizer := httpauth.New(s.oven, authorizer, 0)
 			req, _ := http.NewRequest("GET", "/", nil)
 			for attr, val := range test.header {
 				req.Header[attr] = val
@@ -125,7 +125,7 @@ func (s *authSuite) TestAuthorizeMacaroonRequired(c *qt.C) {
 		MacaroonVerifier: s.oven,
 		ACLManager:       s.aclManager,
 	})
-	httpAuthorizer := httpauth.New(s.oven, authorizer)
+	httpAuthorizer := httpauth.New(s.oven, authorizer, 0)
 	req, err := http.NewRequest("GET", "http://example.com/v1/test", nil)
 	c.Assert(err, qt.Equals, nil)
 	authInfo, err := httpAuthorizer.Auth(context.Background(), req, identchecker.LoginOp)
