@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"testing"
+	"time"
 
 	qt "github.com/frankban/quicktest"
 	aclstore "github.com/juju/aclstore/v2"
@@ -83,6 +84,10 @@ func newFixture(c *qt.C) *fixture {
 		c.Skip("mgotest disabled")
 	}
 	c.Assert(err, qt.Equals, nil)
+	// mgotest sets the SocketTimout to 1s. Restore it back to the
+	// default value.
+	db.Session.SetSocketTimeout(time.Minute)
+
 	backend, err := mgostore.NewBackend(db.Database)
 	if err != nil {
 		db.Close()

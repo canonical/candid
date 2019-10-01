@@ -30,16 +30,6 @@ import (
 	"github.com/CanonicalLtd/candid/store"
 )
 
-const (
-	// identityMacaroonDuration is the length of time for which an
-	// identity macaroon is valid.
-	identityMacaroonDuration = 28 * 24 * time.Hour
-
-	// dischargeTokenDuration is the length of time for which a
-	// discharge token is valid.
-	dischargeTokenDuration = identityMacaroonDuration
-)
-
 type initIDPParams struct {
 	identity.HandlerParams
 	Codec                 *secret.Codec
@@ -94,7 +84,7 @@ func (d *dischargeTokenCreator) DischargeToken(ctx context.Context, id *store.Id
 		ctx,
 		bakery.LatestVersion,
 		[]checkers.Caveat{
-			checkers.TimeBeforeCaveat(time.Now().Add(dischargeTokenDuration)),
+			checkers.TimeBeforeCaveat(time.Now().Add(d.params.DischargeTokenTimeout)),
 			candidclient.UserDeclaration(id.Username),
 		},
 		identchecker.LoginOp,

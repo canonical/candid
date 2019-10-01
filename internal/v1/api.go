@@ -28,7 +28,7 @@ func NewAPIHandler(params identity.HandlerParams) ([]httprequest.Handler, error)
 // new returns a function that will generate a new instance of the v1 API
 // handler for a request.
 func new(hParams identity.HandlerParams) func(p httprequest.Params, arg interface{}) (*handler, context.Context, error) {
-	reqAuth := httpauth.New(hParams.Oven, hParams.Authorizer)
+	reqAuth := httpauth.New(hParams.Oven, hParams.Authorizer, hParams.APIMacaroonTimeout)
 	return func(p httprequest.Params, arg interface{}) (*handler, context.Context, error) {
 		t := trace.New("identity.internal.v1", p.PathPattern)
 		ctx := trace.NewContext(p.Context, t)

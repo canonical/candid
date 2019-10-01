@@ -147,7 +147,7 @@ func (c *thirdPartyCaveatChecker) checkThirdPartyCaveat(ctx context.Context, p h
 	}
 	return []checkers.Caveat{
 		candidclient.UserDeclaration(authInfo.Identity.Id()),
-		checkers.TimeBeforeCaveat(time.Now().Add(24 * time.Hour)),
+		checkers.TimeBeforeCaveat(time.Now().Add(c.params.DischargeMacaroonTimeout)),
 	}, nil
 }
 

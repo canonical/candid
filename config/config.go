@@ -96,6 +96,18 @@ type Config struct {
 	// trusted to be used as return_to URLs during an interactive
 	// login.
 	RedirectLoginWhitelist []string `yaml:"redirect-login-whitelist"`
+
+	// APIMacaroonTimeout is the maximum age an API macaroon can get
+	// before requiring re-authorization.
+	APIMacaroonTimeout DurationString `yaml:"api-macaroon-timeout"`
+
+	// DischargeMacaroonTimeout is the maximum age a discharge
+	// macaroon can get before it becomes invalid.
+	DischargeMacaroonTimeout DurationString `yaml:"discharge-macaroon-timeout"`
+
+	// DischargeTokenTimeout is the maximum age a discharge token can
+	// get before it becomes invalid.
+	DischargeTokenTimeout DurationString `yaml:"discharge-token-timeout"`
 }
 
 // TLSConfig returns a TLS configuration to be used for serving

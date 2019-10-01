@@ -32,6 +32,10 @@ func TestLegacySource(t *testing.T) {
 	}
 	c.Assert(err, qt.Equals, nil)
 	defer db.Close()
+	// mgotest sets the SocketTimout to 1s. Restore it back to the
+	// default value.
+	db.Session.SetSocketTimeout(time.Minute)
+
 	t1 := time.Now().Add(-1 * time.Minute).Round(time.Millisecond)
 	t2 := t1.Add(-1 * time.Minute).Round(time.Millisecond)
 	insert(c, db.Database, &mongodoc.Identity{

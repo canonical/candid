@@ -127,6 +127,9 @@ func serveIdentity(conf *config.Config, params candid.ServerParams) error {
 	params.PrivateAddr = conf.PrivateAddr
 	params.AdminAgentPublicKey = conf.AdminAgentPublicKey
 	params.RedirectLoginWhitelist = conf.RedirectLoginWhitelist
+	params.APIMacaroonTimeout = conf.APIMacaroonTimeout.Duration
+	params.DischargeMacaroonTimeout = conf.DischargeMacaroonTimeout.Duration
+	params.DischargeTokenTimeout = conf.DischargeTokenTimeout.Duration
 	srv, err := candid.NewServer(
 		params,
 		candid.V1,

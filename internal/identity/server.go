@@ -30,6 +30,12 @@ import (
 	"github.com/CanonicalLtd/candid/store"
 )
 
+const (
+	defaultAPIMacaroonTimeout       = 24 * time.Hour
+	defaultDischargeMacaroonTimeout = 24 * time.Hour
+	defaultDischargeTokenTimeout    = 6 * time.Hour
+)
+
 var logger = loggo.GetLogger("candid.internal.identity")
 
 // NewAPIHandlerFunc is a function that returns set of httprequest
@@ -69,6 +75,15 @@ func New(sp ServerParams, versions map[string]NewAPIHandlerFunc) (*Server, error
 		Locator:            locator,
 		Location:           "identity",
 	})
+	if sp.APIMacaroonTimeout == 0 {
+		sp.APIMacaroonTimeout = defaultAPIMacaroonTimeout
+	}
+	if sp.DischargeMacaroonTimeout == 0 {
+		sp.DischargeMacaroonTimeout = defaultDischargeMacaroonTimeout
+	}
+	if sp.DischargeTokenTimeout == 0 {
+		sp.DischargeTokenTimeout = defaultDischargeTokenTimeout
+	}
 	aclManager, err := aclstore.NewManager(context.Background(), aclstore.Params{
 		Store:             sp.ACLStore,
 		InitialAdminUsers: []string{auth.AdminUsername},
@@ -88,7 +103,7 @@ func New(sp ServerParams, versions map[string]NewAPIHandlerFunc) (*Server, error
 		return nil, errgo.Mask(err)
 	}
 
-	aclAuthenticator := httpauth.New(oven, auth)
+	aclAuthenticator := httpauth.New(oven, auth, sp.APIMacaroonTimeout)
 	aclHandler := aclManager.NewHandler(aclstore.HandlerParams{
 		RootPath: "/acl",
 		Authenticate: func(ctx context.Context, w http.ResponseWriter, req *http.Request) (aclstore.Identity, error) {
@@ -254,6 +269,17 @@ type ServerParams struct {
 	// trusted to be used as return_to URLs during an interactive
 	// login.
 	RedirectLoginWhitelist []string
+
+	// APIMacaroonTimeout is the maximum life of an API macaroon.
+	APIMacaroonTimeout time.Duration
+
+	// DischargeMacaroonTimeout is the maximum life of a Discharge
+	// macaroon.
+	DischargeMacaroonTimeout time.Duration
+
+	// DischargeTokenTimeout is the maximum life of a Discharge
+	// token.
+	DischargeTokenTimeout time.Duration
 }
 
 type HandlerParams struct {

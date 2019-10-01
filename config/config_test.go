@@ -91,6 +91,9 @@ no-proxy: localhost,.example.com
 redirect-login-whitelist:
 - https://example.com/1
 - https://example.com/2
+api-macaroon-timeout: 2h
+discharge-macaroon-timeout: 24h
+discharge-token-timeout: 6h
 `
 
 func readConfig(c *qt.C, content string) (*config.Config, error) {
@@ -167,6 +170,9 @@ func TestRead(t *testing.T) {
 			"https://example.com/1",
 			"https://example.com/2",
 		},
+		APIMacaroonTimeout:       config.DurationString{Duration: 2 * time.Hour},
+		DischargeMacaroonTimeout: config.DurationString{Duration: 24 * time.Hour},
+		DischargeTokenTimeout:    config.DurationString{Duration: 6 * time.Hour},
 	})
 }
 
