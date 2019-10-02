@@ -22,6 +22,7 @@ import (
 	"github.com/frankban/quicktest/qtsuite"
 	"github.com/juju/qthttptest"
 	"gopkg.in/CanonicalLtd/candidclient.v1/params"
+	"gopkg.in/CanonicalLtd/candidclient.v1/redirect"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/httprequest.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery"
@@ -35,7 +36,6 @@ import (
 	"github.com/CanonicalLtd/candid/internal/auth"
 	"github.com/CanonicalLtd/candid/internal/candidtest"
 	"github.com/CanonicalLtd/candid/internal/discharger"
-	"github.com/CanonicalLtd/candid/internal/discharger/redirect"
 	"github.com/CanonicalLtd/candid/internal/identity"
 	"github.com/CanonicalLtd/candid/store"
 )

@@ -16,6 +16,7 @@ import (
 	"golang.org/x/net/trace"
 	"gopkg.in/CanonicalLtd/candidclient.v1"
 	"gopkg.in/CanonicalLtd/candidclient.v1/params"
+	"gopkg.in/CanonicalLtd/candidclient.v1/redirect"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/httprequest.v1"
 	"gopkg.in/juju/names.v2"
@@ -27,7 +28,6 @@ import (
 
 	"github.com/CanonicalLtd/candid/internal/auth"
 	"github.com/CanonicalLtd/candid/internal/auth/httpauth"
-	"github.com/CanonicalLtd/candid/internal/discharger/redirect"
 	"github.com/CanonicalLtd/candid/internal/identity"
 	"github.com/CanonicalLtd/candid/store"
 )
