@@ -11,7 +11,7 @@ require (
 	github.com/gorilla/handlers v0.0.0-20170224193955-13d73096a474
 	github.com/juju/aclstore/v2 v2.0.0-alpha2
 	github.com/juju/ansiterm v0.0.0-20180109212912-720a0952cc2a // indirect
-	github.com/juju/clock v0.0.0-20180808021310-bab88fc67299
+	github.com/juju/clock v0.0.0-20190205081909-9c5c9712527c
 	github.com/juju/cmd v0.0.0-20180424151504-9ce53c6f9d00
 	github.com/juju/gnuflag v0.0.0-20171113085948-2ce1bb71843d
 	github.com/juju/go4 v0.0.0-20160222163258-40d72ab9641a // indirect
@@ -22,11 +22,11 @@ require (
 	github.com/juju/persistent-cookiejar v0.0.0-20170428161559-d67418f14c93
 	github.com/juju/postgrestest v0.0.0-20180111150307-95c1ddb2775d
 	github.com/juju/qthttptest v0.0.1
-	github.com/juju/schema v0.0.0-20180109041850-e4f08199aa80
+	github.com/juju/schema v1.0.1-0.20190814234152-1f8aaeef0989
 	github.com/juju/simplekv v0.0.0-20180621131638-ff82918775e5
-	github.com/juju/usso v0.0.0-20160418121039-5b79b358f4bb
+	github.com/juju/usso v1.0.0
 	github.com/juju/utils v0.0.0-20180820210520-bf9cc5bdd62d
-	github.com/julienschmidt/httprouter v0.0.0-20151013225520-77a895ad01eb
+	github.com/julienschmidt/httprouter v1.3.0
 	github.com/lib/pq v0.0.0-20171126050459-83612a56d3dd
 	github.com/lunixbochs/vtclean v0.0.0-20180621232353-2d01aacdc34a // indirect
 	github.com/mattn/go-colorable v0.0.9 // indirect
@@ -40,27 +40,27 @@ require (
 	github.com/prometheus/common v0.0.0-20160503220532-dd586c1c5abb // indirect
 	github.com/prometheus/procfs v0.0.0-20160411190841-abf152e5f3e9 // indirect
 	github.com/stretchr/testify v1.2.2 // indirect
-	github.com/yohcop/openid-go v0.0.0-20160304164425-f38c0087a377
-	golang.org/x/crypto v0.0.0-20181009213950-7c1a557ab941
-	golang.org/x/net v0.0.0-20181017193950-04a2e542c03f
+	github.com/yohcop/openid-go v0.0.0-20170901155220-cfc72ed89575
+	golang.org/x/crypto v0.0.0-20190404164418-38d8ce5564a5
+	golang.org/x/net v0.0.0-20191002035440-2ec189313ef0
 	golang.org/x/oauth2 v0.0.0-20161219192954-314dd2c0bf3e
 	google.golang.org/appengine v1.2.0 // indirect
-	gopkg.in/CanonicalLtd/candidclient.v1 v1.1.1
+	gopkg.in/CanonicalLtd/candidclient.v1 v1.2.0
 	gopkg.in/asn1-ber.v1 v1.0.0-20170511165959-379148ca0225
 	gopkg.in/errgo.v1 v1.0.0
 	gopkg.in/goose.v1 v1.0.0-20161130145116-8f055ce635d6
-	gopkg.in/httprequest.v1 v1.1.2
-	gopkg.in/juju/environschema.v1 v1.0.0-20151104115810-7359fc7857ab
+	gopkg.in/httprequest.v1 v1.2.0
+	gopkg.in/juju/environschema.v1 v1.0.0
 	gopkg.in/juju/names.v2 v2.0.0-20180621093930-fd59336b4621
 	gopkg.in/ldap.v2 v2.5.0
 	gopkg.in/macaroon-bakery.v2 v2.1.0
-	gopkg.in/macaroon.v2 v2.0.0
+	gopkg.in/macaroon.v2 v2.1.0
 	gopkg.in/mgo.v2 v2.0.0-20180705113604-9856a29383ce
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0-20170531180850-df99d62fd42d
-	gopkg.in/retry.v1 v1.0.0 // indirect
+	gopkg.in/retry.v1 v1.0.3 // indirect
 	gopkg.in/square/go-jose.v2 v2.0.1 // indirect
 	gopkg.in/tomb.v2 v2.0.0-20140626144623-14b3d72120e8
-	gopkg.in/yaml.v2 v2.2.1
+	gopkg.in/yaml.v2 v2.2.2
 	launchpad.net/lpad v0.0.0-20131113112110-000000000065
 )
 
