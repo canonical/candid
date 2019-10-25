@@ -121,11 +121,9 @@ func NewIdentityProvider(p Params) (idp.IdentityProvider, error) {
 // SSO by requiring the client to discharge a macaroon addressed directly
 // to UbuntuSSO.
 type identityProvider struct {
-	hostname    string
-	params      Params
-	initParams  idp.InitParams
-	ussoChecker *ussoCaveatChecker
-	checker     *identchecker.Checker
+	hostname   string
+	params     Params
+	initParams idp.InitParams
 }
 
 // Name gives the name of the identity provider (usso).
@@ -156,14 +154,6 @@ func (*identityProvider) Interactive() bool {
 // Init initialises the identity provider.
 func (idp *identityProvider) Init(_ context.Context, params idp.InitParams) error {
 	idp.initParams = params
-	idp.ussoChecker = &ussoCaveatChecker{
-		fallback:  httpbakery.NewChecker(),
-		namespace: idp.hostname,
-	}
-	idp.checker = identchecker.NewChecker(identchecker.CheckerParams{
-		Checker:          idp.ussoChecker,
-		MacaroonVerifier: params.Oven,
-	})
 	return nil
 }
 
@@ -334,15 +324,25 @@ func (idp *identityProvider) verifyUSSOMacaroon(ctx context.Context, req *http.R
 	if err := httprequest.Unmarshal(idputil.RequestParams(ctx, nil, req), &lr); err != nil {
 		return nil, errgo.Mask(err)
 	}
-	_, err := idp.checker.Auth(lr.Login.Macaroons).Allow(ctx, ussoLoginOp)
+
+	ussoChecker := ussoCaveatChecker{
+		namespace: idp.hostname,
+		fallback:  httpbakery.NewChecker(),
+	}
+	checker := identchecker.NewChecker(identchecker.CheckerParams{
+		Checker:          &ussoChecker,
+		MacaroonVerifier: idp.initParams.Oven,
+	})
+	_, err := checker.Auth(lr.Login.Macaroons).Allow(ctx, ussoLoginOp)
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Is(params.ErrBadRequest))
 	}
-	var acct accountInfo
-	if idp.ussoChecker.accountInfo == "" {
+	if ussoChecker.accountInfo == "" {
 		return nil, errgo.WithCausef(nil, params.ErrBadRequest, "account information not specified")
 	}
-	buf, err := base64.StdEncoding.DecodeString(idp.ussoChecker.accountInfo)
+
+	var acct accountInfo
+	buf, err := base64.StdEncoding.DecodeString(ussoChecker.accountInfo)
 	if err != nil {
 		return nil, ussoCaveatErrorf("account caveat badly formed: %v", err)
 	}

@@ -403,6 +403,63 @@ func TestHandlePost(t *testing.T) {
 	}
 }
 
+func TestMultipleLogins(t *testing.T) {
+	c := qt.New(t)
+
+	f := newFixture(c)
+	err := f.idp.Init(f.idptest.Ctx, f.idptest.InitParams(c, "https://idp.test"))
+	c.Assert(err, qt.Equals, nil)
+
+	dologin := func(ai *ussodischarge.AccountInfo) {
+		bm, err := f.idptest.Oven.NewMacaroon(f.idptest.Ctx, bakery.Version1, nil, ussodischarge.USSOLoginOp)
+		c.Assert(err, qt.Equals, nil)
+		m := bm.M()
+		buf, err := json.Marshal(ai)
+		c.Assert(err, qt.Equals, nil)
+		err = m.AddFirstPartyCaveat([]byte("login.staging.ubuntu.com|account|" + base64.StdEncoding.EncodeToString(buf)))
+		c.Assert(err, qt.Equals, nil)
+		err = m.AddFirstPartyCaveat([]byte("login.staging.ubuntu.com|valid_since|" + timeString(-time.Minute)))
+		c.Assert(err, qt.Equals, nil)
+		err = m.AddFirstPartyCaveat([]byte("login.staging.ubuntu.com|last_auth|" + timeString(-time.Hour)))
+		c.Assert(err, qt.Equals, nil)
+		err = m.AddFirstPartyCaveat([]byte("login.staging.ubuntu.com|expires|" + timeString(time.Hour)))
+		c.Assert(err, qt.Equals, nil)
+
+		body := udclient.Login{
+			Macaroons: macaroon.Slice{m},
+		}
+		buf, err = json.Marshal(body)
+		c.Assert(err, qt.Equals, nil)
+		req, err := http.NewRequest("POST", "/login", bytes.NewReader(buf))
+		c.Assert(err, qt.Equals, nil)
+		req.Header.Set("Content-Type", "application/json")
+		req.ParseForm()
+		rr := httptest.NewRecorder()
+		f.idp.Handle(f.idptest.Ctx, rr, req)
+		f.idptest.AssertLoginSuccess(c, ai.OpenID+"@ussotest")
+		f.idptest.Store.AssertUser(c, &store.Identity{
+			ProviderID: store.MakeProviderIdentity("usso_macaroon", ai.OpenID),
+			Username:   ai.OpenID + "@ussotest",
+			Name:       ai.DisplayName,
+			Email:      ai.Email,
+		})
+	}
+
+	dologin(&ussodischarge.AccountInfo{
+		Username:    "username1",
+		OpenID:      "1234568",
+		Email:       "testuser1@example.com",
+		DisplayName: "Test User",
+	})
+	f.idptest.Reset()
+	dologin(&ussodischarge.AccountInfo{
+		Username:    "username2",
+		OpenID:      "1234569",
+		Email:       "testuser2@example.com",
+		DisplayName: "Test User II",
+	})
+}
+
 func timeString(d time.Duration) string {
 	return time.Now().Add(d).UTC().Format(ussodischarge.TimeFormat)
 }
