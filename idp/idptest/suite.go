@@ -315,6 +315,13 @@ func (l *visitCompleter) RedirectFailure(_ context.Context, w http.ResponseWrite
 	http.Redirect(w, req, u.String(), http.StatusSeeOther)
 }
 
+func (f *Fixture) Reset() {
+	f.visitCompleter.called = false
+	f.visitCompleter.dischargeID = ""
+	f.visitCompleter.id = nil
+	f.visitCompleter.err = nil
+}
+
 type errorCoder interface {
 	ErrorCode() params.ErrorCode
 }

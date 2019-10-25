@@ -4,12 +4,12 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"flag"
 	"fmt"
 	"log"
 	"time"
 
+	candidclient "gopkg.in/CanonicalLtd/candidclient.v1"
 	"gopkg.in/CanonicalLtd/candidclient.v1/ussodischarge"
 	errgo "gopkg.in/errgo.v1"
 	"gopkg.in/httprequest.v1"
@@ -36,14 +36,23 @@ func main() {
 	if *insecure {
 		tpl.AllowInsecure()
 	}
+	client := httpbakery.NewClient()
+	iclient, err := candidclient.New(candidclient.NewParams{
+		BaseURL: *url,
+		Client:  client,
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
 	key, err := bakery.GenerateKey()
 	if err != nil {
 		log.Fatal(err)
 	}
 	b := identchecker.NewBakery(identchecker.BakeryParams{
-		Location: "test",
-		Locator:  tpl,
-		Key:      key,
+		Location:       "test",
+		Locator:        tpl,
+		Key:            key,
+		IdentityClient: iclient,
 	})
 	m, err := b.Oven.NewMacaroon(ctx, bakery.LatestVersion, []checkers.Caveat{{
 		Condition: "is-authenticated-user",
@@ -53,13 +62,8 @@ func main() {
 		log.Fatalf("cannot make macaroon: %s", err)
 	}
 
-	client := httpbakery.NewClient()
-	lms, err := login(ctx, client, *url+"/v1/idp/usso_discharge/login")
-	if err != nil {
-		log.Fatalf("cannot login: %s", err)
-	}
-	client.AddInteractor(ussodischarge.NewInteractor(func(*httpbakery.Client, string) (macaroon.Slice, error) {
-		return lms, nil
+	client.AddInteractor(ussodischarge.NewInteractor(func(client *httpbakery.Client, url string) (macaroon.Slice, error) {
+		return login(ctx, client, url)
 	}))
 	ms, err := client.DischargeAll(ctx, m)
 	if err != nil {
@@ -87,7 +91,5 @@ func login(ctx context.Context, doer httprequest.Doer, url string) (macaroon.Sli
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}
-	buf, err := json.MarshalIndent(ms, "\t", "")
-	log.Printf("ms:\n%s", buf)
 	return ms, nil
 }
