@@ -59,6 +59,8 @@ def config_changed():
         'private-key',
         'public-key',
         'rendezvous-timeout',
+        'api-macaroon-timeout',
+        'discharge-macaroon-timeout',
     ]:
         app_config[key] = None if config[key] == '' else config[key]
 
