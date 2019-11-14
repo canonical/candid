@@ -32,6 +32,18 @@ options:
       be active before it is forgotten. The value must be a time duration
       specified as a decimal number followed by a unit from ns, us,
       ms, s, m, h for the time units between nanosecond and hour.
+  api-macaroon-timeout:
+    type: string
+    default: "48h"
+    description: |
+      The maximum age an API macaroon can get before requiring 
+      re-authorization.
+  discharge-macaroon-timeout:
+    type: string
+    default: "48h"
+    description: |
+      The maximum age a discharge macaroon can get before it becomes
+      invalid.
   max-mgo-sessions:
     type: int
     default: 500
