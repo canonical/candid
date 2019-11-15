@@ -57,6 +57,11 @@ func (*identityProvider) Interactive() bool {
 	return false
 }
 
+// Hidden specifies that this identity provider is not hidden.
+func (*identityProvider) Hidden() bool {
+	return false
+}
+
 // Init implements idp.IdentityProvider.Init by doing nothing.
 func (*identityProvider) Init(context.Context, idp.InitParams) error {
 	return errgo.New("agent login IDP no longer supported")

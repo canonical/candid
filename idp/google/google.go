@@ -52,6 +52,10 @@ type Params struct {
 	// the application as generated on
 	// https://console.developers.google.com/apis/credentials.
 	ClientSecret string `yaml:"client-secret"`
+
+	// Hidden is set if the IDP should be hidden from interactive
+	// prompts.
+	Hidden bool `yaml:"hidden"`
 }
 
 // NewIdentityProvider creates a google identity provider with the
@@ -72,5 +76,6 @@ func NewIdentityProvider(p Params) idp.IdentityProvider {
 		Scopes:       []string{oidc.ScopeOpenID, "email"},
 		ClientID:     p.ClientID,
 		ClientSecret: p.ClientSecret,
+		Hidden:       p.Hidden,
 	})
 }

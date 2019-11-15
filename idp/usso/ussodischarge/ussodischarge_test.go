@@ -110,6 +110,10 @@ func (s *ussoMacaroonSuite) TestInteractive(c *qt.C) {
 	c.Assert(s.idp.Interactive(), qt.Equals, false)
 }
 
+func (s *ussoMacaroonSuite) TestHidden(c *qt.C) {
+	c.Assert(s.idp.Hidden(), qt.Equals, false)
+}
+
 func (s *ussoMacaroonSuite) TestURL(c *qt.C) {
 	t := s.idp.URL("1")
 	c.Assert(t, qt.Equals, "https://idp.test/login?id=1")

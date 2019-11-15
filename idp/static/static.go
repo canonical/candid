@@ -54,6 +54,10 @@ type Params struct {
 	// Users is the set of users that are allowed to authenticate, with their
 	// passwords and list of groups.
 	Users map[string]UserInfo `yaml:"users"`
+
+	// Hidden is set if the IDP should be hidden from interactive
+	// prompts.
+	Hidden bool `yaml:"hidden"`
 }
 
 type UserInfo struct {
@@ -104,6 +108,11 @@ func (idp *identityProvider) IconURL() string {
 // Interactive implements idp.IdentityProvider.Interactive.
 func (*identityProvider) Interactive() bool {
 	return true
+}
+
+// Hidden implements idp.IdentityProvider.Hidden.
+func (idp *identityProvider) Hidden() bool {
+	return idp.params.Hidden
 }
 
 // Init implements idp.IdentityProvider.Init.

@@ -91,6 +91,10 @@ type Params struct {
 	// the user id being searched for - e.g.
 	//    (&(objectClass=groupOfNames)(member={{.User}}))
 	GroupQueryFilter string `yaml:"group-query-filter"`
+
+	// Hidden is set if the IDP should be hidden from interactive
+	// prompts.
+	Hidden bool `yaml:"hidden"`
 }
 
 // UserQueryAttrs defines how user attributes are mapped to attributes in the
@@ -221,6 +225,11 @@ func (idp *identityProvider) IconURL() string {
 // Interactive implements idp.IdentityProvider.Interactive.
 func (*identityProvider) Interactive() bool {
 	return true
+}
+
+// Hidden implements idp.IdentityProvider.Hidden.
+func (idp *identityProvider) Hidden() bool {
+	return idp.params.Hidden
 }
 
 // Init implements idp.IdentityProvider.Init.

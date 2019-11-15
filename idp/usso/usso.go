@@ -99,6 +99,11 @@ func (*identityProvider) Interactive() bool {
 	return true
 }
 
+// Hidden implements idp.IdentityProvider.Hidden.
+func (*identityProvider) Hidden() bool {
+	return false
+}
+
 // Init initialises this identity provider
 func (idp *identityProvider) Init(_ context.Context, params idp.InitParams) error {
 	idp.initParams = params

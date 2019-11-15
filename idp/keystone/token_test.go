@@ -40,6 +40,10 @@ func (s *tokenSuite) TestKeystoneTokenIdentityProviderInteractive(c *qt.C) {
 	c.Assert(s.idp.Interactive(), qt.Equals, false)
 }
 
+func (s *tokenSuite) TestKeystoneTokenIdentityProviderHidden(c *qt.C) {
+	c.Assert(s.idp.Hidden(), qt.Equals, false)
+}
+
 func (s *tokenSuite) TestKeystoneTokenIdentityProviderHandle(c *qt.C) {
 	var tok keystoneidp.Token
 	tok.Login.ID = "789"

@@ -47,6 +47,11 @@ func TestInteractive(t *testing.T) {
 	c.Assert(agent.IdentityProvider.Interactive(), qt.Equals, false)
 }
 
+func TestHidden(t *testing.T) {
+	c := qt.New(t)
+	c.Assert(agent.IdentityProvider.Hidden(), qt.Equals, false)
+}
+
 func TestURL(t *testing.T) {
 	c := qt.New(t)
 	u := agent.IdentityProvider.URL("1")

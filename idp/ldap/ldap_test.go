@@ -230,6 +230,18 @@ func (s *ldapSuite) TestInteractive(c *qt.C) {
 	c.Assert(idp.Interactive(), qt.Equals, true)
 }
 
+func (s *ldapSuite) TestHidden(c *qt.C) {
+	idp, err := ldap.NewIdentityProvider(getSampleParams())
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(idp.Hidden(), qt.Equals, false)
+
+	p := getSampleParams()
+	p.Hidden = true
+	idp, err = ldap.NewIdentityProvider(p)
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(idp.Hidden(), qt.Equals, true)
+}
+
 func (s *ldapSuite) TestURL(c *qt.C) {
 	i, err := ldap.NewIdentityProvider(getSampleParams())
 	c.Assert(err, qt.Equals, nil)
