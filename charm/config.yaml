@@ -26,7 +26,7 @@ options:
     description: Loggo logging configuration string.
   rendezvous-timeout:
     type: string
-    default: "1m"
+    default: "10m"
     description: |
       Amount of time that an interactive authentication request can
       be active before it is forgotten. The value must be a time duration
@@ -43,6 +43,12 @@ options:
     default: "48h"
     description: |
       The maximum age a discharge macaroon can get before it becomes
+      invalid.
+  discharge-token-timeout:
+    type: string
+    default: "48h"
+    description: |
+      The maximum age a discharge token can get before it becomes
       invalid.
   max-mgo-sessions:
     type: int
