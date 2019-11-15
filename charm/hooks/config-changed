@@ -54,13 +54,14 @@ def config_changed():
     for key in [
         'admin-agent-public-key',
         'admin-password',
+        'api-macaroon-timeout',
+        'discharge-macaroon-timeout',
+        'discharge-token-timeout',
         'http-proxy',
         'logging-config',
         'private-key',
         'public-key',
         'rendezvous-timeout',
-        'api-macaroon-timeout',
-        'discharge-macaroon-timeout',
     ]:
         app_config[key] = None if config[key] == '' else config[key]
 
