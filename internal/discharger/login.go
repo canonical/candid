@@ -136,7 +136,9 @@ func (h *handler) RedirectLogin(p httprequest.Params, req *redirectLoginRequest)
 			Icon:        idp.IconURL(),
 			URL:         idp.URL(state),
 		}
-		allIDPs = append(allIDPs, choice)
+		if !idp.Hidden() {
+			allIDPs = append(allIDPs, choice)
+		}
 		if req.Domain != "" && idp.Domain() == req.Domain {
 			idps = append(idps, choice)
 		}

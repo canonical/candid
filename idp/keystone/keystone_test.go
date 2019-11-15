@@ -70,6 +70,15 @@ func (s *keystoneSuite) TestKeystoneIdentityProviderInteractive(c *qt.C) {
 	c.Assert(s.idp.Interactive(), qt.Equals, true)
 }
 
+func (s *keystoneSuite) TestKeystoneIdentityProviderHidden(c *qt.C) {
+	c.Assert(s.idp.Hidden(), qt.Equals, false)
+
+	p := s.params
+	p.Hidden = true
+	idp := keystoneidp.NewIdentityProvider(p)
+	c.Assert(idp.Hidden(), qt.Equals, true)
+}
+
 func (s *keystoneSuite) TestKeystoneIdentityProviderUseNameForDescription(c *qt.C) {
 	p := s.params
 	p.Description = ""

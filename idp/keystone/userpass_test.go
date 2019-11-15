@@ -42,6 +42,10 @@ func (s *userpassSuite) TestKeystoneUserpassIdentityProviderInteractive(c *qt.C)
 	c.Assert(s.idp.Interactive(), qt.Equals, false)
 }
 
+func (s *userpassSuite) TestKeystoneUserpassIdentityProviderHidden(c *qt.C) {
+	c.Assert(s.idp.Hidden(), qt.Equals, false)
+}
+
 func (s *userpassSuite) TestKeystoneUserpassIdentityProviderHandle(c *qt.C) {
 	req, err := http.NewRequest("GET", "https://idp.test/login?did=1", nil)
 	c.Assert(err, qt.Equals, nil)

@@ -167,7 +167,7 @@ uses a previously obtained UbuntuSSO OAuth token to log in.
   domain: canonistack
   description: Canonistack
   url: https://keystone.canonistack.canonical.com:443/
-  
+  hidden: false
 ```
 
 The Keystone identity provider is an interactive identity provider
@@ -176,22 +176,26 @@ credentials.
 
 The Keystone identity provider has a number of additional options.
 
-The name parameter specifies the name of the provider, this should be
+The `name` parameter specifies the name of the provider, this should be
 a short name that reflects the name of the system being logged in to.
 The name is used in some URLS and is best if it consists only of
 lower-case letters.
 
-The domain is a string added to the names of users logging in through
+The `domain` is a string added to the names of users logging in through
 this identity provider. The user jsmith for example would be changed
 to jsmith@canonistack in the configuration above. If no domain is
 specified the username will remain unchanged.
 
-The description is optional and will be used if the identity provider
+The `description` is optional and will be used if the identity provider
 is presented in a human readable form, if this is not set the name
 will be used.
 
-The url is the location of the keystone server that will be used to
+The `url` is the location of the keystone server that will be used to
 authenticate the user.
+
+The `hidden` value is an optional value that can be used to not list
+this identity provider in the list of possible identity providers when
+performing an interactive login.
 
 ### Keystone Token
 ```yaml
@@ -200,7 +204,7 @@ authenticate the user.
   domain: canonistack
   description: Canonistack
   url: https://keystone.canonistack.canonical.com:443/
-  
+
 ```
 
 The Keystone Token identity provider is a custom identity provider
@@ -211,22 +215,22 @@ in horizon services to prevent a user having to log in twice.
 
 The Keystone Token identity provider has a number of additional options.
 
-The name parameter specifies the name of the provider. The name is
+The `name` parameter specifies the name of the provider. The name is
 used in some URLS and is best if it consists only of lower-case
 letters. The name "jujugui" can be used to indicate to a jujugui
 instance that this provider can be used to log in with an existing
 token.
 
-The domain is a string added to the names of users logging in through
+The `domain` is a string added to the names of users logging in through
 this identity provider. The user jsmith for example would be changed
 to jsmith@canonistack in the configuration above. If no domain is
 specified the username will remain unchanged.
 
-The description is optional and will be used if the identity provider
+The `description` is optional and will be used if the identity provider
 is presented in a human readable form, if this is not set the name
 will be used.
 
-The url is the location of the keystone server that will be used to
+The `url` is the location of the keystone server that will be used to
 authenticate the user.
 
 ### Keystone Userpass
@@ -248,21 +252,21 @@ web page access is not practical.
 The Keystone Userpass identity provider has a number of additional
 options.
 
-The name parameter specifies the name of the provider. The name is
+The `name` parameter specifies the name of the provider. The name is
 used in some URLS and is best if it consists only of lower-case
 letters. The name "form" can be used to indicate to clients that
 support the form protocol that the protocol can be used.
 
-The domain is a string added to the names of users logging in through
+The `domain` is a string added to the names of users logging in through
 this identity provider. The user jsmith for example would be changed
 to jsmith@canonistack in the configuration above. If no domain is
 specified the username will remain unchanged.
 
-The description is optional and will be used if the identity provider
+The `description` is optional and will be used if the identity provider
 is presented in a human readable form, if this is not set the name
 will be used.
 
-The url is the location of the keystone server that will be used to
+The `url` is the location of the keystone server that will be used to
 authenticate the user.
 
 ### Azure OpenID Connect
@@ -270,6 +274,7 @@ authenticate the user.
 - type: azure
   client-id: 43444f68-3666-4f95-bd34-6fc24b108019
   client-secret: tXV2SRFflAGT9sUdxkdIi7mwfmQ=
+  hidden: false
 ```
 
 The Azure identity provider uses OpenID Connect to log in using Microsoft
@@ -282,11 +287,16 @@ are created by registering the candid instance as an application at
 https://apps.dev.microsoft.com. When registering the application the
 redirect URLs should include `$CANDID_URL/login/azure/callback`.
 
+The `hidden` value is an optional value that can be used to not list
+this identity provider in the list of possible identity providers when
+performing an interactive login.
+
 ### Google OpenID Connect
 ```yaml
 - type: google
   client-id: 483156874216-rh0j89ltslhuqirk7deh70d3mp49kdvq.apps.googleusercontent.com
   client-secret: 8aENrwCL/+PU87ROkXwMB+09xe0=
+  hidden: false
 ```
 
 The Google identity provider uses OpenID Connect to log in using Google
@@ -299,6 +309,10 @@ are created by registering the candid instance as an application
 at https://console.developers.google.com/apis/credentials. When
 registering the application the authorized redirect URLs should include
 `$CANDID_URL/login/google/callback`.
+
+The `hidden` value is an optional value that can be used to not list
+this identity provider in the list of possible identity providers when
+performing an interactive login.
 
 ### LDAP
 ```yaml
@@ -326,6 +340,7 @@ registering the application the authorized redirect URLs should include
     email: mail
     display-name: displayName
   group-query-filter: (&(objectClass=groupOfNames)(member={{.User}}))
+  hidden: false
 ```
 
 The LDAP identity provider allows a user to login using an LDAP server.
@@ -374,6 +389,10 @@ group memberships for a user.  The filter is specified as a template
 will be replaced with the DN of the user for whom candid is attempting
 to find group memberships.
 
+The `hidden` value is an optional value that can be used to not list
+this identity provider in the list of possible identity providers when
+performing an interactive login.
+
 ### Static identity provider
 ```yaml
 - type: static
@@ -391,6 +410,7 @@ to find group memberships.
       email: user2@example.com
       password: password2
       groups: [group3, group4]
+  hidden: false
 ```
 
 The `static` identity provider is meant for testing and allows defining a set of
@@ -412,6 +432,10 @@ identity provider. If it is not set it will default to the value of
 
 `users` contains a static mapping of username to user entries for all
 of the users defined by the identity provider.
+
+The `hidden` value is an optional value that can be used to not list
+this identity provider in the list of possible identity providers when
+performing an interactive login.
 
 Charm Configuration
 -------------------

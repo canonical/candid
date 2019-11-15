@@ -102,6 +102,16 @@ func (s *staticSuite) TestInteractive(c *qt.C) {
 	c.Assert(idp.Interactive(), qt.Equals, true)
 }
 
+func (s *staticSuite) TestHidden(c *qt.C) {
+	idp := static.NewIdentityProvider(getSampleParams())
+	c.Assert(idp.Hidden(), qt.Equals, false)
+
+	p := getSampleParams()
+	p.Hidden = true
+	idp = static.NewIdentityProvider(p)
+	c.Assert(idp.Hidden(), qt.Equals, true)
+}
+
 func (s *staticSuite) TestHandle(c *qt.C) {
 	i := s.setupIdp(c, getSampleParams())
 	id, err := s.idptest.DoInteractiveLogin(c, i, idpPrefix+"/login", candidtest.PostLoginForm("user1", "pass1"))

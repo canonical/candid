@@ -73,6 +73,10 @@ type OpenIDConnectParams struct {
 
 	// ClientSecret is a client specific secret agreed with the issuer.
 	ClientSecret string `yaml:"client-secret"`
+
+	// Hidden is set if the IDP should be hidden from interactive
+	// prompts.
+	Hidden bool `yaml:"hidden"`
 }
 
 // NewOpenIDConnectIdentityProvider creates a new identity provider using
@@ -119,6 +123,11 @@ func (idp *openidConnectIdentityProvider) IconURL() string {
 // Interactive implements idp.IdentityProvider.Interactive.
 func (*openidConnectIdentityProvider) Interactive() bool {
 	return true
+}
+
+// Hidden implements idp.IdentityProvider.Hidden.
+func (idp *openidConnectIdentityProvider) Hidden() bool {
+	return idp.params.Hidden
 }
 
 // Init implements idp.IdentityProvider.Init by performing discovery on

@@ -69,6 +69,10 @@ func (s *ussooauthSuite) TestInteractive(c *qt.C) {
 	c.Assert(s.idp.Interactive(), qt.Equals, false)
 }
 
+func (s *ussooauthSuite) TestHidden(c *qt.C) {
+	c.Assert(s.idp.Hidden(), qt.Equals, false)
+}
+
 func (s *ussooauthSuite) TestURL(c *qt.C) {
 	t := s.idp.URL("1")
 	c.Assert(t, qt.Equals, "https://idp.test/login?id=1")

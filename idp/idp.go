@@ -106,6 +106,11 @@ type IdentityProvider interface {
 	// through a web browser).
 	Interactive() bool
 
+	// Hidden indicates that the IDP should not be listed on the
+	// interactive login page, unless it has specifically been
+	// requested (via a domain).
+	Hidden() bool
+
 	// Init is used to perform any one time initialization tasks that
 	// are needed for the identity provider. Init is called once by
 	// the identity manager once it has determined the identity

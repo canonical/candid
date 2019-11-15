@@ -97,6 +97,10 @@ func (s *ussoSuite) TestInteractive(c *qt.C) {
 	c.Assert(s.idp.Interactive(), qt.Equals, true)
 }
 
+func (s *ussoSuite) TestHidden(c *qt.C) {
+	c.Assert(s.idp.Hidden(), qt.Equals, false)
+}
+
 func (s *ussoSuite) TestURL(c *qt.C) {
 	c.Assert(s.idp.URL("1"), qt.Equals, "http://idp.example.com/login?state=1")
 }
