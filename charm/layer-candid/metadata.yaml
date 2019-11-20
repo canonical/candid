@@ -1,4 +1,5 @@
 name: candid
+display-name: candid
 summary: Candid identity server.
 maintainer: JAAS Developers <jaas-dev@lists.launchpad.net>
 description: |
@@ -17,18 +18,11 @@ peers:
 provides:
   website:
     interface: http
-  nrpe:
-    interface: nrpe-external-master
-    scope: container
-  prometheus:
-    interface: prometheus
 requires:
-  mongodb:
-    interface: mongodb
   postgres:
     interface: pgsql
 resources:
-  service:
+  candid-snap:
     type: file
-    filename: candidsrv.tar.xz
-    description: "candid release tarball."
+    filename: candid.snap
+    description: "Candid snap file"

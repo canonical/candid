@@ -1,6 +1,0 @@
-repo: https://github.com/juju/charm-helpers
-destination: hooks/charmhelpers
-include:
-  - contrib.charmsupport.nrpe
-  - core
-  - osplatform
