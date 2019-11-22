@@ -1,0 +1,77 @@
+options:
+  admin-agent-public-key:
+    type: string
+    default: ""
+    description: |
+      Base64 encoded 256-bit Ed25519 public key for admin agent.
+  api-macaroon-timeout:
+    type: string
+    default: "48h"
+    description: |
+      The maximum age an API macaroon can get before requiring 
+      re-authorization.
+  discharge-macaroon-timeout:
+    type: string
+    default: "48h"
+    description: |
+      The maximum age a discharge macaroon can get before it becomes
+      invalid.
+  discharge-token-timeout:
+    type: string
+    default: "48h"
+    description: |
+      The maximum age a discharge token can get before it becomes
+      invalid.
+  http-proxy:
+    type: string
+    default: ""
+    description:
+      Address of proxy to use for outgoing HTTP connections.
+  identity-providers:
+    type: string
+    default: ""
+    description: |
+     This is a Base64 encoded YAML array
+     containing the identity provider definition. See
+     https://github.com/CanonicalLtd/candid/blob/master/docs/configuration.md#identity-providers-1
+     for a full list of possible options.
+  location:
+    type: string
+    default: ""
+    description: |
+      Publicly accessable URL of the identity manager (defaults to public
+      address of unit).
+  logging-config:
+    type: string
+    default: INFO
+    description: Loggo logging configuration string.
+  no-proxy:
+    type: string
+    default: ""
+    description: |
+      List of addresses that should not use the proxy specified in http-proxy.
+      If specified this should be a comma-separated list of addresses.
+  private-key:
+    type: string
+    default: ""
+    description: Base64 encoded 256-bit Ed25519 private key of the server.
+  public-key:
+    type: string
+    default: ""
+    description: |
+      Base64 encoded 256-bit Ed25519 public key, this should match the
+      private key.
+  redirect-login-whitelist:
+    type: string
+    default: ""
+    description: |
+      List of addresses that are whitelisted to return to when using
+      the redirect login flow.
+  rendezvous-timeout:
+    type: string
+    default: "10m"
+    description: |
+      Amount of time that an interactive authentication request can
+      be active before it is forgotten. The value must be a time duration
+      specified as a decimal number followed by a unit from ns, us,
+      ms, s, m, h for the time units between nanosecond and hour.

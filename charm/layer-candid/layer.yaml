@@ -1,0 +1,13 @@
+repo: https://github.com/CanonicalLtd/candid
+includes:
+- interface:candid
+- interface:http
+- interface:pgsql
+- layer:basic
+- layer:leadership
+- layer:nagios
+- layer:snap
+options:
+  snap:
+    candid:
+      channel: stable

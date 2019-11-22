@@ -1,25 +1,16 @@
-.PHONY: build
-build: hooks/charmhelpers
+CHARM=/snap/bin/charm
 
-hooks/charmhelpers: charm-helpers.yaml
-	./charm_helpers_sync.py -c charm-helpers.yaml
+.PHONY: build
+build:
+	CHARM_INTERFACES_DIR=interfaces $(CHARM) build --build-dir build layer-candid
 
 .PHONY: lint
 lint:
 	@# ls -d hooks/* | grep -v -E '/(install|charmhelpers)$'
 	flake8 \
-		hooks/config-changed \
-		hooks/install.py \
-		hooks/jaascharm.py \
-		hooks/mongodb-relation-changed \
-		hooks/nrpe-relation-changed \
-		hooks/postgres-relation-changed \
-		hooks/status.py \
-		hooks/stop \
-		hooks/update-status \
-		hooks/upgrade-charm \
-		hooks/website-relation-joined \
+		layer-candid/reactive/candid.py \
+		layer-candid/lib/charms/layer/candid.py
 			
 .PHONY: clean
 clean:
-	-rm -rf hooks/charmhelpers
+	-rm -rf build
