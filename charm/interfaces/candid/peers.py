@@ -33,6 +33,6 @@ class CandidPeer(Endpoint):
         This list is de-duplicated and sorted by address, so it will be stable
         for change comparison.
         """
-        addrs = {u.recieved_raw['private-address']
+        addrs = {u.received_raw['private-address']
                  for u in self.all_joined_units}
         return list(sorted(addrs))

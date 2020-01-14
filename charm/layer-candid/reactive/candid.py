@@ -66,7 +66,7 @@ def write_config_file():
             no_proxy = no_proxy[1:]
         ep = endpoint_from_flag('candid.connected')
         if ep:
-            no_proxy.extend(ep.addresses())
+            no_proxy.extend(ep.addresses)
         config["no-proxy"] = ",".join(no_proxy)
     if cc["identity-providers"]:
         try:
