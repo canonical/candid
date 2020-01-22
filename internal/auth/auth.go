@@ -24,9 +24,10 @@ import (
 var logger = loggo.GetLogger("candid.internal.auth")
 
 const (
-	AdminUsername     = "admin@candid"
-	SSHKeyGetterGroup = "sshkeygetter@candid"
-	GroupListGroup    = "grouplist@candid"
+	AdminUsername        = "admin@candid"
+	SSHKeyGetterGroup    = "sshkeygetter@candid"
+	GroupListGroup       = "grouplist@candid"
+	UserInformationGroup = "userinfo@candid"
 )
 
 var AdminProviderID = store.MakeProviderIdentity("idm", "admin")
@@ -65,9 +66,9 @@ const (
 
 var aclDefaults = map[string][]string{
 	dischargeForUserACL: {AdminUsername},
-	readUserACL:         {AdminUsername},
-	readUserGroupsACL:   {AdminUsername, GroupListGroup},
-	readUserSSHKeysACL:  {AdminUsername, SSHKeyGetterGroup},
+	readUserACL:         {AdminUsername, UserInformationGroup},
+	readUserGroupsACL:   {AdminUsername, GroupListGroup, UserInformationGroup},
+	readUserSSHKeysACL:  {AdminUsername, SSHKeyGetterGroup, UserInformationGroup},
 	writeUserACL:        {AdminUsername},
 	writeUserSSHKeysACL: {AdminUsername},
 }
