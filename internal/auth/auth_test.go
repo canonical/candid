@@ -217,7 +217,7 @@ var aclForOpTests = []struct {
 	op: op("other", "read"),
 }, {
 	op:           auth.GlobalOp("read"),
-	expect:       []string{auth.AdminUsername},
+	expect:       []string{auth.AdminUsername, auth.UserInformationGroup},
 	expectPublic: false,
 }, {
 	op:           auth.GlobalOp("verify"),
@@ -244,22 +244,22 @@ var aclForOpTests = []struct {
 	op: auth.UserOp("", "read"),
 }, {
 	op:     auth.UserOp("bob", "read"),
-	expect: []string{"bob", auth.AdminUsername},
+	expect: []string{"bob", auth.AdminUsername, auth.UserInformationGroup},
 }, {
 	op:     auth.UserOp("bob", "readAdmin"),
-	expect: []string{auth.AdminUsername},
+	expect: []string{auth.AdminUsername, auth.UserInformationGroup},
 }, {
 	op:     auth.UserOp("bob", "writeAdmin"),
 	expect: []string{auth.AdminUsername},
 }, {
 	op:     auth.UserOp("bob", "readGroups"),
-	expect: []string{"bob", auth.AdminUsername, auth.GroupListGroup},
+	expect: []string{"bob", auth.AdminUsername, auth.GroupListGroup, auth.UserInformationGroup},
 }, {
 	op:     auth.UserOp("bob", "writeGroups"),
 	expect: []string{auth.AdminUsername},
 }, {
 	op:     auth.UserOp("bob", "readSSHKeys"),
-	expect: []string{"bob", auth.AdminUsername, auth.SSHKeyGetterGroup},
+	expect: []string{"bob", auth.AdminUsername, auth.SSHKeyGetterGroup, auth.UserInformationGroup},
 }, {
 	op:     auth.UserOp("bob", "writeSSHKeys"),
 	expect: []string{"bob", auth.AdminUsername},

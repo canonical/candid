@@ -50,7 +50,7 @@ func (s *aclSuite) TestACLGrant(c *qt.C) {
 	s.fixture.CheckNoOutput(c, "-a", "admin.agent", "acl", "grant", "read-user", "alice", "bob")
 	acl, err := s.fixture.server.ACLStore.Get(context.Background(), "read-user")
 	c.Assert(err, qt.Equals, nil)
-	c.Assert(acl, qt.DeepEquals, []string{"admin@candid", "alice", "bob"})
+	c.Assert(acl, qt.DeepEquals, []string{"admin@candid", "alice", "bob", "userinfo@candid"})
 }
 
 func (s *aclSuite) TestACLGrantNoArguments(c *qt.C) {
