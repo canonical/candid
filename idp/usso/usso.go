@@ -49,6 +49,9 @@ type Params struct {
 
 	// Icon contains the URL or path of an icon.
 	Icon string `yaml:"icon"`
+
+	// Staging enables using the staging login and launchpad servers.
+	Staging bool
 }
 
 // NewIdentityProvider creates a new LDAP identity provider.
@@ -107,8 +110,12 @@ func (*identityProvider) Hidden() bool {
 // Init initialises this identity provider
 func (idp *identityProvider) Init(_ context.Context, params idp.InitParams) error {
 	idp.initParams = params
+	srv := usso.ProductionUbuntuSSOServer
+	if idp.params.Staging {
+		srv = usso.StagingUbuntuSSOServer
+	}
 	idp.client = openid.NewClient(
-		usso.ProductionUbuntuSSOServer,
+		srv,
 		kvnoncestore.New(params.KeyValueStore, time.Minute),
 		nil,
 	)
@@ -248,7 +255,11 @@ func (idp *identityProvider) GetGroups(_ context.Context, id *store.Identity) ([
 // getLaunchpadGroups tries to fetch the list of teams the user
 // belongs to in launchpad. Only public teams are supported.
 func (idp *identityProvider) getLaunchpadGroupsNoCache(ussoID string) ([]string, error) {
-	root, err := lpad.Login(lpad.Production, &lpad.OAuth{Consumer: "idm", Anonymous: true})
+	srv := lpad.Production
+	if idp.params.Staging {
+		srv = lpad.Staging
+	}
+	root, err := lpad.Login(srv, &lpad.OAuth{Consumer: "idm", Anonymous: true})
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot connect to launchpad")
 	}
@@ -269,7 +280,14 @@ func (idp *identityProvider) getLaunchpadGroupsNoCache(ussoID string) ([]string,
 }
 
 func (idp *identityProvider) getLaunchpadPersonByOpenID(root *lpad.Root, ussoID string) (*lpad.Person, error) {
-	launchpadID := "https://login.launchpad.net/+id/" + strings.TrimPrefix(ussoID, "https://login.ubuntu.com/+id/")
+	lpPrefix := "https://login.launchpad.net/+id/"
+	ussoPrefix := "https://login.ubuntu.com/+id/"
+	if idp.params.Staging {
+		lpPrefix = "https://login-lp.staging.ubuntu.com/+id/"
+		ussoPrefix = "https://login.staging.ubuntu.com/+id/"
+	}
+
+	launchpadID := lpPrefix + strings.TrimPrefix(ussoID, ussoPrefix)
 	v, err := root.Location("/people").Get(lpad.Params{"ws.op": "getByOpenIDIdentifier", "identifier": launchpadID})
 	// TODO if err == lpad.ErrNotFound, return a not found error
 	// so that we won't round-trip to launchpad for users that don't exist there.
