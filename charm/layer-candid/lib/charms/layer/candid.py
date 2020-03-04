@@ -17,10 +17,9 @@ def generate_keypair():
         if a keypair is not explicitely configured. """
     res = subprocess.run(
         ("/snap/candid/current/bin/bakery-keygen", ),
-        stdout=subprocess.PIPE,
-        encoding="utf-8")
+        stdout=subprocess.PIPE)
     res.check_returncode()
-    return json.loads(res.stdout)
+    return json.loads(res.stdout.decode('utf-8'))
 
 
 def parse_identity_providers(idps):
