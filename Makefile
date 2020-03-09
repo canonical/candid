@@ -4,6 +4,7 @@
 
 GIT_COMMIT := $(shell git rev-parse --verify HEAD)
 GIT_VERSION := $(shell git describe --dirty)
+ARCH := $(shell dpkg --print-architecture)
 
 DEPENDENCIES := build-essential bzr
 SNAP_DEPENDENCIES := go snapcraft
@@ -15,8 +16,6 @@ build: version/init.go
 
 check: version/init.go
 	go test ./...
-
-release: candid-$(GIT_VERSION).tar.xz
 
 install: version/init.go
 	go install $(INSTALL_FLAGS) -v ./...
@@ -46,27 +45,15 @@ version/init.go: version/init.go.tmpl FORCE
 	gofmt -r "unknownVersion -> Version{GitCommit: \"${GIT_COMMIT}\", Version: \"${GIT_VERSION}\",}" $< >$@
 
 # Generate snaps
-snap:
+candid_$(GIT_VERSION)_$(ARCH).snap:
 	snapcraft
 
 RELEASE_BINARY_PACKAGES=./cmd/candidsrv
 
-# Build a release tarball
-candid-$(GIT_VERSION).tar.xz: version/init.go
-	rm -rf candid-release
-	mkdir -p candid-release
-	GOBIN=$(CURDIR)/candid-release/bin go install $(INSTALL_FLAGS) -v $(RELEASE_BINARY_PACKAGES)
-	cp -r $(CURDIR)/templates candid-release
-	cp -r $(CURDIR)/static candid-release
-	@# Note: we need to redirect the "cd" below because
-	@# it can print things and hence corrupt the tar archive.
-	(cd candid-release >/dev/null 2>&1;  tar c *) | xz > $@
-	-rm -r candid-release
-
 .PHONY: deploy
-deploy: release
+deploy: candid_$(GIT_VERSION)_$(ARCH).snap
 	$(MAKE) -C charm build
-	juju deploy -v ./charm --resource service=candid-$(GIT_VERSION).tar.xz
+	juju deploy -v ./charm/build/candid --resource candid=candid_$(GIT_VERSION)_$(ARCH).snap
 
 # Install packages required to develop the candid service and run tests.
 APT_BASED := $(shell command -v apt-get >/dev/null; echo $$?)
@@ -86,13 +73,12 @@ help:
 	@echo 'make - Build the package.'
 	@echo 'make check - Run tests.'
 	@echo 'make install - Install the package.'
-	@echo 'make release - Build a binary tarball of the package.'
 	@echo 'make server - Start the candid server.'
 	@echo 'make clean - Remove object files from package source directories.'
 	@echo 'make sysdeps - Install the development environment system packages.'
 	@echo 'make format - Format the source files.'
 	@echo 'make simplify - Format and simplify the source files.'
 
-.PHONY: build check install clean format release server simplify snap sysdeps help FORCE
+.PHONY: build check install clean format server simplify snap sysdeps help FORCE
 
 FORCE:

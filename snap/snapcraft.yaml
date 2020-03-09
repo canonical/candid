@@ -4,6 +4,7 @@ summary: Candid Identity Manager
 description: Candid Identity Manager
 grade: stable
 confinement: strict
+base: core
 
 apps:
   candidsrv:
@@ -48,6 +49,7 @@ parts:
 
   jq:
     plugin: dump
+    source: .
     stage-packages:
      - jq
     organize:
