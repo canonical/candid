@@ -22,7 +22,7 @@ requires:
   postgres:
     interface: pgsql
 resources:
-  candid-snap:
+  candid:
     type: file
     filename: candid.snap
     description: "Candid snap file"
