@@ -15,12 +15,12 @@ import (
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
 	"gopkg.in/macaroon-bakery.v2/httpbakery/form"
 
-	"github.com/CanonicalLtd/candid/idp"
-	"github.com/CanonicalLtd/candid/idp/keystone"
-	"github.com/CanonicalLtd/candid/idp/keystone/internal/mockkeystone"
-	"github.com/CanonicalLtd/candid/internal/candidtest"
-	"github.com/CanonicalLtd/candid/internal/discharger"
-	"github.com/CanonicalLtd/candid/internal/identity"
+	"github.com/canonical/candid/idp"
+	"github.com/canonical/candid/idp/keystone"
+	"github.com/canonical/candid/idp/keystone/internal/mockkeystone"
+	"github.com/canonical/candid/internal/candidtest"
+	"github.com/canonical/candid/internal/discharger"
+	"github.com/canonical/candid/internal/identity"
 )
 
 type dischargeSuite struct {

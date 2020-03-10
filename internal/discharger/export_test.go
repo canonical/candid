@@ -6,9 +6,9 @@ package discharger
 import (
 	"github.com/juju/simplekv"
 
-	"github.com/CanonicalLtd/candid/idp"
-	"github.com/CanonicalLtd/candid/internal/discharger/internal"
-	"github.com/CanonicalLtd/candid/internal/identity"
+	"github.com/canonical/candid/idp"
+	"github.com/canonical/candid/internal/discharger/internal"
+	"github.com/canonical/candid/internal/identity"
 )
 
 var NewIDPHandler = newIDPHandler

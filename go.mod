@@ -1,4 +1,4 @@
-module github.com/CanonicalLtd/candid
+module github.com/canonical/candid
 
 require (
 	github.com/BurntSushi/toml v0.3.1 // indirect

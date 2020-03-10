@@ -6,8 +6,8 @@ import (
 	"github.com/juju/utils/debugstatus"
 	"gopkg.in/macaroon-bakery.v2/bakery"
 
-	"github.com/CanonicalLtd/candid/meeting"
-	"github.com/CanonicalLtd/candid/store"
+	"github.com/canonical/candid/meeting"
+	"github.com/canonical/candid/store"
 )
 
 func init() {

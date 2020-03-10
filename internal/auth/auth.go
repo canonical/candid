@@ -17,8 +17,8 @@ import (
 	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
 	macaroon "gopkg.in/macaroon.v2"
 
-	"github.com/CanonicalLtd/candid/idp"
-	"github.com/CanonicalLtd/candid/store"
+	"github.com/canonical/candid/idp"
+	"github.com/canonical/candid/store"
 )
 
 var logger = loggo.GetLogger("candid.internal.auth")

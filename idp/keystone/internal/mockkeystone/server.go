@@ -11,7 +11,7 @@ import (
 	"github.com/julienschmidt/httprouter"
 	"gopkg.in/httprequest.v1"
 
-	"github.com/CanonicalLtd/candid/idp/keystone/internal/keystone"
+	"github.com/canonical/candid/idp/keystone/internal/keystone"
 )
 
 // Server provides a mock keystone server for use in tests.

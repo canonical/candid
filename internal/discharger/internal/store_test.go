@@ -14,9 +14,9 @@ import (
 	errgo "gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
 
-	"github.com/CanonicalLtd/candid/internal/candidtest"
-	"github.com/CanonicalLtd/candid/internal/discharger/internal"
-	"github.com/CanonicalLtd/candid/store"
+	"github.com/canonical/candid/internal/candidtest"
+	"github.com/canonical/candid/internal/discharger/internal"
+	"github.com/canonical/candid/store"
 )
 
 func TestStore(t *testing.T) {

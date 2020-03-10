@@ -15,7 +15,7 @@ import (
 	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
 
-	"github.com/CanonicalLtd/candid/internal/auth"
+	"github.com/canonical/candid/internal/auth"
 )
 
 // An Authorizer is used to authorize HTTP requests.

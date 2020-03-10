@@ -25,11 +25,11 @@ import (
 	"gopkg.in/macaroon-bakery.v2/bakery"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
 
-	"github.com/CanonicalLtd/candid/idp"
-	"github.com/CanonicalLtd/candid/idp/idputil"
-	"github.com/CanonicalLtd/candid/idp/idputil/secret"
-	"github.com/CanonicalLtd/candid/internal/candidtest"
-	"github.com/CanonicalLtd/candid/store"
+	"github.com/canonical/candid/idp"
+	"github.com/canonical/candid/idp/idputil"
+	"github.com/canonical/candid/idp/idputil/secret"
+	"github.com/canonical/candid/internal/candidtest"
+	"github.com/canonical/candid/store"
 )
 
 // Fixture provides a test fixture that is helpful for testing identity

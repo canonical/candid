@@ -1,5 +1,5 @@
 language: go
-go_import_path: "github.com/CanonicalLtd/candid"
+go_import_path: "github.com/canonical/candid"
 go: 
   - "1.11.5"
 script: GO111MODULE=on go test ./...

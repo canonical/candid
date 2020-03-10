@@ -26,10 +26,10 @@ import (
 	"gopkg.in/macaroon-bakery.v2/httpbakery/agent"
 	"gopkg.in/macaroon.v2"
 
-	"github.com/CanonicalLtd/candid/internal/auth"
-	"github.com/CanonicalLtd/candid/internal/auth/httpauth"
-	"github.com/CanonicalLtd/candid/internal/identity"
-	"github.com/CanonicalLtd/candid/store"
+	"github.com/canonical/candid/internal/auth"
+	"github.com/canonical/candid/internal/auth/httpauth"
+	"github.com/canonical/candid/internal/identity"
+	"github.com/canonical/candid/store"
 )
 
 // thirdPartyCaveatChecker implements an

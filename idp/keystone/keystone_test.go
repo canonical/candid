@@ -11,11 +11,11 @@ import (
 	"github.com/frankban/quicktest/qtsuite"
 	yaml "gopkg.in/yaml.v2"
 
-	"github.com/CanonicalLtd/candid/config"
-	keystoneidp "github.com/CanonicalLtd/candid/idp/keystone"
-	"github.com/CanonicalLtd/candid/idp/keystone/internal/keystone"
-	"github.com/CanonicalLtd/candid/internal/candidtest"
-	"github.com/CanonicalLtd/candid/store"
+	"github.com/canonical/candid/config"
+	keystoneidp "github.com/canonical/candid/idp/keystone"
+	"github.com/canonical/candid/idp/keystone/internal/keystone"
+	"github.com/canonical/candid/internal/candidtest"
+	"github.com/canonical/candid/store"
 )
 
 type keystoneSuite struct {

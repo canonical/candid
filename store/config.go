@@ -6,7 +6,7 @@ import (
 	errgo "gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery"
 
-	"github.com/CanonicalLtd/candid/meeting"
+	"github.com/canonical/candid/meeting"
 )
 
 var backends = make(map[string]func(func(interface{}) error) (BackendFactory, error))

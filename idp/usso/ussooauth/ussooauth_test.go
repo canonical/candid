@@ -13,13 +13,13 @@ import (
 	"github.com/garyburd/go-oauth/oauth"
 	"gopkg.in/yaml.v2"
 
-	"github.com/CanonicalLtd/candid/config"
-	"github.com/CanonicalLtd/candid/idp"
-	"github.com/CanonicalLtd/candid/idp/idptest"
-	"github.com/CanonicalLtd/candid/idp/usso/internal/mockusso"
-	"github.com/CanonicalLtd/candid/idp/usso/ussooauth"
-	"github.com/CanonicalLtd/candid/internal/candidtest"
-	"github.com/CanonicalLtd/candid/store"
+	"github.com/canonical/candid/config"
+	"github.com/canonical/candid/idp"
+	"github.com/canonical/candid/idp/idptest"
+	"github.com/canonical/candid/idp/usso/internal/mockusso"
+	"github.com/canonical/candid/idp/usso/ussooauth"
+	"github.com/canonical/candid/internal/candidtest"
+	"github.com/canonical/candid/store"
 )
 
 func TestConfig(t *testing.T) {
