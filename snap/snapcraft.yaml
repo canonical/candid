@@ -43,8 +43,8 @@ parts:
       GIT_VERSION=`git -C $SNAPCRAFT_PART_SRC describe --dirty`
       cp version/init.go.tmpl version/init.go
       gofmt -w -r "unknownVersion -> Version{GitCommit: \"${GIT_COMMIT}\", Version: \"${GIT_VERSION}\",}" version/init.go
-      GOBIN=${SNAPCRAFT_PART_INSTALL}/bin/ go install github.com/CanonicalLtd/candid/cmd/candid
-      GOBIN=${SNAPCRAFT_PART_INSTALL}/bin/ go install github.com/CanonicalLtd/candid/cmd/candidsrv
+      GOBIN=${SNAPCRAFT_PART_INSTALL}/bin/ go install github.com/canonical/candid/cmd/candid
+      GOBIN=${SNAPCRAFT_PART_INSTALL}/bin/ go install github.com/canonical/candid/cmd/candidsrv
       GOBIN=${SNAPCRAFT_PART_INSTALL}/bin/ go install gopkg.in/macaroon-bakery.v2/cmd/bakery-keygen
 
   jq:
