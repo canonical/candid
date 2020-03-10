@@ -19,7 +19,7 @@ import (
 	"gopkg.in/errgo.v1"
 	"gopkg.in/httprequest.v1"
 
-	"github.com/CanonicalLtd/candid/store"
+	"github.com/canonical/candid/store"
 )
 
 var logger = loggo.GetLogger("candid.idp.idputil")

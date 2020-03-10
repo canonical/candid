@@ -12,13 +12,13 @@ import (
 	"github.com/juju/qthttptest"
 	yaml "gopkg.in/yaml.v2"
 
-	"github.com/CanonicalLtd/candid"
-	"github.com/CanonicalLtd/candid/config"
-	"github.com/CanonicalLtd/candid/idp"
-	_ "github.com/CanonicalLtd/candid/idp/agent"
-	_ "github.com/CanonicalLtd/candid/idp/static"
-	"github.com/CanonicalLtd/candid/internal/candidtest"
-	"github.com/CanonicalLtd/candid/version"
+	"github.com/canonical/candid"
+	"github.com/canonical/candid/config"
+	"github.com/canonical/candid/idp"
+	_ "github.com/canonical/candid/idp/agent"
+	_ "github.com/canonical/candid/idp/static"
+	"github.com/canonical/candid/internal/candidtest"
+	"github.com/canonical/candid/version"
 )
 
 func TestServer(t *testing.T) {

@@ -11,9 +11,9 @@ import (
 	"gopkg.in/macaroon-bakery.v2/bakery"
 	mgo "gopkg.in/mgo.v2"
 
-	"github.com/CanonicalLtd/candid/cmd/migrate-db/internal/mongodoc"
-	"github.com/CanonicalLtd/candid/internal/auth"
-	"github.com/CanonicalLtd/candid/store"
+	"github.com/canonical/candid/cmd/migrate-db/internal/mongodoc"
+	"github.com/canonical/candid/internal/auth"
+	"github.com/canonical/candid/store"
 )
 
 const (

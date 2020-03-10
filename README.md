@@ -6,7 +6,7 @@ The Candid server provides a macaroon-based authentication service.
 
 The easiest way to start using the candid service is with the snap:
 
-    snap install candid --edge
+    snap install candid
 
 The configuration file used by the snap can be found in
 `/var/snap/candid/current/config.yaml`.
@@ -26,9 +26,9 @@ that it can fetch and build candid dependencies:
 
 ### Source
 
-Get the source from `github.com/CanoniclaLtd/candid`.
+Get the source from `github.com/canonical/candid`.
 
-    git clone git@github.com:CanonicalLtd/candid
+    git clone https://github.com/canonical/candid
 
 It is recommended that you check out the source outside of any `$GOPATH`
 (`$HOME/go` by default). If you do wish to check out into a `$GOPATH`
@@ -36,12 +36,15 @@ then you will need to set the environment variable `GO111MODULE=on`.
 
 ### Testing
 
-The store/mgostore component additionally requires mongodb to be
-installed, this should be installed from the system packages:
+The `store/mgostore` component additionally requires a running mongodb
+server, this may be running on a different system. The location of the
+mongodb server should be specified in an environment variable called
+`MGOCONNECTIONSTRING`, if this does not exist then the standard
+port (27017) on localhost will be assumed. To disable testing of
+`store/mgostore` completely then set the environment variable
+`MGOTESTDISABLE=1`.
 
-    apt install mongodb
-
-The store/sqlstore component additionally requires a running
+The `store/sqlstore` component additionally requires a running
 postgresql, this may be running on a different system. The posgresql
 system to use is specified using the standard postgresql [environment
 variables](https://www.postgresql.org/docs/10/static/libpq-envars.html).

@@ -15,9 +15,9 @@ import (
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
 
-	"github.com/CanonicalLtd/candid/idp"
-	"github.com/CanonicalLtd/candid/idp/idputil"
-	"github.com/CanonicalLtd/candid/store"
+	"github.com/canonical/candid/idp"
+	"github.com/canonical/candid/idp/idputil"
+	"github.com/canonical/candid/store"
 )
 
 var logger = loggo.GetLogger("candid.idp.static")

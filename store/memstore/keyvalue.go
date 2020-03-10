@@ -10,7 +10,7 @@ import (
 	"github.com/juju/simplekv"
 	"github.com/juju/simplekv/memsimplekv"
 
-	"github.com/CanonicalLtd/candid/store"
+	"github.com/canonical/candid/store"
 )
 
 // NewProviderDataStore creates a new in-memory store.ProviderDataStore.

@@ -13,7 +13,7 @@ import (
 	"gopkg.in/httprequest.v1"
 	"gopkg.in/macaroon-bakery.v2/httpbakery/agent"
 
-	"github.com/CanonicalLtd/candid/idp/idputil"
+	"github.com/canonical/candid/idp/idputil"
 )
 
 // legacyLoginRequest is a request to start a login to the identity manager

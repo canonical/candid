@@ -6,12 +6,12 @@ package keystone_test
 import (
 	qt "github.com/frankban/quicktest"
 
-	"github.com/CanonicalLtd/candid/idp"
-	"github.com/CanonicalLtd/candid/idp/idptest"
-	keystoneidp "github.com/CanonicalLtd/candid/idp/keystone"
-	"github.com/CanonicalLtd/candid/idp/keystone/internal/keystone"
-	"github.com/CanonicalLtd/candid/idp/keystone/internal/mockkeystone"
-	"github.com/CanonicalLtd/candid/internal/candidtest"
+	"github.com/canonical/candid/idp"
+	"github.com/canonical/candid/idp/idptest"
+	keystoneidp "github.com/canonical/candid/idp/keystone"
+	"github.com/canonical/candid/idp/keystone/internal/keystone"
+	"github.com/canonical/candid/idp/keystone/internal/mockkeystone"
+	"github.com/canonical/candid/internal/candidtest"
 )
 
 const idpPrefix = "https://idp.example.com"

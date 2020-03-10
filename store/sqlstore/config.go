@@ -5,7 +5,7 @@ import (
 
 	errgo "gopkg.in/errgo.v1"
 
-	"github.com/CanonicalLtd/candid/store"
+	"github.com/canonical/candid/store"
 )
 
 // Params holds the specification for the parameters

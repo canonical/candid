@@ -31,13 +31,13 @@ import (
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
 	"gopkg.in/macaroon.v2"
 
-	"github.com/CanonicalLtd/candid/idp"
-	"github.com/CanonicalLtd/candid/idp/static"
-	"github.com/CanonicalLtd/candid/internal/auth"
-	"github.com/CanonicalLtd/candid/internal/candidtest"
-	"github.com/CanonicalLtd/candid/internal/discharger"
-	"github.com/CanonicalLtd/candid/internal/identity"
-	"github.com/CanonicalLtd/candid/store"
+	"github.com/canonical/candid/idp"
+	"github.com/canonical/candid/idp/static"
+	"github.com/canonical/candid/internal/auth"
+	"github.com/canonical/candid/internal/candidtest"
+	"github.com/canonical/candid/internal/discharger"
+	"github.com/canonical/candid/internal/identity"
+	"github.com/canonical/candid/store"
 )
 
 var groupOp = bakery.Op{"group", "group"}

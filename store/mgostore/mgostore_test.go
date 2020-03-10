@@ -11,10 +11,10 @@ import (
 	"github.com/juju/mgotest"
 	errgo "gopkg.in/errgo.v1"
 
-	"github.com/CanonicalLtd/candid/meeting"
-	"github.com/CanonicalLtd/candid/store"
-	"github.com/CanonicalLtd/candid/store/mgostore"
-	"github.com/CanonicalLtd/candid/store/storetest"
+	"github.com/canonical/candid/meeting"
+	"github.com/canonical/candid/store"
+	"github.com/canonical/candid/store/mgostore"
+	"github.com/canonical/candid/store/storetest"
 )
 
 func TestKeyValueStore(t *testing.T) {

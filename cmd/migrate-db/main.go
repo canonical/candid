@@ -15,10 +15,10 @@ import (
 	errgo "gopkg.in/errgo.v1"
 	mgo "gopkg.in/mgo.v2"
 
-	"github.com/CanonicalLtd/candid/cmd/migrate-db/internal"
-	"github.com/CanonicalLtd/candid/store"
-	"github.com/CanonicalLtd/candid/store/mgostore"
-	"github.com/CanonicalLtd/candid/store/sqlstore"
+	"github.com/canonical/candid/cmd/migrate-db/internal"
+	"github.com/canonical/candid/store"
+	"github.com/canonical/candid/store/mgostore"
+	"github.com/canonical/candid/store/sqlstore"
 )
 
 var (

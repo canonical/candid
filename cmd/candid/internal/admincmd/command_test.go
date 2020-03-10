@@ -14,10 +14,10 @@ import (
 	"github.com/juju/cmd"
 	"gopkg.in/macaroon-bakery.v2/httpbakery/agent"
 
-	"github.com/CanonicalLtd/candid/candidtest"
-	"github.com/CanonicalLtd/candid/cmd/candid/internal/admincmd"
-	internalcandidtest "github.com/CanonicalLtd/candid/internal/candidtest"
-	"github.com/CanonicalLtd/candid/store"
+	"github.com/canonical/candid/candidtest"
+	"github.com/canonical/candid/cmd/candid/internal/admincmd"
+	internalcandidtest "github.com/canonical/candid/internal/candidtest"
+	"github.com/canonical/candid/store"
 )
 
 type fixture struct {

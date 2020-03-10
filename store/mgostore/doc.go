@@ -10,7 +10,7 @@ import (
 	"gopkg.in/macaroon-bakery.v2/bakery"
 	"gopkg.in/mgo.v2/bson"
 
-	"github.com/CanonicalLtd/candid/store"
+	"github.com/canonical/candid/store"
 )
 
 var logger = loggo.GetLogger("candid.store.mgostore")

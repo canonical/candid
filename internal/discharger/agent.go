@@ -18,8 +18,8 @@ import (
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
 	"gopkg.in/macaroon-bakery.v2/httpbakery/agent"
 
-	"github.com/CanonicalLtd/candid/internal/auth"
-	"github.com/CanonicalLtd/candid/store"
+	"github.com/canonical/candid/internal/auth"
+	"github.com/canonical/candid/store"
 )
 
 const (

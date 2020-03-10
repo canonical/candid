@@ -15,8 +15,8 @@ import (
 	"gopkg.in/macaroon-bakery.v2/bakery/mgorootkeystore"
 	mgo "gopkg.in/mgo.v2"
 
-	"github.com/CanonicalLtd/candid/meeting"
-	"github.com/CanonicalLtd/candid/store"
+	"github.com/canonical/candid/meeting"
+	"github.com/canonical/candid/store"
 )
 
 const aclsCollection = "acls"

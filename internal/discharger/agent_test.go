@@ -22,9 +22,9 @@ import (
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
 	"gopkg.in/macaroon-bakery.v2/httpbakery/agent"
 
-	"github.com/CanonicalLtd/candid/internal/candidtest"
-	"github.com/CanonicalLtd/candid/internal/discharger"
-	"github.com/CanonicalLtd/candid/internal/identity"
+	"github.com/canonical/candid/internal/candidtest"
+	"github.com/canonical/candid/internal/discharger"
+	"github.com/canonical/candid/internal/identity"
 )
 
 type agentSuite struct {

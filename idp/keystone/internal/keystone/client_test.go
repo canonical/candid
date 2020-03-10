@@ -12,7 +12,7 @@ import (
 
 	qt "github.com/frankban/quicktest"
 
-	"github.com/CanonicalLtd/candid/idp/keystone/internal/keystone"
+	"github.com/canonical/candid/idp/keystone/internal/keystone"
 )
 
 var unmarshalErrorTests = []struct {

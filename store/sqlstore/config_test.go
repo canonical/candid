@@ -5,7 +5,7 @@ import (
 
 	qt "github.com/frankban/quicktest"
 
-	"github.com/CanonicalLtd/candid/store/storetest"
+	"github.com/canonical/candid/store/storetest"
 )
 
 func TestConfigUnmarshal(t *testing.T) {

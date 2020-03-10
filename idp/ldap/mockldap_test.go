@@ -11,7 +11,7 @@ import (
 	errgo "gopkg.in/errgo.v1"
 	"gopkg.in/ldap.v2"
 
-	idpldap "github.com/CanonicalLtd/candid/idp/ldap"
+	idpldap "github.com/canonical/candid/idp/ldap"
 )
 
 type mockLDAPDialer struct {

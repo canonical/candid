@@ -4,7 +4,7 @@
 package ldap
 
 import (
-	"github.com/CanonicalLtd/candid/idp"
+	"github.com/canonical/candid/idp"
 )
 
 type LDAPConn ldapConn

@@ -11,13 +11,13 @@ import (
 	"github.com/juju/usso"
 	"gopkg.in/CanonicalLtd/candidclient.v1/ussologin"
 
-	"github.com/CanonicalLtd/candid/idp"
-	"github.com/CanonicalLtd/candid/idp/usso/internal/mockusso"
-	"github.com/CanonicalLtd/candid/idp/usso/ussooauth"
-	"github.com/CanonicalLtd/candid/internal/candidtest"
-	"github.com/CanonicalLtd/candid/internal/discharger"
-	"github.com/CanonicalLtd/candid/internal/identity"
-	"github.com/CanonicalLtd/candid/store"
+	"github.com/canonical/candid/idp"
+	"github.com/canonical/candid/idp/usso/internal/mockusso"
+	"github.com/canonical/candid/idp/usso/ussooauth"
+	"github.com/canonical/candid/internal/candidtest"
+	"github.com/canonical/candid/internal/discharger"
+	"github.com/canonical/candid/internal/identity"
+	"github.com/canonical/candid/store"
 )
 
 func TestDischarge(t *testing.T) {
