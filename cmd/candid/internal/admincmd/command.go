@@ -18,15 +18,15 @@ import (
 
 	"github.com/juju/cmd"
 	"github.com/juju/gnuflag"
-	"github.com/juju/persistent-cookiejar"
+	cookiejar "github.com/juju/persistent-cookiejar"
 	"golang.org/x/net/publicsuffix"
-	"gopkg.in/CanonicalLtd/candidclient.v1"
-	"gopkg.in/CanonicalLtd/candidclient.v1/params"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
 	"gopkg.in/macaroon-bakery.v2/httpbakery/agent"
 
+	"github.com/canonical/candid/candidclient"
+	"github.com/canonical/candid/params"
 	"github.com/canonical/candid/version"
 )
 

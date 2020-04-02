@@ -11,12 +11,12 @@ import (
 
 	"github.com/juju/cmd"
 	"github.com/juju/gnuflag"
-	"gopkg.in/CanonicalLtd/candidclient.v1/params"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery"
 	"gopkg.in/macaroon-bakery.v2/httpbakery/agent"
 
 	"github.com/canonical/candid/internal/auth"
+	"github.com/canonical/candid/params"
 )
 
 type createAgentCommand struct {

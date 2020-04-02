@@ -16,11 +16,11 @@ import (
 	"regexp"
 	"strings"
 
-	"gopkg.in/CanonicalLtd/candidclient.v1/ussologin"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/httprequest.v1"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
 
+	"github.com/canonical/candid/candidclient/ussologin"
 	"github.com/canonical/candid/idp"
 	"github.com/canonical/candid/idp/idputil"
 	"github.com/canonical/candid/store"

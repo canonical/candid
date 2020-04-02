@@ -21,8 +21,6 @@ import (
 	"time"
 
 	"github.com/juju/loggo"
-	"gopkg.in/CanonicalLtd/candidclient.v1/params"
-	"gopkg.in/CanonicalLtd/candidclient.v1/ussodischarge"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/httprequest.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery"
@@ -30,8 +28,10 @@ import (
 	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
 
+	"github.com/canonical/candid/candidclient/ussodischarge"
 	"github.com/canonical/candid/idp"
 	"github.com/canonical/candid/idp/idputil"
+	"github.com/canonical/candid/params"
 	"github.com/canonical/candid/store"
 )
 

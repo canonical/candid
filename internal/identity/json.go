@@ -7,10 +7,11 @@ import (
 	"context"
 	"net/http"
 
-	"gopkg.in/CanonicalLtd/candidclient.v1/params"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/httprequest.v1"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
+
+	"github.com/canonical/candid/params"
 )
 
 // ErrLoginRequired is returned by the /debug/* endpoints when OpenID

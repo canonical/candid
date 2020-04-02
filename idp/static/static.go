@@ -11,12 +11,12 @@ import (
 	"strings"
 
 	"github.com/juju/loggo"
-	"gopkg.in/CanonicalLtd/candidclient.v1/params"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
 
 	"github.com/canonical/candid/idp"
 	"github.com/canonical/candid/idp/idputil"
+	"github.com/canonical/candid/params"
 	"github.com/canonical/candid/store"
 )
 

@@ -10,6 +10,7 @@ import (
 	qt "github.com/frankban/quicktest"
 	"github.com/frankban/quicktest/qtsuite"
 
+	"github.com/canonical/candid/candidtest"
 	"github.com/canonical/candid/store"
 )
 
@@ -27,7 +28,7 @@ func (s *addGroupSuite) Init(c *qt.C) {
 
 func (s *addGroupSuite) TestAddGroup(c *qt.C) {
 	ctx := context.Background()
-	s.fixture.server.AddIdentity(ctx, &store.Identity{
+	candidtest.AddIdentity(ctx, s.fixture.store, &store.Identity{
 		ProviderID: store.MakeProviderIdentity("test", "bob"),
 		Username:   "bob",
 	})
@@ -35,14 +36,14 @@ func (s *addGroupSuite) TestAddGroup(c *qt.C) {
 	identity := store.Identity{
 		ProviderID: store.MakeProviderIdentity("test", "bob"),
 	}
-	err := s.fixture.server.Store.Identity(ctx, &identity)
+	err := s.fixture.store.Identity(ctx, &identity)
 	c.Assert(err, qt.Equals, nil)
 	c.Assert(identity.Groups, qt.DeepEquals, []string{"test1", "test2"})
 }
 
 func (s *addGroupSuite) TestAddGroupForEmail(c *qt.C) {
 	ctx := context.Background()
-	s.fixture.server.AddIdentity(ctx, &store.Identity{
+	candidtest.AddIdentity(ctx, s.fixture.store, &store.Identity{
 		ProviderID: store.MakeProviderIdentity("test", "bob"),
 		Username:   "bob",
 		Email:      "bob@example.com",
@@ -51,7 +52,7 @@ func (s *addGroupSuite) TestAddGroupForEmail(c *qt.C) {
 	identity := store.Identity{
 		ProviderID: store.MakeProviderIdentity("test", "bob"),
 	}
-	err := s.fixture.server.Store.Identity(ctx, &identity)
+	err := s.fixture.store.Identity(ctx, &identity)
 	c.Assert(err, qt.Equals, nil)
 	c.Assert(identity.Groups, qt.DeepEquals, []string{"test1", "test2"})
 }
@@ -77,7 +78,7 @@ func (s *addGroupSuite) TestAddGroupForEmailMultipleUsers(c *qt.C) {
 		Email:      "bob@example.com",
 	}}
 	for _, id := range identities {
-		s.fixture.server.AddIdentity(ctx, &id)
+		candidtest.AddIdentity(ctx, s.fixture.store, &id)
 	}
 	s.fixture.CheckError(
 		c,

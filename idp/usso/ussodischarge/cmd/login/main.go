@@ -9,8 +9,6 @@ import (
 	"log"
 	"time"
 
-	candidclient "gopkg.in/CanonicalLtd/candidclient.v1"
-	"gopkg.in/CanonicalLtd/candidclient.v1/ussodischarge"
 	errgo "gopkg.in/errgo.v1"
 	"gopkg.in/httprequest.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery"
@@ -18,6 +16,9 @@ import (
 	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
 	"gopkg.in/macaroon.v2"
+
+	"github.com/canonical/candid/candidclient"
+	"github.com/canonical/candid/candidclient/ussodischarge"
 )
 
 var (

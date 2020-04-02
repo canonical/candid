@@ -12,6 +12,7 @@ import (
 	qt "github.com/frankban/quicktest"
 	"github.com/frankban/quicktest/qtsuite"
 
+	"github.com/canonical/candid/candidtest"
 	"github.com/canonical/candid/store"
 )
 
@@ -29,7 +30,7 @@ func (s *findSuite) Init(c *qt.C) {
 
 func (s *findSuite) TestFindEmail(c *qt.C) {
 	ctx := context.Background()
-	s.fixture.server.AddIdentity(ctx, &store.Identity{
+	candidtest.AddIdentity(ctx, s.fixture.store, &store.Identity{
 		ProviderID: store.MakeProviderIdentity("test", "bob"),
 		Username:   "bob",
 		Email:      "bob@example.com",
@@ -57,7 +58,7 @@ func (s *findSuite) TestFindNoParameters(c *qt.C) {
 		Username:   "charlie",
 	}}
 	for _, id := range identites {
-		s.fixture.server.AddIdentity(ctx, &id)
+		candidtest.AddIdentity(ctx, s.fixture.store, &id)
 	}
 	stdout := s.fixture.CheckSuccess(c, "find", "-a", "admin.agent", "--format", "json")
 	var usernames []string
@@ -83,7 +84,7 @@ func (s *findSuite) TestFindLastLoginTime(c *qt.C) {
 		LastLogin:  time.Now().Add(-1 * 24 * time.Hour),
 	}}
 	for _, id := range identities {
-		s.fixture.server.AddIdentity(ctx, &id)
+		candidtest.AddIdentity(ctx, s.fixture.store, &id)
 	}
 	stdout := s.fixture.CheckSuccess(c, "find", "-a", "admin.agent", "--format", "json", "--last-login", "30")
 	var usernames []string
@@ -109,7 +110,7 @@ func (s *findSuite) TestFindLastDischargeTime(c *qt.C) {
 		LastDischarge: time.Now().Add(-1 * 24 * time.Hour),
 	}}
 	for _, id := range identities {
-		s.fixture.server.AddIdentity(ctx, &id)
+		candidtest.AddIdentity(ctx, s.fixture.store, &id)
 	}
 	stdout := s.fixture.CheckSuccess(c, "find", "-a", "admin.agent", "--format", "json", "--last-discharge", "20")
 	var usernames []string
@@ -134,7 +135,7 @@ func (s *findSuite) TestFindWithEmail(c *qt.C) {
 		Email:      "charlie@example.com",
 	}}
 	for _, id := range identities {
-		s.fixture.server.AddIdentity(ctx, &id)
+		candidtest.AddIdentity(ctx, s.fixture.store, &id)
 	}
 	stdout := s.fixture.CheckSuccess(c, "find", "-a", "admin.agent", "-d", "email", "--format", "json")
 	var usernames []map[string]string
@@ -164,7 +165,7 @@ func (s *findSuite) TestFindWithEmailAndGravatar(c *qt.C) {
 		Email:      "charlie@example.com",
 	}}
 	for _, id := range identities {
-		s.fixture.server.AddIdentity(ctx, &id)
+		candidtest.AddIdentity(ctx, s.fixture.store, &id)
 	}
 	stdout := s.fixture.CheckSuccess(c, "find", "-a", "admin.agent", "-d", "email, gravatar_id", "--format", "json")
 	var usernames []map[string]string

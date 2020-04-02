@@ -12,7 +12,6 @@ import (
 	qt "github.com/frankban/quicktest"
 	"github.com/frankban/quicktest/qtsuite"
 	"github.com/juju/aclstore/v2"
-	"gopkg.in/CanonicalLtd/candidclient.v1/params"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery"
 	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
@@ -21,6 +20,7 @@ import (
 	"github.com/canonical/candid/internal/auth"
 	"github.com/canonical/candid/internal/auth/httpauth"
 	"github.com/canonical/candid/internal/candidtest"
+	"github.com/canonical/candid/params"
 )
 
 type authSuite struct {

@@ -21,7 +21,6 @@ import (
 	"github.com/juju/loggo"
 	"github.com/juju/qthttptest"
 	"github.com/julienschmidt/httprouter"
-	"gopkg.in/CanonicalLtd/candidclient.v1/params"
 	"gopkg.in/httprequest.v1"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
 
@@ -33,6 +32,7 @@ import (
 	"github.com/canonical/candid/internal/discharger"
 	"github.com/canonical/candid/internal/identity"
 	"github.com/canonical/candid/internal/v1"
+	"github.com/canonical/candid/params"
 	"github.com/canonical/candid/store"
 )
 

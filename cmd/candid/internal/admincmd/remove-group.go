@@ -7,8 +7,9 @@ import (
 	"context"
 
 	"github.com/juju/cmd"
-	"gopkg.in/CanonicalLtd/candidclient.v1/params"
 	"gopkg.in/errgo.v1"
+
+	"github.com/canonical/candid/params"
 )
 
 type removeGroupCommand struct {

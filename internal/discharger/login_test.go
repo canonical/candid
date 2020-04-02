@@ -13,7 +13,6 @@ import (
 
 	qt "github.com/frankban/quicktest"
 	"github.com/frankban/quicktest/qtsuite"
-	"gopkg.in/CanonicalLtd/candidclient.v1/params"
 	errgo "gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
@@ -24,6 +23,7 @@ import (
 	"github.com/canonical/candid/internal/candidtest"
 	"github.com/canonical/candid/internal/discharger"
 	"github.com/canonical/candid/internal/identity"
+	"github.com/canonical/candid/params"
 )
 
 func TestLogin(t *testing.T) {

@@ -12,18 +12,18 @@ import (
 	qt "github.com/frankban/quicktest"
 	"github.com/frankban/quicktest/qtsuite"
 	"github.com/juju/aclstore/v2"
-	"gopkg.in/CanonicalLtd/candidclient.v1"
-	"gopkg.in/CanonicalLtd/candidclient.v1/params"
 	errgo "gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery"
 	"gopkg.in/macaroon-bakery.v2/bakery/checkers"
 	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
 	macaroon "gopkg.in/macaroon.v2"
 
+	"github.com/canonical/candid/candidclient"
 	"github.com/canonical/candid/idp"
 	"github.com/canonical/candid/idp/static"
 	"github.com/canonical/candid/internal/auth"
 	"github.com/canonical/candid/internal/candidtest"
+	"github.com/canonical/candid/params"
 	"github.com/canonical/candid/store"
 )
 

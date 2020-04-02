@@ -6,36 +6,67 @@ package admincmd_test
 import (
 	"bytes"
 	"context"
+	"encoding/pem"
 	"io/ioutil"
+	"net/http/httptest"
 	"path/filepath"
 	"testing"
 
 	qt "github.com/frankban/quicktest"
+	"github.com/juju/aclstore/v2"
 	"github.com/juju/cmd"
+	"github.com/juju/simplekv/memsimplekv"
+	"gopkg.in/macaroon-bakery.v2/bakery"
 	"gopkg.in/macaroon-bakery.v2/httpbakery/agent"
 
+	"github.com/canonical/candid"
 	"github.com/canonical/candid/candidtest"
 	"github.com/canonical/candid/cmd/candid/internal/admincmd"
+	"github.com/canonical/candid/idp"
+	"github.com/canonical/candid/idp/static"
 	internalcandidtest "github.com/canonical/candid/internal/candidtest"
 	"github.com/canonical/candid/store"
+	"github.com/canonical/candid/store/memstore"
 )
 
 type fixture struct {
 	Dir string
 
 	command cmd.Command
-	server  *candidtest.Server
+
+	aclStore aclstore.ACLStore
+	store    store.Store
+	server   *httptest.Server
 }
 
 func newFixture(c *qt.C) *fixture {
 	f := new(fixture)
 
-	srv, err := candidtest.New(nil)
+	adminAgentKey, err := bakery.GenerateKey()
+	c.Assert(err, qt.Equals, nil)
+
+	f.aclStore = aclstore.NewACLStore(memsimplekv.NewStore())
+	f.store = memstore.NewStore()
+
+	t, ok := c.TB.(candidtest.Testing)
+	if !ok {
+		t = &candidtestT{C: c}
+	}
+
+	f.server = candidtest.Serve(t, candid.ServerParams{
+		ACLStore:            f.aclStore,
+		Store:               f.store,
+		AdminAgentPublicKey: &adminAgentKey.Public,
+		IdentityProviders: []idp.IdentityProvider{
+			static.NewIdentityProvider(static.Params{
+				Name: "static",
+			}),
+		},
+	})
 	c.Assert(err, qt.Equals, nil)
 	c.Defer(func() {
-		srv.Close()
+		f.server.Close()
 	})
-	f.server = srv
 
 	f.Dir = c.Mkdir()
 	// If the cookiejar gets saved, it gets saved to $HOME/.go-cookiejar, so make
@@ -43,7 +74,7 @@ func newFixture(c *qt.C) *fixture {
 	c.Setenv("HOME", f.Dir)
 	c.Setenv("CANDID_URL", f.server.URL)
 	err = admincmd.WriteAgentFile(filepath.Join(f.Dir, "admin.agent"), &agent.AuthInfo{
-		Key: f.server.AdminAgentKey,
+		Key: adminAgentKey,
 		Agents: []agent.Agent{{
 			URL:      f.server.URL,
 			Username: "admin@candid",
@@ -96,11 +127,22 @@ func TestLoadCACerts(t *testing.T) {
 	c := qt.New(t)
 	defer c.Done()
 
-	srv, err := candidtest.NewTLS(nil)
+	ct, ok := c.TB.(candidtest.Testing)
+	if !ok {
+		ct = &candidtestT{C: c}
+	}
+
+	st := memstore.NewStore()
+	adminAgentKey, err := bakery.GenerateKey()
 	c.Assert(err, qt.Equals, nil)
+
+	srv := candidtest.ServeTLS(ct, candid.ServerParams{
+		Store:               st,
+		AdminAgentPublicKey: &adminAgentKey.Public,
+	})
 	defer srv.Close()
 
-	srv.AddIdentity(context.Background(), &store.Identity{
+	candidtest.AddIdentity(context.Background(), st, &store.Identity{
 		ProviderID: store.MakeProviderIdentity("test", "bob"),
 		Username:   "bob",
 	})
@@ -110,7 +152,7 @@ func TestLoadCACerts(t *testing.T) {
 	c.Setenv("CANDID_URL", srv.URL)
 	c.Setenv("BAKERY_AGENT_FILE", filepath.Join(dir, "admin.agent"))
 	err = admincmd.WriteAgentFile(filepath.Join(dir, "admin.agent"), &agent.AuthInfo{
-		Key: srv.AdminAgentKey,
+		Key: adminAgentKey,
 		Agents: []agent.Agent{{
 			URL:      srv.URL,
 			Username: "admin@candid",
@@ -123,7 +165,16 @@ func TestLoadCACerts(t *testing.T) {
 	unreadableFile := filepath.Join(dir, "unreadable.pem")
 	nonExistentFile := filepath.Join(dir, "non-existent.pem")
 
-	err = ioutil.WriteFile(certFile, srv.CACert, 0600)
+	err = ioutil.WriteFile(
+		certFile,
+		pem.EncodeToMemory(
+			&pem.Block{
+				Type:  "CERTIFICATE",
+				Bytes: srv.TLS.Certificates[0].Certificate[0],
+			},
+		),
+		0600,
+	)
 	c.Assert(err, qt.Equals, nil)
 	err = ioutil.WriteFile(emptyFile, nil, 0600)
 	c.Assert(err, qt.Equals, nil)
@@ -156,4 +207,12 @@ last-discharge: never
 `[1:])
 
 	c.Assert(errbuf.String(), qt.Equals, "")
+}
+
+type candidtestT struct {
+	*qt.C
+}
+
+func (t candidtestT) Cleanup(f func()) {
+	t.Defer(f)
 }

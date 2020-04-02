@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/juju/schema"
-	"gopkg.in/CanonicalLtd/candidclient.v1/params"
 	"gopkg.in/errgo.v1"
 	gooseidentity "gopkg.in/goose.v1/identity"
 	"gopkg.in/httprequest.v1"
@@ -20,6 +19,7 @@ import (
 	"github.com/canonical/candid/idp"
 	"github.com/canonical/candid/idp/idputil"
 	"github.com/canonical/candid/idp/keystone/internal/keystone"
+	"github.com/canonical/candid/params"
 )
 
 func init() {

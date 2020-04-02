@@ -6,7 +6,6 @@ package admincmd_test
 import (
 	"context"
 
-	"gopkg.in/CanonicalLtd/candidclient.v1"
 	errgo "gopkg.in/errgo.v1"
 	"gopkg.in/httprequest.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery"
@@ -16,6 +15,8 @@ import (
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
 	"gopkg.in/macaroon-bakery.v2/httpbakery/agent"
 	macaroon "gopkg.in/macaroon.v2"
+
+	"github.com/canonical/candid/candidclient"
 )
 
 var agentBakeryKey bakery.KeyPair
