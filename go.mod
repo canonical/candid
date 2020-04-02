@@ -24,8 +24,10 @@ require (
 	github.com/juju/qthttptest v0.0.1
 	github.com/juju/schema v1.0.1-0.20190814234152-1f8aaeef0989
 	github.com/juju/simplekv v1.0.0
+	github.com/juju/testing v0.0.0-20191001232224-ce9dec17d28b
 	github.com/juju/usso v1.0.1
 	github.com/juju/utils v0.0.0-20180820210520-bf9cc5bdd62d
+	github.com/juju/webbrowser v0.0.0-20160309143629-54b8c57083b4 // indirect
 	github.com/julienschmidt/httprouter v1.3.0
 	github.com/lib/pq v1.0.0
 	github.com/lunixbochs/vtclean v0.0.0-20180621232353-2d01aacdc34a // indirect
@@ -39,13 +41,14 @@ require (
 	github.com/prometheus/client_model v0.0.0-20150212101744-fa8ad6fec335 // indirect
 	github.com/prometheus/common v0.0.0-20160503220532-dd586c1c5abb // indirect
 	github.com/prometheus/procfs v0.0.0-20160411190841-abf152e5f3e9 // indirect
+	github.com/rogpeppe/fastuuid v0.0.0-20150106093220-6724a57986af // indirect
 	github.com/stretchr/testify v1.2.2 // indirect
 	github.com/yohcop/openid-go v1.0.0
 	golang.org/x/crypto v0.0.0-20190404164418-38d8ce5564a5
 	golang.org/x/net v0.0.0-20191002035440-2ec189313ef0
 	golang.org/x/oauth2 v0.0.0-20161219192954-314dd2c0bf3e
+	golang.org/x/sync v0.0.0-20180314180146-1d60e4601c6f // indirect
 	google.golang.org/appengine v1.2.0 // indirect
-	gopkg.in/CanonicalLtd/candidclient.v1 v1.2.0
 	gopkg.in/asn1-ber.v1 v1.0.0-20170511165959-379148ca0225
 	gopkg.in/errgo.v1 v1.0.0
 	gopkg.in/goose.v1 v1.0.0-20161130145116-8f055ce635d6

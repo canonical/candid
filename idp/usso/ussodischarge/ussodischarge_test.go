@@ -18,13 +18,13 @@ import (
 
 	qt "github.com/frankban/quicktest"
 	"github.com/frankban/quicktest/qtsuite"
-	udclient "gopkg.in/CanonicalLtd/candidclient.v1/ussodischarge"
 	"gopkg.in/macaroon-bakery.v2/bakery"
 	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
 	macaroon "gopkg.in/macaroon.v2"
 	yaml "gopkg.in/yaml.v2"
 
+	udclient "github.com/canonical/candid/candidclient/ussodischarge"
 	"github.com/canonical/candid/config"
 	"github.com/canonical/candid/idp"
 	"github.com/canonical/candid/idp/idptest"

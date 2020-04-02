@@ -15,10 +15,10 @@ import (
 	"time"
 
 	"github.com/juju/loggo"
-	"gopkg.in/CanonicalLtd/candidclient.v1/params"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/httprequest.v1"
 
+	"github.com/canonical/candid/params"
 	"github.com/canonical/candid/store"
 )
 

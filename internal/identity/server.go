@@ -16,7 +16,6 @@ import (
 	"github.com/juju/utils/debugstatus"
 	"github.com/julienschmidt/httprouter"
 	"github.com/prometheus/client_golang/prometheus"
-	"gopkg.in/CanonicalLtd/candidclient.v1/params"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/httprequest.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery"
@@ -27,6 +26,7 @@ import (
 	"github.com/canonical/candid/internal/auth/httpauth"
 	"github.com/canonical/candid/internal/monitoring"
 	"github.com/canonical/candid/meeting"
+	"github.com/canonical/candid/params"
 	"github.com/canonical/candid/store"
 )
 

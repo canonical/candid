@@ -13,6 +13,7 @@ import (
 	"github.com/frankban/quicktest/qtsuite"
 	"gopkg.in/macaroon-bakery.v2/bakery"
 
+	"github.com/canonical/candid/candidtest"
 	"github.com/canonical/candid/store"
 )
 
@@ -33,7 +34,7 @@ func (s *showSuite) TestShowUserWithAgentEnv(c *qt.C) {
 	// other command that use NewClient.
 	c.Setenv("BAKERY_AGENT_FILE", filepath.Join(s.fixture.Dir, "admin.agent"))
 	ctx := context.Background()
-	s.fixture.server.AddIdentity(ctx, &store.Identity{
+	candidtest.AddIdentity(ctx, s.fixture.store, &store.Identity{
 		ProviderID: store.MakeProviderIdentity("test", "bob"),
 		Username:   "bob",
 	})
@@ -52,7 +53,7 @@ last-discharge: never
 
 func (s *showSuite) TestShowUser(c *qt.C) {
 	ctx := context.Background()
-	s.fixture.server.AddIdentity(ctx, &store.Identity{
+	candidtest.AddIdentity(ctx, s.fixture.store, &store.Identity{
 		ProviderID:    store.MakeProviderIdentity("test", "bob"),
 		Username:      "bob",
 		Name:          "Bob Robertson",
@@ -83,7 +84,7 @@ last-discharge: "2016-12-25T00:00:00Z"
 
 func (s *showSuite) TestShowEmail(c *qt.C) {
 	ctx := context.Background()
-	s.fixture.server.AddIdentity(ctx, &store.Identity{
+	candidtest.AddIdentity(ctx, s.fixture.store, &store.Identity{
 		ProviderID:    store.MakeProviderIdentity("test", "bob"),
 		Username:      "bob",
 		Name:          "Bob Robertson",
@@ -147,7 +148,7 @@ func (s *showSuite) TestShowAgentUser(c *qt.C) {
 		LastDischarge: time.Date(2016, 12, 25, 0, 0, 0, 0, time.UTC),
 	}}
 	for _, id := range identities {
-		s.fixture.server.AddIdentity(ctx, &id)
+		candidtest.AddIdentity(ctx, s.fixture.store, &id)
 	}
 	stdout := s.fixture.CheckSuccess(c, "show", "-a", "admin.agent", "-u", "a-1234@candid")
 	c.Assert(stdout, qt.Equals, `
@@ -166,7 +167,7 @@ last-discharge: "2016-12-25T00:00:00Z"
 
 func (s *showSuite) TestShowZeroValues(c *qt.C) {
 	ctx := context.Background()
-	s.fixture.server.AddIdentity(ctx, &store.Identity{
+	candidtest.AddIdentity(ctx, s.fixture.store, &store.Identity{
 		ProviderID: store.MakeProviderIdentity("test", "bob"),
 		Username:   "bob",
 	})
@@ -194,7 +195,7 @@ func (s *showSuite) TestShowUserError(c *qt.C) {
 
 func (s *showSuite) TestShowUserJSON(c *qt.C) {
 	ctx := context.Background()
-	s.fixture.server.AddIdentity(ctx, &store.Identity{
+	candidtest.AddIdentity(ctx, s.fixture.store, &store.Identity{
 		ProviderID:    store.MakeProviderIdentity("test", "bob"),
 		Username:      "bob",
 		Name:          "Bob Robertson",

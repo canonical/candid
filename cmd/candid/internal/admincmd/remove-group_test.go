@@ -10,6 +10,7 @@ import (
 	qt "github.com/frankban/quicktest"
 	"github.com/frankban/quicktest/qtsuite"
 
+	"github.com/canonical/candid/candidtest"
 	"github.com/canonical/candid/store"
 )
 
@@ -27,7 +28,7 @@ func (s *removeGroupSuite) Init(c *qt.C) {
 
 func (s *removeGroupSuite) TestRemoveGroup(c *qt.C) {
 	ctx := context.Background()
-	s.fixture.server.AddIdentity(ctx, &store.Identity{
+	candidtest.AddIdentity(ctx, s.fixture.store, &store.Identity{
 		ProviderID: store.MakeProviderIdentity("test", "bob"),
 		Username:   "bob",
 		Groups:     []string{"test1", "test2", "test3"},
@@ -36,14 +37,14 @@ func (s *removeGroupSuite) TestRemoveGroup(c *qt.C) {
 	identity := store.Identity{
 		ProviderID: store.MakeProviderIdentity("test", "bob"),
 	}
-	err := s.fixture.server.Store.Identity(ctx, &identity)
+	err := s.fixture.store.Identity(ctx, &identity)
 	c.Assert(err, qt.Equals, nil)
 	c.Assert(identity.Groups, qt.DeepEquals, []string{"test3"})
 }
 
 func (s *removeGroupSuite) TestRemoveGroupForEmail(c *qt.C) {
 	ctx := context.Background()
-	s.fixture.server.AddIdentity(ctx, &store.Identity{
+	candidtest.AddIdentity(ctx, s.fixture.store, &store.Identity{
 		ProviderID: store.MakeProviderIdentity("test", "bob"),
 		Username:   "bob",
 		Email:      "bob@example.com",
@@ -53,7 +54,7 @@ func (s *removeGroupSuite) TestRemoveGroupForEmail(c *qt.C) {
 	identity := store.Identity{
 		ProviderID: store.MakeProviderIdentity("test", "bob"),
 	}
-	err := s.fixture.server.Store.Identity(ctx, &identity)
+	err := s.fixture.store.Identity(ctx, &identity)
 	c.Assert(err, qt.Equals, nil)
 	c.Assert(identity.Groups, qt.DeepEquals, []string{"test3"})
 }

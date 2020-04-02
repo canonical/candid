@@ -8,13 +8,13 @@ import (
 	"net/http"
 	"strings"
 
-	"gopkg.in/CanonicalLtd/candidclient.v1/params"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/httprequest.v1"
 
 	"github.com/canonical/candid/idp"
 	"github.com/canonical/candid/idp/idputil"
 	"github.com/canonical/candid/idp/keystone/internal/keystone"
+	"github.com/canonical/candid/params"
 )
 
 func init() {

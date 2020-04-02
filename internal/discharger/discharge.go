@@ -14,9 +14,6 @@ import (
 	"time"
 
 	"golang.org/x/net/trace"
-	"gopkg.in/CanonicalLtd/candidclient.v1"
-	"gopkg.in/CanonicalLtd/candidclient.v1/params"
-	"gopkg.in/CanonicalLtd/candidclient.v1/redirect"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/httprequest.v1"
 	"gopkg.in/juju/names.v2"
@@ -26,9 +23,12 @@ import (
 	"gopkg.in/macaroon-bakery.v2/httpbakery/agent"
 	"gopkg.in/macaroon.v2"
 
+	"github.com/canonical/candid/candidclient"
+	"github.com/canonical/candid/candidclient/redirect"
 	"github.com/canonical/candid/internal/auth"
 	"github.com/canonical/candid/internal/auth/httpauth"
 	"github.com/canonical/candid/internal/identity"
+	"github.com/canonical/candid/params"
 	"github.com/canonical/candid/store"
 )
 

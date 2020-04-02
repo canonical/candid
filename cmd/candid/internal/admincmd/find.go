@@ -12,8 +12,9 @@ import (
 
 	"github.com/juju/cmd"
 	"github.com/juju/gnuflag"
-	"gopkg.in/CanonicalLtd/candidclient.v1/params"
 	"gopkg.in/errgo.v1"
+
+	"github.com/canonical/candid/params"
 )
 
 type findCommand struct {

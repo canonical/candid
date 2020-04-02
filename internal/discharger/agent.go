@@ -8,8 +8,6 @@ import (
 	"net/http"
 	"time"
 
-	"gopkg.in/CanonicalLtd/candidclient.v1"
-	"gopkg.in/CanonicalLtd/candidclient.v1/params"
 	errgo "gopkg.in/errgo.v1"
 	"gopkg.in/httprequest.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery"
@@ -18,7 +16,9 @@ import (
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
 	"gopkg.in/macaroon-bakery.v2/httpbakery/agent"
 
+	"github.com/canonical/candid/candidclient"
 	"github.com/canonical/candid/internal/auth"
+	"github.com/canonical/candid/params"
 	"github.com/canonical/candid/store"
 )
 

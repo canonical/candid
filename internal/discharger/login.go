@@ -8,12 +8,12 @@ import (
 	"net/url"
 	"time"
 
-	"gopkg.in/CanonicalLtd/candidclient.v1/params"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/httprequest.v1"
 	"gopkg.in/macaroon-bakery.v2/httpbakery/agent"
 
 	"github.com/canonical/candid/idp/idputil"
+	"github.com/canonical/candid/params"
 )
 
 // legacyLoginRequest is a request to start a login to the identity manager

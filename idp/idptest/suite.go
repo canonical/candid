@@ -20,7 +20,6 @@ import (
 	qt "github.com/frankban/quicktest"
 	"github.com/juju/qthttptest"
 	"github.com/juju/simplekv"
-	"gopkg.in/CanonicalLtd/candidclient.v1/params"
 	errgo "gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
@@ -29,6 +28,7 @@ import (
 	"github.com/canonical/candid/idp/idputil"
 	"github.com/canonical/candid/idp/idputil/secret"
 	"github.com/canonical/candid/internal/candidtest"
+	"github.com/canonical/candid/params"
 	"github.com/canonical/candid/store"
 )
 

@@ -14,7 +14,6 @@ import (
 	"strings"
 
 	qt "github.com/frankban/quicktest"
-	"gopkg.in/CanonicalLtd/candidclient.v1/params"
 	errgo "gopkg.in/errgo.v1"
 	"gopkg.in/httprequest.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery"
@@ -25,6 +24,7 @@ import (
 	"github.com/canonical/candid/internal/candidtest"
 	"github.com/canonical/candid/internal/discharger"
 	"github.com/canonical/candid/internal/identity"
+	"github.com/canonical/candid/params"
 )
 
 type agentSuite struct {

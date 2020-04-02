@@ -12,8 +12,6 @@ import (
 	"strings"
 	"time"
 
-	"gopkg.in/CanonicalLtd/candidclient.v1"
-	"gopkg.in/CanonicalLtd/candidclient.v1/params"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/httprequest.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery"
@@ -22,7 +20,9 @@ import (
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
 	macaroon "gopkg.in/macaroon.v2"
 
+	"github.com/canonical/candid/candidclient"
 	"github.com/canonical/candid/internal/auth"
+	"github.com/canonical/candid/params"
 	"github.com/canonical/candid/store"
 )
 

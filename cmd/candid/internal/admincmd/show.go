@@ -9,9 +9,10 @@ import (
 
 	"github.com/juju/cmd"
 	"github.com/juju/gnuflag"
-	"gopkg.in/CanonicalLtd/candidclient.v1/params"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery"
+
+	"github.com/canonical/candid/params"
 )
 
 type showCommand struct {

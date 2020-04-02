@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"time"
 
-	"gopkg.in/CanonicalLtd/candidclient.v1/params"
 	errgo "gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery"
 	"gopkg.in/macaroon-bakery.v2/bakery/checkers"
@@ -16,6 +15,7 @@ import (
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
 
 	"github.com/canonical/candid/internal/auth"
+	"github.com/canonical/candid/params"
 )
 
 // An Authorizer is used to authorize HTTP requests.

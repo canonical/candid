@@ -9,8 +9,8 @@ import (
 
 	qt "github.com/frankban/quicktest"
 	"github.com/juju/usso"
-	"gopkg.in/CanonicalLtd/candidclient.v1/ussologin"
 
+	"github.com/canonical/candid/candidclient/ussologin"
 	"github.com/canonical/candid/idp"
 	"github.com/canonical/candid/idp/usso/internal/mockusso"
 	"github.com/canonical/candid/idp/usso/ussooauth"

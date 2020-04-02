@@ -10,7 +10,6 @@ import (
 
 	"github.com/juju/loggo"
 	"golang.org/x/net/trace"
-	"gopkg.in/CanonicalLtd/candidclient.v1/params"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/httprequest.v1"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
@@ -20,6 +19,7 @@ import (
 	"github.com/canonical/candid/internal/discharger/internal"
 	"github.com/canonical/candid/internal/identity"
 	"github.com/canonical/candid/internal/monitoring"
+	"github.com/canonical/candid/params"
 )
 
 var logger = loggo.GetLogger("candid.internal.discharger")

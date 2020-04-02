@@ -17,7 +17,6 @@ import (
 	"github.com/juju/usso/openid"
 	"github.com/juju/utils/cache"
 	"github.com/prometheus/client_golang/prometheus"
-	"gopkg.in/CanonicalLtd/candidclient.v1/params"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
 	"launchpad.net/lpad"
@@ -25,6 +24,7 @@ import (
 	"github.com/canonical/candid/idp"
 	"github.com/canonical/candid/idp/idputil"
 	"github.com/canonical/candid/idp/usso/internal/kvnoncestore"
+	"github.com/canonical/candid/params"
 	"github.com/canonical/candid/store"
 )
 

@@ -69,7 +69,7 @@ func (s *createAgentSuite) TestCreateAgentWithGeneratedKeyAndAgentFileNotSpecifi
 	identity := store.Identity{
 		Username: agents[0].Username,
 	}
-	c.Assert(s.fixture.server.Store.Identity(context.Background(), &identity), qt.Equals, nil)
+	c.Assert(s.fixture.store.Identity(context.Background(), &identity), qt.Equals, nil)
 	c.Assert(identity.PublicKeys, qt.HasLen, 1)
 	c.Assert(identity.PublicKeys[0], qt.Equals, v.Key.Public)
 }
@@ -88,7 +88,7 @@ func (s *createAgentSuite) TestCreateAgentWithNonExistentAgentsFileSpecified(c *
 	identity := store.Identity{
 		Username: agents[0].Username,
 	}
-	c.Assert(s.fixture.server.Store.Identity(context.Background(), &identity), qt.Equals, nil)
+	c.Assert(s.fixture.store.Identity(context.Background(), &identity), qt.Equals, nil)
 	c.Assert(identity.PublicKeys, qt.HasLen, 1)
 	c.Assert(identity.PublicKeys[0], qt.Equals, v.Key.Public)
 	c.Assert(identity.Owner, qt.Equals, store.MakeProviderIdentity("idm", "admin"))
@@ -107,7 +107,7 @@ func (s *createAgentSuite) TestCreateAgentWithExistingAgentsFile(c *qt.C) {
 	identity := store.Identity{
 		Username: agents[1].Username,
 	}
-	err = s.fixture.server.Store.Identity(context.Background(), &identity)
+	err = s.fixture.store.Identity(context.Background(), &identity)
 	c.Assert(err, qt.Equals, nil)
 	c.Assert(identity.Groups, qt.DeepEquals, []string{"somegroup"})
 }

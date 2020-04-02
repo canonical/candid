@@ -15,7 +15,6 @@ github.com/frankban/quicktest v1.5.0 h1:Tb4jWdSpdjKzTUicPnY61PZxKbDoGa7ABbrReT3g
 github.com/frankban/quicktest v1.5.0/go.mod h1:jaStnuzAqU1AJdCO0l53JDCJrVDKcS03DbaAcR7Ks/o=
 github.com/garyburd/go-oauth v0.0.0-20150329160146-3131beb69b81 h1:9VAI9i6YE9o+FvpODDCximEQgNEUijBl8cGSlbk/MUA=
 github.com/garyburd/go-oauth v0.0.0-20150329160146-3131beb69b81/go.mod h1:HfkOCN6fkKKaPSAeNq/er3xObxTW4VLeY6UUK895gLQ=
-github.com/golang/protobuf v1.0.0/go.mod h1:6lQm79b+lXiMfvg/cZm0SGofjICqVBUtrP5yJMmIC1U=
 github.com/golang/protobuf v1.2.0 h1:P3YflyNX/ehuJFLhxviNdFxQPkGK5cDcApsge1SqnvM=
 github.com/golang/protobuf v1.2.0/go.mod h1:6lQm79b+lXiMfvg/cZm0SGofjICqVBUtrP5yJMmIC1U=
 github.com/google/go-cmp v0.1.0/go.mod h1:oXzfMopK8JAjlY9xF4vHSVASa0yLyX7SntLO5aqRK0M=
@@ -36,7 +35,6 @@ github.com/juju/clock v0.0.0-20190205081909-9c5c9712527c h1:3UvYABOQRhJAApj9MdCN
 github.com/juju/clock v0.0.0-20190205081909-9c5c9712527c/go.mod h1:nD0vlnrUjcjJhqN5WuCWZyzfd5AHZAC9/ajvbSx69xA=
 github.com/juju/cmd v0.0.0-20180424151504-9ce53c6f9d00 h1:7S+FutBbPdRDL9tMG7WvPDu3Nw0PwAYAxNm0y4n8uL0=
 github.com/juju/cmd v0.0.0-20180424151504-9ce53c6f9d00/go.mod h1:yWJQHl73rdSX4DHVKGqkAip+huBslxRwS8m9CrOLq18=
-github.com/juju/errors v0.0.0-20170703010042-c7d06af17c68/go.mod h1:W54LbzXuIE0boCoNJfwqpmkKJ1O4TCTZMetAt6jGk7Q=
 github.com/juju/errors v0.0.0-20180726005433-812b06ada177/go.mod h1:W54LbzXuIE0boCoNJfwqpmkKJ1O4TCTZMetAt6jGk7Q=
 github.com/juju/errors v0.0.0-20180806074554-22422dad46e1/go.mod h1:W54LbzXuIE0boCoNJfwqpmkKJ1O4TCTZMetAt6jGk7Q=
 github.com/juju/errors v0.0.0-20190207033735-e65537c515d7 h1:dMIPRDg6gi7CUp0Kj2+HxqJ5kTr1iAdzsXYIrLCNSmU=
@@ -47,7 +45,6 @@ github.com/juju/go4 v0.0.0-20160222163258-40d72ab9641a h1:45JtCyuNYE+QN9aPuR1ID9
 github.com/juju/go4 v0.0.0-20160222163258-40d72ab9641a/go.mod h1:RVHtZuvrpETIepiNUrNlih2OynoFf1eM6DGC6dloXzk=
 github.com/juju/httpprof v0.0.0-20141217160036-14bf14c30767 h1:COsaGcfAONDdIDnGS8yFdxOyReP7zKQEr7jFzCHKDkM=
 github.com/juju/httpprof v0.0.0-20141217160036-14bf14c30767/go.mod h1:+MaLYz4PumRkkyHYeXJ2G5g5cIW0sli2bOfpmbaMV/g=
-github.com/juju/loggo v0.0.0-20170605014607-8232ab8918d9/go.mod h1:vgyd7OREkbtVEN/8IXZe5Ooef3LQePvuBm9UWj6ZL8U=
 github.com/juju/loggo v0.0.0-20180524022052-584905176618/go.mod h1:vgyd7OREkbtVEN/8IXZe5Ooef3LQePvuBm9UWj6ZL8U=
 github.com/juju/loggo v0.0.0-20190212223446-d976af380377 h1:n6QjW3g5JNY3xPmIjFt6z1H6tFQA6BhwOC2bvTAm1YU=
 github.com/juju/loggo v0.0.0-20190212223446-d976af380377/go.mod h1:vgyd7OREkbtVEN/8IXZe5Ooef3LQePvuBm9UWj6ZL8U=
@@ -74,13 +71,11 @@ github.com/juju/testing v0.0.0-20180517134105-72703b1e95eb/go.mod h1:63prj8cnj0t
 github.com/juju/testing v0.0.0-20180920084828-472a3e8b2073/go.mod h1:63prj8cnj0tU0S9OHjGJn+b1h0ZghCndfnbQolrYTwA=
 github.com/juju/testing v0.0.0-20191001232224-ce9dec17d28b h1:Rrp0ByJXEjhREMPGTt3aWYjoIsUGCbt21ekbeJcTWv0=
 github.com/juju/testing v0.0.0-20191001232224-ce9dec17d28b/go.mod h1:63prj8cnj0tU0S9OHjGJn+b1h0ZghCndfnbQolrYTwA=
-github.com/juju/usso v1.0.0/go.mod h1:Jz50yxHsMM0TY214vF0gnpye2yb31+fRLrcFQL2ge6c=
 github.com/juju/usso v1.0.1 h1:zyQhSUJnhFZdPqVAmPeqXYlnYXv+i0Cp1Ii+aziMXGs=
 github.com/juju/usso v1.0.1/go.mod h1:3cvBcGVmWXyHhrBHBQtpNBzca/JRg4S5XH88Hj/NsYA=
 github.com/juju/utils v0.0.0-20180619112806-c746c6e86f4f/go.mod h1:6/KLg8Wz/y2KVGWEpkK9vMNGkOnu4k/cqs8Z1fKjTOk=
 github.com/juju/utils v0.0.0-20180820210520-bf9cc5bdd62d h1:irPlN9z5VCe6BTsqVsxheCZH99OFSmqSVyTigW4mEoY=
 github.com/juju/utils v0.0.0-20180820210520-bf9cc5bdd62d/go.mod h1:6/KLg8Wz/y2KVGWEpkK9vMNGkOnu4k/cqs8Z1fKjTOk=
-github.com/juju/version v0.0.0-20161031051906-1f41e27e54f2/go.mod h1:kE8gK5X0CImdr7qpSKl3xB2PmpySSmfj7zVbkZFs81U=
 github.com/juju/version v0.0.0-20180108022336-b64dbd566305 h1:lQxPJ1URr2fjsKnJRt/BxiIxjLt9IKGvS+0injMHbag=
 github.com/juju/version v0.0.0-20180108022336-b64dbd566305/go.mod h1:kE8gK5X0CImdr7qpSKl3xB2PmpySSmfj7zVbkZFs81U=
 github.com/juju/webbrowser v0.0.0-20160309143629-54b8c57083b4 h1:go1FDIXkFL8AUWgJ7B68rtFWCidyrMfZH9x3xwFK74s=
@@ -126,12 +121,10 @@ github.com/rogpeppe/fastuuid v0.0.0-20150106093220-6724a57986af h1:gu+uRPtBe88sK
 github.com/rogpeppe/fastuuid v0.0.0-20150106093220-6724a57986af/go.mod h1:XWv6SoW27p1b0cqNHllgS5HIMJraePCO15w5zCzIWYg=
 github.com/stretchr/testify v1.2.2 h1:bSDNvY7ZPG5RlJ8otE/7V6gMiyenm9RtJ7IUVIAoJ1w=
 github.com/stretchr/testify v1.2.2/go.mod h1:a8OnRcib4nhh0OaRAV+Yts87kKdq0PP7pXfy6kDkUVs=
-github.com/yohcop/openid-go v0.0.0-20170901155220-cfc72ed89575/go.mod h1:f6elajwZV+xceiaqgRL090YzLEDGSbqr3poGL3ZgXYo=
 github.com/yohcop/openid-go v1.0.0 h1:EciJ7ZLETHR3wOtxBvKXx9RV6eyHZpCaSZ1inbBaUXE=
 github.com/yohcop/openid-go v1.0.0/go.mod h1:/408xiwkeItSPJZSTPF7+VtZxPkPrRRpRNK2vjGh6yI=
 golang.org/x/crypto v0.0.0-20180723164146-c126467f60eb/go.mod h1:6SG95UA2DQfeDnfUPMdvaQW0Q7yPrPDi9nlGo2tz2b4=
 golang.org/x/crypto v0.0.0-20181009213950-7c1a557ab941/go.mod h1:6SG95UA2DQfeDnfUPMdvaQW0Q7yPrPDi9nlGo2tz2b4=
-golang.org/x/crypto v0.0.0-20190208162236-193df9c0f06f/go.mod h1:6SG95UA2DQfeDnfUPMdvaQW0Q7yPrPDi9nlGo2tz2b4=
 golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2/go.mod h1:djNgcEr1/C05ACkg1iLfiJU5Ep61QUkGW8qpdssI0+w=
 golang.org/x/crypto v0.0.0-20190313024323-a1f597ede03a/go.mod h1:djNgcEr1/C05ACkg1iLfiJU5Ep61QUkGW8qpdssI0+w=
 golang.org/x/crypto v0.0.0-20190404164418-38d8ce5564a5 h1:bselrhR0Or1vomJZC8ZIjWtbDmn9OYFLX5Ik9alpJpE=
@@ -139,7 +132,6 @@ golang.org/x/crypto v0.0.0-20190404164418-38d8ce5564a5/go.mod h1:WFFai1msRO1wXaE
 golang.org/x/net v0.0.0-20150829230318-ea47fc708ee3/go.mod h1:mL1N/T3taQHkDXs73rZJwtUhF3w3ftmwwsq0BUmARs4=
 golang.org/x/net v0.0.0-20180306060152-d25186b37f34/go.mod h1:mL1N/T3taQHkDXs73rZJwtUhF3w3ftmwwsq0BUmARs4=
 golang.org/x/net v0.0.0-20180724234803-3673e40ba225/go.mod h1:mL1N/T3taQHkDXs73rZJwtUhF3w3ftmwwsq0BUmARs4=
-golang.org/x/net v0.0.0-20190206173232-65e2d4e15006/go.mod h1:mL1N/T3taQHkDXs73rZJwtUhF3w3ftmwwsq0BUmARs4=
 golang.org/x/net v0.0.0-20190313082753-5c2c250b6a70/go.mod h1:t9HGtf8HONx5eT2rtn7q6eTqICYqUVnKs3thJo3Qplg=
 golang.org/x/net v0.0.0-20190522155817-f3200d17e092/go.mod h1:HSz+uSET+XFnRR8LxR5pz3Of3rY3CfYBVs4xY44aLks=
 golang.org/x/net v0.0.0-20191002035440-2ec189313ef0 h1:2mqDk8w/o6UmeUCu5Qiq2y7iMf6anbx+YA8d1JFoFrs=
@@ -155,8 +147,6 @@ golang.org/x/text v0.3.0/go.mod h1:NqM8EUOU14njkJ3fqMW+pc6Ldnwhi/IjpwHt7yyuwOQ=
 golang.org/x/tools v0.0.0-20181008205924-a2b3f7f249e9/go.mod h1:n7NCudcB/nEzxVGmLbDWY5pfWTLqBcC2KZ6jyYvM4mQ=
 google.golang.org/appengine v1.2.0 h1:S0iUepdCWODXRvtE+gcRDd15L+k+k1AiHlMiMjefH24=
 google.golang.org/appengine v1.2.0/go.mod h1:xpcJRLb0r/rnEns0DIKYYv+WjYCduHsrkT7/EB5XEv4=
-gopkg.in/CanonicalLtd/candidclient.v1 v1.2.0 h1:3By6Ft2x2Dmv4qFpniHxqSUTUv9Cn/qPMoMaezVLuqY=
-gopkg.in/CanonicalLtd/candidclient.v1 v1.2.0/go.mod h1:bW14hr12Xx8VN5t/NxgyTCmkBNjZ6eQIIS9c9dJBFnk=
 gopkg.in/asn1-ber.v1 v1.0.0-20170511165959-379148ca0225 h1:JBwmEvLfCqgPcIq8MjVMQxsF3LVL4XG/HH0qiG0+IFY=
 gopkg.in/asn1-ber.v1 v1.0.0-20170511165959-379148ca0225/go.mod h1:cuepJuh7vyXfUyUwEgHQXw849cJrilpS5NeIjOWESAw=
 gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=
