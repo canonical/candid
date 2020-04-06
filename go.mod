@@ -7,6 +7,7 @@ require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/frankban/quicktest v1.5.0
 	github.com/garyburd/go-oauth v0.0.0-20150329160146-3131beb69b81
+	github.com/golang/protobuf v1.3.2 // indirect
 	github.com/google/go-cmp v0.3.1
 	github.com/gorilla/handlers v0.0.0-20170224193955-13d73096a474
 	github.com/juju/aclstore/v2 v2.0.0-alpha2
@@ -35,19 +36,18 @@ require (
 	github.com/mattn/go-isatty v0.0.4 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.1 // indirect
 	github.com/mhilton/openid v0.0.0-20150511103207-7922a4e937d8
-	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/pquerna/cachecontrol v0.0.0-20160421231612-c97913dcbd76 // indirect
 	github.com/prometheus/client_golang v0.0.0-20180319131721-d49167c4b9f3
 	github.com/prometheus/client_model v0.0.0-20150212101744-fa8ad6fec335 // indirect
 	github.com/prometheus/common v0.0.0-20160503220532-dd586c1c5abb // indirect
 	github.com/prometheus/procfs v0.0.0-20160411190841-abf152e5f3e9 // indirect
 	github.com/rogpeppe/fastuuid v0.0.0-20150106093220-6724a57986af // indirect
-	github.com/stretchr/testify v1.2.2 // indirect
+	github.com/stretchr/testify v1.4.0 // indirect
 	github.com/yohcop/openid-go v1.0.0
 	golang.org/x/crypto v0.0.0-20190404164418-38d8ce5564a5
-	golang.org/x/net v0.0.0-20191002035440-2ec189313ef0
+	golang.org/x/net v0.0.0-20191004110552-13f9640d40b9
 	golang.org/x/oauth2 v0.0.0-20161219192954-314dd2c0bf3e
-	golang.org/x/sync v0.0.0-20180314180146-1d60e4601c6f // indirect
+	golang.org/x/sys v0.0.0-20191022100944-742c48ecaeb7 // indirect
 	google.golang.org/appengine v1.2.0 // indirect
 	gopkg.in/asn1-ber.v1 v1.0.0-20170511165959-379148ca0225
 	gopkg.in/errgo.v1 v1.0.0
@@ -63,7 +63,7 @@ require (
 	gopkg.in/retry.v1 v1.0.3 // indirect
 	gopkg.in/square/go-jose.v2 v2.0.1 // indirect
 	gopkg.in/tomb.v2 v2.0.0-20140626144623-14b3d72120e8
-	gopkg.in/yaml.v2 v2.2.2
+	gopkg.in/yaml.v2 v2.2.8
 	launchpad.net/lpad v0.0.0-20131113112110-000000000065
 )
 

@@ -73,7 +73,7 @@ func (c *thirdPartyCaveatChecker) checkThirdPartyCaveat(ctx context.Context, p h
 	}
 	var op bakery.Op
 	switch cond {
-	case "is-authenticated-user":
+	case "is-authenticated-user", "is-authenticated-userid":
 		op = auth.GlobalOp(auth.ActionDischarge)
 		if len(args) == 0 {
 			break
@@ -145,8 +145,25 @@ func (c *thirdPartyCaveatChecker) checkThirdPartyCaveat(ctx context.Context, p h
 			return nil, errgo.Mask(err)
 		}
 	}
+
+	var declaration checkers.Caveat
+	switch cond {
+	case "is-authenticated-user":
+		declaration = candidclient.UserDeclaration(authInfo.Identity.Id())
+	case "is-authenticated-userid":
+		id, ok := authInfo.Identity.(*auth.Identity)
+		if !ok {
+			return nil, errgo.Newf("unexpected authinfo type %T", authInfo)
+		}
+		sid, err := id.StoreIdentity(ctx)
+		if err != nil {
+			return nil, errgo.Notef(err, "cannot get stored identity")
+		}
+		declaration = candidclient.UserIDDeclaration(string(sid.ProviderID))
+	}
+
 	return []checkers.Caveat{
-		candidclient.UserDeclaration(authInfo.Identity.Id()),
+		declaration,
 		checkers.TimeBeforeCaveat(time.Now().Add(c.params.DischargeMacaroonTimeout)),
 	}, nil
 }

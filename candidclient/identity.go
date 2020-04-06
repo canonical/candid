@@ -6,6 +6,8 @@ package candidclient
 import (
 	"context"
 
+	"github.com/canonical/candid/params"
+	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
 )
 
@@ -29,20 +31,20 @@ type Identity interface {
 	Groups() ([]string, error)
 }
 
-var _ Identity = (*identity)(nil)
+var _ Identity = (*usernameIdentity)(nil)
 
-type identity struct {
+type usernameIdentity struct {
 	client   *Client
 	username string
 }
 
 // Username implements Identity.Username.
-func (id *identity) Username() (string, error) {
+func (id *usernameIdentity) Username() (string, error) {
 	return id.username, nil
 }
 
 // Groups implements Identity.Groups.
-func (id *identity) Groups() ([]string, error) {
+func (id *usernameIdentity) Groups() ([]string, error) {
 	if id.client.permChecker != nil {
 		return id.client.permChecker.cache.Groups(id.username)
 	}
@@ -50,7 +52,7 @@ func (id *identity) Groups() ([]string, error) {
 }
 
 // Allow implements Identity.Allow.
-func (id *identity) Allow(ctx context.Context, acl []string) (bool, error) {
+func (id *usernameIdentity) Allow(ctx context.Context, acl []string) (bool, error) {
 	if id.client.permChecker != nil {
 		return id.client.permChecker.Allow(id.username, acl)
 	}
@@ -60,11 +62,73 @@ func (id *identity) Allow(ctx context.Context, acl []string) (bool, error) {
 }
 
 // Id implements Identity.Id.
-func (id *identity) Id() string {
+func (id *usernameIdentity) Id() string {
 	return id.username
 }
 
 // Domain implements Identity.Domain.
-func (id *identity) Domain() string {
+func (id *usernameIdentity) Domain() string {
+	return ""
+}
+
+type useridIdentity struct {
+	client   *Client
+	userID   string
+	username string
+}
+
+// Username implements Identity.Username.
+func (id *useridIdentity) Username() (string, error) {
+	if id.username != "" {
+		return id.username, nil
+	}
+
+	ctx := context.Background()
+	usernames, err := id.client.QueryUsers(ctx, &params.QueryUsersRequest{
+		ExternalID: id.userID,
+	})
+	if err != nil {
+		return "", errgo.Mask(err)
+	}
+	if len(usernames) == 1 {
+		id.username = usernames[0]
+	}
+	return id.username, nil
+}
+
+// Groups implements Identity.Groups.
+func (id *useridIdentity) Groups() ([]string, error) {
+	username, err := id.Username()
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
+	if id.client.permChecker != nil {
+		return id.client.permChecker.cache.Groups(username)
+	}
+	return nil, nil
+}
+
+// Allow implements Identity.Allow.
+func (id *useridIdentity) Allow(ctx context.Context, acl []string) (bool, error) {
+	username, err := id.Username()
+	if err != nil {
+		return false, errgo.Mask(err)
+	}
+
+	if id.client.permChecker != nil {
+		return id.client.permChecker.Allow(username, acl)
+	}
+	// No groups - just implement the trivial cases.
+	ok, _ := trivialAllow(username, acl)
+	return ok, nil
+}
+
+// Id implements Identity.Id.
+func (id *useridIdentity) Id() string {
+	return id.userID
+}
+
+// Domain implements Identity.Domain.
+func (id *useridIdentity) Domain() string {
 	return ""
 }

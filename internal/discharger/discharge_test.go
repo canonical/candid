@@ -29,6 +29,7 @@ import (
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
 	"gopkg.in/macaroon.v2"
 
+	"github.com/canonical/candid/candidclient"
 	"github.com/canonical/candid/candidclient/redirect"
 	"github.com/canonical/candid/idp"
 	"github.com/canonical/candid/idp/static"
@@ -36,6 +37,7 @@ import (
 	"github.com/canonical/candid/internal/candidtest"
 	"github.com/canonical/candid/internal/discharger"
 	"github.com/canonical/candid/internal/identity"
+	v1 "github.com/canonical/candid/internal/v1"
 	"github.com/canonical/candid/params"
 	"github.com/canonical/candid/store"
 )
@@ -109,6 +111,7 @@ func (s *dischargeSuite) Init(c *qt.C) {
 	}
 	s.srv = candidtest.NewServer(c, sp, map[string]identity.NewAPIHandlerFunc{
 		"discharger": discharger.NewAPIHandler,
+		"v1":         v1.NewAPIHandler,
 	})
 	s.dischargeCreator = candidtest.NewDischargeCreator(s.srv)
 	s.interactor = httpbakery.WebBrowserInteractor{
@@ -882,4 +885,20 @@ func (s *dischargeSuite) TestDischargeBrowserRedirectLoginNotWhitelisted(c *qt.C
 	err = httprequest.UnmarshalJSONResponse(resp, &perr)
 	c.Assert(err, qt.Equals, nil)
 	c.Assert(&perr, qt.ErrorMatches, "invalid return_to")
+}
+
+func (s *dischargeSuite) TestDischargeUserID(c *qt.C) {
+	dc := candidtest.NewUserIDDischargeCreator(s.srv)
+	client := s.srv.AdminClient()
+	ms, err := dc.Discharge(c, "is-authenticated-userid", client)
+	c.Assert(err, qt.Equals, nil)
+	ai, err := dc.Bakery.Checker.Auth(ms).Allow(context.Background(), identchecker.LoginOp)
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(ai.Identity.Id(), qt.Equals, string(auth.AdminProviderID))
+
+	id, ok := ai.Identity.(candidclient.Identity)
+	c.Assert(ok, qt.Equals, true)
+	username, err := id.Username()
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(username, qt.Equals, auth.AdminUsername)
 }
