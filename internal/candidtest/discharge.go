@@ -46,11 +46,32 @@ func NewDischargeCreator(server *Server) *DischargeCreator {
 		Bakery: identchecker.NewBakery(identchecker.BakeryParams{
 			Locator:        server,
 			Key:            bakeryKey,
-			IdentityClient: server.AdminIdentityClient(),
+			IdentityClient: server.AdminIdentityClient(false),
 			Location:       "discharge-test",
 		}),
 		bakeryKey: bakeryKey,
 	}
+}
+
+// NewUserIDDischargeCreator returns a DischargeCreator that creates
+// third party caveats addressed to the given server, which must be
+// serving the "discharger" API. The macaroons will use unique user IDs
+// rather than usernames.
+func NewUserIDDischargeCreator(server *Server) *DischargeCreator {
+	bakeryKey, err := bakery.GenerateKey()
+	if err != nil {
+		panic(err)
+	}
+	return &DischargeCreator{
+		ServerURL: server.URL,
+		Bakery: identchecker.NewBakery(identchecker.BakeryParams{
+			Locator:        server,
+			Key:            bakeryKey,
+			IdentityClient: server.AdminIdentityClient(true),
+			Location:       "discharge-test",
+		}),
+		bakeryKey: bakeryKey,
+	}	
 }
 
 // AssertDischarge checks that a macaroon can be discharged with

@@ -172,7 +172,7 @@ func (s *Server) AdminClient() *httpbakery.Client {
 
 // AdminIdentityClient creates a new candidclient.Client that is configured to log
 // in as an admin user.
-func (s *Server) AdminIdentityClient() *candidclient.Client {
+func (s *Server) AdminIdentityClient(userID bool) *candidclient.Client {
 	client, err := candidclient.New(candidclient.NewParams{
 		BaseURL: s.URL,
 		Client: &httpbakery.Client{
@@ -180,6 +180,7 @@ func (s *Server) AdminIdentityClient() *candidclient.Client {
 			Key:    s.adminAgentKey,
 		},
 		AgentUsername: auth.AdminUsername,
+		UseUserID: userID,
 	})
 	if err != nil {
 		panic(err)

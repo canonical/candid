@@ -307,7 +307,7 @@ func (s *fullServerSuite) TestUserGroups(c *qt.C) {
 	)
 	c.Assert(err, qt.Equals, nil)
 
-	client := s.srv.AdminIdentityClient()
+	client := s.srv.AdminIdentityClient(false)
 	groups, err := client.UserGroups(ctx, &params.UserGroupsRequest{
 		Username: "bob",
 	})

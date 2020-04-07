@@ -59,7 +59,7 @@ func (s *usersSuite) Init(c *qt.C) {
 		"discharger": discharger.NewAPIHandler,
 		"v1":         v1.NewAPIHandler,
 	})
-	s.adminClient = s.srv.AdminIdentityClient()
+	s.adminClient = s.srv.AdminIdentityClient(false)
 	s.interactor = httpbakery.WebBrowserInteractor{
 		OpenWebBrowser: candidtest.PasswordLogin(c, "bob", "bobpassword"),
 	}

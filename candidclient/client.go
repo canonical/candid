@@ -22,8 +22,12 @@ import (
 // Note: tests for this code are in the server implementation.
 
 const (
+	// Production holds the URL of the production jujucharms candid
+	// server.
 	Production = "https://api.jujucharms.com/identity"
-	Staging    = "https://api.staging.jujucharms.com/identity"
+
+	// Staging holds the URL of the staging jujucharms candid server.
+	Staging = "https://api.staging.jujucharms.com/identity"
 )
 
 // Client represents the client of an identity server.
@@ -36,6 +40,8 @@ type Client struct {
 	// permChecker is used to check group membership.
 	// It is only non-zero when groups are enabled.
 	permChecker *PermChecker
+
+	useUserID bool
 }
 
 var _ identchecker.IdentityClient = (*Client)(nil)
@@ -58,6 +64,10 @@ type NewParams struct {
 	// group membership information will be cached.
 	// If this is zero, group membership information will not be cached.
 	CacheTime time.Duration
+
+	// If UseUserID is true then the macaroons will use unique user
+	// ID to transfer identity information rather than usernames.
+	UseUserID bool
 }
 
 // New returns a new client.
@@ -82,12 +92,16 @@ func New(p NewParams) (*Client, error) {
 	}
 	c.Client.Doer = p.Client
 	c.Client.UnmarshalError = httprequest.ErrorUnmarshaler(new(params.Error))
+	c.useUserID = p.UseUserID
 	return &c, nil
 }
 
 // IdentityFromContext implements identchecker.IdentityClient.IdentityFromContext
 // by returning caveats created by IdentityCaveats.
 func (c *Client) IdentityFromContext(ctx context.Context) (identchecker.Identity, []checkers.Caveat, error) {
+	if c.useUserID {
+		return nil, IdentityUserIDCaveats(c.Client.BaseURL), nil
+	}
 	return nil, IdentityCaveats(c.Client.BaseURL), nil
 }
 
@@ -95,13 +109,29 @@ func (c *Client) IdentityFromContext(ctx context.Context) (identchecker.Identity
 // On success, it returns a value that implements Identity as
 // well as identchecker.Identity.
 func (c *Client) DeclaredIdentity(ctx context.Context, declared map[string]string) (identchecker.Identity, error) {
+	if c.useUserID {
+		return c.declaredUserIDIdentity(ctx, declared)
+	}
 	username := declared["username"]
+
 	if username == "" {
 		return nil, errgo.Newf("no declared user name in %q", declared)
 	}
-	return &identity{
+
+	return &usernameIdentity{
 		client:   c,
 		username: username,
+	}, nil
+}
+
+func (c *Client) declaredUserIDIdentity(ctx context.Context, declared map[string]string) (identchecker.Identity, error) {
+	userid := declared["userid"]
+	if userid == "" {
+		return nil, errgo.Newf("no declared user id in %q", declared)
+	}
+	return &useridIdentity{
+		client: c,
+		userID: userid,
 	}, nil
 }
 
@@ -169,6 +199,29 @@ func IdentityCaveats(url string) []checkers.Caveat {
 // macaroon.
 func UserDeclaration(username string) checkers.Caveat {
 	return checkers.DeclaredCaveat("username", username)
+}
+
+// IdentityUserIDCaveats returns a slice containing a third party
+// "is-authenticated-userid" caveat addressed to the identity server at
+// the given URL that will authenticate the user with discharged. The
+// user can be determined by calling Client.DeclaredIdentity on the
+// declarations made by the discharge macaroon,
+func IdentityUserIDCaveats(url string) []checkers.Caveat {
+	return []checkers.Caveat{
+		checkers.NeedDeclaredCaveat(
+			checkers.Caveat{
+				Location:  url,
+				Condition: "is-authenticated-userid",
+			},
+			"userid",
+		),
+	}
+}
+
+// UserIDDeclaration returns a first party caveat that can be used by an
+// identity manager to declare an identity on a discharge macaroon.
+func UserIDDeclaration(id string) checkers.Caveat {
+	return checkers.DeclaredCaveat("userid", id)
 }
 
 //go:generate httprequest-generate-client ../internal/v1 handler client
