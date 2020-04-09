@@ -71,7 +71,7 @@ func NewUserIDDischargeCreator(server *Server) *DischargeCreator {
 			Location:       "discharge-test",
 		}),
 		bakeryKey: bakeryKey,
-	}	
+	}
 }
 
 // AssertDischarge checks that a macaroon can be discharged with

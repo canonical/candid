@@ -44,6 +44,20 @@ func (c *client) GetSSHKeys(ctx context.Context, p *params.SSHKeysRequest) (para
 	return r, err
 }
 
+// GetUserGroupsWithID returns the groups for a user with the given ID.
+func (c *client) GetUserGroupsWithID(ctx context.Context, p *params.GetUserGroupsWithIDRequest) (*params.GroupsResponse, error) {
+	var r *params.GroupsResponse
+	err := c.Client.Call(ctx, p, &r)
+	return r, err
+}
+
+// GetUserWithID returns the user information for the request user.
+func (c *client) GetUserWithID(ctx context.Context, p *params.GetUserWithIDRequest) (*params.User, error) {
+	var r *params.User
+	err := c.Client.Call(ctx, p, &r)
+	return r, err
+}
+
 // ModifyUserGroups updates the groups stored for the given user. Groups
 // can be either added or removed in a single query. It is an error to
 // try and both add and remove groups at the same time.
