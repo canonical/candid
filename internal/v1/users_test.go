@@ -1066,3 +1066,126 @@ func publicKeyPtrs(pks []bakery.PublicKey) []*bakery.PublicKey {
 	}
 	return pks1
 }
+
+var getUserWithIDTests = []struct {
+	about       string
+	userid      string
+	expectUser  *params.User
+	expectError string
+}{{
+	about:  "no groups",
+	userid: "test:jbloggs",
+	expectUser: &params.User{
+		Username:   "jbloggs",
+		ExternalID: "test:jbloggs",
+		Email:      "jbloggs@example.com",
+		FullName:   "Joe Bloggs",
+		GravatarID: "62300f8842b68279680736dc1f9fc52e",
+		IDPGroups:  []string{},
+		PublicKeys: []*bakery.PublicKey{},
+	},
+}, {
+	about:  "groups",
+	userid: "test:jbloggs2",
+	expectUser: &params.User{
+		Username:   "jbloggs2",
+		ExternalID: "test:jbloggs2",
+		Email:      "jbloggs2@example.com",
+		FullName:   "Joe Bloggs II",
+		GravatarID: "b1337cf8d58e2e2be9b6a5356cfc268b",
+		IDPGroups: []string{
+			"test1",
+			"test2",
+		},
+		PublicKeys: []*bakery.PublicKey{},
+	},
+}, {
+	about:       "no such user",
+	userid:      "test:not-there",
+	expectError: `Get .*/v1/uid/test:not-there: identity "test:not-there" not found`,
+}}
+
+func (s *usersSuite) TestGetUserWithID(c *qt.C) {
+	s.addUser(c, params.User{
+		Username:   "jbloggs",
+		ExternalID: "test:jbloggs",
+		Email:      "jbloggs@example.com",
+		FullName:   "Joe Bloggs",
+	})
+	s.addUser(c, params.User{
+		Username:   "jbloggs2",
+		ExternalID: "test:jbloggs2",
+		Email:      "jbloggs2@example.com",
+		FullName:   "Joe Bloggs II",
+		IDPGroups: []string{
+			"test1",
+			"test2",
+		},
+	})
+
+	for _, test := range getUserWithIDTests {
+		c.Run(test.about, func(c *qt.C) {
+			user, err := s.adminClient.GetUserWithID(s.srv.Ctx, &params.GetUserWithIDRequest{
+				UserID: test.userid,
+			})
+			if test.expectError != "" {
+				c.Assert(err, qt.ErrorMatches, test.expectError)
+				return
+			}
+			c.Assert(err, qt.Equals, nil)
+			c.Assert(user, qt.DeepEquals, test.expectUser)
+		})
+	}
+}
+
+var getUserIDGroupsTests = []struct {
+	about        string
+	userid       string
+	expectGroups []string
+	expectError  string
+}{{
+	about:        "no groups",
+	userid:       "test:jbloggs",
+	expectGroups: []string{},
+}, {
+	about:        "groups",
+	userid:       "test:jbloggs2",
+	expectGroups: []string{"test1", "test2"},
+}, {
+	about:       "no such user",
+	userid:      "test:not-there",
+	expectError: `Get .*/v1/uid/test:not-there/groups: identity "test:not-there" not found`,
+}}
+
+func (s *usersSuite) TestGetUserIDGroups(c *qt.C) {
+	s.addUser(c, params.User{
+		Username:   "jbloggs",
+		ExternalID: "test:jbloggs",
+		Email:      "jbloggs@example.com",
+		FullName:   "Joe Bloggs",
+	})
+	s.addUser(c, params.User{
+		Username:   "jbloggs2",
+		ExternalID: "test:jbloggs2",
+		Email:      "jbloggs2@example.com",
+		FullName:   "Joe Bloggs II",
+		IDPGroups: []string{
+			"test1",
+			"test2",
+		},
+	})
+
+	for _, test := range getUserIDGroupsTests {
+		c.Run(test.about, func(c *qt.C) {
+			groups, err := s.adminClient.GetUserGroupsWithID(s.srv.Ctx, &params.GetUserGroupsWithIDRequest{
+				UserID: test.userid,
+			})
+			if test.expectError != "" {
+				c.Assert(err, qt.ErrorMatches, test.expectError)
+				return
+			}
+			c.Assert(err, qt.Equals, nil)
+			c.Assert(groups.Groups, qt.DeepEquals, test.expectGroups)
+		})
+	}
+}

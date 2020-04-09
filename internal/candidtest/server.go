@@ -180,7 +180,7 @@ func (s *Server) AdminIdentityClient(userID bool) *candidclient.Client {
 			Key:    s.adminAgentKey,
 		},
 		AgentUsername: auth.AdminUsername,
-		UseUserID: userID,
+		UseUserID:     userID,
 	})
 	if err != nil {
 		panic(err)

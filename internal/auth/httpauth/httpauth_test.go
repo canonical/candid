@@ -100,6 +100,9 @@ func (s *authSuite) TestAuthorizeWithAdminCredentials(c *qt.C) {
 				MacaroonVerifier: s.oven,
 				ACLManager:       s.aclManager,
 			})
+			c.Assert(err, qt.Equals, nil)
+			err = authorizer.SetAdminPublicKey(context.Background(), &bakery.PublicKey{})
+			c.Assert(err, qt.Equals, nil)
 			httpAuthorizer := httpauth.New(s.oven, authorizer, 0)
 			req, _ := http.NewRequest("GET", "/", nil)
 			for attr, val := range test.header {

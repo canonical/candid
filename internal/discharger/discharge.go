@@ -155,11 +155,7 @@ func (c *thirdPartyCaveatChecker) checkThirdPartyCaveat(ctx context.Context, p h
 		if !ok {
 			return nil, errgo.Newf("unexpected authinfo type %T", authInfo)
 		}
-		sid, err := id.StoreIdentity(ctx)
-		if err != nil {
-			return nil, errgo.Notef(err, "cannot get stored identity")
-		}
-		declaration = candidclient.UserIDDeclaration(string(sid.ProviderID))
+		declaration = candidclient.UserIDDeclaration(string(id.ProviderID))
 	}
 
 	return []checkers.Caveat{

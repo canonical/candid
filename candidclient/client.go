@@ -131,7 +131,9 @@ func (c *Client) declaredUserIDIdentity(ctx context.Context, declared map[string
 	}
 	return &useridIdentity{
 		client: c,
-		userID: userid,
+		user: params.User{
+			ExternalID: userid,
+		},
 	}, nil
 }
 

@@ -106,7 +106,9 @@ func (s *authSuite) createIdentity(c *qt.C, username string, pk *bakery.PublicKe
 		store.PublicKeys: store.Set,
 	})
 	c.Assert(err, qt.Equals, nil)
-	id, err := s.authorizer.Identity(s.context, username)
+	id, err := s.authorizer.Identity(s.context, &store.Identity{
+		ProviderID: store.MakeProviderIdentity("test", username),
+	})
 	c.Assert(err, qt.Equals, nil)
 	return id
 }
@@ -285,15 +287,10 @@ func (s *authSuite) TestAdminUserGroups(c *qt.C) {
 	assertAuthorizedGroups(c, authInfo, nil)
 }
 
-func (s *authSuite) TestNonExistentUserGroups(c *qt.C) {
+func (s *authSuite) TestNonExistentUser(c *qt.C) {
 	m := s.identityMacaroon(c, "noone")
-	authInfo, err := s.authorizer.Auth(s.context, []macaroon.Slice{{m.M()}}, identchecker.LoginOp)
-	c.Assert(err, qt.Equals, nil)
-	ident := authInfo.Identity.(*auth.Identity)
-	groups, err := ident.Groups(s.context)
-	c.Assert(err, qt.ErrorMatches, `user noone not found`)
-	c.Assert(errgo.Cause(err), qt.Equals, params.ErrNotFound)
-	c.Assert(groups, qt.IsNil)
+	_, err := s.authorizer.Auth(s.context, []macaroon.Slice{{m.M()}}, identchecker.LoginOp)
+	c.Assert(err, qt.ErrorMatches, `could not determine identity: user noone not found`)
 }
 
 func (s *authSuite) TestExistingUserGroups(c *qt.C) {

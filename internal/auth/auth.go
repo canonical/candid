@@ -35,6 +35,7 @@ var AdminProviderID = store.MakeProviderIdentity("idm", "admin")
 const (
 	kindGlobal = "global"
 	kindUser   = "u"
+	kindUserID = "uid"
 )
 
 // The following constants define possible operation actions.
@@ -143,7 +144,7 @@ func New(params Params) (*Authorizer, error) {
 				return a.aclForOp(ctx, op)
 			},
 		},
-		IdentityClient:   identityClient{a},
+		IdentityClient:   a,
 		MacaroonVerifier: params.MacaroonVerifier,
 	})
 	return a, nil
@@ -209,6 +210,39 @@ func (a *Authorizer) aclForOp(ctx context.Context, op bakery.Op) (acl []string, 
 			acl, err := a.aclManager.ACL(ctx, writeUserSSHKeysACL)
 			return append(acl, username), false, errgo.Mask(err)
 		}
+	case kindUserID:
+		if name == "" {
+			return nil, false, nil
+		}
+		var acl []string
+
+		id := store.Identity{
+			ProviderID: store.ProviderIdentity(name),
+		}
+		sterr := a.store.Identity(ctx, &id)
+		if sterr == nil {
+			acl = append(acl, id.Username)
+		}
+		if errgo.Cause(sterr) == store.ErrNotFound {
+			// If we can't find the user, then supress the
+			// error, whatever operation is being performed
+			// will undoubtedly get the same error.
+			sterr = nil
+		}
+		switch op.Action {
+		case ActionRead:
+			acl1, err := a.aclManager.ACL(ctx, readUserACL)
+			if err == nil {
+				err = sterr
+			}
+			return append(acl, acl1...), false, errgo.Mask(err)
+		case ActionReadGroups:
+			acl1, err := a.aclManager.ACL(ctx, readUserGroupsACL)
+			if err == nil {
+				err = sterr
+			}
+			return append(acl, acl1...), false, errgo.Mask(err)
+		}
 	case "groups":
 		switch op.Action {
 		case ActionDischarge:
@@ -262,36 +296,36 @@ func isDischargeRequiredError(err error) bool {
 	return ok
 }
 
-// Identity creates a new identity for the user with the given username,
-// such a user must exist in the store.
-func (a *Authorizer) Identity(ctx context.Context, username string) (*Identity, error) {
-	id := &Identity{
-		id: store.Identity{
-			Username: username,
-		},
+// Identity creates a new identity for the user identified by the given
+// store.Identity.
+func (a *Authorizer) Identity(ctx context.Context, id *store.Identity) (*Identity, error) {
+	aid := &Identity{
+		Identity:   *id,
 		authorizer: a,
 	}
-	if err := id.lookup(ctx); err != nil {
-		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	if aid.Identity.ID == "" {
+		// Get the complete identity information from the store.
+		if err := a.store.Identity(ctx, &aid.Identity); err != nil {
+			if errgo.Cause(err) == store.ErrNotFound {
+				return nil, errgo.WithCausef(err, params.ErrNotFound, "")
+			}
+			return nil, errgo.Mask(err)
+		}
 	}
-	return id, nil
-}
-
-// An identityClient is an implementation of identchecker.IdentityClient that
-// uses the identity server's data store to get identity information.
-type identityClient struct {
-	authorizer *Authorizer
+	return aid, nil
 }
 
 // IdentityFromContext implements
 // identchecker.IdentityClient.IdentityFromContext by looking for admin
 // credentials in the context.
-func (c identityClient) IdentityFromContext(ctx context.Context) (identchecker.Identity, []checkers.Caveat, error) {
+func (a *Authorizer) IdentityFromContext(ctx context.Context) (identchecker.Identity, []checkers.Caveat, error) {
 	if username := usernameFromContext(ctx); username != "" {
 		if err := CheckUserDomain(ctx, username); err != nil {
 			return nil, nil, errgo.Mask(err)
 		}
-		id, err := c.authorizer.Identity(ctx, username)
+		id, err := a.Identity(ctx, &store.Identity{
+			Username: username,
+		})
 		if err != nil {
 			return nil, nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 		}
@@ -302,20 +336,21 @@ func (c identityClient) IdentityFromContext(ctx context.Context) (identchecker.I
 		// credentials and the admin username is unfortunate but we'll
 		// leave it for now. We should probably remove basic-auth authentication
 		// entirely.
-		if username+"@candid" == AdminUsername && c.authorizer.adminPassword != "" && password == c.authorizer.adminPassword {
-			return &Identity{
-				id: store.Identity{
-					Username: AdminUsername,
-				},
-				authorizer: c.authorizer,
-			}, nil, nil
+		if username+"@candid" == AdminUsername && a.adminPassword != "" && password == a.adminPassword {
+			id, err := a.Identity(ctx, &store.Identity{
+				Username: AdminUsername,
+			})
+			if err == nil {
+				return id, nil, nil
+			}
+			return nil, nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 		}
 		return nil, nil, errgo.WithCausef(nil, params.ErrUnauthorized, "invalid credentials")
 	}
 	return nil, []checkers.Caveat{
 		checkers.NeedDeclaredCaveat(
 			checkers.Caveat{
-				Location:  c.authorizer.location,
+				Location:  a.location,
 				Condition: "is-authenticated-user",
 			},
 			"username",
@@ -336,36 +371,43 @@ func CheckUserDomain(ctx context.Context, username string) error {
 
 // DeclaredIdentity implements identchecker.IdentityClient.DeclaredIdentity by
 // retrieving the user information from the declared map.
-func (c identityClient) DeclaredIdentity(ctx context.Context, declared map[string]string) (identchecker.Identity, error) {
-	username, ok := declared["username"]
-	if !ok {
+func (a *Authorizer) DeclaredIdentity(ctx context.Context, declared map[string]string) (identchecker.Identity, error) {
+	username, hasUsername := declared["username"]
+	userID, hasUserID := declared["userid"]
+
+	if hasUsername == hasUserID {
+		if hasUsername {
+			return nil, errgo.New("both username and userid declared")
+		}
 		return nil, errgo.Newf("no declared user")
 	}
-	if err := CheckUserDomain(ctx, username); err != nil {
+
+	id, err := a.Identity(ctx, &store.Identity{
+		ProviderID: store.ProviderIdentity(userID),
+		Username:   username,
+	})
+	if err != nil {
+		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	}
+
+	if err := CheckUserDomain(ctx, id.Username); err != nil {
 		return nil, errgo.Mask(err)
 	}
-	return &Identity{
-		id: store.Identity{
-			Username: username,
-		},
-		authorizer: c.authorizer,
-	}, nil
+	return id, nil
 }
 
 // An Identity is the implementation of identchecker.Identity used in the
 // identity server.
 type Identity struct {
-	// Initially id is populated only with the Username field,
-	// but calls that require more information call Identity.lookup
-	// which fills out the rest.
-	id             store.Identity
+	store.Identity
+
 	authorizer     *Authorizer
 	resolvedGroups []string
 }
 
 // Id implements identchecker.Identity.Id.
 func (id *Identity) Id() string {
-	return string(id.id.Username)
+	return string(id.Username)
 }
 
 // Domain implements identchecker.Identity.Domain.
@@ -376,7 +418,7 @@ func (id *Identity) Domain() string {
 // Allow implements identchecker.ACLIdentity.Allow by checking whether the
 // given identity is in any of the required groups or users.
 func (id *Identity) Allow(ctx context.Context, acl []string) (bool, error) {
-	if ok, isTrivial := trivialAllow(id.id.Username, acl); isTrivial {
+	if ok, isTrivial := trivialAllow(id.Username, acl); isTrivial {
 		return ok, nil
 	}
 	groups, err := id.Groups(ctx)
@@ -401,13 +443,10 @@ func (id *Identity) Groups(ctx context.Context) ([]string, error) {
 	if id.resolvedGroups != nil {
 		return id.resolvedGroups, nil
 	}
-	if err := id.lookup(ctx); err != nil {
-		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
-	}
-	groups := id.id.Groups
-	if gr := id.authorizer.groupResolvers[id.id.ProviderID.Provider()]; gr != nil {
+	groups := id.Identity.Groups
+	if gr := id.authorizer.groupResolvers[id.ProviderID.Provider()]; gr != nil {
 		var err error
-		groups, err = gr.resolveGroups(ctx, &id.id)
+		groups, err = gr.resolveGroups(ctx, &id.Identity)
 		if err != nil {
 			logger.Warningf("error resolving groups: %s", err)
 		} else {
@@ -415,29 +454,6 @@ func (id *Identity) Groups(ctx context.Context) ([]string, error) {
 		}
 	}
 	return groups, nil
-}
-
-// StoreIdentity returns the store identity document.
-// Callers must not mutate the contents of the returned
-// value.
-func (id *Identity) StoreIdentity(ctx context.Context) (*store.Identity, error) {
-	if err := id.lookup(ctx); err != nil {
-		return nil, errgo.Mask(err)
-	}
-	return &id.id, nil
-}
-
-func (id *Identity) lookup(ctx context.Context) error {
-	if id.id.ID != "" {
-		return nil
-	}
-	if err := id.authorizer.store.Identity(ctx, &id.id); err != nil {
-		if errgo.Cause(err) == store.ErrNotFound {
-			return errgo.WithCausef(err, params.ErrNotFound, "")
-		}
-		return errgo.Mask(err)
-	}
-	return nil
 }
 
 // trivialAllow reports whether the username should be allowed
@@ -468,10 +484,17 @@ func GroupsDischargeOp(groups []string) bakery.Op {
 	return op("groups-"+strings.Join(groups, " "), ActionDischarge)
 }
 
+// UserOp is an operation specific to a username.
 func UserOp(u params.Username, action string) bakery.Op {
 	return op(kindUser+"-"+string(u), action)
 }
 
+// UserIDOp is an operation specific to a user ID.
+func UserIDOp(uid string, action string) bakery.Op {
+	return op(kindUserID+"-"+uid, action)
+}
+
+// GlobalOp is an operation that is not specific to a user.
 func GlobalOp(action string) bakery.Op {
 	return op(kindGlobal, action)
 }

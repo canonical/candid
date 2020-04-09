@@ -6,9 +6,10 @@ package candidclient
 import (
 	"context"
 
-	"github.com/canonical/candid/params"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
+
+	"github.com/canonical/candid/params"
 )
 
 // Identity represents a Candid identity. It includes bakery.ACLIdentity but
@@ -72,60 +73,55 @@ func (id *usernameIdentity) Domain() string {
 }
 
 type useridIdentity struct {
-	client   *Client
-	userID   string
-	username string
+	client *Client
+	user   params.User
 }
 
 // Username implements Identity.Username.
 func (id *useridIdentity) Username() (string, error) {
-	if id.username != "" {
-		return id.username, nil
+	if id.user.Username != "" {
+		return string(id.user.Username), nil
 	}
 
 	ctx := context.Background()
-	usernames, err := id.client.QueryUsers(ctx, &params.QueryUsersRequest{
-		ExternalID: id.userID,
+	user, err := id.client.GetUserWithID(ctx, &params.GetUserWithIDRequest{
+		UserID: id.user.ExternalID,
 	})
 	if err != nil {
 		return "", errgo.Mask(err)
 	}
-	if len(usernames) == 1 {
-		id.username = usernames[0]
-	}
-	return id.username, nil
+	id.user = *user
+	return string(id.user.Username), nil
 }
 
 // Groups implements Identity.Groups.
 func (id *useridIdentity) Groups() ([]string, error) {
-	username, err := id.Username()
+	_, err := id.Username()
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}
-	if id.client.permChecker != nil {
-		return id.client.permChecker.cache.Groups(username)
-	}
-	return nil, nil
+	return id.user.IDPGroups, nil
 }
 
 // Allow implements Identity.Allow.
 func (id *useridIdentity) Allow(ctx context.Context, acl []string) (bool, error) {
-	username, err := id.Username()
+	groups, err := id.Groups()
 	if err != nil {
 		return false, errgo.Mask(err)
 	}
 
-	if id.client.permChecker != nil {
-		return id.client.permChecker.Allow(username, acl)
+	groups = append(groups, string(id.user.Username))
+	for _, g := range groups {
+		if ok, _ := trivialAllow(g, acl); ok {
+			return true, nil
+		}
 	}
-	// No groups - just implement the trivial cases.
-	ok, _ := trivialAllow(username, acl)
-	return ok, nil
+	return false, nil
 }
 
 // Id implements Identity.Id.
 func (id *useridIdentity) Id() string {
-	return id.userID
+	return id.user.ExternalID
 }
 
 // Domain implements Identity.Domain.
