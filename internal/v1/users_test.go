@@ -1102,7 +1102,7 @@ var getUserWithIDTests = []struct {
 }, {
 	about:       "no such user",
 	userid:      "test:not-there",
-	expectError: `Get .*/v1/uid/test:not-there: identity "test:not-there" not found`,
+	expectError: `Get .*/v1/uid\?id=test%3Anot-there: identity "test:not-there" not found`,
 }}
 
 func (s *usersSuite) TestGetUserWithID(c *qt.C) {
@@ -1154,7 +1154,7 @@ var getUserIDGroupsTests = []struct {
 }, {
 	about:       "no such user",
 	userid:      "test:not-there",
-	expectError: `Get .*/v1/uid/test:not-there/groups: identity "test:not-there" not found`,
+	expectError: `Get .*/v1/uid/groups\?id=test%3Anot-there: identity "test:not-there" not found`,
 }}
 
 func (s *usersSuite) TestGetUserIDGroups(c *qt.C) {
