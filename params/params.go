@@ -328,15 +328,15 @@ type IDPChoiceDetails struct {
 // GetUserWithIDRequest is a request for the user details of the user with the
 // given ID.
 type GetUserWithIDRequest struct {
-	httprequest.Route `httprequest:"GET /v1/uid/:UserID"`
-	UserID            string `httprequest:",path"`
+	httprequest.Route `httprequest:"GET /v1/uid"`
+	UserID            string `httprequest:"id,form"`
 }
 
 // GetUserGroupsWithIDRequest is a request for the groups of the user with the
 // given ID.
 type GetUserGroupsWithIDRequest struct {
-	httprequest.Route `httprequest:"GET /v1/uid/:UserID/groups"`
-	UserID            string `httprequest:",path"`
+	httprequest.Route `httprequest:"GET /v1/uid/groups"`
+	UserID            string `httprequest:"id,form"`
 }
 
 // GroupsResponse is the response to a GetUserGroupsWithIDRequest.
