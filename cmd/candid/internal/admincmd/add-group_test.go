@@ -37,7 +37,7 @@ func (s *addGroupSuite) TestAddGroup(c *qt.C) {
 		ProviderID: store.MakeProviderIdentity("test", "bob"),
 	}
 	err := s.fixture.store.Identity(ctx, &identity)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	c.Assert(identity.Groups, qt.DeepEquals, []string{"test1", "test2"})
 }
 
@@ -53,7 +53,7 @@ func (s *addGroupSuite) TestAddGroupForEmail(c *qt.C) {
 		ProviderID: store.MakeProviderIdentity("test", "bob"),
 	}
 	err := s.fixture.store.Identity(ctx, &identity)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	c.Assert(identity.Groups, qt.DeepEquals, []string{"test1", "test2"})
 }
 

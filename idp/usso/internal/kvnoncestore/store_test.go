@@ -62,13 +62,13 @@ func TestAccept(t *testing.T) {
 	defer c.Done()
 
 	kv, err := candidtest.NewStore().ProviderDataStore.KeyValueStore(context.Background(), "test")
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	store := kvnoncestore.New(kv, time.Minute)
 
 	now, err := time.Parse(time.RFC3339, "2014-12-25T00:00:00Z")
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	err = kvnoncestore.Accept(store, "https://example.com", "2014-12-25T00:00:00Z0", now)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	for i, test := range acceptTests {
 		c.Run(test.about, func(c *qt.C) {
 			c.Logf("%d. %s", i, test.about)
@@ -77,7 +77,7 @@ func TestAccept(t *testing.T) {
 				c.Assert(err, qt.ErrorMatches, test.expectError)
 				return
 			}
-			c.Assert(err, qt.Equals, nil)
+			c.Assert(err, qt.IsNil)
 		})
 	}
 }

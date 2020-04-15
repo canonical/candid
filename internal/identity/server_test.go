@@ -76,7 +76,7 @@ func (s *serverSuite) TestNewServerWithVersions(c *qt.C) {
 					}
 					enc := json.NewEncoder(w)
 					err := enc.Encode(response)
-					c.Assert(err, qt.Equals, nil)
+					c.Assert(err, qt.IsNil)
 				},
 			}}, nil
 		}
@@ -89,7 +89,7 @@ func (s *serverSuite) TestNewServerWithVersions(c *qt.C) {
 	}, map[string]identity.NewAPIHandlerFunc{
 		"version1": serveVersion("version1"),
 	})
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	defer h.Close()
 	assertServesVersion(c, h, "version1")
 	assertDoesNotServeVersion(c, h, "version2")
@@ -103,7 +103,7 @@ func (s *serverSuite) TestNewServerWithVersions(c *qt.C) {
 		"version1": serveVersion("version1"),
 		"version2": serveVersion("version2"),
 	})
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	defer h.Close()
 	assertServesVersion(c, h, "version1")
 	assertServesVersion(c, h, "version2")
@@ -118,7 +118,7 @@ func (s *serverSuite) TestNewServerWithVersions(c *qt.C) {
 		"version2": serveVersion("version2"),
 		"version3": serveVersion("version3"),
 	})
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	defer h.Close()
 	assertServesVersion(c, h, "version1")
 	assertServesVersion(c, h, "version2")
@@ -142,7 +142,7 @@ func (s *serverSuite) TestServerHasAccessControlAllowHeaders(c *qt.C) {
 		MeetingStore: s.store.MeetingStore,
 		ACLStore:     s.store.ACLStore,
 	}, impl)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	defer h.Close()
 	rec := qthttptest.DoRequest(c, qthttptest.DoRequestParams{
 		Handler: h,
@@ -190,7 +190,7 @@ func (s *serverSuite) TestServerPanicRecovery(c *qt.C) {
 		MeetingStore: s.store.MeetingStore,
 		ACLStore:     s.store.ACLStore,
 	}, impl)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	defer h.Close()
 	qthttptest.AssertJSONCall(c, qthttptest.JSONCallParams{
 		Handler:      h,
@@ -218,7 +218,7 @@ func (s *serverSuite) TestServerStaticFiles(c *qt.C) {
 					}
 					enc := json.NewEncoder(w)
 					err := enc.Encode(response)
-					c.Assert(err, qt.Equals, nil)
+					c.Assert(err, qt.IsNil)
 				},
 			}}, nil
 		}
@@ -232,17 +232,17 @@ func (s *serverSuite) TestServerStaticFiles(c *qt.C) {
 	}, map[string]identity.NewAPIHandlerFunc{
 		"version1": serveVersion("version1"),
 	})
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	defer h.Close()
 
 	f, err := os.Create(filepath.Join(path, "file"))
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	fmt.Fprintf(f, "test file")
 	f.Close()
 
 	rr := httptest.NewRecorder()
 	req, err := http.NewRequest("GET", "/static/file", nil)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	h.ServeHTTP(rr, req)
 	c.Assert(rr.Code, qt.Equals, http.StatusOK, qt.Commentf("%d: %s", rr.Code, rr.Body.String()))
 	c.Assert(rr.Body.String(), qt.Equals, "test file")
@@ -305,13 +305,13 @@ func (s *fullServerSuite) TestUserGroups(c *qt.C) {
 			store.Groups:   store.Set,
 		},
 	)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 
 	client := s.srv.AdminIdentityClient(false)
 	groups, err := client.UserGroups(ctx, &params.UserGroupsRequest{
 		Username: "bob",
 	})
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	c.Assert(groups, qt.DeepEquals, []string{"g1", "g2", "g3", "g4"})
 }
 
@@ -321,29 +321,29 @@ func (s *fullServerSuite) TestACL(c *qt.C) {
 		Doer:    s.srv.AdminClient(),
 	})
 	acl, err := client.Get(context.Background(), "read-user")
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	c.Assert(acl, qt.DeepEquals, []string{auth.AdminUsername})
 	err = client.Add(context.Background(), "read-user", []string{"test-1"})
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	acl, err = client.Get(context.Background(), "read-user")
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	c.Assert(acl, qt.DeepEquals, []string{auth.AdminUsername, "test-1"})
 	err = client.Set(context.Background(), "read-user", []string{"test-2"})
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	acl, err = client.Get(context.Background(), "read-user")
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	c.Assert(acl, qt.DeepEquals, []string{"test-2"})
 }
 
 func (s *fullServerSuite) TestACLMACARAQResponse(c *qt.C) {
 	resp, err := http.Get(s.srv.URL + "/acl/read-user")
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	defer resp.Body.Close()
 	buf, err := ioutil.ReadAll(resp.Body)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	var herr httpbakery.Error
 	err = json.Unmarshal(buf, &herr)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	c.Assert(herr.Code, qt.Equals, httpbakery.ErrDischargeRequired)
 	c.Assert(herr.Info, qt.Not(qt.IsNil))
 	c.Assert(herr.Info.MacaroonPath, qt.Equals, "../")

@@ -53,7 +53,7 @@ func TestDischarge(t *testing.T) {
 			store.Groups:   store.Set,
 		},
 	)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	ussoSrv.MockUSSO.AddUser(&mockusso.User{
 		ID:       "1234",
 		NickName: "test",

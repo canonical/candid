@@ -80,7 +80,7 @@ func (s *DischargeCreator) AssertDischarge(c *qt.C, i httpbakery.Interactor) {
 	ms, err := s.Discharge(c, "is-authenticated-user", BakeryClient(i))
 	c.Assert(err, qt.Equals, nil, qt.Commentf("%s", errgo.Details(err)))
 	_, err = s.Bakery.Checker.Auth(ms).Allow(context.Background(), identchecker.LoginOp)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 }
 
 // Discharge attempts to perform a discharge of a new macaroon against
@@ -104,7 +104,7 @@ func (s *DischargeCreator) NewMacaroon(c *qt.C, condition string, op bakery.Op) 
 		}, checkers.TimeBeforeCaveat(time.Now().Add(time.Minute))},
 		op,
 	)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	return m
 }
 
@@ -113,7 +113,7 @@ func (s *DischargeCreator) NewMacaroon(c *qt.C, condition string, op bakery.Op) 
 // macaroon is checked to be the same as id.
 func (s *DischargeCreator) AssertMacaroon(c *qt.C, ms macaroon.Slice, op bakery.Op, id string) {
 	ui, err := s.Bakery.Checker.Auth(ms).Allow(context.Background(), op)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	if id == "" {
 		return
 	}

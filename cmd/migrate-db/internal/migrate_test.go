@@ -67,14 +67,14 @@ func TestStoreSource(t *testing.T) {
 	}, store.Update{
 		store.Username: store.Set,
 	})
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	err = st.UpdateIdentity(ctx, &store.Identity{
 		ProviderID: store.MakeProviderIdentity("test", "2"),
 		Username:   "test2",
 	}, store.Update{
 		store.Username: store.Set,
 	})
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	source := internal.NewStoreSource(ctx, st)
 	usernames := make(map[string]struct{})
 	for source.Next() {
@@ -165,7 +165,7 @@ func TestCopy(t *testing.T) {
 		store.ProviderInfo:  store.Set,
 		store.ExtraInfo:     store.Set,
 	})
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 
 	identity2 := store.Identity{
 		ProviderID: store.MakeProviderIdentity("test", "2"),
@@ -174,17 +174,17 @@ func TestCopy(t *testing.T) {
 	err = store1.UpdateIdentity(ctx, &identity2, store.Update{
 		store.Username: store.Set,
 	})
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 
 	store2 := memstore.NewStore()
 	err = internal.Copy(ctx, store2, internal.NewStoreSource(ctx, store1))
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 
 	copiedIdentity1 := store.Identity{
 		ProviderID: store.MakeProviderIdentity("test", "1"),
 	}
 	err = store2.Identity(ctx, &copiedIdentity1)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	normalize(&identity1)
 	normalize(&copiedIdentity1)
 	c.Assert(copiedIdentity1, qt.DeepEquals, identity1)
@@ -193,7 +193,7 @@ func TestCopy(t *testing.T) {
 		ProviderID: store.MakeProviderIdentity("test", "2"),
 	}
 	err = store2.Identity(ctx, &copiedIdentity2)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	normalize(&identity2)
 	normalize(&copiedIdentity2)
 	c.Assert(copiedIdentity2, qt.DeepEquals, identity2)
@@ -261,7 +261,7 @@ func TestCopyDstError(t *testing.T) {
 		store.ProviderInfo:  store.Set,
 		store.ExtraInfo:     store.Set,
 	})
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 
 	store2 := errorStore{errgo.New("test error")}
 	err = internal.Copy(ctx, store2, internal.NewStoreSource(ctx, store1))

@@ -159,14 +159,14 @@ func TestInitIdempotent(t *testing.T) {
 			store.Owner:        store.Set,
 		},
 	)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	backend, err := sqlstore.NewBackend("postgres", f.pg.DB)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	id2 := store.Identity{
 		ProviderID: store.MakeProviderIdentity("test", "test-1"),
 	}
 	err = backend.Store().Identity(context.Background(), &id2)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	c.Assert(id2, qt.DeepEquals, id1)
 }
 
@@ -180,10 +180,10 @@ func newFixture(c *qt.C) *fixture {
 	if errgo.Cause(err) == postgrestest.ErrDisabled {
 		c.Skip(err.Error())
 	}
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 
 	backend, err := sqlstore.NewBackend("postgres", pg.DB)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	// Note: closing backend also closes the db.
 	c.Defer(backend.Close)
 

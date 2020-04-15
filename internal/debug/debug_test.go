@@ -63,7 +63,7 @@ func (s *debugSuite) TestServeDebugStatus(c *qt.C) {
 		ExpectBody: qthttptest.BodyAsserter(func(c *qt.C, body json.RawMessage) {
 			var result map[string]debugstatus.CheckResult
 			err := json.Unmarshal(body, &result)
-			c.Assert(err, qt.Equals, nil)
+			c.Assert(err, qt.IsNil)
 			c.Assert(result, qt.HasLen, len(expectNames))
 			for k, v := range result {
 				c.Assert(v.Name, qt.Equals, expectNames[k], qt.Commentf("%s: incorrect name", k))
@@ -90,7 +90,7 @@ func newFixture(c *qt.C) *fixture {
 	if errgo.Cause(err) == mgotest.ErrDisabled {
 		c.Skip("mgotest disabled")
 	}
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	// mgotest sets the SocketTimout to 1s. Restore it back to the
 	// default value.
 	db.Session.SetSocketTimeout(time.Minute)
@@ -99,7 +99,7 @@ func newFixture(c *qt.C) *fixture {
 		db.Close()
 		c.Fatal(err)
 	}
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	c.Defer(backend.Close)
 
 	sp := identity.ServerParams{

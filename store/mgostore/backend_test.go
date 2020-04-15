@@ -21,7 +21,7 @@ func TestNewBackend(t *testing.T) {
 	if errgo.Cause(err) == mgotest.ErrDisabled {
 		c.Skip("mgotest disabled")
 	}
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	defer db.Close()
 	// mgotest sets the SocketTimout to 1s. Restore it back to the
 	// default value.
@@ -31,14 +31,14 @@ func TestNewBackend(t *testing.T) {
 	s := testdb.Session.Copy()
 	testdb = testdb.With(s)
 	backend, err := mgostore.NewBackend(testdb)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	c.Defer(backend.Close)
 	s.Close()
 
 	ctx := context.Background()
 	_, err = backend.Store().FindIdentities(ctx, &store.Identity{}, store.Filter{}, nil, 0, 0)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 
 	err = backend.ACLStore().CreateACL(ctx, "test", []string{"test"})
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 }

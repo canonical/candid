@@ -33,30 +33,30 @@ func (s *keyValueSuite) Init(c *qt.C) {
 func (s *keyValueSuite) TestSet(c *qt.C) {
 	ctx := context.Background()
 	kv, err := s.Store.KeyValueStore(ctx, "test")
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	ctx, close := kv.Context(ctx)
 	defer close()
 
 	err = kv.Set(ctx, "test-key", []byte("test-value"), time.Time{})
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 
 	result, err := kv.Get(ctx, "test-key")
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	c.Assert(string(result), qt.Equals, "test-value")
 
 	// Try again with an existing record, which might trigger different behavior.
 	err = kv.Set(ctx, "test-key", []byte("test-value-2"), time.Time{})
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 
 	result, err = kv.Get(ctx, "test-key")
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	c.Assert(string(result), qt.Equals, "test-value-2")
 }
 
 func (s *keyValueSuite) TestGetNotFound(c *qt.C) {
 	ctx := context.Background()
 	kv, err := s.Store.KeyValueStore(ctx, "test")
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	ctx, close := kv.Context(ctx)
 	defer close()
 
@@ -68,27 +68,27 @@ func (s *keyValueSuite) TestGetNotFound(c *qt.C) {
 func (s *keyValueSuite) TestSetKeyOnce(c *qt.C) {
 	ctx := context.Background()
 	kv, err := s.Store.KeyValueStore(ctx, "test")
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	ctx, close := kv.Context(ctx)
 	defer close()
 
 	err = simplekv.SetKeyOnce(ctx, kv, "test-key", []byte("test-value"), time.Time{})
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 
 	result, err := kv.Get(ctx, "test-key")
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	c.Assert(string(result), qt.Equals, "test-value")
 }
 
 func (s *keyValueSuite) TestSetKeyOnceDuplicate(c *qt.C) {
 	ctx := context.Background()
 	kv, err := s.Store.KeyValueStore(ctx, "test")
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	ctx, close := kv.Context(ctx)
 	defer close()
 
 	err = simplekv.SetKeyOnce(ctx, kv, "test-key", []byte("test-value"), time.Time{})
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 
 	err = simplekv.SetKeyOnce(ctx, kv, "test-key", []byte("test-value"), time.Time{})
 	c.Assert(errgo.Cause(err), qt.Equals, simplekv.ErrDuplicateKey)
@@ -98,82 +98,82 @@ func (s *keyValueSuite) TestSetKeyOnceDuplicate(c *qt.C) {
 func (s *keyValueSuite) TestTwoStoresForTheSameIDPCommunicate(c *qt.C) {
 	ctx := context.Background()
 	kv1, err := s.Store.KeyValueStore(ctx, "test")
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	kv2, err := s.Store.KeyValueStore(ctx, "test")
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	ctx1, close := kv1.Context(ctx)
 	defer close()
 	ctx2, close := kv2.Context(ctx)
 	defer close()
 
 	err = kv1.Set(ctx1, "test-key", []byte("test-value"), time.Time{})
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 
 	v, err := kv2.Get(ctx2, "test-key")
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	c.Assert(string(v), qt.Equals, "test-value")
 }
 
 func (s *keyValueSuite) TestTwoStoresForDifferentIDPsAreIndependent(c *qt.C) {
 	ctx := context.Background()
 	kv1, err := s.Store.KeyValueStore(ctx, "test")
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	kv2, err := s.Store.KeyValueStore(ctx, "test2")
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	ctx1, close := kv1.Context(ctx)
 	defer close()
 	ctx2, close := kv2.Context(ctx)
 	defer close()
 
 	err = simplekv.SetKeyOnce(ctx1, kv1, "test-key", []byte("test-value"), time.Time{})
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 
 	err = simplekv.SetKeyOnce(ctx2, kv2, "test-key", []byte("test-value-2"), time.Time{})
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 
 	v, err := kv1.Get(ctx1, "test-key")
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	c.Assert(string(v), qt.Equals, "test-value")
 }
 
 func (s *keyValueSuite) TestUpdateSuccessWithPreexistingKey(c *qt.C) {
 	ctx := context.Background()
 	kv, err := s.Store.KeyValueStore(ctx, "test")
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	err = kv.Set(ctx, "test-key", []byte("test-value"), time.Time{})
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 
 	err = kv.Update(ctx, "test-key", time.Time{}, func(oldVal []byte) ([]byte, error) {
 		c.Check(string(oldVal), qt.Equals, "test-value")
 		return []byte("test-value-2"), nil
 	})
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 
 	val, err := kv.Get(ctx, "test-key")
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	c.Assert(string(val), qt.Equals, "test-value-2")
 }
 
 func (s *keyValueSuite) TestUpdateSuccessWithoutPreexistingKey(c *qt.C) {
 	ctx := context.Background()
 	kv, err := s.Store.KeyValueStore(ctx, "test")
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 
 	err = kv.Update(ctx, "test-key", time.Time{}, func(oldVal []byte) ([]byte, error) {
 		c.Check(oldVal, qt.IsNil)
 		return []byte("test-value"), nil
 	})
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 
 	val, err := kv.Get(ctx, "test-key")
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	c.Assert(string(val), qt.Equals, "test-value")
 }
 
 func (s *keyValueSuite) TestUpdateConcurrent(c *qt.C) {
 	ctx := context.Background()
 	kv, err := s.Store.KeyValueStore(ctx, "test")
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 
 	const N = 100
 	done := make(chan struct{})
@@ -195,7 +195,7 @@ func (s *keyValueSuite) TestUpdateConcurrent(c *qt.C) {
 	<-done
 	<-done
 	val, err := kv.Get(ctx, "test-key")
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	c.Assert(val, qt.HasLen, 1)
 	c.Assert(int(val[0]), qt.Equals, N*2)
 }
@@ -203,12 +203,12 @@ func (s *keyValueSuite) TestUpdateConcurrent(c *qt.C) {
 func (s *keyValueSuite) TestUpdateErrorWithExistingKey(c *qt.C) {
 	ctx := context.Background()
 	kv, err := s.Store.KeyValueStore(ctx, "test")
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 
 	testErr := errgo.Newf("test error")
 
 	err = kv.Set(ctx, "test-key", []byte("test-value"), time.Time{})
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 
 	err = kv.Update(ctx, "test-key", time.Time{}, func(oldVal []byte) ([]byte, error) {
 		c.Check(string(oldVal), qt.Equals, "test-value")
@@ -220,7 +220,7 @@ func (s *keyValueSuite) TestUpdateErrorWithExistingKey(c *qt.C) {
 func (s *keyValueSuite) TestUpdateErrorWithNonExistentKey(c *qt.C) {
 	ctx := context.Background()
 	kv, err := s.Store.KeyValueStore(ctx, "test")
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 
 	testErr := errgo.Newf("test error")
 
@@ -235,36 +235,36 @@ func (s *keyValueSuite) TestUpdateErrorWithNonExistentKey(c *qt.C) {
 func (s *keyValueSuite) TestSetNilUpdatesAsNonNil(c *qt.C) {
 	ctx := context.Background()
 	kv, err := s.Store.KeyValueStore(ctx, "test")
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 
 	err = kv.Set(ctx, "test-key", nil, time.Time{})
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 
 	err = kv.Update(ctx, "test-key", time.Time{}, func(oldVal []byte) ([]byte, error) {
 		c.Assert(oldVal, qt.DeepEquals, []byte{})
 		return nil, nil
 	})
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 }
 
 func (s *keyValueSuite) TestUpdateReturnNilThenUpdatesAsNonNil(c *qt.C) {
 	ctx := context.Background()
 	kv, err := s.Store.KeyValueStore(ctx, "test")
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 
 	err = kv.Set(ctx, "test-key", []byte("test-value"), time.Time{})
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 
 	err = kv.Update(ctx, "test-key", time.Time{}, func(oldVal []byte) ([]byte, error) {
 		c.Check(string(oldVal), qt.Equals, "test-value")
 		return nil, nil
 	})
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 
 	err = kv.Update(ctx, "test-key", time.Time{}, func(oldVal []byte) ([]byte, error) {
 		c.Check(oldVal, qt.Not(qt.IsNil))
 		c.Assert(oldVal, qt.DeepEquals, []byte{})
 		return nil, nil
 	})
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 }

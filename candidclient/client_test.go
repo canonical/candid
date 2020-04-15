@@ -66,15 +66,15 @@ func testIdentityClient(c *qt.C, candidClient identchecker.IdentityClient, bclie
 	derr := errgo.Cause(authErr).(*bakery.DischargeRequiredError)
 
 	m, err := b.Oven.NewMacaroon(context.TODO(), bakery.LatestVersion, derr.Caveats, derr.Ops...)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 
 	ms, err := bclient.DischargeAll(context.TODO(), m)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 
 	// Make sure that the macaroon discharged correctly and that it
 	// has the right declared caveats.
 	authInfo, err := b.Checker.Auth(ms).Allow(context.TODO(), identchecker.LoginOp)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 
 	c.Assert(authInfo.Identity, qt.Not(qt.IsNil))
 	c.Assert(authInfo.Identity.Id(), qt.Equals, expectId)
@@ -83,14 +83,14 @@ func testIdentityClient(c *qt.C, candidClient identchecker.IdentityClient, bclie
 	user := authInfo.Identity.(candidclient.Identity)
 
 	u, err := user.Username()
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	c.Assert(u, qt.Equals, expectUser)
 	ok, err := user.Allow(context.TODO(), []string{expectGroups[0]})
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	c.Assert(ok, qt.Equals, true)
 
 	groups, err := user.Groups()
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	sort.Strings(groups)
 	c.Assert(groups, qt.DeepEquals, expectGroups)
 }

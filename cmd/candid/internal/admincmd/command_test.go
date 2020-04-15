@@ -43,7 +43,7 @@ func newFixture(c *qt.C) *fixture {
 	f := new(fixture)
 
 	adminAgentKey, err := bakery.GenerateKey()
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 
 	f.aclStore = aclstore.NewACLStore(memsimplekv.NewStore())
 	f.store = memstore.NewStore()
@@ -63,7 +63,7 @@ func newFixture(c *qt.C) *fixture {
 			}),
 		},
 	})
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	c.Defer(func() {
 		f.server.Close()
 	})
@@ -80,7 +80,7 @@ func newFixture(c *qt.C) *fixture {
 			Username: "admin@candid",
 		}},
 	})
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 
 	f.command = admincmd.New()
 	internalcandidtest.LogTo(c)
@@ -134,7 +134,7 @@ func TestLoadCACerts(t *testing.T) {
 
 	st := memstore.NewStore()
 	adminAgentKey, err := bakery.GenerateKey()
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 
 	srv := candidtest.ServeTLS(ct, candid.ServerParams{
 		Store:               st,
@@ -158,7 +158,7 @@ func TestLoadCACerts(t *testing.T) {
 			Username: "admin@candid",
 		}},
 	})
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 
 	certFile := filepath.Join(dir, "cacerts.pem")
 	emptyFile := filepath.Join(dir, "empty.pem")
@@ -175,11 +175,11 @@ func TestLoadCACerts(t *testing.T) {
 		),
 		0600,
 	)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	err = ioutil.WriteFile(emptyFile, nil, 0600)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	err = ioutil.WriteFile(unreadableFile, nil, 0)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 
 	c.Setenv("CANDID_CA_CERTS", emptyFile+":"+unreadableFile+":"+nonExistentFile+"::"+certFile)
 

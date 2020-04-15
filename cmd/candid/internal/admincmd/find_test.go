@@ -63,7 +63,7 @@ func (s *findSuite) TestFindNoParameters(c *qt.C) {
 	stdout := s.fixture.CheckSuccess(c, "find", "-a", "admin.agent", "--format", "json")
 	var usernames []string
 	err := json.Unmarshal([]byte(stdout), &usernames)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	c.Assert(usernames, qt.DeepEquals, []string{"admin@candid", "alice", "bob", "charlie"})
 }
 
@@ -89,7 +89,7 @@ func (s *findSuite) TestFindLastLoginTime(c *qt.C) {
 	stdout := s.fixture.CheckSuccess(c, "find", "-a", "admin.agent", "--format", "json", "--last-login", "30")
 	var usernames []string
 	err := json.Unmarshal([]byte(stdout), &usernames)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	c.Assert(usernames, qt.DeepEquals, []string{"alice", "charlie"})
 }
 
@@ -115,7 +115,7 @@ func (s *findSuite) TestFindLastDischargeTime(c *qt.C) {
 	stdout := s.fixture.CheckSuccess(c, "find", "-a", "admin.agent", "--format", "json", "--last-discharge", "20")
 	var usernames []string
 	err := json.Unmarshal([]byte(stdout), &usernames)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	c.Assert(usernames, qt.DeepEquals, []string{"admin@candid", "alice", "charlie"})
 }
 
@@ -140,7 +140,7 @@ func (s *findSuite) TestFindWithEmail(c *qt.C) {
 	stdout := s.fixture.CheckSuccess(c, "find", "-a", "admin.agent", "-d", "email", "--format", "json")
 	var usernames []map[string]string
 	err := json.Unmarshal([]byte(stdout), &usernames)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	c.Assert(usernames, qt.DeepEquals, []map[string]string{
 		{"username": "admin@candid", "email": ""},
 		{"username": "alice", "email": "alice@example.com"},
@@ -170,7 +170,7 @@ func (s *findSuite) TestFindWithEmailAndGravatar(c *qt.C) {
 	stdout := s.fixture.CheckSuccess(c, "find", "-a", "admin.agent", "-d", "email, gravatar_id", "--format", "json")
 	var usernames []map[string]string
 	err := json.Unmarshal([]byte(stdout), &usernames)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	c.Assert(usernames, qt.DeepEquals, []map[string]string{
 		{"username": "admin@candid", "email": "", "gravatar_id": ""},
 		{"username": "alice", "email": "alice@example.com", "gravatar_id": "c160f8cc69a4f0bf2b0362752353d060"},

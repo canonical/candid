@@ -64,10 +64,10 @@ func TestRootKeyStore(t *testing.T) {
 	ctx := context.Background()
 
 	key, id, err := rks.RootKey(ctx)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 
 	key2, err := rks.Get(ctx, id)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 
 	c.Assert(key2, qt.DeepEquals, key)
 }
@@ -83,7 +83,7 @@ func newFixture(c *qt.C) *fixture {
 	if errgo.Cause(err) == mgotest.ErrDisabled {
 		c.Skip("mgotest disabled")
 	}
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	// mgotest sets the SocketTimout to 1s. Restore it back to the
 	// default value.
 	db.Session.SetSocketTimeout(time.Minute)
@@ -93,7 +93,7 @@ func newFixture(c *qt.C) *fixture {
 		db.Close()
 		c.Fatal(err)
 	}
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	c.Defer(backend.Close)
 
 	connStr := os.Getenv("MGOCONNECTIONSTRING")

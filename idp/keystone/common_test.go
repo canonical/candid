@@ -53,6 +53,6 @@ func newFixture(c *qt.C, p fixtureParams) *fixture {
 	s.server.UserGroupsFunc = p.userGroupsFunc
 	s.idp = p.newIDP(s.params)
 	err := s.idp.Init(s.idptest.Ctx, s.idptest.InitParams(c, idpPrefix))
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	return s
 }

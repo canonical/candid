@@ -35,16 +35,16 @@ func TestPutGetToken(t *testing.T) {
 	path := filepath.Join(c.Mkdir(), "subdir", "tokenFile")
 	store := ussologin.NewFileTokenStore(path)
 	err := store.Put(token)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 
 	tok, err := store.Get()
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	c.Assert(tok, qt.DeepEquals, token)
 	data, err := ioutil.ReadFile(path)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	var storedToken *usso.SSOData
 	err = json.Unmarshal(data, &storedToken)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	c.Assert(token, qt.DeepEquals, storedToken)
 }
 
@@ -54,7 +54,7 @@ func TestReadInvalidToken(t *testing.T) {
 
 	path := fmt.Sprintf("%s/tokenFile", c.Mkdir())
 	err := ioutil.WriteFile(path, []byte("foobar"), 0700)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	store := ussologin.NewFileTokenStore(path)
 
 	_, err = store.Get()
@@ -81,7 +81,7 @@ func TestTokenInStore(t *testing.T) {
 	}
 	ctx := context.Background()
 	tok, err := g.GetToken(ctx)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	c.Assert(tok, qt.DeepEquals, testToken)
 	c.Assert(st.Calls(), qt.DeepEquals, []jt.StubCall{{
 		FuncName: "Get",
@@ -111,7 +111,7 @@ func TestTokenNotInStore(t *testing.T) {
 	}
 	ctx := context.Background()
 	tok, err := g.GetToken(ctx)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	c.Assert(tok, qt.DeepEquals, testToken)
 	c.Assert(st.Calls(), qt.DeepEquals, []jt.StubCall{{
 		FuncName: "Get",
@@ -141,7 +141,7 @@ func TestCorrectUserPasswordSentToUSSOServer(t *testing.T) {
 		Name: "testToken",
 	}
 	_, err := tg.GetToken(context.Background())
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	calls := ussoStub.Calls()
 	c.Assert(len(calls) > 0, qt.Equals, true)
 	c.Assert(calls[0], qt.DeepEquals, jt.StubCall{

@@ -58,11 +58,11 @@ func (s *idpSuite) Init(c *qt.C) {
 		Metrics:    monitoring.NewMeetingMetrics(),
 		ListenAddr: "localhost",
 	})
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	c.Defer(s.meetingPlace.Close)
 
 	kvs, err := s.store.ProviderDataStore.KeyValueStore(context.Background(), "test-discharge-tokens")
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	s.vc = discharger.NewVisitCompleter(identity.HandlerParams{
 		ServerParams: identity.ServerParams{
 			Store:        s.store.Store,
@@ -81,7 +81,7 @@ func (s *idpSuite) TestLoginFailure(c *qt.C) {
 	c.Assert(rr.Code, qt.Equals, http.StatusForbidden)
 	var perr params.Error
 	err := json.Unmarshal(rr.Body.Bytes(), &perr)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	c.Assert(perr, qt.DeepEquals, params.Error{
 		Code:    params.ErrForbidden,
 		Message: "test error",
@@ -91,14 +91,14 @@ func (s *idpSuite) TestLoginFailure(c *qt.C) {
 func (s *idpSuite) TestLoginFailureWithWait(c *qt.C) {
 	id := "test"
 	err := s.meetingPlace.NewRendezvous(context.Background(), id, []byte("test"))
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 
 	rr := httptest.NewRecorder()
 	s.vc.Failure(context.Background(), rr, nil, id, errgo.WithCausef(nil, params.ErrForbidden, "test error"))
 	c.Assert(rr.Code, qt.Equals, http.StatusForbidden)
 	var perr params.Error
 	err = json.Unmarshal(rr.Body.Bytes(), &perr)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	c.Assert(perr, qt.DeepEquals, params.Error{
 		Code:    params.ErrForbidden,
 		Message: "test error",
@@ -107,11 +107,11 @@ func (s *idpSuite) TestLoginFailureWithWait(c *qt.C) {
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
 	d1, d2, err := s.meetingPlace.Wait(ctx, id)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	c.Assert(string(d1), qt.Equals, "test")
 	var li discharger.LoginInfo
 	err = json.Unmarshal(d2, &li)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	c.Assert(li.DischargeToken, qt.IsNil)
 	c.Assert(li.Error, qt.DeepEquals, &httpbakery.Error{
 		Message: "test error",
@@ -120,7 +120,7 @@ func (s *idpSuite) TestLoginFailureWithWait(c *qt.C) {
 
 func (s *idpSuite) TestLoginSuccess(c *qt.C) {
 	req, err := http.NewRequest("GET", "", nil)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	rr := httptest.NewRecorder()
 	s.vc.Success(context.Background(), rr, req, "", &store.Identity{
 		Username: "test-user",
@@ -132,9 +132,9 @@ func (s *idpSuite) TestLoginSuccess(c *qt.C) {
 
 func (s *idpSuite) TestLoginSuccessWithTemplate(c *qt.C) {
 	_, err := s.template.New("login").Parse("<h1>Login successful as {{.Username}}</h1>")
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	req, err := http.NewRequest("GET", "", nil)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	rr := httptest.NewRecorder()
 	s.vc.Success(context.Background(), rr, req, "", &store.Identity{
 		Username: "test-user",
@@ -146,7 +146,7 @@ func (s *idpSuite) TestLoginSuccessWithTemplate(c *qt.C) {
 
 func (s *idpSuite) TestLoginRedirectSuccess(c *qt.C) {
 	req, err := http.NewRequest("GET", "", nil)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	rr := httptest.NewRecorder()
 	s.vc.RedirectSuccess(context.Background(), rr, req, "http://example.com/callback", "1234", &store.Identity{
 		Username: "test-user",
@@ -154,7 +154,7 @@ func (s *idpSuite) TestLoginRedirectSuccess(c *qt.C) {
 	resp := rr.Result()
 	c.Assert(resp.StatusCode, qt.Equals, http.StatusTemporaryRedirect)
 	loc, err := resp.Location()
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	v := loc.Query()
 	loc.RawQuery = ""
 	c.Assert(loc.String(), qt.Equals, "http://example.com/callback")
@@ -164,7 +164,7 @@ func (s *idpSuite) TestLoginRedirectSuccess(c *qt.C) {
 
 func (s *idpSuite) TestLoginRedirectSuccessInvalidReturnTo(c *qt.C) {
 	req, err := http.NewRequest("GET", "", nil)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	rr := httptest.NewRecorder()
 	s.vc.RedirectSuccess(context.Background(), rr, req, "::", "1234", &store.Identity{
 		Username: "test-user",
@@ -172,7 +172,7 @@ func (s *idpSuite) TestLoginRedirectSuccessInvalidReturnTo(c *qt.C) {
 	c.Assert(rr.Code, qt.Equals, http.StatusBadRequest)
 	var perr params.Error
 	err = json.Unmarshal(rr.Body.Bytes(), &perr)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	c.Assert(perr, qt.DeepEquals, params.Error{
 		Code:    params.ErrBadRequest,
 		Message: `invalid return_to: parse ::: missing protocol scheme`,
@@ -181,7 +181,7 @@ func (s *idpSuite) TestLoginRedirectSuccessInvalidReturnTo(c *qt.C) {
 
 func (s *idpSuite) TestLoginRedirectSuccessReturnToNotInWhitelist(c *qt.C) {
 	req, err := http.NewRequest("GET", "", nil)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	rr := httptest.NewRecorder()
 	s.vc.RedirectSuccess(context.Background(), rr, req, "https://example.com", "1234", &store.Identity{
 		Username: "test-user",
@@ -189,7 +189,7 @@ func (s *idpSuite) TestLoginRedirectSuccessReturnToNotInWhitelist(c *qt.C) {
 	c.Assert(rr.Code, qt.Equals, http.StatusBadRequest)
 	var perr params.Error
 	err = json.Unmarshal(rr.Body.Bytes(), &perr)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	c.Assert(perr, qt.DeepEquals, params.Error{
 		Code:    params.ErrBadRequest,
 		Message: `invalid return_to`,
@@ -198,13 +198,13 @@ func (s *idpSuite) TestLoginRedirectSuccessReturnToNotInWhitelist(c *qt.C) {
 
 func (s *idpSuite) TestLoginRedirectFailureInvalidReturnTo(c *qt.C) {
 	req, err := http.NewRequest("GET", "", nil)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	rr := httptest.NewRecorder()
 	s.vc.RedirectFailure(context.Background(), rr, req, "::", "1234", errgo.WithCausef(nil, params.ErrForbidden, "test error"))
 	c.Assert(rr.Code, qt.Equals, http.StatusForbidden)
 	var perr params.Error
 	err = json.Unmarshal(rr.Body.Bytes(), &perr)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	c.Assert(perr, qt.DeepEquals, params.Error{
 		Code:    params.ErrForbidden,
 		Message: `test error`,

@@ -48,6 +48,7 @@ func TestHandleErrors(t *testing.T) {
 
 func TestHandleErrorsInternalServerError(t *testing.T) {
 	c := qt.New(t)
+	defer c.Done()
 	candidtest.LogTo(c)
 	w := new(loggo.TestWriter)
 	loggo.RegisterWriter("test", w)

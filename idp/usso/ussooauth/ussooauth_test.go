@@ -31,7 +31,7 @@ identity-providers:
 `
 	var conf config.Config
 	err := yaml.Unmarshal([]byte(configYaml), &conf)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	c.Assert(conf.IdentityProviders, qt.HasLen, 1)
 	c.Assert(conf.IdentityProviders[0].Name(), qt.Equals, "usso_oauth")
 }
@@ -50,7 +50,7 @@ func (s *ussooauthSuite) Init(c *qt.C) {
 	s.idptest = idptest.NewFixture(c, candidtest.NewStore())
 	s.idp = ussooauth.IdentityProvider
 	err := s.idp.Init(s.idptest.Ctx, s.idptest.InitParams(c, "https://idp.test"))
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 }
 
 func (s *ussooauthSuite) TestName(c *qt.C) {
@@ -95,7 +95,7 @@ func (s *ussooauthSuite) TestHandleSuccess(c *qt.C) {
 			store.Email:    store.Set,
 		},
 	)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	ussoSrv.MockUSSO.AddUser(&mockusso.User{
 		ID:             "test",
 		NickName:       "test",
@@ -113,7 +113,7 @@ func (s *ussooauthSuite) TestHandleSuccess(c *qt.C) {
 		SignatureMethod: oauth.HMACSHA1,
 	}
 	req, err := http.NewRequest("GET", "http://example.com/oauth?id=2", nil)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	err = oc.SetAuthorizationHeader(
 		req.Header,
 		&oauth.Credentials{
@@ -124,7 +124,7 @@ func (s *ussooauthSuite) TestHandleSuccess(c *qt.C) {
 		req.URL,
 		nil,
 	)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	rr := httptest.NewRecorder()
 	s.idp.Handle(s.idptest.Ctx, rr, req)
 	s.idptest.AssertLoginSuccess(c, "test")
@@ -147,7 +147,7 @@ func (s *ussooauthSuite) TestHandleVerifyFail(c *qt.C) {
 			store.Email:    store.Set,
 		},
 	)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	ussoSrv.MockUSSO.AddUser(&mockusso.User{
 		ID:             "test",
 		NickName:       "test",
@@ -165,7 +165,7 @@ func (s *ussooauthSuite) TestHandleVerifyFail(c *qt.C) {
 		SignatureMethod: oauth.HMACSHA1,
 	}
 	req, err := http.NewRequest("GET", "http://example.com/oauth?id=2", nil)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	err = oc.SetAuthorizationHeader(
 		req.Header,
 		&oauth.Credentials{
@@ -176,7 +176,7 @@ func (s *ussooauthSuite) TestHandleVerifyFail(c *qt.C) {
 		req.URL,
 		nil,
 	)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	rr := httptest.NewRecorder()
 	s.idp.Handle(s.idptest.Ctx, rr, req)
 	s.idptest.AssertLoginFailureMatches(c, `invalid OAuth credentials`)

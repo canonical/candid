@@ -25,7 +25,7 @@ func LogTo(c *qt.C) {
 	loggo.RegisterWriter(loggo.DefaultWriterName, discardWriter{})
 	loggo.RegisterWriter("testlogger", &loggoWriter{c})
 	err := loggo.ConfigureLoggers(cfg)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	c.Defer(loggo.ResetLogging)
 }
 

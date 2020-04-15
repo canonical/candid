@@ -66,13 +66,13 @@ func NewFixture(c *qt.C, store *candidtest.Store) *Fixture {
 	c.Defer(closeMeetingStore)
 
 	key, err := bakery.GenerateKey()
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	oven := bakery.NewOven(bakery.OvenParams{
 		Key:      key,
 		Location: "idptest",
 	})
 	kv, err := store.ProviderDataStore.KeyValueStore(ctx, "idptest")
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	return &Fixture{
 		Ctx:                   ctx,
 		Codec:                 secret.NewCodec(key),
@@ -105,9 +105,9 @@ func (s *Fixture) InitParams(c *qt.C, prefix string) idp.InitParams {
 // LoginState creates a candid-login with the given login state.
 func (s *Fixture) LoginState(c *qt.C, state idputil.LoginState) (*http.Cookie, string) {
 	value, err := s.Codec.Encode(state)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	rawValue, err := base64.URLEncoding.DecodeString(value)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	hash := sha256.Sum256(rawValue)
 	return &http.Cookie{
 		Name:  idputil.LoginCookieName,
@@ -121,7 +121,7 @@ func (s *Fixture) LoginState(c *qt.C, state idputil.LoginState) (*http.Cookie, s
 // stopPrefix is attempted.
 func (s *Fixture) Client(c *qt.C, prefix, replacement, stopPrefix string) *http.Client {
 	jar, err := cookiejar.New(nil)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	return &http.Client{
 		Transport: qthttptest.URLRewritingTransport{
 			MatchPrefix:  prefix,
@@ -143,14 +143,14 @@ func (s *Fixture) ParseResponse(c *qt.C, resp *http.Response) (*store.Identity, 
 	switch resp.StatusCode {
 	case http.StatusOK:
 		buf, err := ioutil.ReadAll(resp.Body)
-		c.Assert(err, qt.Equals, nil)
+		c.Assert(err, qt.IsNil)
 		parts := bytes.Split(buf, []byte("\n"))
 		if len(parts) > 1 && len(parts[1]) > 0 {
 			return nil, errgo.New(string(parts[1]))
 		}
 	case http.StatusSeeOther:
 		ru, err := url.Parse(resp.Header.Get("Location"))
-		c.Assert(err, qt.Equals, nil)
+		c.Assert(err, qt.IsNil)
 		rv := ru.Query()
 		if msg := rv.Get("error"); msg != "" {
 			if code := rv.Get("error_code"); code != "" {
@@ -169,7 +169,7 @@ func (s *Fixture) ParseResponse(c *qt.C, resp *http.Response) (*store.Identity, 
 // given IDP.
 func (s *Fixture) DoInteractiveLogin(c *qt.C, idp idp.IdentityProvider, loginURL string, f func(*http.Client, *http.Response) (*http.Response, error)) (*store.Identity, error) {
 	u, err := url.Parse(loginURL)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	hu := *u
 	hu.Path = ""
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
@@ -188,10 +188,10 @@ func (s *Fixture) DoInteractiveLogin(c *qt.C, idp idp.IdentityProvider, loginURL
 	v.Set("state", state)
 	u.RawQuery = v.Encode()
 	resp, err := client.Get(u.String())
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	if f != nil {
 		resp, err = f(client, resp)
-		c.Assert(err, qt.Equals, nil)
+		c.Assert(err, qt.IsNil)
 	}
 	defer resp.Body.Close()
 	return s.ParseResponse(c, resp)
@@ -210,7 +210,7 @@ func (s *Fixture) AssertLoginSuccess(c *qt.C, username string) {
 // a successful login of the given user.
 func (s *Fixture) AssertLoginRedirectSuccess(c *qt.C, rurl, returnTo, state string, username string) {
 	u, err := url.Parse(rurl)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	v := u.Query()
 	u.RawQuery = ""
 	c.Assert(u.String(), qt.Equals, returnTo)
@@ -230,7 +230,7 @@ func (s *Fixture) AssertLoginFailureMatches(c *qt.C, regex string) {
 // failure with an error that matches the given regex.
 func (s *Fixture) AssertLoginRedirectFailureMatches(c *qt.C, rurl, returnTo, state, errorCode, regex string) {
 	u, err := url.Parse(rurl)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	v := u.Query()
 	u.RawQuery = ""
 	c.Assert(u.String(), qt.Equals, returnTo)

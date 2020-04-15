@@ -16,6 +16,7 @@ import (
 	"github.com/juju/utils/debugstatus"
 	"github.com/julienschmidt/httprouter"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/httprequest.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery"
@@ -148,7 +149,7 @@ func New(sp ServerParams, versions map[string]NewAPIHandlerFunc) (*Server, error
 	srv.router.MethodNotAllowed = http.HandlerFunc(srv.methodNotAllowed)
 
 	srv.router.Handle("OPTIONS", "/*path", srv.options)
-	srv.router.Handler("GET", "/metrics", prometheus.Handler())
+	srv.router.Handler("GET", "/metrics", promhttp.Handler())
 	srv.router.Handler("GET", "/acl/*path", aclHandler)
 	srv.router.Handler("PUT", "/acl/*path", aclHandler)
 	srv.router.Handler("POST", "/acl/*path", aclHandler)

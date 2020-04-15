@@ -126,15 +126,15 @@ func (s *dischargeSuite) TestInteractiveDischarge(c *qt.C) {
 func (s *dischargeSuite) TestNonInteractiveDischarge(c *qt.C) {
 	client := s.srv.AdminClient()
 	ms, err := s.dischargeCreator.Discharge(c, "is-authenticated-user", client)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	s.dischargeCreator.AssertMacaroon(c, ms, identchecker.LoginOp, auth.AdminUsername)
 }
 
 func (s *dischargeSuite) TestInteractiveDischargeWithOldClientCaveat(c *qt.C) {
 	ms, err := s.dischargeCreator.Discharge(c, "<is-authenticated-user", s.srv.Client(s.interactor))
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	_, err = s.dischargeCreator.Bakery.Checker.Auth(ms).Allow(context.Background(), identchecker.LoginOp)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 }
 
 func (s *dischargeSuite) TestInteractiveDischargeJSON(c *qt.C) {
@@ -159,7 +159,7 @@ func (s *dischargeSuite) TestInteractiveDischargeJSON(c *qt.C) {
 		OpenWebBrowser: openWebBrowser,
 	})
 	_, err := s.dischargeCreator.Discharge(c, "is-authenticated-user", client)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 }
 
 func (s *dischargeSuite) TestTwoDischargesOfSameCaveat(c *qt.C) {
@@ -202,16 +202,16 @@ func (s *dischargeSuite) TestTwoDischargesOfSameCaveat(c *qt.C) {
 func (s *dischargeSuite) TestDischargeWhenLoggedIn(c *qt.C) {
 	client := s.srv.Client(s.interactor)
 	ms, err := s.dischargeCreator.Discharge(c, "is-authenticated-user", client)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	s.dischargeCreator.AssertMacaroon(c, ms, identchecker.LoginOp, "test")
 	ms, err = s.dischargeCreator.Discharge(c, "is-authenticated-user", client)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	s.dischargeCreator.AssertMacaroon(c, ms, identchecker.LoginOp, "test")
 }
 
 func (s *dischargeSuite) TestVisitURLWithDomainCookie(c *qt.C) {
 	u, err := url.Parse(s.srv.URL + "/discharge")
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	client := s.srv.Client(nil)
 	client.Client.Jar.SetCookies(u, []*http.Cookie{{
 		Name:  "domain",
@@ -225,13 +225,13 @@ func (s *dischargeSuite) TestVisitURLWithDomainCookie(c *qt.C) {
 		OpenWebBrowser: openWebBrowser.OpenWebBrowser,
 	})
 	_, err = s.dischargeCreator.Discharge(c, "is-authenticated-user", client)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	c.Assert(openWebBrowser.url.Query().Get("domain"), qt.Equals, "test2")
 }
 
 func (s *dischargeSuite) TestVisitURLWithInvalidDomainCookie(c *qt.C) {
 	u, err := url.Parse(s.srv.URL + "/discharge")
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	client := s.srv.Client(nil)
 	client.Client.Jar.SetCookies(u, []*http.Cookie{{
 		Name:  "domain",
@@ -244,13 +244,13 @@ func (s *dischargeSuite) TestVisitURLWithInvalidDomainCookie(c *qt.C) {
 		OpenWebBrowser: openWebBrowser.OpenWebBrowser,
 	})
 	_, err = s.dischargeCreator.Discharge(c, "is-authenticated-user", client)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	c.Assert(openWebBrowser.url.Query().Get("domain"), qt.Equals, "")
 }
 
 func (s *dischargeSuite) TestVisitURLWithEscapedDomainCookie(c *qt.C) {
 	u, err := url.Parse(s.srv.URL + "/discharge")
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	client := s.srv.Client(nil)
 	client.Client.Jar.SetCookies(u, []*http.Cookie{{
 		Name:  "domain",
@@ -263,7 +263,7 @@ func (s *dischargeSuite) TestVisitURLWithEscapedDomainCookie(c *qt.C) {
 		OpenWebBrowser: openWebBrowser.OpenWebBrowser,
 	})
 	_, err = s.dischargeCreator.Discharge(c, "is-authenticated-user", client)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	c.Assert(openWebBrowser.url.Query().Get("domain"), qt.Equals, "test+2")
 }
 
@@ -349,10 +349,10 @@ func (s *dischargeSuite) TestDischargeFromDifferentOriginWhenLoggedIn(c *qt.C) {
 		OpenWebBrowser: openWebBrowser,
 	})
 	_, err := s.dischargeCreator.Discharge(c, "is-authenticated-user", client)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	disabled = true
 	_, err = s.dischargeCreator.Discharge(c, "is-authenticated-user", client)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 
 	// Check that we can't discharge using the candid macaroon
 	// when we've got a different origin header.
@@ -477,7 +477,7 @@ func (s *dischargeSuite) TestDischargeForUser(c *qt.C) {
 			c.Assert(err, qt.ErrorMatches, test.expectErr)
 			continue
 		}
-		c.Assert(err, qt.Equals, nil)
+		c.Assert(err, qt.IsNil)
 		ui, err := s.dischargeCreator.Bakery.Checker.Auth(ms).Allow(context.Background(), identchecker.LoginOp)
 		c.Assert(ui.Identity.Id(), qt.Equals, test.expectUser)
 	}
@@ -567,7 +567,7 @@ func (s *dischargeSuite) TestDischargeMemberOf(c *qt.C) {
 				c.Assert(err, qt.ErrorMatches, test.expectError)
 				return
 			}
-			c.Assert(err, qt.Equals, nil)
+			c.Assert(err, qt.IsNil)
 			s.dischargeCreator.AssertMacaroon(c, ms, groupOp, "")
 		})
 	}
@@ -582,7 +582,7 @@ func (s *dischargeSuite) TestDischargeXMemberOfX(c *qt.C) {
 
 	m := s.dischargeCreator.NewMacaroon(c, "is-member-of test2", groupOp)
 	ms, err := client.DischargeAll(context.Background(), m)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	s.dischargeCreator.AssertMacaroon(c, ms, groupOp, "")
 }
 
@@ -600,7 +600,7 @@ func (s *dischargeSuite) TestDischargeStatusProxyAuthRequiredResponse(c *qt.C) {
 		}},
 		identchecker.LoginOp,
 	)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 
 	var thirdPartyCaveat macaroon.Caveat
 	for _, cav := range m.M().Caveats() {
@@ -614,7 +614,7 @@ func (s *dischargeSuite) TestDischargeStatusProxyAuthRequiredResponse(c *qt.C) {
 		"id":       {string(thirdPartyCaveat.Id)},
 		"location": {thirdPartyCaveat.Location},
 	})
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	defer resp.Body.Close()
 
 	c.Assert(resp.StatusCode, qt.Equals, http.StatusProxyAuthRequired)
@@ -633,7 +633,7 @@ func (s *dischargeSuite) TestDischargeStatusUnauthorizedResponse(c *qt.C) {
 		}},
 		identchecker.LoginOp,
 	)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 
 	var thirdPartyCaveat macaroon.Caveat
 	for _, cav := range m.M().Caveats() {
@@ -649,11 +649,11 @@ func (s *dischargeSuite) TestDischargeStatusUnauthorizedResponse(c *qt.C) {
 	}
 
 	req, err := http.NewRequest("POST", s.srv.URL+"/discharge", strings.NewReader(values.Encode()))
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Bakery-Protocol-Version", "1")
 	resp, err := http.DefaultClient.Do(req)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	defer resp.Body.Close()
 
 	c.Assert(resp.StatusCode, qt.Equals, http.StatusUnauthorized)
@@ -662,7 +662,7 @@ func (s *dischargeSuite) TestDischargeStatusUnauthorizedResponse(c *qt.C) {
 
 func (s *dischargeSuite) TestPublicKey(c *qt.C) {
 	info, err := s.srv.ThirdPartyInfo(testContext, s.srv.URL)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	qthttptest.AssertJSONCall(c, qthttptest.JSONCallParams{
 		URL:          s.srv.URL + "/publickey",
 		ExpectStatus: http.StatusOK,
@@ -677,7 +677,7 @@ func (s *dischargeSuite) TestIdentityCookieParameters(c *qt.C) {
 	jar := new(testCookieJar)
 	client.Client.Jar = jar
 	ms, err := s.dischargeCreator.Discharge(c, "is-authenticated-user", client)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	s.dischargeCreator.AssertMacaroon(c, ms, identchecker.LoginOp, "test")
 	c.Assert(jar.cookies, qt.HasLen, 1)
 	for k := range jar.cookies {
@@ -726,7 +726,7 @@ func (s *dischargeSuite) TestLastDischargeTimeUpdates(c *qt.C) {
 		ProviderID: "test:test",
 	}
 	err := s.store.Store.Identity(context.Background(), &id1)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	c.Assert(id1.LastDischarge.IsZero(), qt.Equals, false)
 
 	// Wait at least one ms so that the discharge time stored in the
@@ -738,7 +738,7 @@ func (s *dischargeSuite) TestLastDischargeTimeUpdates(c *qt.C) {
 		ProviderID: "test:test",
 	}
 	err = s.store.Store.Identity(context.Background(), &id2)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	c.Assert(id2.LastDischarge.After(id1.LastDischarge), qt.Equals, true)
 }
 
@@ -776,14 +776,14 @@ func (s *dischargeSuite) TestDomainInInteractionURLs(c *qt.C) {
 			client := s.srv.Client(s.interactor)
 			for k, v := range tst.cookies {
 				u, err := url.Parse(s.srv.URL)
-				c.Assert(err, qt.Equals, nil)
+				c.Assert(err, qt.IsNil)
 				client.Jar.SetCookies(u, []*http.Cookie{{
 					Name:  k,
 					Value: v,
 				}})
 			}
 			ms, err := s.dischargeCreator.Discharge(c, tst.condition, client)
-			c.Assert(err, qt.Equals, nil)
+			c.Assert(err, qt.IsNil)
 			username := "test"
 			if tst.expectDomain != "" {
 				username = "test@" + tst.expectDomain
@@ -798,7 +798,7 @@ func (s *dischargeSuite) TestDischargeWithDomainWithExistingNonDomainAuth(c *qt.
 	s.dischargeCreator.AssertDischarge(c, s.interactor)
 	// Then try with a caveat that requires a domain.
 	ms, err := s.dischargeCreator.Discharge(c, "is-authenticated-user @test-domain", s.srv.Client(s.interactor))
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	s.dischargeCreator.AssertMacaroon(c, ms, identchecker.LoginOp, "test@test-domain")
 }
 
@@ -821,7 +821,7 @@ func (s *dischargeSuite) TestDischargeBrowserRedirectLogin(c *qt.C) {
 	rerr := errgo.Cause(ierr.Reason).(*redirect.RedirectRequiredError)
 
 	jar, err := cookiejar.New(nil)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	client := &http.Client{
 		Jar: jar,
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
@@ -832,24 +832,24 @@ func (s *dischargeSuite) TestDischargeBrowserRedirectLogin(c *qt.C) {
 		},
 	}
 	resp, err := client.Get(rerr.InteractionInfo.RedirectURL("https://www.example.com/callback", "123456"))
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 
 	f := candidtest.SelectInteractiveLogin(candidtest.PostLoginForm("test", "password"))
 	resp, err = f(client, resp)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	defer resp.Body.Close()
 
 	c.Assert(resp.StatusCode, qt.Equals, http.StatusSeeOther, qt.Commentf("unexpected response %q", resp.Status))
 	state, code, err := redirect.ParseLoginResult(resp.Header.Get("Location"))
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	c.Assert(state, qt.Equals, "123456")
 
 	dt, err := rerr.InteractionInfo.GetDischargeToken(context.Background(), code)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 
 	interactor.SetDischargeToken(rerr.InteractionInfo.LoginURL, dt)
 	ms, err := s.dischargeCreator.Discharge(c, "is-authenticated-user", s.srv.Client(interactor))
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	s.dischargeCreator.AssertMacaroon(c, ms, identchecker.LoginOp, "")
 }
 
@@ -862,7 +862,7 @@ func (s *dischargeSuite) TestDischargeBrowserRedirectLoginNotWhitelisted(c *qt.C
 	rerr := errgo.Cause(ierr.Reason).(*redirect.RedirectRequiredError)
 
 	jar, err := cookiejar.New(nil)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	client := &http.Client{
 		Jar: jar,
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
@@ -873,17 +873,17 @@ func (s *dischargeSuite) TestDischargeBrowserRedirectLoginNotWhitelisted(c *qt.C
 		},
 	}
 	resp, err := client.Get(rerr.InteractionInfo.RedirectURL("https://www.example.com/callback2", "123456"))
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 
 	f := candidtest.SelectInteractiveLogin(candidtest.PostLoginForm("test", "password"))
 	resp, err = f(client, resp)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	defer resp.Body.Close()
 
 	c.Assert(resp.StatusCode, qt.Equals, http.StatusBadRequest, qt.Commentf("unexpected response %q", resp.Status))
 	var perr params.Error
 	err = httprequest.UnmarshalJSONResponse(resp, &perr)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	c.Assert(&perr, qt.ErrorMatches, "invalid return_to")
 }
 
@@ -891,14 +891,14 @@ func (s *dischargeSuite) TestDischargeUserID(c *qt.C) {
 	dc := candidtest.NewUserIDDischargeCreator(s.srv)
 	client := s.srv.AdminClient()
 	ms, err := dc.Discharge(c, "is-authenticated-userid", client)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	ai, err := dc.Bakery.Checker.Auth(ms).Allow(context.Background(), identchecker.LoginOp)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	c.Assert(ai.Identity.Id(), qt.Equals, string(auth.AdminProviderID))
 
 	id, ok := ai.Identity.(candidclient.Identity)
 	c.Assert(ok, qt.Equals, true)
 	username, err := id.Username()
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	c.Assert(username, qt.Equals, auth.AdminUsername)
 }

@@ -60,7 +60,7 @@ func (s *Store) AssertUser(c *qt.C, id *store.Identity) *store.Identity {
 		Username:   id.Username,
 	}
 	err := s.Store.Identity(context.Background(), &id1)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	AssertEqualIdentity(c, &id1, id)
 	return &id1
 }

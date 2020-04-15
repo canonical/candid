@@ -42,7 +42,7 @@ func (s *ussoSuite) Init(c *qt.C) {
 	s.idptest = idptest.NewFixture(c, candidtest.NewStore())
 	s.idp = usso.NewIdentityProvider(usso.Params{})
 	err := s.idp.Init(s.idptest.Ctx, s.idptest.InitParams(c, idpPrefix))
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 }
 
 func (s *ussoSuite) TestConfig(c *qt.C) {
@@ -52,7 +52,7 @@ identity-providers:
 `
 	var conf config.Config
 	err := yaml.Unmarshal([]byte(configYaml), &conf)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	c.Assert(conf.IdentityProviders, qt.HasLen, 1)
 	c.Assert(conf.IdentityProviders[0].Name(), qt.Equals, "usso")
 }
@@ -78,7 +78,7 @@ func (s *ussoSuite) TestAbsoluteIconURL(c *qt.C) {
 		Icon: "https://www.example.com/icon.bmp",
 	})
 	err := idp.Init(s.idptest.Ctx, s.idptest.InitParams(c, idpPrefix))
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	c.Assert(idp.IconURL(), qt.Equals, "https://www.example.com/icon.bmp")
 }
 
@@ -89,7 +89,7 @@ func (s *ussoSuite) TestRelativeIconURL(c *qt.C) {
 	params := s.idptest.InitParams(c, idpPrefix)
 	params.Location = "https://www.example.com/candid"
 	err := idp.Init(s.idptest.Ctx, params)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	c.Assert(idp.IconURL(), qt.Equals, "https://www.example.com/candid/static/icon.bmp")
 }
 
@@ -126,7 +126,7 @@ func (s *ussoSuite) TestRedirect(c *qt.C) {
 func (s *ussoSuite) TestRedirectWithLaunchpadTeams(c *qt.C) {
 	s.idp = usso.NewIdentityProvider(usso.Params{LaunchpadTeams: []string{"myteam1", "myteam2"}})
 	err := s.idp.Init(s.idptest.Ctx, s.idptest.InitParams(c, "http://idp.example.com"))
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 
 	u := s.getRedirectURL(c, "/login")
 	c.Assert(u.Host, qt.Equals, "login.ubuntu.com")
@@ -155,11 +155,11 @@ func (s *ussoSuite) getRedirectURL(c *qt.C, path string) *url.URL {
 		Expires:  time.Now().Add(10 * time.Minute),
 	})
 	resp, err := client.Get("/login")
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	defer resp.Body.Close()
 	c.Assert(resp.StatusCode, qt.Equals, http.StatusFound)
 	u, err := url.Parse(resp.Header.Get("Location"))
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	return u
 }
 
@@ -175,7 +175,7 @@ func (s *ussoSuite) TestHandleSuccess(c *qt.C) {
 	ussoSrv.MockUSSO.SetLoginUser("test")
 
 	id, err := s.idptest.DoInteractiveLogin(c, s.idp, idpPrefix+"/login", nil)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	candidtest.AssertEqualIdentity(c, id, &store.Identity{
 		ProviderID: "usso:https://login.ubuntu.com/+id/test",
 		Username:   "test",
@@ -201,7 +201,7 @@ func (s *ussoSuite) TestHandleSuccessNoExtensions(c *qt.C) {
 			store.Email:    store.Set,
 		},
 	)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	ussoSrv.MockUSSO.AddUser(&mockusso.User{
 		ID:       "test",
 		NickName: "test",
@@ -212,7 +212,7 @@ func (s *ussoSuite) TestHandleSuccessNoExtensions(c *qt.C) {
 	ussoSrv.MockUSSO.ExcludeExtensions()
 
 	id, err := s.idptest.DoInteractiveLogin(c, s.idp, idpPrefix+"/login", nil)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	candidtest.AssertEqualIdentity(c, id, &store.Identity{
 		ProviderID: "usso:https://login.ubuntu.com/+id/test",
 		Username:   "test",
@@ -267,7 +267,7 @@ func (s *ussoSuite) TestInteractiveLoginFromDifferentProvider(c *qt.C) {
 		Expires:  time.Now().Add(10 * time.Minute),
 	})
 	u, err := url.Parse(idpPrefix)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	client.Jar.SetCookies(u, []*http.Cookie{cookie})
 
 	mockUSSO.SetLoginUser("test")
@@ -285,7 +285,7 @@ func (s *ussoSuite) TestInteractiveLoginFromDifferentProvider(c *qt.C) {
 		RawQuery: v.Encode(),
 	}
 	resp, err := client.Get(u.String())
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	defer resp.Body.Close()
 	id, err := s.idptest.ParseResponse(c, resp)
 	c.Assert(err, qt.ErrorMatches, `OpenID response from unexpected endpoint "https://badplace.example.com/\+openid"`)
@@ -311,7 +311,7 @@ func (s *ussoSuite) TestHandleUpdateUserError(c *qt.C) {
 func (s *ussoSuite) TestInvalidCookie(c *qt.C) {
 	client := idptest.NewClient(s.idp, s.idptest.Codec)
 	resp, err := client.Get("/callback")
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	defer resp.Body.Close()
 	c.Assert(resp.StatusCode, qt.Equals, http.StatusBadRequest)
 }
@@ -347,7 +347,7 @@ func (s *ussoSuite) TestGetGroups(c *qt.C) {
 	groups, err := s.idp.GetGroups(context.Background(), &store.Identity{
 		ProviderID: store.MakeProviderIdentity("usso", "https://login.ubuntu.com/+id/test"),
 	})
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	c.Assert(groups, qt.DeepEquals, []string{"test1", "test2"})
 }
 
@@ -382,13 +382,13 @@ func (s *ussoSuite) TestGetGroupsReturnsNewSlice(c *qt.C) {
 	groups, err := s.idp.GetGroups(context.Background(), &store.Identity{
 		ProviderID: store.MakeProviderIdentity("usso", "https://login.ubuntu.com/+id/test"),
 	})
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	c.Assert(groups, qt.DeepEquals, []string{"test1", "test2"})
 	groups[0] = "test1@domain"
 	groups, err = s.idp.GetGroups(s.idptest.Ctx, &store.Identity{
 		ProviderID: store.MakeProviderIdentity("usso", "https://login.ubuntu.com/+id/test"),
 	})
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	c.Assert(groups, qt.DeepEquals, []string{"test1", "test2"})
 }
 
@@ -397,7 +397,7 @@ func (s *ussoSuite) TestWithDomain(c *qt.C) {
 		Domain: "test1",
 	})
 	err := s.idp.Init(s.idptest.Ctx, s.idptest.InitParams(c, idpPrefix))
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 
 	c.Assert(s.idp.Domain(), qt.Equals, "test1")
 
@@ -412,7 +412,7 @@ func (s *ussoSuite) TestWithDomain(c *qt.C) {
 	ussoSrv.MockUSSO.SetLoginUser("test")
 
 	id, err := s.idptest.DoInteractiveLogin(c, s.idp, idpPrefix+"/login", nil)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	candidtest.AssertEqualIdentity(c, id, &store.Identity{
 		ProviderID: "usso:https://login.ubuntu.com/+id/test",
 		Username:   "test@test1",
