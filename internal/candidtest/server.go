@@ -88,7 +88,7 @@ func NewServer(c *qt.C, p identity.ServerParams, versions map[string]identity.Ne
 	if s.params.Key == nil {
 		var err error
 		s.params.Key, err = bakery.GenerateKey()
-		c.Assert(err, qt.Equals, nil)
+		c.Assert(err, qt.IsNil)
 	}
 	s.Key = s.params.Key
 
@@ -98,7 +98,7 @@ func NewServer(c *qt.C, p identity.ServerParams, versions map[string]identity.Ne
 	if s.params.AdminAgentPublicKey == nil {
 		var err error
 		s.adminAgentKey, err = bakery.GenerateKey()
-		c.Assert(err, qt.Equals, nil)
+		c.Assert(err, qt.IsNil)
 		s.params.AdminAgentPublicKey = &s.adminAgentKey.Public
 	}
 	if s.params.Template == nil {
@@ -106,7 +106,7 @@ func NewServer(c *qt.C, p identity.ServerParams, versions map[string]identity.Ne
 	}
 	var err error
 	s.handler, err = identity.New(s.params, versions)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	c.Defer(s.handler.Close)
 
 	s.server.Config.Handler = s.handler
@@ -195,7 +195,7 @@ func (s *Server) AdminIdentityClient(userID bool) *candidclient.Client {
 // The agent will be owned by admin@candid.
 func (s *Server) CreateAgent(c *qt.C, username string, groups ...string) *bakery.KeyPair {
 	key, err := bakery.GenerateKey()
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	name := strings.TrimSuffix(username, "@candid")
 	if name == username {
 		c.Fatalf("agent username must end in @candid")
@@ -218,7 +218,7 @@ func (s *Server) CreateAgent(c *qt.C, username string, groups ...string) *bakery
 			store.Owner:      store.Set,
 		},
 	)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	return key
 }
 
@@ -237,7 +237,7 @@ func (s *Server) CreateUser(c *qt.C, name string, groups ...string) string {
 			store.Groups:   store.Set,
 		},
 	)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	return name
 }
 
@@ -255,7 +255,7 @@ func (s *Server) IdentityClient(c *qt.C, username string, groups ...string) *can
 		},
 		AgentUsername: username,
 	})
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	return client
 }
 
@@ -265,7 +265,7 @@ func (s *Server) IdentityClient(c *qt.C, username string, groups ...string) *can
 // http.DefaultClient.
 func (s *Server) Do(c *qt.C, req *http.Request) *http.Response {
 	resp, err := http.DefaultClient.Do(s.reqUrl(c, req))
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	return resp
 }
 
@@ -274,7 +274,7 @@ func (s *Server) Do(c *qt.C, req *http.Request) *http.Response {
 // the GET will be performed using http.DefaultClient.
 func (s *Server) Get(c *qt.C, url string) *http.Response {
 	req, err := http.NewRequest("GET", url, nil)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	return s.Do(c, req)
 }
 
@@ -284,13 +284,13 @@ func (s *Server) Get(c *qt.C, url string) *http.Response {
 // performed using http.DefaultTransport.
 func (s *Server) RoundTrip(c *qt.C, req *http.Request) *http.Response {
 	resp, err := http.DefaultTransport.RoundTrip(s.reqUrl(c, req))
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	return resp
 }
 
 func (s *Server) reqUrl(c *qt.C, req *http.Request) *http.Request {
 	u, err := url.Parse(s.URL)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	req.URL = u.ResolveReference(req.URL)
 	return req
 }

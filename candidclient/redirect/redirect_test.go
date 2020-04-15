@@ -40,7 +40,7 @@ func TestInteractor(t *testing.T) {
 	c.Assert(i.Kind(), qt.Equals, redirect.Kind)
 
 	req, err := http.NewRequest("GET", "https://www.example.com/discharge", nil)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	irerr := httpbakery.NewInteractionRequiredError(nil, req)
 	// Fake an empty InteractionRequiredError
 	irerr.Info = &httpbakery.ErrorInfo{}
@@ -65,7 +65,7 @@ func TestInteractor(t *testing.T) {
 	}
 	i.SetDischargeToken("https://www.example.com/login", dt)
 	dt2, err := i.Interact(ctx, nil, "", irerr)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	c.Assert(*dt2, qt.DeepEquals, *dt)
 }
 
@@ -74,7 +74,7 @@ func TestParseLoginResult(t *testing.T) {
 
 	state, code, err := redirect.ParseLoginResult("https://example.com/callback?state=12345&code=54321")
 	c.Assert(state, qt.Equals, "12345")
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	c.Assert(code, qt.Equals, "54321")
 
 	state, code, err = redirect.ParseLoginResult("https://example.com/callback?state=12345&error_code=ec&error=test+error")

@@ -39,7 +39,7 @@ func (s *authSuite) Init(c *qt.C) {
 	s.store = candidtest.NewStore()
 
 	key, err := bakery.GenerateKey()
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	locator := bakery.NewThirdPartyStore()
 	locator.AddInfo(identityLocation, bakery.ThirdPartyInfo{
 		PublicKey: key.Public,
@@ -54,7 +54,7 @@ func (s *authSuite) Init(c *qt.C) {
 		Store:             s.store.ACLStore,
 		InitialAdminUsers: []string{auth.AdminUsername},
 	})
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 }
 
 func (s *authSuite) TestAuthorizeWithAdminCredentials(c *qt.C) {
@@ -100,9 +100,9 @@ func (s *authSuite) TestAuthorizeWithAdminCredentials(c *qt.C) {
 				MacaroonVerifier: s.oven,
 				ACLManager:       s.aclManager,
 			})
-			c.Assert(err, qt.Equals, nil)
+			c.Assert(err, qt.IsNil)
 			err = authorizer.SetAdminPublicKey(context.Background(), &bakery.PublicKey{})
-			c.Assert(err, qt.Equals, nil)
+			c.Assert(err, qt.IsNil)
 			httpAuthorizer := httpauth.New(s.oven, authorizer, 0)
 			req, _ := http.NewRequest("GET", "/", nil)
 			for attr, val := range test.header {
@@ -114,7 +114,7 @@ func (s *authSuite) TestAuthorizeWithAdminCredentials(c *qt.C) {
 				c.Assert(errgo.Cause(err), qt.Equals, params.ErrUnauthorized)
 				return
 			}
-			c.Assert(err, qt.Equals, nil)
+			c.Assert(err, qt.IsNil)
 			c.Assert(authInfo.Identity.Id(), qt.Equals, auth.AdminUsername)
 		})
 	}
@@ -130,7 +130,7 @@ func (s *authSuite) TestAuthorizeMacaroonRequired(c *qt.C) {
 	})
 	httpAuthorizer := httpauth.New(s.oven, authorizer, 0)
 	req, err := http.NewRequest("GET", "http://example.com/v1/test", nil)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	authInfo, err := httpAuthorizer.Auth(context.Background(), req, identchecker.LoginOp)
 	c.Assert(err, qt.ErrorMatches, `macaroon discharge required: authentication required`)
 	c.Assert(authInfo, qt.IsNil)

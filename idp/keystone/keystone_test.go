@@ -51,7 +51,7 @@ func (s *keystoneSuite) TestAbsoluteIconURL(c *qt.C) {
 		Icon: "https://www.example.com/icon.bmp",
 	})
 	err := idp.Init(s.idptest.Ctx, s.idptest.InitParams(c, idpPrefix))
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	c.Assert(idp.IconURL(), qt.Equals, "https://www.example.com/icon.bmp")
 }
 
@@ -62,7 +62,7 @@ func (s *keystoneSuite) TestRelativeIconURL(c *qt.C) {
 	params := s.idptest.InitParams(c, idpPrefix)
 	params.Location = "https://www.example.com/candid"
 	err := idp.Init(s.idptest.Ctx, params)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	c.Assert(idp.IconURL(), qt.Equals, "https://www.example.com/candid/static/icon.bmp")
 }
 
@@ -93,7 +93,7 @@ func (s *keystoneSuite) TestKeystoneIdentityProviderURL(c *qt.C) {
 
 func (s *keystoneSuite) TestKeystoneIdentityProviderHandleSuccess(c *qt.C) {
 	id, err := s.idptest.DoInteractiveLogin(c, s.idp, idpPrefix+"/login", candidtest.PostLoginForm("testuser", "testpass"))
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	candidtest.AssertEqualIdentity(c, id, &store.Identity{
 		ProviderID: store.MakeProviderIdentity("openstack", "abc@openstack"),
 		Username:   "testuser@openstack",
@@ -131,7 +131,7 @@ func (s *keystoneSuite) TestKeystoneIdentityProviderHandleExistingUser(c *qt.C) 
 			store.Username: store.Set,
 		},
 	)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 
 	_, err = s.idptest.DoInteractiveLogin(c, s.idp, idpPrefix+"/login", candidtest.PostLoginForm("testuser", "testpass"))
 	c.Assert(err, qt.ErrorMatches, `cannot update identity: username testuser@openstack already in use`)
@@ -176,7 +176,7 @@ func (s *keystoneSuite) TestKeystoneIdentityProviderRegisterConfig(c *qt.C) {
 				c.Assert(err, qt.ErrorMatches, test.expectError)
 				return
 			}
-			c.Assert(err, qt.Equals, nil)
+			c.Assert(err, qt.IsNil)
 			c.Assert(conf.IdentityProviders, qt.HasLen, 1)
 			c.Assert(conf.IdentityProviders[0].Name(), qt.Equals, "openstack")
 		})

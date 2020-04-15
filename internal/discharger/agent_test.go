@@ -51,11 +51,11 @@ func (s *agentSuite) TestHTTPBakeryAgentDischarge(c *qt.C) {
 			Username: "bob@candid",
 		}},
 	})
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	ms, err := s.dischargeCreator.Discharge(c, "is-authenticated-user", client)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	_, err = s.dischargeCreator.Bakery.Checker.Auth(ms).Allow(context.Background(), identchecker.LoginOp)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 }
 
 func (s *agentSuite) TestGetAgentDischargeNoCookie(c *qt.C) {
@@ -81,11 +81,11 @@ func (s *agentSuite) TestLegacyAgentDischarge(c *qt.C) {
 			Username: "bob@candid",
 		}},
 	})
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	ms, err := s.dischargeCreator.Discharge(c, "is-authenticated-user", client)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	_, err = s.dischargeCreator.Bakery.Checker.Auth(ms).Allow(context.Background(), identchecker.LoginOp)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 }
 
 func (s *agentSuite) TestLegacyCookieAgentDischarge(c *qt.C) {
@@ -124,9 +124,9 @@ func (s *agentSuite) TestLegacyCookieAgentDischarge(c *qt.C) {
 	visitCalled := false
 	visit = func(u *url.URL) error {
 		req, err := http.NewRequest("GET", u.String(), nil)
-		c.Assert(err, qt.Equals, nil)
+		c.Assert(err, qt.IsNil)
 		resp, err := client.Do(req)
-		c.Assert(err, qt.Equals, nil)
+		c.Assert(err, qt.IsNil)
 		resp.Body.Close()
 		visitCalled = true
 		return nil
@@ -136,9 +136,9 @@ func (s *agentSuite) TestLegacyCookieAgentDischarge(c *qt.C) {
 	// error.
 	s.setAgentCookie(client.Jar, "bob@candid", &key.Public)
 	ms, err := s.dischargeCreator.Discharge(c, "is-authenticated-user", client)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	_, err = s.dischargeCreator.Bakery.Checker.Auth(ms).Allow(context.Background(), identchecker.LoginOp)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	c.Assert(visitCalled, qt.Equals, true)
 }
 

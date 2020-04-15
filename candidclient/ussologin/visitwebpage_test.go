@@ -32,7 +32,7 @@ func TestInteractNotSupportedError(t *testing.T) {
 
 	i := ussologin.NewInteractor(nil)
 	req, err := http.NewRequest("GET", "", nil)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	ierr := httpbakery.NewInteractionRequiredError(nil, req)
 	httpbakery.SetLegacyInteraction(ierr, "", "")
 	_, err = i.Interact(context.Background(), nil, "", ierr)
@@ -81,7 +81,7 @@ func TestAuthenticatedRequest(t *testing.T) {
 	}))
 	ierr := interactionRequiredError(c, server.URL)
 	dt, err := i.Interact(context.Background(), httpbakery.NewClient(), "", ierr)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	c.Assert(dt, qt.DeepEquals, &httpbakery.DischargeToken{
 		Kind:  "test",
 		Value: []byte("test-token"),
@@ -118,7 +118,7 @@ func TestAuthenticatedRequestError(t *testing.T) {
 
 func interactionRequiredError(c *qt.C, url string) *httpbakery.Error {
 	req, err := http.NewRequest("GET", "", nil)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	ierr := httpbakery.NewInteractionRequiredError(nil, req)
 	ussologin.SetInteraction(ierr, url)
 	return ierr

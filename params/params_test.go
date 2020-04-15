@@ -34,7 +34,7 @@ func TestUsernameTextUnmarshal(t *testing.T) {
 			u := new(params.Username)
 			err := u.UnmarshalText([]byte(test.username))
 			if test.expectError == "" {
-				c.Assert(err, qt.Equals, nil)
+				c.Assert(err, qt.IsNil)
 				c.Assert(*u, qt.Equals, params.Username(test.username))
 			} else {
 				c.Assert(err, qt.ErrorMatches, test.expectError)

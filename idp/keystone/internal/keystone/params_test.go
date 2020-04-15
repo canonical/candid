@@ -38,7 +38,7 @@ func TestTimeUnmarshalJSON(t *testing.T) {
 				c.Assert(err, qt.ErrorMatches, test.expectError)
 				return
 			}
-			c.Assert(err, qt.Equals, nil)
+			c.Assert(err, qt.IsNil)
 			c.Assert(t.Equal(test.expect), qt.Equals, true, qt.Commentf("obtained: %#v, expected: %#v", t, test.expect))
 		})
 	}

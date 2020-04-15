@@ -48,7 +48,7 @@ func (s *userpassSuite) TestKeystoneUserpassIdentityProviderHidden(c *qt.C) {
 
 func (s *userpassSuite) TestKeystoneUserpassIdentityProviderHandle(c *qt.C) {
 	req, err := http.NewRequest("GET", "https://idp.test/login?did=1", nil)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	rr := httptest.NewRecorder()
 	s.idp.Handle(s.idptest.Ctx, rr, req)
 	s.idptest.AssertLoginNotComplete(c)
@@ -63,9 +63,9 @@ func (s *userpassSuite) TestKeystoneUserpassIdentityProviderHandleResponse(c *qt
 	body, err := json.Marshal(form.LoginBody{
 		Form: login,
 	})
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	req, err := http.NewRequest("POST", "/login?did=1", bytes.NewReader(body))
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 	s.idp.Handle(s.idptest.Ctx, rr, req)
@@ -78,13 +78,13 @@ func (s *userpassSuite) TestKeystoneUserpassIdentityProviderHandleResponse(c *qt
 		},
 	})
 	groups, err := s.idp.GetGroups(s.idptest.Ctx, identity)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	c.Assert(groups, qt.DeepEquals, []string{"abc_project"})
 }
 
 func (s *userpassSuite) TestKeystoneUserpassIdentityProviderHandleBadRequest(c *qt.C) {
 	req, err := http.NewRequest("POST", "/login?did=1", strings.NewReader("{"))
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 	s.idp.Handle(s.idptest.Ctx, rr, req)
@@ -98,9 +98,9 @@ func (s *userpassSuite) TestKeystoneUserpassIdentityProviderHandleNoUsername(c *
 	body, err := json.Marshal(form.LoginBody{
 		Form: login,
 	})
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	req, err := http.NewRequest("POST", "https://idp.test/login?did=1", bytes.NewReader(body))
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 	s.idp.Handle(s.idptest.Ctx, rr, req)
@@ -116,7 +116,7 @@ identity-providers:
 `
 	var conf config.Config
 	err := yaml.Unmarshal([]byte(input), &conf)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	c.Assert(conf.IdentityProviders, qt.HasLen, 1)
 	c.Assert(conf.IdentityProviders[0].Name(), qt.Equals, "openstack2")
 }

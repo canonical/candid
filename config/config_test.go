@@ -100,7 +100,7 @@ func readConfig(c *qt.C, content string) (*config.Config, error) {
 	// Write the configuration content to file.
 	path := path.Join(c.Mkdir(), "config.yaml")
 	err := ioutil.WriteFile(path, []byte(content), 0666)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 
 	// Read the configuration.
 	return config.Read(path)
@@ -114,7 +114,7 @@ func TestRead(t *testing.T) {
 	idp.Register("keystone", testIdentityProvider)
 	store.Register("test", testStorageBackend)
 	conf, err := readConfig(c, testConfig)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	// Check that the TLS configuration creates a valid *tls.Config
 	tlsConfig := conf.TLSConfig()
 	c.Assert(tlsConfig, qt.Not(qt.IsNil))
@@ -123,13 +123,13 @@ func TestRead(t *testing.T) {
 
 	var key bakery.KeyPair
 	err = key.Public.UnmarshalText([]byte("CIdWcEUN+0OZnKW9KwruRQnQDY/qqzVdD30CijwiWCk="))
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	err = key.Private.UnmarshalText([]byte("8PjzjakvIlh3BVFKe8axinRDutF6EDIfjtuf4+JaNow="))
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 
 	var adminPubKey bakery.PublicKey
 	err = adminPubKey.UnmarshalText([]byte("dUnC8p9p3nygtE2h92a47Ooq0rXg0fVSm3YBWou5/UQ="))
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 
 	c.Assert(conf, qt.DeepEquals, &config.Config{
 		Storage: &store.Config{

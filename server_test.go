@@ -62,7 +62,7 @@ func (s *serverSuite) TestNewServerWithVersions(c *qt.C) {
 		candid.ServerParams(s.store.ServerParams()),
 		candid.Debug,
 	)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	defer h.Close()
 
 	qthttptest.AssertJSONCall(c, qthttptest.JSONCallParams{
@@ -77,7 +77,7 @@ func (s *serverSuite) TestNewServerWithVersions(c *qt.C) {
 func (s *serverSuite) TestNewServerRemovesAgentIDP(c *qt.C) {
 	var conf config.Config
 	err := yaml.Unmarshal([]byte(`{"identity-providers": [{"type":"agent"},{"type":"static","name":"test"}]}`), &conf)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	idps := make([]idp.IdentityProvider, len(conf.IdentityProviders))
 	for i, idp := range conf.IdentityProviders {
 		idps[i] = idp.IdentityProvider
@@ -85,7 +85,7 @@ func (s *serverSuite) TestNewServerRemovesAgentIDP(c *qt.C) {
 	sp := candid.ServerParams(s.store.ServerParams())
 	sp.IdentityProviders = idps
 	h, err := candid.NewServer(sp, candid.V1)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	h.Close()
 }
 

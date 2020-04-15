@@ -81,7 +81,7 @@ func (s *loginSuite) TestLegacyInteractiveLogin(c *qt.C) {
 	client := s.srv.Client(s.interactor)
 	// Use "<is-authenticated-user" to force legacy interaction
 	ms, err := s.dischargeCreator.Discharge(c, "<is-authenticated-user", client)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	s.dischargeCreator.AssertMacaroon(c, ms, identchecker.LoginOp, "test")
 }
 
@@ -89,7 +89,7 @@ func (s *loginSuite) TestLegacyNonInteractiveLogin(c *qt.C) {
 	client := s.srv.AdminClient()
 	// Use "<is-authenticated-user" to force legacy interaction
 	ms, err := s.dischargeCreator.Discharge(c, "<is-authenticated-user", client)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	s.dischargeCreator.AssertMacaroon(c, ms, identchecker.LoginOp, auth.AdminUsername)
 }
 
@@ -105,14 +105,14 @@ func (s *loginSuite) TestLegacyLoginFailure(c *qt.C) {
 func (s *loginSuite) TestInteractiveLogin(c *qt.C) {
 	client := s.srv.Client(s.interactor)
 	ms, err := s.dischargeCreator.Discharge(c, "is-authenticated-user", client)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	s.dischargeCreator.AssertMacaroon(c, ms, identchecker.LoginOp, "test")
 }
 
 func (s *loginSuite) TestNonInteractiveLogin(c *qt.C) {
 	client := s.srv.AdminClient()
 	ms, err := s.dischargeCreator.Discharge(c, "is-authenticated-user", client)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	s.dischargeCreator.AssertMacaroon(c, ms, identchecker.LoginOp, auth.AdminUsername)
 }
 
@@ -126,16 +126,16 @@ func (s *loginSuite) TestLoginFailure(c *qt.C) {
 
 func (s *loginSuite) TestLoginMethodsIncludesAgent(c *qt.C) {
 	req, err := http.NewRequest("GET", "/login-legacy", nil)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	req.Header.Set("Accept", "application/json")
 	resp := s.srv.Do(c, req)
 	defer resp.Body.Close()
 	c.Assert(resp.StatusCode, qt.Equals, http.StatusOK)
 	buf, err := ioutil.ReadAll(resp.Body)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	var lm params.LoginMethods
 	err = json.Unmarshal(buf, &lm)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	c.Assert(lm.Agent, qt.Equals, s.srv.URL+"/login/legacy-agent")
 }
 
@@ -155,19 +155,19 @@ func badLoginFormRequestMethod(client *http.Client, resp *http.Response) (*http.
 
 func (s *loginSuite) TestLoginIDPChoice(c *qt.C) {
 	req, err := http.NewRequest("GET", "/login", nil)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	req.Header.Set("Accept", "application/json")
 	resp := s.srv.Do(c, req)
 	defer resp.Body.Close()
 	c.Assert(resp.StatusCode, qt.Equals, http.StatusOK)
 	buf, err := ioutil.ReadAll(resp.Body)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	var choice params.IDPChoice
 	err = json.Unmarshal(buf, &choice)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	for i, ch := range choice.IDPs {
 		u, err := url.Parse(ch.URL)
-		c.Assert(err, qt.Equals, nil)
+		c.Assert(err, qt.IsNil)
 		c.Assert(u.Query().Get("state"), qt.Not(qt.Equals), "")
 		u.RawQuery = ""
 		choice.IDPs[i].URL = u.String()
@@ -190,19 +190,19 @@ func (s *loginSuite) TestLoginIDPChoice(c *qt.C) {
 
 func (s *loginSuite) TestLoginIDPChoiceHidden(c *qt.C) {
 	req, err := http.NewRequest("GET", "/login?domain=test3", nil)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	req.Header.Set("Accept", "application/json")
 	resp := s.srv.Do(c, req)
 	defer resp.Body.Close()
 	c.Assert(resp.StatusCode, qt.Equals, http.StatusOK)
 	buf, err := ioutil.ReadAll(resp.Body)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	var choice params.IDPChoice
 	err = json.Unmarshal(buf, &choice)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	for i, ch := range choice.IDPs {
 		u, err := url.Parse(ch.URL)
-		c.Assert(err, qt.Equals, nil)
+		c.Assert(err, qt.IsNil)
 		c.Assert(u.Query().Get("state"), qt.Not(qt.Equals), "")
 		u.RawQuery = ""
 		choice.IDPs[i].URL = u.String()
@@ -220,20 +220,20 @@ func (s *loginSuite) TestLoginIDPChoiceHidden(c *qt.C) {
 
 func (s *loginSuite) TestLoginRedirectNotWhitelisted(c *qt.C) {
 	req, err := http.NewRequest("GET", "/login-redirect?return_to=https://example.com/bad-callback&state=12345", nil)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	req.Header.Set("Accept", "application/json")
 	resp := s.srv.Do(c, req)
 	defer resp.Body.Close()
 	c.Assert(resp.StatusCode, qt.Equals, http.StatusOK)
 	buf, err := ioutil.ReadAll(resp.Body)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	var choice params.IDPChoice
 	err = json.Unmarshal(buf, &choice)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 
 	body := strings.NewReader("username=test&password=testpassword")
 	req, err = http.NewRequest("POST", choice.IDPs[0].URL, body)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	for _, cookie := range resp.Cookies() {
 		req.AddCookie(cookie)
@@ -242,12 +242,12 @@ func (s *loginSuite) TestLoginRedirectNotWhitelisted(c *qt.C) {
 	resp = s.srv.Do(c, req)
 	defer resp.Body.Close()
 	buf, err = ioutil.ReadAll(resp.Body)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 
 	c.Assert(resp.StatusCode, qt.Equals, http.StatusBadRequest, qt.Commentf("unexpected status code %s: %q", resp.Status, buf))
 	var perr params.Error
 	err = json.Unmarshal(buf, &perr)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	c.Assert(perr, qt.Equals, params.Error{
 		Code:    "bad request",
 		Message: "invalid return_to",
@@ -256,20 +256,20 @@ func (s *loginSuite) TestLoginRedirectNotWhitelisted(c *qt.C) {
 
 func (s *loginSuite) TestLoginRedirect(c *qt.C) {
 	req, err := http.NewRequest("GET", "/login-redirect?return_to=https://example.com/callback&state=12345", nil)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	req.Header.Set("Accept", "application/json")
 	resp := s.srv.Do(c, req)
 	defer resp.Body.Close()
 	c.Assert(resp.StatusCode, qt.Equals, http.StatusOK)
 	buf, err := ioutil.ReadAll(resp.Body)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	var choice params.IDPChoice
 	err = json.Unmarshal(buf, &choice)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 
 	body := strings.NewReader("username=test&password=testpassword")
 	req, err = http.NewRequest("POST", choice.IDPs[0].URL, body)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	for _, cookie := range resp.Cookies() {
 		req.AddCookie(cookie)
@@ -278,11 +278,11 @@ func (s *loginSuite) TestLoginRedirect(c *qt.C) {
 	resp = s.srv.RoundTrip(c, req)
 	defer resp.Body.Close()
 	buf, err = ioutil.ReadAll(resp.Body)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 
 	c.Assert(resp.StatusCode, qt.Equals, http.StatusSeeOther, qt.Commentf("unexpected status code %s: %q", resp.Status, buf))
 	u, err := url.Parse(resp.Header.Get("Location"))
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	c.Assert(u.Host, qt.Equals, "example.com")
 	c.Assert(u.Path, qt.Equals, "/callback")
 	q := u.Query()

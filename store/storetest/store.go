@@ -749,7 +749,7 @@ func (s *storeSuite) TestUpdateIdentity(c *qt.C) {
 			store.Username: store.Set,
 		},
 	)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 
 	for i, test := range updateIdentityTests {
 		c.Run(test.about, func(c *qt.C) {
@@ -779,7 +779,7 @@ func (s *storeSuite) TestUpdateIdentity(c *qt.C) {
 					update[store.LastLogin] = store.Set
 				}
 				err := s.Store.UpdateIdentity(s.ctx, test.startIdentity, update)
-				c.Assert(err, qt.Equals, nil)
+				c.Assert(err, qt.IsNil)
 			}
 
 			if test.updateIdentity.Username == "" && test.updateIdentity.ProviderID == "" {
@@ -799,7 +799,7 @@ func (s *storeSuite) TestUpdateIdentity(c *qt.C) {
 					c.Assert(errgo.Cause(err), qt.Equals, test.expectErrorCause)
 				}
 			} else {
-				c.Assert(err, qt.Equals, nil)
+				c.Assert(err, qt.IsNil)
 			}
 			if test.expectIdentity == nil {
 				return
@@ -814,7 +814,7 @@ func (s *storeSuite) TestUpdateIdentity(c *qt.C) {
 				ProviderID: test.expectIdentity.ProviderID,
 			}
 			err = s.Store.Identity(s.ctx, &obtained)
-			c.Assert(err, qt.Equals, nil)
+			c.Assert(err, qt.IsNil)
 			candidtest.AssertEqualIdentity(c, &obtained, test.expectIdentity)
 		})
 	}
@@ -842,7 +842,7 @@ func (s *storeSuite) TestInsertDuplicateUsername(c *qt.C) {
 			store.Username: store.Set,
 		},
 	)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 
 	identity := store.Identity{
 		ProviderID: store.MakeProviderIdentity("test", "test-user"),
@@ -877,7 +877,7 @@ func (s *storeSuite) TestUpdateIDDuplicateUsername(c *qt.C) {
 			store.Username: store.Set,
 		},
 	)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 
 	identity := store.Identity{
 		ProviderID: store.MakeProviderIdentity("test", "test-user"),
@@ -890,7 +890,7 @@ func (s *storeSuite) TestUpdateIDDuplicateUsername(c *qt.C) {
 			store.Username: store.Set,
 		},
 	)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 
 	identity2 := store.Identity{
 		ID:       identity.ID,
@@ -919,7 +919,7 @@ func (s *storeSuite) TestUpdateIDEmpty(c *qt.C) {
 			store.Username: store.Set,
 		},
 	)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 
 	identity2 := store.Identity{
 		ID: identity.ID,
@@ -929,7 +929,7 @@ func (s *storeSuite) TestUpdateIDEmpty(c *qt.C) {
 		&identity2,
 		store.Update{},
 	)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 }
 
 func (s *storeSuite) TestIdentity(c *qt.C) {
@@ -962,27 +962,27 @@ func (s *storeSuite) TestIdentity(c *qt.C) {
 		store.ExtraInfo:     store.Set,
 		store.Owner:         store.Set,
 	})
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 
 	identity2 := store.Identity{
 		ID: identity.ID,
 	}
 	err = s.Store.Identity(s.ctx, &identity2)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	c.Assert(identity2, qt.DeepEquals, identity)
 
 	identity3 := store.Identity{
 		ProviderID: identity.ProviderID,
 	}
 	err = s.Store.Identity(s.ctx, &identity3)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	c.Assert(identity3, qt.DeepEquals, identity)
 
 	identity4 := store.Identity{
 		Username: identity.Username,
 	}
 	err = s.Store.Identity(s.ctx, &identity4)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	c.Assert(identity4, qt.DeepEquals, identity)
 }
 
@@ -1420,13 +1420,13 @@ func (s *storeSuite) TestFindIdentities(c *qt.C) {
 			update[store.Owner] = store.Set
 		}
 		err := s.Store.UpdateIdentity(s.ctx, &testIdentities[i], update)
-		c.Assert(err, qt.Equals, nil)
+		c.Assert(err, qt.IsNil)
 	}
 
 	for i, test := range findIdentitiesTests {
 		c.Logf("%d. %s", i, test.about)
 		identities, err := s.Store.FindIdentities(s.ctx, &test.ref, test.filter, test.sort, test.skip, test.limit)
-		c.Assert(err, qt.Equals, nil)
+		c.Assert(err, qt.IsNil)
 		c.Assert(len(identities), qt.Equals, len(test.expect))
 		for i, identity := range identities {
 			candidtest.AssertEqualIdentity(c, &identity, &testIdentities[test.expect[i]])
@@ -1444,10 +1444,10 @@ func (s *storeSuite) TestIdentityCounts(c *qt.C) {
 		}, store.Update{
 			store.Username: store.Set,
 		})
-		c.Assert(err, qt.Equals, nil)
+		c.Assert(err, qt.IsNil)
 	}
 	counts, err := s.Store.IdentityCounts(s.ctx)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	c.Assert(counts, qt.DeepEquals, map[string]int{
 		"a": 3,
 		"b": 2,

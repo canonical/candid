@@ -30,7 +30,7 @@ func TestLegacySource(t *testing.T) {
 	if errgo.Cause(err) == mgotest.ErrDisabled {
 		c.Skip("mmgotest disabled")
 	}
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	defer db.Close()
 	// mgotest sets the SocketTimout to 1s. Restore it back to the
 	// default value.
@@ -76,12 +76,12 @@ func TestLegacySource(t *testing.T) {
 
 	st := memstore.NewStore()
 	err = internal.Copy(ctx, st, internal.NewLegacySource(db.Database))
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	identity1 := store.Identity{
 		Username: "test1",
 	}
 	err = st.Identity(ctx, &identity1)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	normalize(&identity1)
 	c.Assert(identity1, qt.DeepEquals, store.Identity{
 		ProviderID:    "usso:https://login.ubuntu.com/+id/AAAAAA",
@@ -100,7 +100,7 @@ func TestLegacySource(t *testing.T) {
 		Username: "test2@admin@idm",
 	}
 	err = st.Identity(ctx, &identity2)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	normalize(&identity2)
 	c.Assert(identity2, qt.DeepEquals, store.Identity{
 		ProviderID: "idm:test2@admin@idm",
@@ -114,7 +114,7 @@ func TestLegacySource(t *testing.T) {
 		Username: "test3@azure",
 	}
 	err = st.Identity(ctx, &identity3)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	normalize(&identity3)
 	c.Assert(identity3, qt.DeepEquals, store.Identity{
 		ProviderID: "azure:https://login.live.com:AAAAAAAAAAAAAAAAAAAAAIDX0brimGEivOk0995Z2FB",
@@ -127,7 +127,7 @@ func TestLegacySource(t *testing.T) {
 		Username: "AAAAAAA@usso",
 	}
 	err = st.Identity(ctx, &identity4)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	normalize(&identity4)
 	c.Assert(identity4, qt.DeepEquals, store.Identity{
 		ProviderID: "usso_macaroon:AAAAAAA",
@@ -139,5 +139,5 @@ func TestLegacySource(t *testing.T) {
 
 func insert(c *qt.C, db *mgo.Database, identity *mongodoc.Identity) {
 	err := db.C("identities").Insert(identity)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 }

@@ -34,23 +34,23 @@ func (s *storeSuite) Init(c *qt.C) {
 func (s *storeSuite) TestRoundTrip(c *qt.C) {
 	ctx := context.Background()
 	kv, err := s.store.ProviderDataStore.KeyValueStore(ctx, "test")
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	store := internal.NewDischargeTokenStore(kv)
 	dt := httpbakery.DischargeToken{
 		Kind:  "test",
 		Value: []byte("test-value"),
 	}
 	key, err := store.Put(ctx, &dt, time.Now().Add(time.Minute))
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	dt1, err := store.Get(ctx, key)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	c.Assert(dt1, qt.DeepEquals, &dt)
 }
 
 func (s *storeSuite) TestPutCanceled(c *qt.C) {
 	ctx := context.Background()
 	kv, err := s.store.ProviderDataStore.KeyValueStore(ctx, "test")
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	store := internal.NewDischargeTokenStore(withSet(kv, func(context.Context, string, []byte, time.Time) error {
 		return context.Canceled
 	}))
@@ -66,7 +66,7 @@ func (s *storeSuite) TestPutCanceled(c *qt.C) {
 func (s *storeSuite) TestPutDeadlineExceeded(c *qt.C) {
 	ctx := context.Background()
 	kv, err := s.store.ProviderDataStore.KeyValueStore(ctx, "test")
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	store := internal.NewDischargeTokenStore(withSet(kv, func(context.Context, string, []byte, time.Time) error {
 		return context.DeadlineExceeded
 	}))
@@ -82,7 +82,7 @@ func (s *storeSuite) TestPutDeadlineExceeded(c *qt.C) {
 func (s *storeSuite) TestGetNotFound(c *qt.C) {
 	ctx := context.Background()
 	kv, err := s.store.ProviderDataStore.KeyValueStore(ctx, "test")
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	st := internal.NewDischargeTokenStore(withGet(kv, func(context.Context, string) ([]byte, error) {
 		return nil, simplekv.ErrNotFound
 	}))
@@ -94,7 +94,7 @@ func (s *storeSuite) TestGetNotFound(c *qt.C) {
 func (s *storeSuite) TestGetCanceled(c *qt.C) {
 	ctx := context.Background()
 	kv, err := s.store.ProviderDataStore.KeyValueStore(ctx, "test")
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	st := internal.NewDischargeTokenStore(withGet(kv, func(context.Context, string) ([]byte, error) {
 		return nil, context.Canceled
 	}))
@@ -106,7 +106,7 @@ func (s *storeSuite) TestGetCanceled(c *qt.C) {
 func (s *storeSuite) TestGetDeadlineExceeded(c *qt.C) {
 	ctx := context.Background()
 	kv, err := s.store.ProviderDataStore.KeyValueStore(ctx, "test")
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	st := internal.NewDischargeTokenStore(withGet(kv, func(context.Context, string) ([]byte, error) {
 		return nil, context.DeadlineExceeded
 	}))
@@ -118,7 +118,7 @@ func (s *storeSuite) TestGetDeadlineExceeded(c *qt.C) {
 func (s *storeSuite) TestGetInvalidJSON(c *qt.C) {
 	ctx := context.Background()
 	kv, err := s.store.ProviderDataStore.KeyValueStore(ctx, "test")
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	st := internal.NewDischargeTokenStore(withGet(kv, func(context.Context, string) ([]byte, error) {
 		return []byte("}"), nil
 	}))
@@ -129,14 +129,14 @@ func (s *storeSuite) TestGetInvalidJSON(c *qt.C) {
 func (s *storeSuite) TestExpiredEntry(c *qt.C) {
 	ctx := context.Background()
 	kv, err := s.store.ProviderDataStore.KeyValueStore(ctx, "test")
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	st := internal.NewDischargeTokenStore(kv)
 	dt := httpbakery.DischargeToken{
 		Kind:  "test",
 		Value: []byte("test-value"),
 	}
 	key, err := st.Put(ctx, &dt, time.Now())
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	_, err = st.Get(ctx, key)
 	c.Assert(err, qt.ErrorMatches, `".*" not found`)
 	c.Assert(errgo.Cause(err), qt.Equals, store.ErrNotFound)

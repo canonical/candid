@@ -93,7 +93,7 @@ func (s *staticSuite) TestRelativeIconURL(c *qt.C) {
 	err := i.Init(context.Background(), idp.InitParams{
 		Location: "https://www.example.com/candid",
 	})
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	c.Assert(i.IconURL(), qt.Equals, "https://www.example.com/candid/static/icon.bmp")
 }
 
@@ -115,7 +115,7 @@ func (s *staticSuite) TestHidden(c *qt.C) {
 func (s *staticSuite) TestHandle(c *qt.C) {
 	i := s.setupIdp(c, getSampleParams())
 	id, err := s.idptest.DoInteractiveLogin(c, i, idpPrefix+"/login", candidtest.PostLoginForm("user1", "pass1"))
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	candidtest.AssertEqualIdentity(c, id, &store.Identity{
 		ProviderID: store.MakeProviderIdentity("test", "user1"),
 		Username:   "user1",
@@ -135,7 +135,7 @@ func (s *staticSuite) TestHandleWithDomain(c *qt.C) {
 	params.Domain = "domain"
 	i := s.setupIdp(c, params)
 	id, err := s.idptest.DoInteractiveLogin(c, i, idpPrefix+"/login", candidtest.PostLoginForm("user1", "pass1"))
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 
 	candidtest.AssertEqualIdentity(c, id, &store.Identity{
 		ProviderID: store.MakeProviderIdentity("test", "user1@domain"),
@@ -155,7 +155,7 @@ func (s *staticSuite) TestGetGroups(c *qt.C) {
 	params := getSampleParams()
 	i := s.setupIdp(c, params)
 	_, err := s.idptest.DoInteractiveLogin(c, i, idpPrefix+"/login", candidtest.PostLoginForm("user1", "pass1"))
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	identity := s.idptest.Store.AssertUser(c, &store.Identity{
 		ProviderID: store.MakeProviderIdentity("test", "user1"),
 		Username:   "user1",
@@ -163,7 +163,7 @@ func (s *staticSuite) TestGetGroups(c *qt.C) {
 		Email:      "user1@example.com",
 	})
 	groups, err := i.GetGroups(s.idptest.Ctx, identity)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	c.Assert(groups, qt.DeepEquals, []string{"group1", "group2"})
 }
 
@@ -172,7 +172,7 @@ func (s *staticSuite) TestGetGroupsReturnsNewSlice(c *qt.C) {
 	params.Domain = "domain"
 	i := s.setupIdp(c, params)
 	_, err := s.idptest.DoInteractiveLogin(c, i, idpPrefix+"/login", candidtest.PostLoginForm("user1", "pass1"))
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	identity := s.idptest.Store.AssertUser(c, &store.Identity{
 		ProviderID: store.MakeProviderIdentity("test", "user1@domain"),
 		Username:   "user1@domain",
@@ -180,11 +180,11 @@ func (s *staticSuite) TestGetGroupsReturnsNewSlice(c *qt.C) {
 		Email:      "user1@example.com",
 	})
 	groups, err := i.GetGroups(s.idptest.Ctx, identity)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	c.Assert(groups, qt.DeepEquals, []string{"group1", "group2"})
 	groups[0] = "group1@domain"
 	groups, err = i.GetGroups(s.idptest.Ctx, identity)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	c.Assert(groups, qt.DeepEquals, []string{"group1", "group2"})
 }
 

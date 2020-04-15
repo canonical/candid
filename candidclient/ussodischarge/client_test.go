@@ -65,10 +65,10 @@ func (s *clientSuite) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func (s *clientSuite) Init(c *qt.C) {
 	var err error
 	s.testMacaroon, err = bakery.NewMacaroon([]byte("test rootkey"), []byte("test macaroon"), "test location", bakery.LatestVersion, nil)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	// Discharge macaroons from Ubuntu SSO will be binary encoded in the version 1 format.
 	s.testDischargeMacaroon, err = macaroon.New([]byte("test discharge rootkey"), []byte("test discharge macaroon"), "test discharge location", macaroon.V1)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 
 	s.srv = httptest.NewServer(s)
 	c.Defer(s.srv.Close)
@@ -78,7 +78,7 @@ func (s *clientSuite) Init(c *qt.C) {
 func (s *clientSuite) TestMacaroon(c *qt.C) {
 	s.macaroon = s.testMacaroon
 	m, err := ussodischarge.Macaroon(testContext, nil, s.srv.URL+"/macaroon")
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	c.Assert(m.M(), macaroonEquals, s.testMacaroon.M())
 }
 
@@ -96,11 +96,11 @@ func (s *clientSuite) TestVisitor(c *qt.C) {
 
 	client := httpbakery.NewClient()
 	req, err := http.NewRequest("GET", "", nil)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	ierr := httpbakery.NewInteractionRequiredError(nil, req)
 	ussodischarge.SetInteraction(ierr, s.srv.URL+"/login")
 	dt, err := v.Interact(testContext, client, "", ierr)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	c.Assert(dt, qt.DeepEquals, &httpbakery.DischargeToken{
 		Kind:  "test-kind",
 		Value: []byte("test-value"),
@@ -113,7 +113,7 @@ func (s *clientSuite) TestVisitorMethodNotSupported(c *qt.C) {
 	})
 	client := httpbakery.NewClient()
 	req, err := http.NewRequest("GET", "", nil)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	ierr := httpbakery.NewInteractionRequiredError(nil, req)
 	ierr.SetInteraction("other", nil)
 	dt, err := v.Interact(testContext, client, "", ierr)
@@ -127,7 +127,7 @@ func (s *clientSuite) TestVisitorFunctionError(c *qt.C) {
 	})
 	client := httpbakery.NewClient()
 	req, err := http.NewRequest("GET", "", nil)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	ierr := httpbakery.NewInteractionRequiredError(nil, req)
 	ussodischarge.SetInteraction(ierr, s.srv.URL+"/login")
 	dt, err := v.Interact(testContext, client, "", ierr)
@@ -146,7 +146,7 @@ func (s *clientSuite) TestAcquireDischarge(c *qt.C) {
 		Location: s.srv.URL,
 		Id:       []byte("test caveat id"),
 	}, nil)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	c.Assert(m.M(), macaroonEquals, s.testDischargeMacaroon)
 }
 
@@ -167,14 +167,14 @@ func (s *clientSuite) TestAcquireDischargeError(c *qt.C) {
 func (s *clientSuite) TestDischargeAll(c *qt.C) {
 	m := s.testMacaroon.Clone()
 	err := m.M().AddThirdPartyCaveat([]byte("third party root key"), []byte("third party caveat id"), s.srv.URL)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	d := &ussodischarge.Discharger{
 		Email:    "user@example.com",
 		Password: "secret",
 		OTP:      "123456",
 	}
 	ms, err := d.DischargeAll(testContext, m)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	md := s.testDischargeMacaroon.Clone()
 	md.Bind(m.M().Signature())
 	c.Assert(ms, macaroonEquals, macaroon.Slice{m.M(), md})
@@ -183,7 +183,7 @@ func (s *clientSuite) TestDischargeAll(c *qt.C) {
 func (s *clientSuite) TestDischargeAllError(c *qt.C) {
 	m := s.testMacaroon.Clone()
 	err := m.M().AddThirdPartyCaveat([]byte("third party root key"), []byte("third party caveat id"), s.srv.URL)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	d := &ussodischarge.Discharger{
 		Email:    "user@example.com",
 		Password: "bad-secret",

@@ -28,7 +28,7 @@ func TestDischarge(t *testing.T) {
 	client := srv.Client("bob")
 
 	key, err := bakery.GenerateKey()
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	b := identchecker.NewBakery(identchecker.BakeryParams{
 		Key:            key,
 		Locator:        srv,
@@ -40,23 +40,23 @@ func TestDischarge(t *testing.T) {
 		candidclient.IdentityCaveats(srv.URL.String()),
 		identchecker.LoginOp,
 	)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 
 	ms, err := client.DischargeAll(ctx, m)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 
 	// Make sure that the macaroon discharged correctly and that it
 	// has the right declared caveats.
 	authInfo, err := b.Checker.Auth(ms).Allow(ctx, identchecker.LoginOp)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	c.Assert(authInfo.Identity, qt.Not(qt.IsNil))
 	ident := authInfo.Identity.(candidclient.Identity)
 	c.Assert(ident.Id(), qt.Equals, "bob")
 	username, err := ident.Username()
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	c.Assert(username, qt.Equals, "bob")
 	groups, err := ident.Groups()
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	c.Assert(groups, qt.DeepEquals, []string{"somegroup"})
 }
 
@@ -69,7 +69,7 @@ func TestDischargeDefaultUser(t *testing.T) {
 	srv.SetDefaultUser("bob")
 
 	key, err := bakery.GenerateKey()
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	b := identchecker.NewBakery(identchecker.BakeryParams{
 		Key:            key,
 		Locator:        srv,
@@ -81,24 +81,24 @@ func TestDischargeDefaultUser(t *testing.T) {
 		candidclient.IdentityCaveats(srv.URL.String()),
 		identchecker.LoginOp,
 	)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 
 	client := httpbakery.NewClient()
 	ms, err := client.DischargeAll(ctx, m)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 
 	// Make sure that the macaroon discharged correctly and that it
 	// has the right declared caveats.
 	authInfo, err := b.Checker.Auth(ms).Allow(ctx, identchecker.LoginOp)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	c.Assert(authInfo.Identity, qt.Not(qt.IsNil))
 	ident := authInfo.Identity.(candidclient.Identity)
 	c.Assert(ident.Id(), qt.Equals, "bob")
 	username, err := ident.Username()
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	c.Assert(username, qt.Equals, "bob")
 	groups, err := ident.Groups()
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	c.Assert(groups, qt.HasLen, 0)
 }
 
@@ -115,13 +115,13 @@ func TestGroups(t *testing.T) {
 	groups, err := client.UserGroups(context.TODO(), &candidparams.UserGroupsRequest{
 		Username: "bob",
 	})
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	c.Assert(groups, qt.DeepEquals, []string{"beatles", "bobbins"})
 
 	groups, err = client.UserGroups(context.TODO(), &candidparams.UserGroupsRequest{
 		Username: "alice",
 	})
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	c.Assert(groups, qt.HasLen, 0)
 }
 
@@ -138,6 +138,6 @@ func TestAddUserWithExistingGroups(t *testing.T) {
 	groups, err := client.UserGroups(context.TODO(), &candidparams.UserGroupsRequest{
 		Username: "alice",
 	})
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	c.Assert(groups, qt.DeepEquals, []string{"anteaters", "goof"})
 }

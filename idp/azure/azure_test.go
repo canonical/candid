@@ -52,7 +52,7 @@ func TestConfig(t *testing.T) {
 				c.Assert(err, qt.ErrorMatches, test.expectError)
 				return
 			}
-			c.Assert(err, qt.Equals, nil)
+			c.Assert(err, qt.IsNil)
 			c.Assert(conf.IdentityProviders, qt.HasLen, 1)
 			c.Assert(conf.IdentityProviders[0].Name(), qt.Equals, "azure")
 		})

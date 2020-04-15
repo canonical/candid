@@ -49,30 +49,30 @@ func (s *meetingSuite) Init(c *qt.C) {
 
 func (s *meetingSuite) TestPutGetRemove(c *qt.C) {
 	err := s.Store.Put(s.ctx, "x", "xaddr")
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	err = s.Store.Put(s.ctx, "y", "yaddr")
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 
 	addr, err := s.Store.Get(s.ctx, "x")
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	c.Assert(addr, qt.Equals, "xaddr")
 
 	addr, err = s.Store.Get(s.ctx, "y")
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	c.Assert(addr, qt.Equals, "yaddr")
 
 	_, err = s.Store.Remove(s.ctx, "y")
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 
 	// Check it's idempotent.
 	_, err = s.Store.Remove(s.ctx, "y")
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 
 	addr, err = s.Store.Get(s.ctx, "y")
 	c.Assert(err, qt.ErrorMatches, "rendezvous not found, probably expired")
 
 	addr, err = s.Store.Get(s.ctx, "x")
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	c.Assert(addr, qt.Equals, "xaddr")
 }
 
@@ -83,16 +83,16 @@ func (s *meetingSuite) TestRemoveNothingRemoved(c *qt.C) {
 	for i := 0; i < 10; i++ {
 		id := fmt.Sprint("a", i)
 		err := s.PutAtTimeFunc(s.ctx, s.Store, id, "a", now.Add(time.Duration(-i)*time.Second))
-		c.Assert(err, qt.Equals, nil)
+		c.Assert(err, qt.IsNil)
 		allIds[id] = true
 
 		id = fmt.Sprint("b", i)
 		err = s.PutAtTimeFunc(s.ctx, s.Store, id, "b", now.Add(time.Duration(-i)*time.Second))
-		c.Assert(err, qt.Equals, nil)
+		c.Assert(err, qt.IsNil)
 		allIds[id] = true
 	}
 	ids, err := s.Store.RemoveOld(s.ctx, "a", now.Add(time.Duration(-11)*time.Second))
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	c.Assert(len(ids), qt.Equals, 0)
 }
 
@@ -103,16 +103,16 @@ func (s *meetingSuite) TestRemoveOld(c *qt.C) {
 	for i := 0; i < 10; i++ {
 		id := fmt.Sprint("a", i)
 		err := s.PutAtTimeFunc(s.ctx, s.Store, id, "a", now.Add(time.Duration(-i)*time.Second))
-		c.Assert(err, qt.Equals, nil)
+		c.Assert(err, qt.IsNil)
 		allIds[id] = true
 
 		id = fmt.Sprint("b", i)
 		err = s.PutAtTimeFunc(s.ctx, s.Store, id, "b", now.Add(time.Duration(-i)*time.Second))
-		c.Assert(err, qt.Equals, nil)
+		c.Assert(err, qt.IsNil)
 		allIds[id] = true
 	}
 	ids, err := s.Store.RemoveOld(s.ctx, "a", now.Add(-5500*time.Millisecond))
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	sort.Strings(ids)
 	c.Assert(ids, qt.DeepEquals, []string{"a6", "a7", "a8", "a9"})
 	for _, id := range ids {
@@ -122,11 +122,11 @@ func (s *meetingSuite) TestRemoveOld(c *qt.C) {
 	}
 	for id := range allIds {
 		_, err = s.Store.Get(s.ctx, id)
-		c.Assert(err, qt.Equals, nil)
+		c.Assert(err, qt.IsNil)
 	}
 
 	ids, err = s.Store.RemoveOld(s.ctx, "", now.Add(-1500*time.Millisecond))
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	sort.Strings(ids)
 	c.Assert(ids, qt.DeepEquals, []string{"a2", "a3", "a4", "a5", "b2", "b3", "b4", "b5", "b6", "b7", "b8", "b9"})
 	for _, id := range ids {
@@ -136,13 +136,13 @@ func (s *meetingSuite) TestRemoveOld(c *qt.C) {
 	}
 	for id := range allIds {
 		_, err = s.Store.Get(s.ctx, id)
-		c.Assert(err, qt.Equals, nil)
+		c.Assert(err, qt.IsNil)
 	}
 }
 
 func (s *meetingSuite) TestPutSameIDTwice(c *qt.C) {
 	err := s.Store.Put(s.ctx, "x", "addr1")
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	// Putting the same id should result in an error.
 	err = s.Store.Put(s.ctx, "x", "addr2")
 	if err == nil {

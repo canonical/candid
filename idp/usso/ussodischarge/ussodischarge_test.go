@@ -53,7 +53,7 @@ identity-providers:
 `
 	var conf config.Config
 	err := yaml.Unmarshal([]byte(configYaml), &conf)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	c.Assert(conf.IdentityProviders, qt.HasLen, 1)
 	c.Assert(conf.IdentityProviders[0].Name(), qt.Equals, "usso_macaroon")
 }
@@ -84,9 +84,9 @@ func newFixture(c *qt.C) *fixture {
 			PublicKey: testKey.PublicKey,
 		},
 	})
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	err = f.idp.Init(f.idptest.Ctx, f.idptest.InitParams(c, "https://idp.test"))
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	return f
 }
 
@@ -121,13 +121,13 @@ func (s *ussoMacaroonSuite) TestURL(c *qt.C) {
 
 func (s *ussoMacaroonSuite) TestHandleGetSuccess(c *qt.C) {
 	req, err := http.NewRequest("GET", "/login", nil)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	rr := httptest.NewRecorder()
 	s.idp.Handle(s.idptest.Ctx, rr, req)
 	c.Assert(rr.Code, qt.Equals, http.StatusOK, qt.Commentf("%s", rr.Body))
 	var mresp udclient.MacaroonResponse
 	err = json.Unmarshal(rr.Body.Bytes(), &mresp)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	m := mresp.Macaroon.M()
 	cavs := m.Caveats()
 	var thirdPartyCav macaroon.Caveat
@@ -139,33 +139,33 @@ func (s *ussoMacaroonSuite) TestHandleGetSuccess(c *qt.C) {
 	c.Assert(thirdPartyCav.VerificationId, qt.Not(qt.HasLen), 0)
 	var cid ussodischarge.USSOCaveatID
 	err = json.Unmarshal(thirdPartyCav.Id, &cid)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	c.Assert(cid.Version, qt.Equals, 1)
 	secret, err := base64.StdEncoding.DecodeString(cid.Secret)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	rk, err := rsa.DecryptOAEP(sha1.New(), nil, testKey, secret, nil)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	md, err := macaroon.New(rk, thirdPartyCav.Id, "test", macaroon.V1)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	md.Bind(m.Signature())
 	ms := macaroon.Slice{m, md}
 	checker := identchecker.NewChecker(identchecker.CheckerParams{
 		MacaroonVerifier: s.idptest.Oven,
 	})
 	authInfo, err := checker.Auth(ms).Allow(s.idptest.Ctx, ussodischarge.USSOLoginOp)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	c.Assert(authInfo.Identity, qt.Equals, nil)
 }
 
 func (s *ussoMacaroonSuite) TestHandleGetV1Success(c *qt.C) {
 	req, err := http.NewRequest("GET", "/interact", nil)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	rr := httptest.NewRecorder()
 	s.idp.Handle(s.idptest.Ctx, rr, req)
 	c.Assert(rr.Code, qt.Equals, http.StatusOK, qt.Commentf("%s", rr.Body))
 	var mresp udclient.MacaroonResponse
 	err = json.Unmarshal(rr.Body.Bytes(), &mresp)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	m := mresp.Macaroon.M()
 	cavs := m.Caveats()
 	var thirdPartyCav macaroon.Caveat
@@ -177,21 +177,21 @@ func (s *ussoMacaroonSuite) TestHandleGetV1Success(c *qt.C) {
 	c.Assert(thirdPartyCav.VerificationId, qt.Not(qt.HasLen), 0)
 	var cid ussodischarge.USSOCaveatID
 	err = json.Unmarshal(thirdPartyCav.Id, &cid)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	c.Assert(cid.Version, qt.Equals, 1)
 	secret, err := base64.StdEncoding.DecodeString(cid.Secret)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	rk, err := rsa.DecryptOAEP(sha1.New(), nil, testKey, secret, nil)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	md, err := macaroon.New(rk, thirdPartyCav.Id, "test", macaroon.V1)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	md.Bind(m.Signature())
 	ms := macaroon.Slice{m, md}
 	checker := identchecker.NewChecker(identchecker.CheckerParams{
 		MacaroonVerifier: s.idptest.Oven,
 	})
 	authInfo, err := checker.Auth(ms).Allow(s.idptest.Ctx, ussodischarge.USSOLoginOp)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	c.Assert(authInfo.Identity, qt.Equals, nil)
 }
 
@@ -308,9 +308,9 @@ var postTests = []struct {
 
 func (s *ussoMacaroonSuite) TestHandlePostV1(c *qt.C) {
 	err := s.idp.Init(s.idptest.Ctx, s.idptest.InitParams(c, "https://idp.test"))
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	bm, err := s.idptest.Oven.NewMacaroon(s.idptest.Ctx, bakery.Version1, nil, ussodischarge.USSOLoginOp)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	m := bm.M()
 	buf, err := json.Marshal(&ussodischarge.AccountInfo{
 		Username:    "username",
@@ -318,24 +318,24 @@ func (s *ussoMacaroonSuite) TestHandlePostV1(c *qt.C) {
 		Email:       "testuser@example.com",
 		DisplayName: "Test User",
 	})
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	err = m.AddFirstPartyCaveat([]byte("login.staging.ubuntu.com|account|" + base64.StdEncoding.EncodeToString(buf)))
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 
 	err = m.AddFirstPartyCaveat([]byte("login.staging.ubuntu.com|valid_since|" + timeString(-time.Hour)))
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 
 	err = m.AddFirstPartyCaveat([]byte("login.staging.ubuntu.com|last_auth|" + timeString(-time.Minute)))
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	err = m.AddFirstPartyCaveat([]byte("login.staging.ubuntu.com|expires|" + timeString(time.Hour)))
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	body := udclient.Login{
 		Macaroons: macaroon.Slice{m},
 	}
 	buf, err = json.Marshal(body)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	req, err := http.NewRequest("POST", "/interact", bytes.NewReader(buf))
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	req.Header.Set("Content-Type", "application/json")
 	req.ParseForm()
 	rr := httptest.NewRecorder()
@@ -344,7 +344,7 @@ func (s *ussoMacaroonSuite) TestHandlePostV1(c *qt.C) {
 	c.Assert(rr.HeaderMap.Get("Content-Type"), qt.Equals, "application/json")
 	var resp udclient.LoginResponse
 	err = json.Unmarshal(rr.Body.Bytes(), &resp)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	c.Assert(resp, qt.DeepEquals, udclient.LoginResponse{
 		DischargeToken: &httpbakery.DischargeToken{
 			Kind:  "test",
@@ -360,39 +360,39 @@ func TestHandlePost(t *testing.T) {
 		c.Run(test.about, func(c *qt.C) {
 			f := newFixture(c)
 			err := f.idp.Init(f.idptest.Ctx, f.idptest.InitParams(c, "https://idp.test"))
-			c.Assert(err, qt.Equals, nil)
+			c.Assert(err, qt.IsNil)
 			bm, err := f.idptest.Oven.NewMacaroon(f.idptest.Ctx, bakery.Version1, nil, ussodischarge.USSOLoginOp)
-			c.Assert(err, qt.Equals, nil)
+			c.Assert(err, qt.IsNil)
 			m := bm.M()
 			if test.account != nil {
 				buf, err := json.Marshal(test.account)
-				c.Assert(err, qt.Equals, nil)
+				c.Assert(err, qt.IsNil)
 				err = m.AddFirstPartyCaveat([]byte("login.staging.ubuntu.com|account|" + base64.StdEncoding.EncodeToString(buf)))
-				c.Assert(err, qt.Equals, nil)
+				c.Assert(err, qt.IsNil)
 			}
 			if test.validSince != "" {
 				err = m.AddFirstPartyCaveat([]byte("login.staging.ubuntu.com|valid_since|" + test.validSince))
-				c.Assert(err, qt.Equals, nil)
+				c.Assert(err, qt.IsNil)
 			}
 			if test.lastAuth != "" {
 				err = m.AddFirstPartyCaveat([]byte("login.staging.ubuntu.com|last_auth|" + test.lastAuth))
-				c.Assert(err, qt.Equals, nil)
+				c.Assert(err, qt.IsNil)
 			}
 			if test.expires != "" {
 				err = m.AddFirstPartyCaveat([]byte("login.staging.ubuntu.com|expires|" + test.expires))
-				c.Assert(err, qt.Equals, nil)
+				c.Assert(err, qt.IsNil)
 			}
 			for _, cav := range test.extraCaveats {
 				err = m.AddFirstPartyCaveat([]byte(cav))
-				c.Assert(err, qt.Equals, nil)
+				c.Assert(err, qt.IsNil)
 			}
 			body := udclient.Login{
 				Macaroons: macaroon.Slice{m},
 			}
 			buf, err := json.Marshal(body)
-			c.Assert(err, qt.Equals, nil)
+			c.Assert(err, qt.IsNil)
 			req, err := http.NewRequest("POST", "/login", bytes.NewReader(buf))
-			c.Assert(err, qt.Equals, nil)
+			c.Assert(err, qt.IsNil)
 			req.Header.Set("Content-Type", "application/json")
 			req.ParseForm()
 			rr := httptest.NewRecorder()
@@ -409,33 +409,34 @@ func TestHandlePost(t *testing.T) {
 
 func TestMultipleLogins(t *testing.T) {
 	c := qt.New(t)
+	defer c.Done()
 
 	f := newFixture(c)
 	err := f.idp.Init(f.idptest.Ctx, f.idptest.InitParams(c, "https://idp.test"))
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 
 	dologin := func(ai *ussodischarge.AccountInfo) {
 		bm, err := f.idptest.Oven.NewMacaroon(f.idptest.Ctx, bakery.Version1, nil, ussodischarge.USSOLoginOp)
-		c.Assert(err, qt.Equals, nil)
+		c.Assert(err, qt.IsNil)
 		m := bm.M()
 		buf, err := json.Marshal(ai)
-		c.Assert(err, qt.Equals, nil)
+		c.Assert(err, qt.IsNil)
 		err = m.AddFirstPartyCaveat([]byte("login.staging.ubuntu.com|account|" + base64.StdEncoding.EncodeToString(buf)))
-		c.Assert(err, qt.Equals, nil)
+		c.Assert(err, qt.IsNil)
 		err = m.AddFirstPartyCaveat([]byte("login.staging.ubuntu.com|valid_since|" + timeString(-time.Minute)))
-		c.Assert(err, qt.Equals, nil)
+		c.Assert(err, qt.IsNil)
 		err = m.AddFirstPartyCaveat([]byte("login.staging.ubuntu.com|last_auth|" + timeString(-time.Hour)))
-		c.Assert(err, qt.Equals, nil)
+		c.Assert(err, qt.IsNil)
 		err = m.AddFirstPartyCaveat([]byte("login.staging.ubuntu.com|expires|" + timeString(time.Hour)))
-		c.Assert(err, qt.Equals, nil)
+		c.Assert(err, qt.IsNil)
 
 		body := udclient.Login{
 			Macaroons: macaroon.Slice{m},
 		}
 		buf, err = json.Marshal(body)
-		c.Assert(err, qt.Equals, nil)
+		c.Assert(err, qt.IsNil)
 		req, err := http.NewRequest("POST", "/login", bytes.NewReader(buf))
-		c.Assert(err, qt.Equals, nil)
+		c.Assert(err, qt.IsNil)
 		req.Header.Set("Content-Type", "application/json")
 		req.ParseForm()
 		rr := httptest.NewRecorder()

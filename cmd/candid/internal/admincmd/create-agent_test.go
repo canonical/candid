@@ -60,7 +60,7 @@ func (s *createAgentSuite) TestCreateAgentWithGeneratedKeyAndAgentFileNotSpecifi
 	// The output should be valid input to an agent.AuthInfo unmarshal.
 	var v agent.AuthInfo
 	err := json.Unmarshal([]byte(out), &v)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 
 	// Check that the public key looks right.
 	agents := v.Agents
@@ -80,7 +80,7 @@ func (s *createAgentSuite) TestCreateAgentWithNonExistentAgentsFileSpecified(c *
 	c.Assert(out, qt.Matches, `added agent a-[0-9a-f]+@candid for http://.* to .+\n`)
 
 	v, err := admincmd.ReadAgentFile(agentFile)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 
 	agents := v.Agents
 	c.Assert(agents, qt.HasLen, 1)
@@ -99,7 +99,7 @@ func (s *createAgentSuite) TestCreateAgentWithExistingAgentsFile(c *qt.C) {
 	c.Assert(out, qt.Matches, `added agent a-[0-9a-f]+@candid for http://.* to .+\n`)
 
 	v, err := admincmd.ReadAgentFile(filepath.Join(s.fixture.Dir, "admin.agent"))
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 
 	agents := v.Agents
 	c.Assert(agents, qt.HasLen, 2)
@@ -108,7 +108,7 @@ func (s *createAgentSuite) TestCreateAgentWithExistingAgentsFile(c *qt.C) {
 		Username: agents[1].Username,
 	}
 	err = s.fixture.store.Identity(context.Background(), &identity)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	c.Assert(identity.Groups, qt.DeepEquals, []string{"somegroup"})
 }
 
@@ -117,7 +117,7 @@ func (s *createAgentSuite) TestCreateAgentWithAdminFlag(c *qt.C) {
 	out := s.fixture.CheckSuccess(c, "create-agent", "--admin")
 	var v agent.AuthInfo
 	err := json.Unmarshal([]byte(out), &v)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	agents := v.Agents
 	c.Assert(agents, qt.HasLen, 1)
 	c.Assert(agents[0].Username, qt.Equals, "admin@candid")
@@ -128,7 +128,7 @@ func (s *createAgentSuite) TestCreateAgentWithParentFlag(c *qt.C) {
 	out := s.fixture.CheckSuccess(c, "create-agent", "-a", "admin.agent", "--parent")
 	var v agent.AuthInfo
 	err := json.Unmarshal([]byte(out), &v)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	agents := v.Agents
 	c.Assert(agents, qt.HasLen, 1)
 	if !strings.HasPrefix(string(agents[0].Username), "a-") {

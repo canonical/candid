@@ -19,7 +19,7 @@ func TestUnmarshalUSSOMacaroon(t *testing.T) {
 	data := []byte(`"MDAxYmxvY2F0aW9uIHRlc3QgbG9jYXRpb24KMDAxZGlkZW50aWZpZXIgdGVzdCBtYWNhcm9vbgowMDJmc2lnbmF0dXJlICaaplwsJeHwPuBK6er_d3DnEnSJ2b85-V9SXsiL6xWOCg"`)
 	var m ussodischarge.USSOMacaroon
 	err := json.Unmarshal(data, &m)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	c.Assert(string(m.Macaroon.Id()), qt.Equals, "test macaroon")
 }
 

@@ -23,7 +23,7 @@ func TestInteractiveDischarge(t *testing.T) {
 	store := candidtest.NewStore()
 	sp := store.ServerParams()
 	ldapIDP, err := ldap.NewIdentityProvider(getSampleParams())
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 	ldap.SetLDAP(ldapIDP, newMockLDAPDialer(getSampleLdapDB()).Dial)
 	sp.IdentityProviders = []idp.IdentityProvider{
 		ldapIDP,

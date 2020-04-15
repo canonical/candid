@@ -53,7 +53,7 @@ storage:
 		Storage *store.Config `yaml:"storage"`
 	}
 	err := yaml.Unmarshal([]byte(configData), &cfg)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.IsNil)
 
 	p, ok := cfg.Storage.BackendFactory.(mgostore.Params)
 	c.Assert(ok, qt.Equals, true)
