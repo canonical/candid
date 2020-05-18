@@ -118,7 +118,7 @@ func (c *Codec) decrypt(out, in []byte) ([]byte, error) {
 // SetCookie encodes the given value as a session cookie with the given
 // name. The returned value is used the verify the cookie later - it
 // should be passed to Cookie when the cookie is retrieved.
-func (c *Codec) SetCookie(w http.ResponseWriter, name string, v interface{}) (string, error) {
+func (c *Codec) SetCookie(w http.ResponseWriter, name, path string, v interface{}) (string, error) {
 	out, err := c.encode(v)
 	if err != nil {
 		return "", errgo.Mask(err)
@@ -127,6 +127,7 @@ func (c *Codec) SetCookie(w http.ResponseWriter, name string, v interface{}) (st
 	http.SetCookie(w, &http.Cookie{
 		Name:  name,
 		Value: base64.URLEncoding.EncodeToString(out),
+		Path:  path,
 	})
 	return base64.RawURLEncoding.EncodeToString(hash[:]), nil
 }

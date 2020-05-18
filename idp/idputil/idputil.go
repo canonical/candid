@@ -140,6 +140,10 @@ func NameWithDomain(name, domain string) string {
 // whilst a login is being processed.
 const LoginCookieName = "candid-login"
 
+// LoginCookiePath is the path to associate with the cookie storing the
+// current login state.
+const LoginCookiePath = "/login"
+
 // LoginState holds the state of the current loging process.
 type LoginState struct {
 	// ReturnTo holds the address to return to after the login has

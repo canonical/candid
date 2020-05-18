@@ -145,7 +145,7 @@ func TestCookieRoundTrip(t *testing.T) {
 	}
 	a.A = 1
 	a.B = "test"
-	verification, err := codec.SetCookie(w, "test-cookie", a)
+	verification, err := codec.SetCookie(w, "test-cookie", "/", a)
 	c.Assert(err, qt.IsNil)
 	resp := w.Result()
 	defer resp.Body.Close()
@@ -180,7 +180,7 @@ func TestCookieDecodeError(t *testing.T) {
 	}
 	a.A = 1
 	a.B = "test"
-	_, err := codec.SetCookie(w, "test-cookie", a)
+	_, err := codec.SetCookie(w, "test-cookie", "/", a)
 	c.Assert(err, qt.IsNil)
 	resp := w.Result()
 	defer resp.Body.Close()
@@ -206,7 +206,7 @@ func TestCookieValidationError(t *testing.T) {
 	}
 	a.A = 1
 	a.B = "test"
-	_, err := codec.SetCookie(w, "test-cookie", a)
+	_, err := codec.SetCookie(w, "test-cookie", "/", a)
 	c.Assert(err, qt.IsNil)
 	resp := w.Result()
 	defer resp.Body.Close()
