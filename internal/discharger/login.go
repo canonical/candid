@@ -73,7 +73,7 @@ func (h *handler) Login(p httprequest.Params, req *loginRequest) error {
 	// Store the requested discharge ID in a session cookie so that
 	// when the redirect comes back to login-complete we know the
 	// login was initiated in this session.
-	state, err := h.params.codec.SetCookie(p.Response, waitCookieName, waitState{
+	state, err := h.params.codec.SetCookie(p.Response, waitCookieName, "/login-complete", waitState{
 		DischargeID: req.DischargeID,
 	})
 	if err != nil {
@@ -113,7 +113,7 @@ type redirectLoginRequest struct {
 // identity provider which the user must then choose to start the login
 // process.
 func (h *handler) RedirectLogin(p httprequest.Params, req *redirectLoginRequest) error {
-	state, err := h.params.codec.SetCookie(p.Response, idputil.LoginCookieName, idputil.LoginState{
+	state, err := h.params.codec.SetCookie(p.Response, idputil.LoginCookieName, idputil.LoginCookiePath, idputil.LoginState{
 		ReturnTo: req.ReturnTo,
 		State:    req.State,
 		Expires:  time.Now().Add(15 * time.Minute),
