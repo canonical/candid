@@ -234,7 +234,7 @@ func (s *ussoSuite) TestHandleNoExtensionsNotFound(c *qt.C) {
 	ussoSrv.MockUSSO.ExcludeExtensions()
 
 	id, err := s.idptest.DoInteractiveLogin(c, s.idp, idpPrefix+"/login", nil)
-	c.Assert(err, qt.ErrorMatches, `invalid user: username not specified`)
+	c.Assert(err, qt.ErrorMatches, `username not specified`)
 	c.Assert(id, qt.IsNil)
 }
 
@@ -292,7 +292,7 @@ func (s *ussoSuite) TestInteractiveLoginFromDifferentProvider(c *qt.C) {
 	c.Assert(id, qt.IsNil)
 }
 
-func (s *ussoSuite) TestHandleUpdateUserError(c *qt.C) {
+func (s *ussoSuite) TestHandleRegisterUserError(c *qt.C) {
 	ussoSrv := mockusso.NewServer()
 	defer ussoSrv.Close()
 	ussoSrv.MockUSSO.AddUser(&mockusso.User{
@@ -304,7 +304,7 @@ func (s *ussoSuite) TestHandleUpdateUserError(c *qt.C) {
 	ussoSrv.MockUSSO.SetLoginUser("test")
 
 	id, err := s.idptest.DoInteractiveLogin(c, s.idp, idpPrefix+"/login", nil)
-	c.Assert(err, qt.ErrorMatches, `invalid user: invalid username "test-"`)
+	c.Assert(err, qt.ErrorMatches, `invalid username "test-"`)
 	c.Assert(id, qt.IsNil)
 }
 
@@ -418,5 +418,146 @@ func (s *ussoSuite) TestWithDomain(c *qt.C) {
 		Username:   "test@test1",
 		Name:       "Test User",
 		Email:      "test@example.com",
+	})
+}
+
+func (s *ussoSuite) TestUpdateIdentity(c *qt.C) {
+	ussoSrv := mockusso.NewServer()
+	defer ussoSrv.Close()
+	ussoSrv.MockUSSO.AddUser(&mockusso.User{
+		ID:       "test",
+		NickName: "test",
+		FullName: "Test User",
+		Email:    "test@example.com",
+		Groups:   []string{"test1", "test2"},
+	})
+	ussoSrv.MockUSSO.SetLoginUser("test")
+
+	id, err := s.idptest.DoInteractiveLogin(c, s.idp, idpPrefix+"/login", nil)
+	c.Assert(err, qt.IsNil)
+	candidtest.AssertEqualIdentity(c, id, &store.Identity{
+		ProviderID: "usso:https://login.ubuntu.com/+id/test",
+		Username:   "test",
+		Name:       "Test User",
+		Email:      "test@example.com",
+		ProviderInfo: map[string][]string{
+			"groups": []string{"test1", "test2"},
+		},
+	})
+
+	ussoSrv.MockUSSO.AddUser(&mockusso.User{
+		ID:       "test",
+		NickName: "test-changed",
+		FullName: "Test User Changed",
+		Email:    "test-changed@example.com",
+		Groups:   []string{"test1", "test3"},
+	})
+
+	id, err = s.idptest.DoInteractiveLogin(c, s.idp, idpPrefix+"/login", nil)
+	c.Assert(err, qt.IsNil)
+	candidtest.AssertEqualIdentity(c, id, &store.Identity{
+		ProviderID: "usso:https://login.ubuntu.com/+id/test",
+		Username:   "test-changed",
+		Name:       "Test User Changed",
+		Email:      "test-changed@example.com",
+		ProviderInfo: map[string][]string{
+			"groups": []string{"test1", "test3"},
+		},
+	})
+}
+
+func (s *ussoSuite) TestUpdateIdentityKeepsUsernameIfNewNameInvalid(c *qt.C) {
+	ussoSrv := mockusso.NewServer()
+	defer ussoSrv.Close()
+	ussoSrv.MockUSSO.AddUser(&mockusso.User{
+		ID:       "test",
+		NickName: "test",
+		FullName: "Test User",
+		Email:    "test@example.com",
+		Groups:   []string{"test1", "test2"},
+	})
+	ussoSrv.MockUSSO.SetLoginUser("test")
+
+	id, err := s.idptest.DoInteractiveLogin(c, s.idp, idpPrefix+"/login", nil)
+	c.Assert(err, qt.IsNil)
+	candidtest.AssertEqualIdentity(c, id, &store.Identity{
+		ProviderID: "usso:https://login.ubuntu.com/+id/test",
+		Username:   "test",
+		Name:       "Test User",
+		Email:      "test@example.com",
+		ProviderInfo: map[string][]string{
+			"groups": []string{"test1", "test2"},
+		},
+	})
+
+	ussoSrv.MockUSSO.AddUser(&mockusso.User{
+		ID:       "test",
+		NickName: "test-changed-",
+		FullName: "Test User Changed",
+		Email:    "test-changed@example.com",
+		Groups:   []string{"test1", "test3"},
+	})
+
+	id, err = s.idptest.DoInteractiveLogin(c, s.idp, idpPrefix+"/login", nil)
+	c.Assert(err, qt.IsNil)
+	candidtest.AssertEqualIdentity(c, id, &store.Identity{
+		ProviderID: "usso:https://login.ubuntu.com/+id/test",
+		Username:   "test",
+		Name:       "Test User Changed",
+		Email:      "test-changed@example.com",
+		ProviderInfo: map[string][]string{
+			"groups": []string{"test1", "test3"},
+		},
+	})
+}
+
+func (s *ussoSuite) TestUpdateIdentityKeepsUsernameIfFixed(c *qt.C) {
+	idp := usso.NewIdentityProvider(usso.Params{
+		FixedUsername: true,
+	})
+	err := idp.Init(s.idptest.Ctx, s.idptest.InitParams(c, idpPrefix))
+	c.Assert(err, qt.IsNil)
+
+	ussoSrv := mockusso.NewServer()
+	defer ussoSrv.Close()
+	ussoSrv.MockUSSO.AddUser(&mockusso.User{
+		ID:       "test",
+		NickName: "test",
+		FullName: "Test User",
+		Email:    "test@example.com",
+		Groups:   []string{"test1", "test2"},
+	})
+	ussoSrv.MockUSSO.SetLoginUser("test")
+
+	id, err := s.idptest.DoInteractiveLogin(c, idp, idpPrefix+"/login", nil)
+	c.Assert(err, qt.IsNil)
+	candidtest.AssertEqualIdentity(c, id, &store.Identity{
+		ProviderID: "usso:https://login.ubuntu.com/+id/test",
+		Username:   "test",
+		Name:       "Test User",
+		Email:      "test@example.com",
+		ProviderInfo: map[string][]string{
+			"groups": []string{"test1", "test2"},
+		},
+	})
+
+	ussoSrv.MockUSSO.AddUser(&mockusso.User{
+		ID:       "test",
+		NickName: "test-changed",
+		FullName: "Test User Changed",
+		Email:    "test-changed@example.com",
+		Groups:   []string{"test1", "test3"},
+	})
+
+	id, err = s.idptest.DoInteractiveLogin(c, idp, idpPrefix+"/login", nil)
+	c.Assert(err, qt.IsNil)
+	candidtest.AssertEqualIdentity(c, id, &store.Identity{
+		ProviderID: "usso:https://login.ubuntu.com/+id/test",
+		Username:   "test",
+		Name:       "Test User Changed",
+		Email:      "test-changed@example.com",
+		ProviderInfo: map[string][]string{
+			"groups": []string{"test1", "test3"},
+		},
 	})
 }
