@@ -41,7 +41,8 @@ func init() {
 }
 
 type Params struct {
-	// LaunchpadTeams contains any private teams that the system needs to know about.
+	// LaunchpadTeams contains any private teams that the system needs to
+	// know about.
 	LaunchpadTeams []string `yaml:"launchpad-teams"`
 
 	// Domain contains the domain that the identities are created in.
@@ -52,6 +53,11 @@ type Params struct {
 
 	// Staging enables using the staging login and launchpad servers.
 	Staging bool
+
+	// FixedUsername stops any username changes in Ubuntu SSO being
+	// propergated into candid. Once an identity has been registered it's
+	// Username will not be changed.
+	FixedUsername bool `yaml:"fixed-username"`
 }
 
 // NewIdentityProvider creates a new LDAP identity provider.
@@ -180,55 +186,103 @@ func (idp *identityProvider) callback(ctx context.Context, w http.ResponseWriter
 		resp.Teams = nil
 	}
 
-	username := resp.SReg[openid.SRegNickname]
-	identity := store.Identity{
-		ProviderID: store.MakeProviderIdentity("usso", resp.ID),
-		Username:   idputil.NameWithDomain(username, idp.params.Domain),
-		Email:      resp.SReg[openid.SRegEmail],
-		Name:       resp.SReg[openid.SRegFullName],
-		ProviderInfo: map[string][]string{
+	var username string
+	if resp.SReg[openid.SRegNickname] != "" {
+		username = idputil.NameWithDomain(resp.SReg[openid.SRegNickname], idp.params.Domain)
+	}
+	email := resp.SReg[openid.SRegEmail]
+	fullname := resp.SReg[openid.SRegFullName]
+	var providerInfo map[string][]string
+	if len(resp.Teams) > 0 {
+		providerInfo = map[string][]string{
 			"groups": resp.Teams,
-		},
-	}
-	switch {
-	case username == "":
-		err = errgo.New("username not specified")
-	case !names.IsValidUser(username):
-		err = errgo.Newf("invalid username %q", username)
-	case identity.Email == "":
-		err = errgo.New("email address not specified")
-	case identity.Name == "":
-		err = errgo.New("full name not specified")
-	}
-	// If we have an error it is because
-	// the OpenID simple registration fields (see
-	// http://openid.net/specs/openid-simple-registration-extension-1_1-01.html)
-	// were not filled out in the callback. This means that a new
-	// identity cannot be created. It is still possible to log the
-	// user in if the identity already exists.
-	if err != nil {
-		serr := idp.initParams.Store.Identity(ctx, &identity)
-		if serr == nil {
-			successf(&identity)
-			return
 		}
-		if errgo.Cause(serr) == store.ErrNotFound {
-			serr = errgo.WithCausef(err, params.ErrForbidden, "invalid user")
-		}
-		errorf(serr)
-		return
 	}
 
-	if err := idp.initParams.Store.UpdateIdentity(ctx, &identity, store.Update{
-		store.Username:     store.Set,
-		store.Name:         store.Set,
-		store.Email:        store.Set,
-		store.ProviderInfo: store.Set,
-	}); err != nil {
+	identity := store.Identity{
+		ProviderID: store.MakeProviderIdentity("usso", resp.ID),
+	}
+	err = idp.initParams.Store.Identity(ctx, &identity)
+	if errgo.Cause(err) == store.ErrNotFound {
+		// If the identity is not found this is the first time they have
+		// logged in, attempt to create an identity for them.
+		identity.Username = username
+		identity.Email = email
+		identity.Name = fullname
+		identity.ProviderInfo = providerInfo
+		err = idp.registerIdentity(ctx, &identity)
+		if errgo.Cause(err) == store.ErrDuplicateUsername {
+			// TODO(mhilton) format an error with useful instructions.
+			logger.Errorf("Error creating identity for %s, duplicate username %s", identity.ProviderID, username)
+			err = errgo.WithCausef(nil, params.ErrorCode("bad username"), "cannot create identity with username %s", username)
+		}
+	}
+	if err != nil {
 		errorf(err)
 		return
 	}
+
+	var doUpdate bool
+	var update store.Update
+	updateIdentity := identity
+	if !idp.params.FixedUsername && username != "" && username != identity.Username {
+		// TODO(mhilton): candid should have a service wide policy for
+		// username validity.
+		if names.IsValidUser(username) {
+			doUpdate = true
+			updateIdentity.Username = username
+			update[store.Username] = store.Set
+		} else {
+			logger.Warningf("not updating username for %s to invalid username %q", identity.ProviderID, username)
+		}
+	}
+	if email != "" && email != identity.Email {
+		doUpdate = true
+		updateIdentity.Email = email
+		update[store.Email] = store.Set
+	}
+	if fullname != "" && fullname != identity.Name {
+		doUpdate = true
+		updateIdentity.Name = fullname
+		update[store.Name] = store.Set
+	}
+	if len(providerInfo) != 0 && !valuesMatch(providerInfo["groups"], identity.ProviderInfo["groups"]) {
+		doUpdate = true
+		updateIdentity.ProviderInfo = providerInfo
+		update[store.ProviderInfo] = store.Set
+	}
+
+	if doUpdate {
+		if err := idp.initParams.Store.UpdateIdentity(ctx, &updateIdentity, update); err != nil {
+			// If the identity information cannot be updated, just stick
+			// with the old data. We know who the identity is.
+			logger.Errorf("cannot update indentity information for %s: %v", updateIdentity.ProviderID, err)
+		} else {
+			identity = updateIdentity
+		}
+	}
+
 	successf(&identity)
+}
+
+func (idp *identityProvider) registerIdentity(ctx context.Context, identity *store.Identity) error {
+	switch {
+	case identity.Username == "":
+		return errgo.New("username not specified")
+	case !names.IsValidUser(identity.Username):
+		return errgo.WithCausef(nil, params.ErrorCode("bad username"), "invalid username %q", identity.Username)
+	case identity.Email == "":
+		return errgo.New("email address not specified")
+	case identity.Name == "":
+		return errgo.New("full name not specified")
+	}
+	err := idp.initParams.Store.UpdateIdentity(ctx, identity, store.Update{
+		store.Username:     store.Set,
+		store.Email:        store.Set,
+		store.Name:         store.Set,
+		store.ProviderInfo: store.Set,
+	})
+	return errgo.Mask(err, errgo.Is(store.ErrDuplicateUsername))
 }
 
 // GetGroups implements idp.IdentityProvider.GetGroups by fetching group
@@ -295,4 +349,27 @@ func (idp *identityProvider) getLaunchpadPersonByOpenID(root *lpad.Root, ussoID 
 		return nil, errgo.Notef(err, "cannot find user %s", ussoID)
 	}
 	return &lpad.Person{v}, nil
+}
+
+// valuesMatch determines if string sets a and b contain exactly the same
+// values.
+func valuesMatch(a, b []string) bool {
+	// filter out any repeated values in a
+	inA := make(map[string]bool, len(a))
+	for _, v := range a {
+		inA[v] = true
+	}
+	inB := make(map[string]bool, len(b))
+	for _, v := range b {
+		inB[v] = true
+	}
+	if len(inA) != len(inB) {
+		return false
+	}
+	for k := range inA {
+		if !inB[k] {
+			return false
+		}
+	}
+	return true
 }
