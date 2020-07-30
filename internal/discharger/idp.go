@@ -110,38 +110,20 @@ func (d *dischargeTokenCreator) DischargeToken(ctx context.Context, id *store.Id
 
 // A visitCompleter is an implementation of idp.VisitCompleter.
 type visitCompleter struct {
-	params                identity.HandlerParams
-	dischargeTokenCreator *dischargeTokenCreator
-	dischargeTokenStore   *internal.DischargeTokenStore
-	place                 *place
+	params        identity.HandlerParams
+	identityStore *internal.IdentityStore
+	place         *place
 }
 
 // Success implements idp.VisitCompleter.Success.
 func (c *visitCompleter) Success(ctx context.Context, w http.ResponseWriter, req *http.Request, dischargeID string, id *store.Identity) {
-	dt, err := c.dischargeTokenCreator.DischargeToken(ctx, id)
-	if err != nil {
-		c.Failure(ctx, w, req, dischargeID, errgo.Mask(err))
-		return
-	}
-	c.successToken(ctx, w, req, dischargeID, dt, id)
-}
-
-func (c *visitCompleter) successToken(ctx context.Context, w http.ResponseWriter, req *http.Request, dischargeID string, dt *httpbakery.DischargeToken, id *store.Identity) {
 	if dischargeID != "" {
-		if err := c.place.Done(ctx, dischargeID, &loginInfo{DischargeToken: dt}); err != nil {
+		if err := c.place.Done(ctx, dischargeID, &loginInfo{ProviderID: id.ProviderID}); err != nil {
 			c.Failure(ctx, w, req, dischargeID, errgo.Mask(err))
 			return
 		}
 	}
-	if id == nil {
-		id = &store.Identity{
-			Username: usernameFromDischargeToken(dt),
-		}
-		if err := c.params.Store.Identity(ctx, id); err != nil {
-			// Log, but otherwise ignore this error, the username is probably enough.
-			logger.Errorf("cannot look up user identity: %s", err)
-		}
-	}
+
 	t := c.params.Template.Lookup("login")
 	if t == nil {
 		fmt.Fprintf(w, "Login successful as %s", id.Username)
@@ -166,12 +148,7 @@ func (c *visitCompleter) Failure(ctx context.Context, w http.ResponseWriter, req
 
 // RedirectSuccess implements idp.VisitCompleter.RedirectSuccess.
 func (c *visitCompleter) RedirectSuccess(ctx context.Context, w http.ResponseWriter, req *http.Request, returnTo, state string, id *store.Identity) {
-	dt, err := c.dischargeTokenCreator.DischargeToken(ctx, id)
-	if err != nil {
-		c.RedirectFailure(ctx, w, req, returnTo, state, errgo.Mask(err))
-		return
-	}
-	code, err := c.dischargeTokenStore.Put(ctx, dt, time.Now().Add(10*time.Minute))
+	code, err := c.identityStore.Put(ctx, id, time.Now().Add(10*time.Minute))
 	if err != nil {
 		c.RedirectFailure(ctx, w, req, returnTo, state, errgo.Mask(err))
 		return

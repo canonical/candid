@@ -278,11 +278,15 @@ type dischargeTokenRequest struct {
 // DischargeToken is used to collect a DischargeToken when redirect based
 // login is being used.
 func (h *handler) DischargeToken(p httprequest.Params, req *dischargeTokenRequest) (*redirect.DischargeTokenResponse, error) {
-	dt, err := h.params.dischargeTokenStore.Get(p.Context, req.Body.Code)
-	if err != nil {
+	var id store.Identity
+	if err := h.params.identityStore.Get(p.Context, req.Body.Code, &id); err != nil {
 		if errgo.Cause(err) == store.ErrNotFound {
 			return nil, errgo.WithCausef(err, params.ErrNotFound, "")
 		}
+		return nil, errgo.Mask(err)
+	}
+	dt, err := h.params.dischargeTokenCreator.DischargeToken(p.Context, &id)
+	if err != nil {
 		return nil, errgo.Mask(err)
 	}
 	return &redirect.DischargeTokenResponse{DischargeToken: dt}, nil

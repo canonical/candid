@@ -31,16 +31,15 @@ func NewAPIHandler(params identity.HandlerParams) ([]httprequest.Handler, error)
 	dt := &dischargeTokenCreator{
 		params: params,
 	}
-	dtks, err := params.ProviderDataStore.KeyValueStore(context.Background(), "_discharge_tokens")
+	pidks, err := params.ProviderDataStore.KeyValueStore(context.Background(), "_provider_identity")
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}
-	dts := internal.NewDischargeTokenStore(dtks)
+	idstore := internal.NewIdentityStore(pidks, params.Store)
 	vc := &visitCompleter{
-		params:                params,
-		dischargeTokenCreator: dt,
-		dischargeTokenStore:   dts,
-		place:                 place,
+		params:        params,
+		identityStore: idstore,
+		place:         place,
 	}
 	codec := secret.NewCodec(params.Key)
 	err = initIDPs(context.Background(), initIDPParams{
@@ -61,7 +60,7 @@ func NewAPIHandler(params identity.HandlerParams) ([]httprequest.Handler, error)
 		HandlerParams:         params,
 		checker:               checker,
 		dischargeTokenCreator: dt,
-		dischargeTokenStore:   dts,
+		identityStore:         idstore,
 		visitCompleter:        vc,
 		place:                 place,
 		reqAuth:               reqAuth,
@@ -90,7 +89,7 @@ type handlerParams struct {
 	identity.HandlerParams
 	checker               *thirdPartyCaveatChecker
 	dischargeTokenCreator *dischargeTokenCreator
-	dischargeTokenStore   *internal.DischargeTokenStore
+	identityStore         *internal.IdentityStore
 	visitCompleter        *visitCompleter
 	place                 *place
 	reqAuth               *httpauth.Authorizer

@@ -9,17 +9,17 @@ import (
 	"github.com/canonical/candid/idp"
 	"github.com/canonical/candid/internal/discharger/internal"
 	"github.com/canonical/candid/internal/identity"
+	"github.com/canonical/candid/store"
 )
 
 var NewIDPHandler = newIDPHandler
 
 type LoginInfo loginInfo
 
-func NewVisitCompleter(params identity.HandlerParams, store simplekv.Store) idp.VisitCompleter {
+func NewVisitCompleter(params identity.HandlerParams, kvstore simplekv.Store, store store.Store) idp.VisitCompleter {
 	return &visitCompleter{
-		params:                params,
-		dischargeTokenCreator: &dischargeTokenCreator{params: params},
-		dischargeTokenStore:   internal.NewDischargeTokenStore(store),
-		place:                 &place{params.MeetingPlace},
+		params:        params,
+		identityStore: internal.NewIdentityStore(kvstore, store),
+		place:         &place{params.MeetingPlace},
 	}
 }
