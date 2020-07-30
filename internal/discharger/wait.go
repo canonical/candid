@@ -78,7 +78,7 @@ func (h *handler) WaitLegacy(p httprequest.Params, req *waitRequest) (*waitRespo
 	//
 	// however... why can't we just add the origin caveat when we create
 	// the discharge token? the problem with that is that the callers of
-	// DischargeToken don't neceessarily have access to the original origin
+	// DischargeToken don't necessarily have access to the original origin
 	// (because they might be creating the token in response to a callback
 	// from an external identity provider, for example).
 	m, err := bakery.Discharge(p.Context, bakery.DischargeParams{
