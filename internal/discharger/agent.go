@@ -147,14 +147,16 @@ func (h *handler) legacyAgentLogin(ctx context.Context, req *http.Request, disch
 	ctx = auth.ContextWithDischargeID(ctx, dischargeID)
 	_, err := h.params.Authorizer.Auth(ctx, httpbakery.RequestMacaroons(req), loginOp)
 	if err == nil {
-		dt, err := h.params.dischargeTokenCreator.DischargeToken(ctx, &store.Identity{
+		id := store.Identity{
 			Username: user,
-		})
-		if err != nil {
+		}
+		if err := h.params.Store.Identity(ctx, &id); err != nil {
+			// This will always be unexpected as if the verification succeeded
+			// the identity must exist.
 			return nil, errgo.Mask(err)
 		}
 		h.params.place.Done(ctx, dischargeID, &loginInfo{
-			DischargeToken: dt,
+			ProviderID: id.ProviderID,
 		})
 		return &agent.LegacyAgentResponse{
 			AgentLogin: true,

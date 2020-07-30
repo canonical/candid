@@ -10,9 +10,9 @@ import (
 
 	qt "github.com/frankban/quicktest"
 	"github.com/frankban/quicktest/qtsuite"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/juju/simplekv"
 	errgo "gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v2/httpbakery"
 
 	"github.com/canonical/candid/internal/candidtest"
 	"github.com/canonical/candid/internal/discharger/internal"
@@ -35,30 +35,50 @@ func (s *storeSuite) TestRoundTrip(c *qt.C) {
 	ctx := context.Background()
 	kv, err := s.store.ProviderDataStore.KeyValueStore(ctx, "test")
 	c.Assert(err, qt.IsNil)
-	store := internal.NewDischargeTokenStore(kv)
-	dt := httpbakery.DischargeToken{
-		Kind:  "test",
-		Value: []byte("test-value"),
+	st := internal.NewIdentityStore(kv, s.store.Store)
+	id := store.Identity{
+		ProviderID: "test:test",
+		Username:   "test",
+		Name:       "Test User",
+		Email:      "test@example.com",
 	}
-	key, err := store.Put(ctx, &dt, time.Now().Add(time.Minute))
+	err = s.store.Store.UpdateIdentity(ctx, &id, store.Update{
+		store.Username: store.Set,
+		store.Name:     store.Set,
+		store.Email:    store.Set,
+	})
 	c.Assert(err, qt.IsNil)
-	dt1, err := store.Get(ctx, key)
+
+	key, err := st.Put(ctx, &id, time.Now().Add(time.Minute))
 	c.Assert(err, qt.IsNil)
-	c.Assert(dt1, qt.DeepEquals, &dt)
+	var id2 store.Identity
+	err = st.Get(ctx, key, &id2)
+	c.Assert(err, qt.IsNil)
+	c.Check(id2, qt.CmpEquals(cmpopts.EquateEmpty()), id)
 }
 
 func (s *storeSuite) TestPutCanceled(c *qt.C) {
 	ctx := context.Background()
 	kv, err := s.store.ProviderDataStore.KeyValueStore(ctx, "test")
 	c.Assert(err, qt.IsNil)
-	store := internal.NewDischargeTokenStore(withSet(kv, func(context.Context, string, []byte, time.Time) error {
+	kv = withSet(kv, func(context.Context, string, []byte, time.Time) error {
 		return context.Canceled
-	}))
-	dt := httpbakery.DischargeToken{
-		Kind:  "test",
-		Value: []byte("test-value"),
+	})
+	st := internal.NewIdentityStore(kv, s.store.Store)
+	id := store.Identity{
+		ProviderID: "test:test",
+		Username:   "test",
+		Name:       "Test User",
+		Email:      "test@example.com",
 	}
-	_, err = store.Put(ctx, &dt, time.Now().Add(time.Minute))
+	err = s.store.Store.UpdateIdentity(ctx, &id, store.Update{
+		store.Username: store.Set,
+		store.Name:     store.Set,
+		store.Email:    store.Set,
+	})
+	c.Assert(err, qt.IsNil)
+
+	_, err = st.Put(ctx, &id, time.Now().Add(time.Minute))
 	c.Assert(err, qt.ErrorMatches, "context canceled")
 	c.Assert(errgo.Cause(err), qt.Equals, context.Canceled)
 }
@@ -67,14 +87,24 @@ func (s *storeSuite) TestPutDeadlineExceeded(c *qt.C) {
 	ctx := context.Background()
 	kv, err := s.store.ProviderDataStore.KeyValueStore(ctx, "test")
 	c.Assert(err, qt.IsNil)
-	store := internal.NewDischargeTokenStore(withSet(kv, func(context.Context, string, []byte, time.Time) error {
+	kv = withSet(kv, func(context.Context, string, []byte, time.Time) error {
 		return context.DeadlineExceeded
-	}))
-	dt := httpbakery.DischargeToken{
-		Kind:  "test",
-		Value: []byte("test-value"),
+	})
+	st := internal.NewIdentityStore(kv, s.store.Store)
+	id := store.Identity{
+		ProviderID: "test:test",
+		Username:   "test",
+		Name:       "Test User",
+		Email:      "test@example.com",
 	}
-	_, err = store.Put(ctx, &dt, time.Now().Add(time.Minute))
+	err = s.store.Store.UpdateIdentity(ctx, &id, store.Update{
+		store.Username: store.Set,
+		store.Name:     store.Set,
+		store.Email:    store.Set,
+	})
+	c.Assert(err, qt.IsNil)
+
+	_, err = st.Put(ctx, &id, time.Now().Add(time.Minute))
 	c.Assert(err, qt.ErrorMatches, "context deadline exceeded")
 	c.Assert(errgo.Cause(err), qt.Equals, context.DeadlineExceeded)
 }
@@ -83,10 +113,11 @@ func (s *storeSuite) TestGetNotFound(c *qt.C) {
 	ctx := context.Background()
 	kv, err := s.store.ProviderDataStore.KeyValueStore(ctx, "test")
 	c.Assert(err, qt.IsNil)
-	st := internal.NewDischargeTokenStore(withGet(kv, func(context.Context, string) ([]byte, error) {
+	kv = withGet(kv, func(context.Context, string) ([]byte, error) {
 		return nil, simplekv.ErrNotFound
-	}))
-	_, err = st.Get(ctx, "")
+	})
+	st := internal.NewIdentityStore(kv, s.store.Store)
+	err = st.Get(ctx, "", nil)
 	c.Assert(err, qt.ErrorMatches, "not found")
 	c.Assert(errgo.Cause(err), qt.Equals, store.ErrNotFound)
 }
@@ -95,10 +126,11 @@ func (s *storeSuite) TestGetCanceled(c *qt.C) {
 	ctx := context.Background()
 	kv, err := s.store.ProviderDataStore.KeyValueStore(ctx, "test")
 	c.Assert(err, qt.IsNil)
-	st := internal.NewDischargeTokenStore(withGet(kv, func(context.Context, string) ([]byte, error) {
+	kv = withGet(kv, func(context.Context, string) ([]byte, error) {
 		return nil, context.Canceled
-	}))
-	_, err = st.Get(ctx, "")
+	})
+	st := internal.NewIdentityStore(kv, s.store.Store)
+	err = st.Get(ctx, "", nil)
 	c.Assert(err, qt.ErrorMatches, "context canceled")
 	c.Assert(errgo.Cause(err), qt.Equals, context.Canceled)
 }
@@ -107,10 +139,11 @@ func (s *storeSuite) TestGetDeadlineExceeded(c *qt.C) {
 	ctx := context.Background()
 	kv, err := s.store.ProviderDataStore.KeyValueStore(ctx, "test")
 	c.Assert(err, qt.IsNil)
-	st := internal.NewDischargeTokenStore(withGet(kv, func(context.Context, string) ([]byte, error) {
+	kv = withGet(kv, func(context.Context, string) ([]byte, error) {
 		return nil, context.DeadlineExceeded
-	}))
-	_, err = st.Get(ctx, "")
+	})
+	st := internal.NewIdentityStore(kv, s.store.Store)
+	err = st.Get(ctx, "", nil)
 	c.Assert(err, qt.ErrorMatches, "context deadline exceeded")
 	c.Assert(errgo.Cause(err), qt.Equals, context.DeadlineExceeded)
 }
@@ -119,10 +152,11 @@ func (s *storeSuite) TestGetInvalidJSON(c *qt.C) {
 	ctx := context.Background()
 	kv, err := s.store.ProviderDataStore.KeyValueStore(ctx, "test")
 	c.Assert(err, qt.IsNil)
-	st := internal.NewDischargeTokenStore(withGet(kv, func(context.Context, string) ([]byte, error) {
+	kv = withGet(kv, func(context.Context, string) ([]byte, error) {
 		return []byte("}"), nil
-	}))
-	_, err = st.Get(ctx, "")
+	})
+	st := internal.NewIdentityStore(kv, s.store.Store)
+	err = st.Get(ctx, "", nil)
 	c.Assert(err, qt.ErrorMatches, "invalid character '}' looking for beginning of value")
 }
 
@@ -130,14 +164,43 @@ func (s *storeSuite) TestExpiredEntry(c *qt.C) {
 	ctx := context.Background()
 	kv, err := s.store.ProviderDataStore.KeyValueStore(ctx, "test")
 	c.Assert(err, qt.IsNil)
-	st := internal.NewDischargeTokenStore(kv)
-	dt := httpbakery.DischargeToken{
-		Kind:  "test",
-		Value: []byte("test-value"),
+	st := internal.NewIdentityStore(kv, s.store.Store)
+	id := store.Identity{
+		ProviderID: "test:test",
+		Username:   "test",
+		Name:       "Test User",
+		Email:      "test@example.com",
 	}
-	key, err := st.Put(ctx, &dt, time.Now())
+	err = s.store.Store.UpdateIdentity(ctx, &id, store.Update{
+		store.Username: store.Set,
+		store.Name:     store.Set,
+		store.Email:    store.Set,
+	})
 	c.Assert(err, qt.IsNil)
-	_, err = st.Get(ctx, key)
+
+	key, err := st.Put(ctx, &id, time.Now())
+	c.Assert(err, qt.IsNil)
+	err = st.Get(ctx, key, nil)
+	c.Assert(err, qt.ErrorMatches, `".*" not found`)
+	c.Assert(errgo.Cause(err), qt.Equals, store.ErrNotFound)
+}
+
+func (s *storeSuite) TestIdentityNotInStore(c *qt.C) {
+	ctx := context.Background()
+	kv, err := s.store.ProviderDataStore.KeyValueStore(ctx, "test")
+	c.Assert(err, qt.IsNil)
+	st := internal.NewIdentityStore(kv, s.store.Store)
+	id := store.Identity{
+		ProviderID: "test:test",
+		Username:   "test",
+		Name:       "Test User",
+		Email:      "test@example.com",
+	}
+
+	key, err := st.Put(ctx, &id, time.Now().Add(time.Minute))
+	c.Assert(err, qt.IsNil)
+	var id2 store.Identity
+	err = st.Get(ctx, key, &id2)
 	c.Assert(err, qt.ErrorMatches, `".*" not found`)
 	c.Assert(errgo.Cause(err), qt.Equals, store.ErrNotFound)
 }

@@ -11,6 +11,7 @@ import (
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
 
 	"github.com/canonical/candid/meeting"
+	"github.com/canonical/candid/store"
 )
 
 type dischargeRequestInfo struct {
@@ -21,10 +22,8 @@ type dischargeRequestInfo struct {
 }
 
 type loginInfo struct {
-	// When a user logs in successfully, a discharge token is
-	// provided which grants them the right to discharge macaroons as
-	// that user.
-	DischargeToken *httpbakery.DischargeToken
+	// When a user logs in successfully their ProviderID will be supplied.
+	ProviderID store.ProviderIdentity
 
 	// When a login request fails, the error is filled out appropriately.
 	Error *httpbakery.Error

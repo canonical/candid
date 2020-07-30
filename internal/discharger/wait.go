@@ -17,6 +17,7 @@ import (
 
 	"github.com/canonical/candid/internal/auth"
 	"github.com/canonical/candid/params"
+	"github.com/canonical/candid/store"
 )
 
 // waitTokenRequest is the request sent to the server to wait for logins to
@@ -30,7 +31,7 @@ type waitTokenRequest struct {
 // WaitToken waits on the rendezvous place for a discharge token and
 // returns it.
 func (h *handler) WaitToken(p httprequest.Params, req *waitTokenRequest) (*httpbakery.WaitTokenResponse, error) {
-	_, dt, err := h.waitToken(p, req.DischargeID)
+	_, dt, err := h.wait(p.Context, req.DischargeID)
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Any)
 	}
@@ -38,21 +39,6 @@ func (h *handler) WaitToken(p httprequest.Params, req *waitTokenRequest) (*httpb
 		Kind:    dt.Kind,
 		Token64: base64.StdEncoding.EncodeToString(dt.Value),
 	}, nil
-}
-
-func (h *handler) waitToken(p httprequest.Params, dischargeID string) (*dischargeRequestInfo, *httpbakery.DischargeToken, error) {
-	if dischargeID == "" {
-		return nil, nil, errgo.WithCausef(nil, params.ErrBadRequest, "discharge id parameter not found")
-	}
-	// TODO don't wait forever here.
-	reqInfo, login, err := h.params.place.Wait(p.Context, dischargeID)
-	if err != nil {
-		return nil, nil, errgo.Notef(err, "cannot wait")
-	}
-	if login.Error != nil {
-		return nil, nil, errgo.NoteMask(login.Error, "login failed", errgo.Any)
-	}
-	return reqInfo, login.DischargeToken, nil
 }
 
 // waitRequest is the request sent to the server to wait for logins to
@@ -95,7 +81,6 @@ func (h *handler) WaitLegacy(p httprequest.Params, req *waitRequest) (*waitRespo
 	// DischargeToken don't neceessarily have access to the original origin
 	// (because they might be creating the token in response to a callback
 	// from an external identity provider, for example).
-
 	m, err := bakery.Discharge(p.Context, bakery.DischargeParams{
 		Id:     reqInfo.CaveatId,
 		Caveat: reqInfo.Caveat,
@@ -141,7 +126,17 @@ func (h *handler) wait(ctx context.Context, dischargeID string) (*dischargeReque
 	if login.Error != nil {
 		return nil, nil, errgo.NoteMask(login.Error, "login failed", errgo.Any)
 	}
-	return reqInfo, login.DischargeToken, nil
+	id := store.Identity{
+		ProviderID: login.ProviderID,
+	}
+	if err := h.params.Store.Identity(ctx, &id); err != nil {
+		return nil, nil, errgo.Mask(err)
+	}
+	dt, err := h.params.dischargeTokenCreator.DischargeToken(ctx, &id)
+	if err != nil {
+		return nil, nil, errgo.Mask(err)
+	}
+	return reqInfo, dt, nil
 }
 
 // setIdentityCookie sets a cookie on the given response that will allow

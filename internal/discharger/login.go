@@ -14,6 +14,7 @@ import (
 
 	"github.com/canonical/candid/idp/idputil"
 	"github.com/canonical/candid/params"
+	"github.com/canonical/candid/store"
 )
 
 // legacyLoginRequest is a request to start a login to the identity manager
@@ -202,13 +203,13 @@ func (h *handler) LoginComplete(p httprequest.Params, req *loginCompleteRequest)
 		return
 	}
 
-	dt, err := h.params.dischargeTokenStore.Get(ctx, req.Code)
-	if err != nil {
+	var id store.Identity
+	if err := h.params.identityStore.Get(ctx, req.Code, &id); err != nil {
 		h.params.visitCompleter.Failure(ctx, p.Response, p.Request, ws.DischargeID, err)
 		return
 	}
 
-	h.params.visitCompleter.successToken(ctx, p.Response, p.Request, ws.DischargeID, dt, nil)
+	h.params.visitCompleter.Success(ctx, p.Response, p.Request, ws.DischargeID, &id)
 }
 
 const waitCookieName = "candid-discharge-wait"

@@ -72,7 +72,7 @@ func (s *idpSuite) Init(c *qt.C) {
 		},
 		MeetingPlace: s.meetingPlace,
 		Oven:         oven,
-	}, kvs)
+	}, kvs, s.store.Store)
 }
 
 func (s *idpSuite) TestLoginFailure(c *qt.C) {
@@ -112,7 +112,7 @@ func (s *idpSuite) TestLoginFailureWithWait(c *qt.C) {
 	var li discharger.LoginInfo
 	err = json.Unmarshal(d2, &li)
 	c.Assert(err, qt.IsNil)
-	c.Assert(li.DischargeToken, qt.IsNil)
+	c.Assert(li.ProviderID, qt.Equals, store.ProviderIdentity(""))
 	c.Assert(li.Error, qt.DeepEquals, &httpbakery.Error{
 		Message: "test error",
 	})
