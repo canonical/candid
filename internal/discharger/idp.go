@@ -85,7 +85,7 @@ func (d *dischargeTokenCreator) DischargeToken(ctx context.Context, id *store.Id
 		bakery.LatestVersion,
 		[]checkers.Caveat{
 			checkers.TimeBeforeCaveat(time.Now().Add(d.params.DischargeTokenTimeout)),
-			candidclient.UserDeclaration(id.Username),
+			candidclient.UserIDDeclaration(string(id.ProviderID)),
 		},
 		identchecker.LoginOp,
 	)
