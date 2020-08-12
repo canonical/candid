@@ -314,6 +314,32 @@ The `hidden` value is an optional value that can be used to not list
 this identity provider in the list of possible identity providers when
 performing an interactive login.
 
+### Keycloak OpenID Connect
+```yaml
+- type: keycloak
+  domain: example
+  client-id: 483156874216
+  client-secret: 32hf3uhud23dS@#e
+  keycloak-realm: https://example.com/auth/realms/example
+  hidden: false
+```
+
+The Keycloak identity provider uses OpenID Connect to log in using configured
+credentials. When a user first logs in with this IDP they will be prompted
+to create a new identity. The new identity must have a unique username
+and will be in the domain specified "@domain", otherwise default to "@KEYCLOAK".
+
+The 'keycloak-realm, `client-id`, and `client-secret` parameters 
+must be specified and should be provided by the keycloak service administrator.
+
+When registering the application the authorized redirect URLs should include
+`$CANDID_URL/login/keycloak/callback`.
+
+The `hidden` value is an optional value that can be used to not list
+this identity provider in the list of possible identity providers when
+performing an interactive login.
+```
+
 ### LDAP
 ```yaml
 - type: ldap
