@@ -21,9 +21,6 @@ func init() {
 		if p.ClientID == "" {
 			return nil, errgo.Newf("client-id not specified")
 		}
-		if p.ClientSecret == "" {
-			return nil, errgo.Newf("client-secret not specified")
-		}
 		if p.KeycloakRealm == "" {
 			return nil, errgo.Newf("keycloak-realm not specified")
 		}
@@ -47,11 +44,11 @@ type Params struct {
 	Domain string `yaml:"domain"`
 
 	// ClientID contains the Application Id for the application
-	// registered at
+	// registered
 	ClientID string `yaml:"client-id"`
 
-	// ClientSecret contains a password type Application Secret for
-	// the application as generated on
+	// Optional: ClientSecret contains a password type Application Secret
+	// for the application generated
 	ClientSecret string `yaml:"client-secret"`
 
 	// KeycloakReam contains the URI for the keycloak server

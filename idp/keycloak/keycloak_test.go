@@ -26,6 +26,14 @@ identity-providers:
    keycloak-realm: https://example.com/auth/realms/example
 `,
 }, {
+  about: "another good config",
+  yaml: `
+identity-providers:
+ - type: keycloak 
+   client-id: client-001
+   keycloak-realm: https://example.com/auth/realms/example
+`,
+}, {
 	about: "no client-id",
 	yaml: `
 identity-providers:
@@ -34,15 +42,6 @@ identity-providers:
    keycloak-realm: https://example.com/auth/realms/example
 `,
 	expectError: `cannot unmarshal keycloak configuration: client-id not specified`,
-}, {
-	about: "no client-secret",
-	yaml: `
-identity-providers:
- - type: keycloak 
-   client-id: client-001
-   keycloak-realm: https://example.com/auth/realms/example
-`,
-	expectError: `cannot unmarshal keycloak configuration: client-secret not specified`,
 }, {
 	about: "no keycloak-realm",
 	yaml: `
