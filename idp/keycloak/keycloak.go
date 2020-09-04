@@ -1,3 +1,4 @@
+// Copyright 2020 Mark Klein <mdklein@gmail.com>
 // Copyright 2017 Canonical Ltd.
 // Licensed under the AGPLv3, see LICENCE file for details.
 
@@ -10,6 +11,11 @@ import (
 
 	"github.com/canonical/candid/idp"
 	"github.com/canonical/candid/idp/openid"
+)
+
+const (
+	defaultProviderName = "keycloak"
+	defaultProviderDomain = "KEYCLOAK"
 )
 
 func init() {
@@ -28,6 +34,7 @@ func init() {
 	})
 }
 
+// Params is a struct containing the configuration data to register a keycloak identity Provider
 type Params struct {
 	// Name is the name that will be given to the identity provider.
 	Name string `yaml:"name"`
@@ -63,11 +70,12 @@ type Params struct {
 // NewIdentityProvider creates a keycloak identity provider with the
 // configuration defined by p.
 func NewIdentityProvider(p Params) idp.IdentityProvider {
+
 	if p.Name == "" {
-		p.Name = "keycloak"
+		p.Name = defaultProviderName
 	}
 	if p.Domain == "" {
-		p.Domain = "KEYCLOAK"
+		p.Domain = defaultProviderDomain
 	}
 	return openid.NewOpenIDConnectIdentityProvider(openid.OpenIDConnectParams{
 		Name:         p.Name,
