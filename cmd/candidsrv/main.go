@@ -25,6 +25,7 @@ import (
 	_ "github.com/canonical/candid/idp/agent"
 	_ "github.com/canonical/candid/idp/azure"
 	_ "github.com/canonical/candid/idp/google"
+	_ "github.com/canonical/candid/idp/keycloak"
 	_ "github.com/canonical/candid/idp/keystone"
 	_ "github.com/canonical/candid/idp/ldap"
 	_ "github.com/canonical/candid/idp/static"
