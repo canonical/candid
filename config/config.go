@@ -108,6 +108,10 @@ type Config struct {
 	// DischargeTokenTimeout is the maximum age a discharge token can
 	// get before it becomes invalid.
 	DischargeTokenTimeout DurationString `yaml:"discharge-token-timeout"`
+
+	// SkipLocationForCookiePaths instructs if the Cookie Paths are to
+	// be set relative to the Location Path or not.
+	SkipLocationForCookiePaths bool `yaml:"skip-location-for-cookie-paths"`
 }
 
 // TLSConfig returns a TLS configuration to be used for serving

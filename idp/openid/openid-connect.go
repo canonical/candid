@@ -223,7 +223,8 @@ func (idp *openidConnectIdentityProvider) callback(ctx context.Context, w http.R
 		return errgo.Mask(err)
 	}
 	ls.ProviderID = user.ProviderID
-	state, err := idp.initParams.Codec.SetCookie(w, idputil.LoginCookieName, idputil.CookiePathRelativeToLocation(idputil.LoginCookiePath, idp.initParams.Location), ls)
+	cookiePath := idputil.CookiePathRelativeToLocation(idputil.LoginCookiePath, idp.initParams.Location, idp.initParams.SkipLocationForCookiePaths)
+	state, err := idp.initParams.Codec.SetCookie(w, idputil.LoginCookieName, cookiePath, ls)
 	if err != nil {
 		return errgo.Mask(err)
 	}

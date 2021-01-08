@@ -73,9 +73,9 @@ type loginRequest struct {
 func (h *handler) Login(p httprequest.Params, req *loginRequest) error {
 	// Store the requested discharge ID in a session cookie so that
 	// when the redirect comes back to login-complete we know the
-	// login was initiated in this session. In case Candid is running in a sub-path,
-	// we handle that as well.
-	state, err := h.params.codec.SetCookie(p.Response, waitCookieName, idputil.CookiePathRelativeToLocation("/login-complete", h.params.Location), waitState{
+	// login was initiated in this session.
+	cookiePath := idputil.CookiePathRelativeToLocation("/login-complete", h.params.Location, h.params.SkipLocationForCookiePaths)
+	state, err := h.params.codec.SetCookie(p.Response, waitCookieName, cookiePath, waitState{
 		DischargeID: req.DischargeID,
 	})
 	if err != nil {
@@ -115,7 +115,8 @@ type redirectLoginRequest struct {
 // identity provider which the user must then choose to start the login
 // process.
 func (h *handler) RedirectLogin(p httprequest.Params, req *redirectLoginRequest) error {
-	state, err := h.params.codec.SetCookie(p.Response, idputil.LoginCookieName, idputil.CookiePathRelativeToLocation(idputil.LoginCookiePath, h.params.Location), idputil.LoginState{
+	cookiePath := idputil.CookiePathRelativeToLocation(idputil.LoginCookiePath, h.params.Location, h.params.SkipLocationForCookiePaths)
+	state, err := h.params.codec.SetCookie(p.Response, idputil.LoginCookieName, cookiePath, idputil.LoginState{
 		ReturnTo: req.ReturnTo,
 		State:    req.State,
 		Expires:  time.Now().Add(15 * time.Minute),

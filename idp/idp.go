@@ -81,6 +81,10 @@ type InitParams struct {
 
 	// Template contains the templates loaded in the identity server.
 	Template *template.Template
+
+	// SkipLocationForCookiePaths instructs if the Cookie Paths are to
+	// be set relative to the Location Path or not.
+	SkipLocationForCookiePaths bool
 }
 
 // IdentityProvider is the interface that is satisfied by all identity providers.

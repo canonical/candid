@@ -126,6 +126,10 @@ type ServerParams struct {
 	// DischargeTokenTimeout is the maximum life of a Discharge
 	// token.
 	DischargeTokenTimeout time.Duration
+
+	// SkipLocationForCookiePaths instructs if the Cookie Paths are to
+	// be set relative to the Location Path or not.
+	SkipLocationForCookiePaths bool
 }
 
 // NewServer returns a new handler that handles identity service requests and

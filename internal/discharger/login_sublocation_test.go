@@ -1,4 +1,4 @@
-// Copyright 2015 Canonical Ltd.
+// Copyright 2021 Canonical Ltd.
 // Licensed under the AGPLv3, see LICENCE file for details.
 
 package discharger_test
@@ -9,7 +9,6 @@ import (
 	"testing"
 
 	qt "github.com/frankban/quicktest"
-	"github.com/frankban/quicktest/qtsuite"
 
 	"github.com/canonical/candid/idp"
 	"github.com/canonical/candid/idp/static"
@@ -20,42 +19,55 @@ import (
 
 const sublocationPath = "/sublocation"
 
-func TestLoginWithSublocation(t *testing.T) {
-	qtsuite.Run(qt.New(t), &loginSuite{})
-}
+var cookiePathTests = []struct {
+	about        string
+	skipLocation bool
+}{{
+	about:        "location in the cookie",
+	skipLocation: false,
+}, {
+	about:        "location NOT in the cookie",
+	skipLocation: true,
+}}
 
-type loginSuite struct {
-	srv *candidtest.Server
-}
+func TestLoginCookiePath(t *testing.T) {
+	c := qt.New(t)
+	for _, test := range cookiePathTests {
+		c.Run(test.about, func(c *qt.C) {
+			// Set up the store and the server.
+			store := candidtest.NewStore()
+			p := store.ServerParams()
+			p.IdentityProviders = []idp.IdentityProvider{
+				static.NewIdentityProvider(static.Params{
+					Name:   "test",
+					Domain: "test",
+					Icon:   "/static/static1.bmp",
+				}),
+			}
+			p.SkipLocationForCookiePaths = test.skipLocation
+			srv := candidtest.NewServerWithSublocation(c, p, map[string]identity.NewAPIHandlerFunc{
+				"discharger": discharger.NewAPIHandler,
+			}, sublocationPath)
 
-func (s *loginSuite) Init(c *qt.C) {
-	store := candidtest.NewStore()
-	sp := store.ServerParams()
-	sp.IdentityProviders = []idp.IdentityProvider{
-		static.NewIdentityProvider(static.Params{
-			Name:   "test",
-			Domain: "test",
-			Icon:   "/static/static1.bmp",
-		}),
-	}
-	s.srv = candidtest.NewServerWithSublocation(c, sp, map[string]identity.NewAPIHandlerFunc{
-		"discharger": discharger.NewAPIHandler,
-	}, sublocationPath)
-}
+			// Make the request.
+			req, err := http.NewRequest("GET", sublocationPath+"/login", nil)
+			c.Assert(err, qt.IsNil)
+			req.Header.Set("Accept", "application/json")
+			resp := srv.Do(c, req)
+			defer resp.Body.Close()
 
-func (s *loginSuite) TestLoginCookiePathContainsServerSublocation(c *qt.C) {
-	req, err := http.NewRequest("GET", sublocationPath+"/login", nil)
-	c.Assert(err, qt.IsNil)
-	req.Header.Set("Accept", "application/json")
-	resp := s.srv.Do(c, req)
-	defer resp.Body.Close()
-	c.Assert(resp.StatusCode, qt.Equals, http.StatusOK)
-
-	cookies := resp.Cookies()
-	c.Assert(len(cookies) > 0, qt.IsTrue)
-
-	for _, cookie := range cookies {
-		dir := filepath.Dir(cookie.Path)
-		c.Assert(dir, qt.Equals, sublocationPath)
+			// Check the response.
+			c.Assert(resp.StatusCode, qt.Equals, http.StatusOK)
+			cookies := resp.Cookies()
+			c.Assert(cookies, qt.Not(qt.HasLen), 0)
+			for _, cookie := range cookies {
+				dir := filepath.Dir(cookie.Path)
+				if test.skipLocation {
+					c.Assert(dir, qt.Not(qt.Equals), sublocationPath)
+				} else {
+					c.Assert(dir, qt.Equals, sublocationPath)
+				}
+			}
+		})
 	}
 }
