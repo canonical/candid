@@ -77,6 +77,17 @@ func NewMemServer(c *qt.C, versions map[string]identity.NewAPIHandlerFunc) *Serv
 // is zero then it will default to localhost. If p.Template is zero then
 // DefaultTemplate will be used.
 func NewServer(c *qt.C, p identity.ServerParams, versions map[string]identity.NewAPIHandlerFunc) *Server {
+	return newServer(c, p, versions, "")
+}
+
+// NewServerWithSublocation returns a new Server instance. It does the same
+// as NewServer, but it allows to specify a sublocation that fakes the
+// server as operating from a subpath (e.g. http://serveraddr/sublocation).
+func NewServerWithSublocation(c *qt.C, p identity.ServerParams, versions map[string]identity.NewAPIHandlerFunc, sublocation string) *Server {
+	return newServer(c, p, versions, sublocation)
+}
+
+func newServer(c *qt.C, p identity.ServerParams, versions map[string]identity.NewAPIHandlerFunc, sublocation string) *Server {
 	s := new(Server)
 	s.params = p
 	if s.params.ACLStore == nil {
@@ -84,7 +95,7 @@ func NewServer(c *qt.C, p identity.ServerParams, versions map[string]identity.Ne
 	}
 	s.server = httptest.NewUnstartedServer(nil)
 	c.Defer(s.server.Close)
-	s.params.Location = "http://" + s.server.Listener.Addr().String()
+	s.params.Location = "http://" + s.server.Listener.Addr().String() + sublocation
 	if s.params.Key == nil {
 		var err error
 		s.params.Key, err = bakery.GenerateKey()
@@ -109,7 +120,7 @@ func NewServer(c *qt.C, p identity.ServerParams, versions map[string]identity.Ne
 	c.Assert(err, qt.IsNil)
 	c.Defer(s.handler.Close)
 
-	s.server.Config.Handler = s.handler
+	s.server.Config.Handler = http.StripPrefix(sublocation, s.handler)
 	s.server.Start()
 	s.URL = s.server.URL
 	ctx := context.Background()

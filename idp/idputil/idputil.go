@@ -240,3 +240,15 @@ func ServiceURL(location, dest string) string {
 	lu.Path = path.Join(lu.Path, u.Path)
 	return lu.String()
 }
+
+// CookiePathRelativeToLocation returns the Login Cookie Path
+// relative to the sub-path in the location URL given.
+func CookiePathRelativeToLocation(cookiePath, location string) string {
+	relativePath := ""
+	u, err := url.Parse(location)
+	if err == nil {
+		relativePath = u.Path
+	}
+
+	return relativePath + cookiePath
+}
