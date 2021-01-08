@@ -291,6 +291,36 @@ The `hidden` value is an optional value that can be used to not list
 this identity provider in the list of possible identity providers when
 performing an interactive login.
 
+### ADFS OpenID Connect
+```yaml
+- type: adfs
+  name: example
+  domain: example
+  url: https://adfs.example.com
+  client-id: 43444f68-3666-4f95-bd34-6fc24b108019
+  client-secret: tXV2SRFflAGT9sUdxkdIi7mwfmQ=
+  hidden: true
+```
+
+The ADFS identity provider uses OpenID Connect to authenticate with an
+Active Directory Federation Services deployment.
+
+The required `url` parameter specifies the location of the ADFS OpenID
+Connect service. OpenID Connect Discovery will be performed using this
+URL to determine the correct endpoints, keys and other parameters
+required to successfully perform OpenID Connect authentication.
+
+The `client-id` and `client-secret` parameters must be specified and
+are created by registering the candid instance as an application on the
+ADFS service. When  registering the application the redirect URLs should
+include `$CANDID_URL/login/{name}/callback`. When authenticating candid
+requests the "email" and "profile" scopes in addition to the "openid"
+scope in order to retrieve the required profile information.
+
+The `hidden` value is an optional value that can be used to not list
+this identity provider in the list of possible identity providers when
+performing an interactive login.
+
 ### Google OpenID Connect
 ```yaml
 - type: google

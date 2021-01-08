@@ -22,6 +22,7 @@ import (
 	"github.com/canonical/candid"
 	"github.com/canonical/candid/config"
 	"github.com/canonical/candid/idp"
+	_ "github.com/canonical/candid/idp/adfs"
 	_ "github.com/canonical/candid/idp/agent"
 	_ "github.com/canonical/candid/idp/azure"
 	_ "github.com/canonical/candid/idp/google"
