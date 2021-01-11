@@ -240,3 +240,17 @@ func ServiceURL(location, dest string) string {
 	lu.Path = path.Join(lu.Path, u.Path)
 	return lu.String()
 }
+
+// CookiePathRelativeToLocation returns the Login Cookie Path
+// relative to the sub-path in the location URL given.
+// If skipLocation = true, then it's a no-op.
+func CookiePathRelativeToLocation(cookiePath, location string, skipLocation bool) string {
+	if skipLocation {
+		return cookiePath
+	}
+	u, err := url.Parse(location)
+	if err != nil {
+		return cookiePath
+	}
+	return u.Path + cookiePath
+}

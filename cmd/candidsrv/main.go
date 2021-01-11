@@ -132,6 +132,7 @@ func serveIdentity(conf *config.Config, params candid.ServerParams) error {
 	params.APIMacaroonTimeout = conf.APIMacaroonTimeout.Duration
 	params.DischargeMacaroonTimeout = conf.DischargeMacaroonTimeout.Duration
 	params.DischargeTokenTimeout = conf.DischargeTokenTimeout.Duration
+	params.SkipLocationForCookiePaths = conf.SkipLocationForCookiePaths
 	srv, err := candid.NewServer(
 		params,
 		candid.V1,

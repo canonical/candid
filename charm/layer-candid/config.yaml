@@ -75,3 +75,9 @@ options:
       be active before it is forgotten. The value must be a time duration
       specified as a decimal number followed by a unit from ns, us,
       ms, s, m, h for the time units between nanosecond and hour.
+  skip-location-for-cookie-paths:
+    type: boolean
+    default: false
+    description: |
+      If true, it leaves cookies' Path value absolute, instead of
+      seeting it relative to the path in the location config.
