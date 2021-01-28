@@ -4,6 +4,7 @@
 package discharger
 
 import (
+	"fmt"
 	"net/http"
 	"net/url"
 	"time"
@@ -124,7 +125,10 @@ func (h *handler) RedirectLogin(p httprequest.Params, req *redirectLoginRequest)
 	if err != nil {
 		return errgo.Mask(err)
 	}
+	return errgo.Mask(h.authChoice(p.Response, p.Request, state, req.Domain, "", false))
+}
 
+func (h *handler) authChoice(w http.ResponseWriter, req *http.Request, state, domain, errorMessage string, useEmail bool) error {
 	// Find all the possible login methods.
 	var allIDPs []params.IDPChoiceDetails
 	var idps []params.IDPChoiceDetails
@@ -142,7 +146,7 @@ func (h *handler) RedirectLogin(p httprequest.Params, req *redirectLoginRequest)
 		if !idp.Hidden() {
 			allIDPs = append(allIDPs, choice)
 		}
-		if req.Domain != "" && idp.Domain() == req.Domain {
+		if domain != "" && idp.Domain() == domain {
 			idps = append(idps, choice)
 		}
 	}
@@ -152,15 +156,74 @@ func (h *handler) RedirectLogin(p httprequest.Params, req *redirectLoginRequest)
 	if len(idps) == 0 {
 		idps = allIDPs
 	}
-	idpChoices := params.IDPChoice{IDPs: idps}
-	if p.Request.Header.Get("Accept") == "application/json" {
-		httprequest.WriteJSON(p.Response, http.StatusOK, idpChoices)
+	if req.Header.Get("Accept") == "application/json" {
+		httprequest.WriteJSON(w, http.StatusOK, params.IDPChoice{IDPs: idps})
 		return nil
 	}
-	if err := h.params.Template.ExecuteTemplate(p.Response, "authentication-required", idpChoices); err != nil {
+	type authenticationRequiredParams struct {
+		IDPs          []params.IDPChoiceDetails
+		Error         string
+		UseEmail      bool
+		ShowEmailLink bool
+		WithEmailURL  string
+	}
+	authParams := authenticationRequiredParams{
+		IDPs:          idps,
+		Error:         errorMessage,
+		UseEmail:      useEmail,
+		ShowEmailLink: domain == "" && !useEmail,
+		WithEmailURL:  h.params.Location + "/login-email?state=" + state,
+	}
+	if err := h.params.Template.ExecuteTemplate(w, "authentication-required", authParams); err != nil {
 		return errgo.Mask(err)
 	}
 	return nil
+}
+
+type emailLoginRequest struct {
+	httprequest.Route `httprequest:"GET /login-email"`
+
+	// State holds the state information generated in the /login-redirect
+	// handler.
+	State string `httprequest:"state,form"`
+}
+
+// EmailLogin starts a request to choose an identity provider using an
+// email address.
+func (h *handler) EmailLogin(p httprequest.Params, req *emailLoginRequest) error {
+	return h.authChoice(p.Response, p.Request, req.State, "", "", true)
+}
+
+type emailLoginSubmitRequest struct {
+	httprequest.Route `httprequest:"POST /login-email"`
+
+	// State holds the state information generated in the /login-redirect
+	// handler.
+	State string `httprequest:"state,form"`
+
+	// Email holds the email address to use to select the identity
+	// provider.
+	Email string `httprequest:"email,form"`
+}
+
+// EmailLoginSubmit attemtps to find an identity provider suitable for
+// use with the provided email address and either redirects to that
+// identity provider, or outputs the same email form with an error message.
+func (h *handler) EmailLoginSubmit(p httprequest.Params, req *emailLoginSubmitRequest) error {
+	for _, idp := range h.params.IdentityProviders {
+		type isForEmailAddrer interface {
+			IsForEmailAddr(string) bool
+		}
+		matcher, ok := idp.(isForEmailAddrer)
+		if !ok {
+			continue
+		}
+		if matcher.IsForEmailAddr(req.Email) {
+			http.Redirect(p.Response, p.Request, idp.URL(req.State), http.StatusSeeOther)
+			return nil
+		}
+	}
+	return h.authChoice(p.Response, p.Request, req.State, "", fmt.Sprintf(`cannot find identity provider for email address "%s"`, req.Email), true)
 }
 
 // loginCompleteRequest is a request that completes a login attempt.

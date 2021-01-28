@@ -29,10 +29,29 @@
             <h1 class="p-heading--four">Login with</h1>
           </div>
           <hr class="u-sv1">
+  {{if .Error}}
+            <div class="p-notification--negative">
+              <p class="p-notification__response">
+                <span class="p-notification__status">Error:</span>{{.Error}}
+              </p>
+            </div>
+  {{end}}
+  {{ if .UseEmail }}
+          <div>
+            <form method="post" action="{{ .WithEmailURL }}">
+              <label for="email">Email address</label>
+              <input type="email" id="email" name="email">
+              <button type="submit">Continue</button>
+            </form>
+          </div>
+  {{ end }}
   {{ range .IDPs }}
           <div>
             <a href="{{.URL}}" class="p-button--neutral" data-idp-name="{{.Name}}" data-idp-domain="{{.Domain}}" style="width: 100%">{{.Description}}</a>
           </div>
+  {{ end }}
+  {{ if .ShowEmailLink }}
+          <a href="{{.WithEmailURL}}">Login with email address...</a>
   {{ end }}
         </div>
       </div>
