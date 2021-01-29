@@ -8,6 +8,7 @@ package static
 import (
 	"context"
 	"net/http"
+	"regexp"
 	"strings"
 
 	"github.com/juju/loggo"
@@ -58,6 +59,10 @@ type Params struct {
 	// Hidden is set if the IDP should be hidden from interactive
 	// prompts.
 	Hidden bool `yaml:"hidden"`
+
+	// MatchEmailAddr is a regular expression that is used to determine if
+	// this identity provider can be used for a particular user email.
+	MatchEmailAddr string `yaml:"match-email-addr"`
 }
 
 type UserInfo struct {
@@ -76,13 +81,28 @@ func NewIdentityProvider(p Params) idp.IdentityProvider {
 	if p.Description == "" {
 		p.Description = p.Name
 	}
-	return &identityProvider{params: p}
+	var matchEmailAddr *regexp.Regexp
+	if p.MatchEmailAddr != "" {
+		var err error
+		matchEmailAddr, err = regexp.Compile(p.MatchEmailAddr)
+		if err != nil {
+			// if the email address matcher doesn't compile log the error but
+			// carry on. A regular expression that doesn't compile also doesn't
+			// match anything.
+			logger.Errorf("cannot compile match-email-addr regular expression: %s", err)
+		}
+	}
 
+	return &identityProvider{
+		params:         p,
+		matchEmailAddr: matchEmailAddr,
+	}
 }
 
 type identityProvider struct {
-	params     Params
-	initParams idp.InitParams
+	params         Params
+	initParams     idp.InitParams
+	matchEmailAddr *regexp.Regexp
 }
 
 // Name implements idp.IdentityProvider.Name.
@@ -113,6 +133,15 @@ func (*identityProvider) Interactive() bool {
 // Hidden implements idp.IdentityProvider.Hidden.
 func (idp *identityProvider) Hidden() bool {
 	return idp.params.Hidden
+}
+
+// IsForEmailAddr returns true when the identity provider should be used
+// to identify a user with the given email address.
+func (idp *identityProvider) IsForEmailAddr(addr string) bool {
+	if idp.matchEmailAddr == nil {
+		return false
+	}
+	return idp.matchEmailAddr.MatchString(addr)
 }
 
 // Init implements idp.IdentityProvider.Init.

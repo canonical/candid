@@ -9,6 +9,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"regexp"
 
 	"github.com/coreos/go-oidc"
 	"github.com/juju/loggo"
@@ -77,6 +78,10 @@ type OpenIDConnectParams struct {
 	// Hidden is set if the IDP should be hidden from interactive
 	// prompts.
 	Hidden bool `yaml:"hidden"`
+
+	// MatchEmailAddr is a regular expression that is used to determine if
+	// this identity provider can be used for a particular user email.
+	MatchEmailAddr string `yaml:"match-email-addr"`
 }
 
 // NewOpenIDConnectIdentityProvider creates a new identity provider using
@@ -88,8 +93,22 @@ func NewOpenIDConnectIdentityProvider(params OpenIDConnectParams) idp.IdentityPr
 	if len(params.Scopes) == 0 {
 		params.Scopes = []string{oidc.ScopeOpenID}
 	}
+
+	var matchEmailAddr *regexp.Regexp
+	if params.MatchEmailAddr != "" {
+		var err error
+		matchEmailAddr, err = regexp.Compile(params.MatchEmailAddr)
+		if err != nil {
+			// if the email address matcher doesn't compile log the error but
+			// carry on. A regular expression that doesn't compile also doesn't
+			// match anything.
+			logger.Errorf("cannot compile match-email-addr regular expression: %s", err)
+		}
+	}
+
 	return &openidConnectIdentityProvider{
-		params: params,
+		params:         params,
+		matchEmailAddr: matchEmailAddr,
 	}
 }
 
@@ -98,6 +117,7 @@ type openidConnectIdentityProvider struct {
 	initParams idp.InitParams
 	provider   *oidc.Provider
 	config     *oauth2.Config
+	matchEmailAddr *regexp.Regexp
 }
 
 // Name implements idp.IdentityProvider.Name.
@@ -128,6 +148,15 @@ func (*openidConnectIdentityProvider) Interactive() bool {
 // Hidden implements idp.IdentityProvider.Hidden.
 func (idp *openidConnectIdentityProvider) Hidden() bool {
 	return idp.params.Hidden
+}
+
+// IsForEmailAddr returns true when the identity provider should be used
+// to identify a user with the given email address.
+func (idp *openidConnectIdentityProvider) IsForEmailAddr(addr string) bool {
+	if idp.matchEmailAddr == nil {
+		return false
+	}
+	return idp.matchEmailAddr.MatchString(addr)
 }
 
 // Init implements idp.IdentityProvider.Init by performing discovery on

@@ -300,6 +300,7 @@ performing an interactive login.
   client-id: 43444f68-3666-4f95-bd34-6fc24b108019
   client-secret: tXV2SRFflAGT9sUdxkdIi7mwfmQ=
   hidden: true
+  match-email-addr: @example.com$
 ```
 
 The ADFS identity provider uses OpenID Connect to authenticate with an
@@ -320,6 +321,12 @@ scope in order to retrieve the required profile information.
 The `hidden` value is an optional value that can be used to not list
 this identity provider in the list of possible identity providers when
 performing an interactive login.
+
+The `match-email-addr` value is a regular expression that can be used to
+select the identity provider using an email address. If configured when
+a user attempts to login via an email address the address will be
+checked against the regular expression and if they match the identity
+provider will be used to perform the login.
 
 ### Google OpenID Connect
 ```yaml
@@ -468,6 +475,7 @@ performing an interactive login.
       password: password2
       groups: [group3, group4]
   hidden: false
+  match-email-addr: @example.com$
 ```
 
 The `static` identity provider is meant for testing and allows defining a set of
@@ -493,6 +501,12 @@ of the users defined by the identity provider.
 The `hidden` value is an optional value that can be used to not list
 this identity provider in the list of possible identity providers when
 performing an interactive login.
+
+The `match-email-addr` value is a regular expression that can be used to
+select the identity provider using an email address. If configured when
+a user attempts to login via an email address the address will be
+checked against the regular expression and if they match the identity
+provider will be used to perform the login.
 
 Charm Configuration
 -------------------

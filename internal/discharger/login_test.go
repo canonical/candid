@@ -5,6 +5,7 @@ package discharger_test
 
 import (
 	"encoding/json"
+	"html/template"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -25,6 +26,24 @@ import (
 	"github.com/canonical/candid/internal/identity"
 	"github.com/canonical/candid/params"
 )
+
+// loginTemplate contains the template to use in login tests.
+var loginTemplate *template.Template
+
+func init() {
+	var err error
+	loginTemplate, err = candidtest.DefaultTemplate.Clone()
+	if err != nil {
+		panic(err)
+	}
+	template.Must(loginTemplate.New("authentication-required").Parse(`
+{{range .IDPs}}{{.URL}}
+{{end}}Error: {{.Error}}
+UseEmail: {{.UseEmail}}
+ShowEmailLink: {{.ShowEmailLink}}
+WithEmailURL: {{.WithEmailURL}}
+`[1:]))
+}
 
 func TestLogin(t *testing.T) {
 	qtsuite.Run(qt.New(t), &loginSuite{})
@@ -60,6 +79,7 @@ func (s *loginSuite) Init(c *qt.C) {
 			Name:   "test2",
 			Domain: "test2",
 			Icon:   "/static/static2.bmp",
+			MatchEmailAddr: "@example.com$",
 		}),
 		static.NewIdentityProvider(static.Params{
 			Name:   "test3",
@@ -68,6 +88,7 @@ func (s *loginSuite) Init(c *qt.C) {
 			Hidden: true,
 		}),
 	}
+	sp.Template = loginTemplate
 	s.srv = candidtest.NewServer(c, sp, map[string]identity.NewAPIHandlerFunc{
 		"discharger": discharger.NewAPIHandler,
 	})
@@ -288,4 +309,53 @@ func (s *loginSuite) TestLoginRedirect(c *qt.C) {
 	q := u.Query()
 	c.Assert(q.Get("state"), qt.Equals, "12345")
 	c.Assert(q.Get("code"), qt.Not(qt.Equals), "")
+}
+
+func (s *loginSuite) TestLoginEmail(c *qt.C) {
+	req, err := http.NewRequest("GET", "/login-email?state=12345", nil)
+	c.Assert(err, qt.IsNil)
+	resp := s.srv.Do(c, req)
+	defer resp.Body.Close()
+	c.Check(resp.StatusCode, qt.Equals, http.StatusOK)
+	buf, err := ioutil.ReadAll(resp.Body)
+	c.Assert(err, qt.IsNil)
+	c.Check(string(buf), qt.Matches, `
+.*/login/test/login\?state=12345
+.*/login/test2/login\?state=12345
+Error: 
+UseEmail: true
+ShowEmailLink: false
+WithEmailURL: .*/login-email\?state=12345
+`[1:])
+}
+
+func (s *loginSuite) TestLoginEmailSubmitNoMatch(c *qt.C) {
+	req, err := http.NewRequest("POST", "/login-email?state=12345", strings.NewReader("email=test@example.net"))
+	c.Assert(err, qt.IsNil)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	resp := s.srv.Do(c, req)
+	defer resp.Body.Close()
+	c.Check(resp.StatusCode, qt.Equals, http.StatusOK)
+	buf, err := ioutil.ReadAll(resp.Body)
+	c.Assert(err, qt.IsNil)
+	c.Check(string(buf), qt.Matches, `
+.*/login/test/login\?state=12345
+.*/login/test2/login\?state=12345
+Error: cannot find identity provider for email address &#34;test@example.net&#34;
+UseEmail: true
+ShowEmailLink: false
+WithEmailURL: .*/login-email\?state=12345
+`[1:])
+}
+
+func (s *loginSuite) TestLoginEmailSubmitMatch(c *qt.C) {
+	req, err := http.NewRequest("POST", "/login-email?state=12345", strings.NewReader("email=test@example.com"))
+	c.Assert(err, qt.IsNil)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	resp := s.srv.RoundTrip(c, req)
+	defer resp.Body.Close()
+	buf, err := ioutil.ReadAll(resp.Body)
+	c.Assert(err, qt.IsNil)
+	c.Check(resp.StatusCode, qt.Equals, http.StatusSeeOther, qt.Commentf("%s %s", resp.Status, buf))
+	c.Check(resp.Header.Get("Location"), qt.Matches, `.*/login/test2/login\?state=12345`)
 }

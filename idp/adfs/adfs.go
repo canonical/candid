@@ -63,6 +63,10 @@ type Params struct {
 	// Hidden is set if the IDP should be hidden from interactive
 	// prompts.
 	Hidden bool `yaml:"hidden"`
+
+	// MatchEmailAddr is a regular expression that is used to determine if
+	// this identity provider can be used for a particular user email.
+	MatchEmailAddr string `yaml:"match-email-addr"`
 }
 
 // NewIdentityProvider creates an ADFS identity provider with the
@@ -75,14 +79,15 @@ func NewIdentityProvider(p Params) idp.IdentityProvider {
 		p.Domain = p.Name
 	}
 	return openid.NewOpenIDConnectIdentityProvider(openid.OpenIDConnectParams{
-		Name:         p.Name,
-		Issuer:       p.URL,
-		Domain:       p.Domain,
-		Description:  p.Description,
-		Icon:         p.Icon,
-		Scopes:       []string{oidc.ScopeOpenID, "email", "profile"},
-		ClientID:     p.ClientID,
-		ClientSecret: p.ClientSecret,
-		Hidden:       p.Hidden,
+		Name:           p.Name,
+		Issuer:         p.URL,
+		Domain:         p.Domain,
+		Description:    p.Description,
+		Icon:           p.Icon,
+		Scopes:         []string{oidc.ScopeOpenID, "email", "profile"},
+		ClientID:       p.ClientID,
+		ClientSecret:   p.ClientSecret,
+		Hidden:         p.Hidden,
+		MatchEmailAddr: p.MatchEmailAddr,
 	})
 }
