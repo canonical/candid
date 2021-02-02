@@ -285,6 +285,10 @@ type ServerParams struct {
 	// SkipLocationForCookiePaths instructs if the Cookie Paths are to
 	// be set relative to the Location Path or not.
 	SkipLocationForCookiePaths bool
+
+	// EnableEmailLogin enables the login with email address link on the
+	// authentication required page.
+	EnableEmailLogin bool
 }
 
 type HandlerParams struct {

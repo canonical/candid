@@ -10,8 +10,9 @@ tags:
   - authentication
   - identity
 series:
-  - xenial
+  - focal
   - bionic
+  - xenial
 peers:
   candid:
     interface: candid

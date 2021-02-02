@@ -27,8 +27,8 @@ identity-providers:
    keycloak-realm: https://example.com/auth/realms/example
 `,
 }, {
-  about: "another good config",
-  yaml: `
+	about: "another good config",
+	yaml: `
 identity-providers:
  - type: keycloak 
    client-id: client-001

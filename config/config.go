@@ -112,6 +112,10 @@ type Config struct {
 	// SkipLocationForCookiePaths instructs if the Cookie Paths are to
 	// be set relative to the Location Path or not.
 	SkipLocationForCookiePaths bool `yaml:"skip-location-for-cookie-paths"`
+
+	// EnableEmailLogin enables the login with email address link on the
+	// authentication required page.
+	EnableEmailLogin bool `yaml:"enable-email-login"`
 }
 
 // TLSConfig returns a TLS configuration to be used for serving

@@ -171,7 +171,7 @@ func (h *handler) authChoice(w http.ResponseWriter, req *http.Request, state, do
 		IDPs:          idps,
 		Error:         errorMessage,
 		UseEmail:      useEmail,
-		ShowEmailLink: domain == "" && !useEmail,
+		ShowEmailLink: h.params.EnableEmailLogin && domain == "" && !useEmail,
 		WithEmailURL:  h.params.Location + "/login-email?state=" + state,
 	}
 	if err := h.params.Template.ExecuteTemplate(w, "authentication-required", authParams); err != nil {
