@@ -22,6 +22,12 @@ options:
     description: |
       The maximum age a discharge token can get before it becomes
       invalid.
+  enable-email-login:
+    type: boolean
+    default: false
+    description: |
+      Enable the "login with email address" functionality on the
+      authentication required page.
   http-proxy:
     type: string
     default: ""

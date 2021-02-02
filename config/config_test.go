@@ -94,6 +94,7 @@ redirect-login-whitelist:
 api-macaroon-timeout: 2h
 discharge-macaroon-timeout: 24h
 discharge-token-timeout: 6h
+enable-email-login: true
 `
 
 func readConfig(c *qt.C, content string) (*config.Config, error) {
@@ -173,6 +174,7 @@ func TestRead(t *testing.T) {
 		APIMacaroonTimeout:       config.DurationString{Duration: 2 * time.Hour},
 		DischargeMacaroonTimeout: config.DurationString{Duration: 24 * time.Hour},
 		DischargeTokenTimeout:    config.DurationString{Duration: 6 * time.Hour},
+		EnableEmailLogin:         true,
 	})
 }
 

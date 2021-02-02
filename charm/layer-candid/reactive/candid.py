@@ -52,9 +52,11 @@ def write_config_file():
         "api-macaroon-timeout": cc["api-macaroon-timeout"],
         "discharge-macaroon-timeout": cc["discharge-macaroon-timeout"],
         "discharge-token-timeout": cc["discharge-token-timeout"],
+        "enable-email-login": cc["enable-email-login"],
         "logging-config": cc["logging-config"],
         "private-addr": hookenv.unit_private_ip(),
         "rendezvous-timeout": cc["rendezvous-timeout"],
+        "skip-location-for-cookie-paths": cc["skip-location-for-cookie-paths"],
     }
     if cc["admin-agent-public-key"]:
         config["admin-agent-public-key"] = cc["admin-agent-public-key"]

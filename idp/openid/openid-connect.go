@@ -113,10 +113,10 @@ func NewOpenIDConnectIdentityProvider(params OpenIDConnectParams) idp.IdentityPr
 }
 
 type openidConnectIdentityProvider struct {
-	params     OpenIDConnectParams
-	initParams idp.InitParams
-	provider   *oidc.Provider
-	config     *oauth2.Config
+	params         OpenIDConnectParams
+	initParams     idp.InitParams
+	provider       *oidc.Provider
+	config         *oauth2.Config
 	matchEmailAddr *regexp.Regexp
 }
 

@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	defaultProviderName = "keycloak"
+	defaultProviderName   = "keycloak"
 	defaultProviderDomain = "KEYCLOAK"
 )
 

@@ -76,9 +76,9 @@ func (s *loginSuite) Init(c *qt.C) {
 			Icon: "/static/static1.bmp",
 		}),
 		static.NewIdentityProvider(static.Params{
-			Name:   "test2",
-			Domain: "test2",
-			Icon:   "/static/static2.bmp",
+			Name:           "test2",
+			Domain:         "test2",
+			Icon:           "/static/static2.bmp",
 			MatchEmailAddr: "@example.com$",
 		}),
 		static.NewIdentityProvider(static.Params{

@@ -49,3 +49,4 @@ identity-providers:
       groups:
        - group2
        - group3
+enable-email-login: true
