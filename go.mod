@@ -6,6 +6,7 @@ require (
 	github.com/frankban/quicktest v1.9.0
 	github.com/garyburd/go-oauth v0.0.0-20150329160146-3131beb69b81
 	github.com/google/go-cmp v0.4.0
+	github.com/google/uuid v1.2.0
 	github.com/gorilla/handlers v0.0.0-20170224193955-13d73096a474
 	github.com/juju/aclstore/v2 v2.0.0
 	github.com/juju/ansiterm v0.0.0-20180109212912-720a0952cc2a // indirect
@@ -50,7 +51,7 @@ require (
 	gopkg.in/mgo.v2 v2.0.0-20180705113604-9856a29383ce
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0-20170531180850-df99d62fd42d
 	gopkg.in/retry.v1 v1.0.3 // indirect
-	gopkg.in/square/go-jose.v2 v2.0.1 // indirect
+	gopkg.in/square/go-jose.v2 v2.0.1
 	gopkg.in/tomb.v2 v2.0.0-20140626144623-14b3d72120e8
 	gopkg.in/yaml.v2 v2.2.8
 	launchpad.net/lpad v0.0.0-20131113112110-000000000065

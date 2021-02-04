@@ -8,5 +8,6 @@ parts/
 prime/
 stage/
 snap/.snapcraft/
+*.assert
 *.snap
 *.swp
