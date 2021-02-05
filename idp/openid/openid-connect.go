@@ -47,6 +47,25 @@ func init() {
 	})
 }
 
+// An IdentityCreator is used to create a candid identity from the
+// OAuth2 token returned by the OAuth2 authentication process.
+type IdentityCreator interface {
+	// Create an identity using the provided token. The identity must 
+	// include a ProviderID which will remain constant for all
+	// authentications made by the same user, it is recommended that the
+	// ProviderID function is used for this purpose.
+	//
+	// If the identity includes a username then that username will be
+	// used as the default when creating a new user. If a user already
+	// exists that are identified by the ProviderID then the username
+	// will not be updated.
+	//
+	// If the Name or Email values are non-zero these values will either
+	// replace any currently stored values, or be used as defaults when
+	// registering a new user.
+	CreateIdentity(context.Context, *oauth2.Token) (store.Identity, error)
+}
+
 type OpenIDConnectParams struct {
 	// Name is the name that will be given to the identity provider.
 	Name string `yaml:"name"`
@@ -82,6 +101,12 @@ type OpenIDConnectParams struct {
 	// MatchEmailAddr is a regular expression that is used to determine if
 	// this identity provider can be used for a particular user email.
 	MatchEmailAddr string `yaml:"match-email-addr"`
+	
+	// IdentityCreator is the IdentityCreator that the identity provider
+	// will use to convert the OAuth2 token into a candid Identity. If
+	// this is nil the default implementation provided by the
+	// openIDConnect identity provider will be used.
+	IdentityCreator IdentityCreator
 }
 
 // NewOpenIDConnectIdentityProvider creates a new identity provider using
@@ -223,50 +248,72 @@ func (idp *openidConnectIdentityProvider) callback(ctx context.Context, w http.R
 	if err != nil {
 		return errgo.Mask(err)
 	}
-	idtok := tok.Extra("id_token")
-	if idtok == nil {
-		return errgo.Newf("no id_token in OpenID response")
+
+	ic := idp.params.IdentityCreator
+	if ic == nil {
+		ic = idp
 	}
-	idtoks, ok := idtok.(string)
-	if !ok {
-		return errgo.Newf("invalid id_token in OpenID response")
-	}
-	id, err := idp.provider.Verifier(&oidc.Config{ClientID: idp.config.ClientID}).Verify(ctx, idtoks)
+	user, err := ic.CreateIdentity(ctx, tok)
 	if err != nil {
 		return errgo.Mask(err)
 	}
-	user := store.Identity{
-		ProviderID: store.MakeProviderIdentity(idp.Name(), fmt.Sprintf("%s:%s", id.Issuer, id.Subject)),
+	
+	existingUser := store.Identity{
+		ProviderID: user.ProviderID,
 	}
-	err = idp.initParams.Store.Identity(ctx, &user)
+	err = idp.initParams.Store.Identity(ctx, &existingUser)
 	if err == nil {
-		idp.initParams.VisitCompleter.RedirectSuccess(ctx, w, req, ls.ReturnTo, ls.State, &user)
-		return nil
+		var upd store.Update
+		// A user exists check if it needs updating.
+		if user.Name != "" && existingUser.Name != user.Name {
+			existingUser.Name = user.Name
+			upd[store.Name] = store.Set
+		}
+		if user.Email != "" && existingUser.Email != user.Email {
+			existingUser.Email = user.Email
+			upd[store.Email] = store.Set
+		}
+		if (upd != store.Update{}) {
+			err = idp.initParams.Store.UpdateIdentity(ctx, &existingUser, upd)
+		}
+		if err == nil {
+			idp.initParams.VisitCompleter.RedirectSuccess(ctx, w, req, ls.ReturnTo, ls.State, &existingUser)
+			return nil
+		}
 	}
-
 	if errgo.Cause(err) != store.ErrNotFound {
 		return errgo.Mask(err)
 	}
-	var claims claims
-	if err := id.Claims(&claims); err != nil {
-		return errgo.Mask(err)
+	
+	// The user needs to be created.
+	if user.Username != "" {
+		// Attempt to create a user with the preferred username.
+		err := idp.initParams.Store.UpdateIdentity(ctx, &user, store.Update{
+			store.Username: store.Set,
+			store.Name: store.Set,
+			store.Email: store.Set,
+		})
+		if err == nil {
+			idp.initParams.VisitCompleter.RedirectSuccess(ctx, w, req, ls.ReturnTo, ls.State, &user)
+			return nil
+		}
+		if errgo.Cause(err) != store.ErrDuplicateUsername {
+			return errgo.Mask(err)
+		}
 	}
+	
+	// The user needs to register.	
 	ls.ProviderID = user.ProviderID
 	cookiePath := idputil.CookiePathRelativeToLocation(idputil.LoginCookiePath, idp.initParams.Location, idp.initParams.SkipLocationForCookiePaths)
 	state, err := idp.initParams.Codec.SetCookie(w, idputil.LoginCookieName, cookiePath, ls)
 	if err != nil {
 		return errgo.Mask(err)
 	}
-	preferredUsername := ""
-	if names.IsValidUserName(claims.PreferredUsername) {
-		preferredUsername = claims.PreferredUsername
-	}
 	return errgo.Mask(idputil.RegistrationForm(ctx, w, idputil.RegistrationParams{
 		State:    state,
-		Username: preferredUsername,
 		Domain:   idp.params.Domain,
-		FullName: claims.FullName,
-		Email:    claims.Email,
+		FullName: user.Name,
+		Email:    user.Email,
 	}, idp.initParams.Template))
 }
 
@@ -318,6 +365,39 @@ func (idp *openidConnectIdentityProvider) registerUser(ctx context.Context, user
 	return errgo.WithCausef(nil, errInvalidUser, "Username already taken, please pick a different one.")
 }
 
+// CreateIdentity is the default implementation of an IdentityCreator.
+// CreateIdentity creates the identity from the "id_token" attached to
+// the given token. The ProviderID will be created using the ProviderID
+// function. The Username, Name & Email values will be taken from the
+// claims "preferred_username", "name" & "email" if they are present.
+func (idp *openidConnectIdentityProvider) CreateIdentity(ctx context.Context, tok *oauth2.Token) (store.Identity, error) {
+	idtok := tok.Extra("id_token")
+	if idtok == nil {
+		return store.Identity{}, errgo.Newf("no id_token in OpenID response")
+	}
+	idtoks, ok := idtok.(string)
+	if !ok {
+		return store.Identity{}, errgo.Newf("invalid id_token in OpenID response")
+	}
+	id, err := idp.provider.Verifier(&oidc.Config{ClientID: idp.config.ClientID}).Verify(ctx, idtoks)
+	if err != nil {
+		return store.Identity{}, errgo.Mask(err)
+	}
+	
+	user := store.Identity{
+		ProviderID: ProviderID(idp.Name(), id),
+	}
+	var claims claims
+	if err := id.Claims(&claims); err == nil {
+		if names.IsValidUserName(claims.PreferredUsername) {
+			user.Username = joinDomain(claims.PreferredUsername, idp.Domain())
+		}
+		user.Email = claims.Email
+		user.Name = claims.FullName
+	}
+	return user, nil
+}
+
 // claims contains the set of claims possibly returned in the OpenID
 // token.
 type claims struct {
@@ -340,4 +420,10 @@ func joinDomain(name, domain string) string {
 type registrationState struct {
 	WaitID     string                 `json:"wid"`
 	ProviderID store.ProviderIdentity `json:"pid"`
+}
+
+// ProviderID creates a ProviderIdentity using the Subject and Issuer
+//from the given ID token.
+func ProviderID(provider string, id *oidc.IDToken) store.ProviderIdentity{
+	return store.MakeProviderIdentity(provider, fmt.Sprintf("%s:%s", id.Issuer, id.Subject))
 }

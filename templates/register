@@ -42,9 +42,9 @@
             <input type="text" id="username" name="username" class="js_username_input" autocomplete="off">
             <p class="p-form-help-text"><span class="js_username_output"></span>@{{.Domain}}</p>
             <label for="fullname">Full name</label>
-            <input type="text" id="fullname" name="fullname" autocomplete="off">
+            <input type="text" id="fullname" name="fullname" autocomplete="off" value="{{.FullName}}">
             <label for="email">Email address</label>
-            <input type="text" id="email" name="email" autocomplete="off">
+            <input type="text" id="email" name="email" autocomplete="off" value="{{.Email}}">
             <br /><br />
             <a href="/login" class="p-button--neutral u-float-left u-no-margin--bottom">Back</a>
             <button type="submit" class="p-button--positive u-float-right u-no-margin--bottom">Register</button>

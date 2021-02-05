@@ -60,10 +60,10 @@ type Fixture struct {
 
 func NewFixture(c *qt.C, store *candidtest.Store) *Fixture {
 	ctx, closeStore := store.Store.Context(context.Background())
-	c.Defer(closeStore)
+	c.Cleanup(closeStore)
 
 	ctx, closeMeetingStore := store.MeetingStore.Context(ctx)
-	c.Defer(closeMeetingStore)
+	c.Cleanup(closeMeetingStore)
 
 	key, err := bakery.GenerateKey()
 	c.Assert(err, qt.IsNil)
@@ -160,8 +160,9 @@ func (s *Fixture) ParseResponse(c *qt.C, resp *http.Response) (*store.Identity, 
 		}
 		c.Assert(rv.Get("code"), qt.Equals, "6789")
 		return s.visitCompleter.id, nil
+	default:
+		c.Fatalf("unexpected response type: %s", resp.Status)
 	}
-	c.Fatalf("unexpect response type")
 	return nil, nil
 }
 

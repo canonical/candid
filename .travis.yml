@@ -1,7 +1,7 @@
 language: go
 go_import_path: "github.com/canonical/candid"
 go: 
-  - "1.11.5"
+  - "1.15.x"
 script: GO111MODULE=on go test ./...
 services:
   - mongodb
