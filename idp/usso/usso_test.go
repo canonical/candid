@@ -49,12 +49,19 @@ func (s *ussoSuite) TestConfig(c *qt.C) {
 	configYaml := `
 identity-providers:
  - type: usso
+ - type: usso
+   name: usso2
+   description: Another USSO
+   staging: true
 `
 	var conf config.Config
 	err := yaml.Unmarshal([]byte(configYaml), &conf)
 	c.Assert(err, qt.IsNil)
-	c.Assert(conf.IdentityProviders, qt.HasLen, 1)
+	c.Assert(conf.IdentityProviders, qt.HasLen, 2)
 	c.Assert(conf.IdentityProviders[0].Name(), qt.Equals, "usso")
+	c.Assert(conf.IdentityProviders[0].Description(), qt.Equals, "Ubuntu SSO")
+	c.Assert(conf.IdentityProviders[1].Name(), qt.Equals, "usso2")
+	c.Assert(conf.IdentityProviders[1].Description(), qt.Equals, "Another USSO")
 }
 
 func (s *ussoSuite) TestName(c *qt.C) {

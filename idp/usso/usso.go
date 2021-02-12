@@ -41,6 +41,13 @@ func init() {
 }
 
 type Params struct {
+	// Name is the name that will be given to the identity provider.
+	Name string `yaml:"name"`
+
+	// Description is the description that will be used with the
+	// identity provider. If this is not set then Name will be used.
+	Description string `yaml:"description"`
+
 	// LaunchpadTeams contains any private teams that the system needs to
 	// know about.
 	LaunchpadTeams []string `yaml:"launchpad-teams"`
@@ -62,6 +69,12 @@ type Params struct {
 
 // NewIdentityProvider creates a new LDAP identity provider.
 func NewIdentityProvider(p Params) idp.IdentityProvider {
+	if p.Name == "" {
+		p.Name = "usso"
+	}
+	if p.Description == "" {
+		p.Description = "Ubuntu SSO"
+	}
 	return &identityProvider{
 		groupCache: cache.New(10 * time.Minute),
 		groupMonitor: prometheus.NewSummary(prometheus.SummaryOpts{
@@ -84,8 +97,8 @@ type identityProvider struct {
 }
 
 // Name gives the name of the identity provider (usso).
-func (*identityProvider) Name() string {
-	return "usso"
+func (idp *identityProvider) Name() string {
+	return idp.params.Name
 }
 
 // Domain implements idp.IdentityProvider.Domain.
@@ -94,8 +107,8 @@ func (idp *identityProvider) Domain() string {
 }
 
 // Description gives a description of the identity provider.
-func (*identityProvider) Description() string {
-	return "Ubuntu SSO"
+func (idp *identityProvider) Description() string {
+	return idp.params.Description
 }
 
 // IconURL returns the URL of an icon for the identity provider.
@@ -200,7 +213,7 @@ func (idp *identityProvider) callback(ctx context.Context, w http.ResponseWriter
 	}
 
 	identity := store.Identity{
-		ProviderID: store.MakeProviderIdentity("usso", resp.ID),
+		ProviderID: store.MakeProviderIdentity(idp.Name(), resp.ID),
 	}
 	err = idp.initParams.Store.Identity(ctx, &identity)
 	if errgo.Cause(err) == store.ErrNotFound {
