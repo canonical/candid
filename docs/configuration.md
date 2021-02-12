@@ -142,15 +142,42 @@ for details on the agent login protocol.
 ### UbuntuSSO
 ```yaml
 - type: usso
+  name: usso
+  domain: external
+  description: Ubuntu SSO
   launchpad-teams:
     - group1
     - group2
+  staging: false
+  fixed-username: false
 ```
 
 The UbuntuSSO identity provider is an interactive identity provider
 that uses OpenID with UbuntuSSO to log in.
 
-The launchpad-teams contains any private launchpad teams that candid needs to know about.
+The `name` parameter specifies the name of the provider, this should be
+a short name that reflects the name of the system being logged in to.
+The name is used in some URLS and is best if it consists only of
+lower-case letters.
+
+The `domain` is a string added to the names of users logging in through
+this identity provider. The user jsmith for example would be changed
+to jsmith@example in the configuration above. If no domain is
+specified the username will remain unchanged.
+
+The `description` is optional and will be used if the identity provider
+is presented in a human readable form, if this is not set "Ubuntu SSO"
+will be used.
+
+The `launchpad-teams` contains any private launchpad teams that candid
+needs to know about.
+
+If `staging` is true then the identity provider will use staging
+instances of Ubuntu SSO and launchpad for the identity information.
+
+If `fixed-username` is true then username changes returned from Ubuntu
+SSO will not be automatically reflected when a user authenticates. The
+username in candid will remain fixed to the username that is first used.
 
 ### UbuntuSSO OAuth
 ```yaml
