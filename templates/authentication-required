@@ -26,10 +26,10 @@
       <div class="col-6 col-start-large-4">
         <div class="p-card--highlighted">
           <div class="p-card__thumbnail">
-            <h1 class="p-heading--four">Login with</h1>
+            <h1 class="p-heading--four">Login {{ if .UseEmail }}with email address{{ end }}</h1>
           </div>
           <hr class="u-sv1">
-  {{if .Error}}
+  {{if and .Error  (not .UseEmail)}}
             <div class="p-notification--negative">
               <p class="p-notification__response">
                 <span class="p-notification__status">Error:</span>{{.Error}}
@@ -38,12 +38,23 @@
   {{end}}
   {{ if .UseEmail }}
           <div>
-            <form method="post" action="{{ .WithEmailURL }}">
-              <label for="email">Email address</label>
-              <input type="email" id="email" name="email">
-              <button type="submit">Continue</button>
+            <form method="post" action="{{ .WithEmailURL }}" style="margin-bottom: 1rem;">
+              <div class="p-form-validation {{ if .Error  }}is-error{{ end }}">
+                <label for="email">Email address</label>
+                <div class="p-form--inline" style="width: 100%;">
+                  <div style="width: 100%;">
+                    <input type="email" id="email" name="email" class="p-form-validation__input">
+                    {{ if .Error }}
+                      <p class="p-form-validation__message" role="alert">
+                        <strong>Error:</strong> {{.Error}}
+                      </p>
+                    {{ end }}
+                  </div>
+                <button type="submit" class="u-no-margin--bottom" style="margin-left: 0.5rem;">Login</button>
+              </div>
             </form>
           </div>
+          <p>Or continue with...</p>
   {{ end }}
   {{ range .IDPs }}
           <div>
@@ -51,7 +62,7 @@
           </div>
   {{ end }}
   {{ if .ShowEmailLink }}
-          <a href="{{.WithEmailURL}}">Login with email address...</a>
+          <a href="{{.WithEmailURL}}">Or login with email address</a>
   {{ end }}
         </div>
       </div>
