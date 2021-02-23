@@ -43,7 +43,7 @@
                 <label for="email">Email address</label>
                 <div class="p-form--inline" style="width: 100%;">
                   <div style="width: 100%;">
-                    <input type="email" id="email" name="email" class="p-form-validation__input">
+                    <input type="email" id="email" name="email" class="p-form-validation__input" required>
                     {{ if .Error }}
                       <p class="p-form-validation__message" role="alert">
                         <strong>Error:</strong> {{.Error}}
