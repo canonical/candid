@@ -1,14 +1,1 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<svg width="48px" height="48px" viewBox="0 0 48 48" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
-    <!-- Generator: Sketch 55.2 (78181) - https://sketchapp.com -->
-    <title>LOGO-UBUNTU-SSO</title>
-    <desc>Created with Sketch.</desc>
-    <g id="Candid" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
-        <g id="Group-2" transform="translate(-291.000000, -112.000000)">
-            <g id="LOGO-UBUNTU-SSO" transform="translate(291.000000, 112.000000)">
-                <circle id="Oval" stroke="#E5E5E5" fill="#FFFFFF" cx="24" cy="24" r="23.5"></circle>
-                <path d="M14,13.0787485 L14.0881479,28.7990044 C14.0881479,28.7990044 14.005323,35.4068341 21.1798352,36.7994859 C25.3062653,37.6004699 33.1106472,35.7431092 33.1106472,35.7431092 L33.0485061,13.06214 L26.7724024,13.06214 L26.7724024,30.7098013 L20.8691359,30.7098013 L20.8691359,19.0275479 L18.3214101,19.0275479 L21.3041135,13 L14,13.0787485 Z" id="path3049" fill="#E95420" fill-rule="nonzero"></path>
-            </g>
-        </g>
-    </g>
-</svg>
+<svg width="48" height="48" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 .157l.18 31.441s-.17 13.216 14.472 16.001C27.073 49.201 43 45.486 43 45.486L42.873.124H30.065V35.42H18.018V12.055h-5.2L18.907 0 4 .157z" fill="#E95420"/></svg>
