@@ -23,10 +23,10 @@
   </div>
   <div class="p-strip">
     <div class="row">
-      <div class="col-6 col-start-large-4">
+      <div class="col-4 col-start-large-5">
         <div class="p-card--highlighted">
           <div class="p-card__thumbnail">
-            <h1 class="p-heading--four">Login {{ if .UseEmail }}with email address{{ end }}</h1>
+            <h1 class="p-heading--four">Log in {{ if .UseEmail }}with email address{{ end }}</h1>
           </div>
           <hr class="u-sv1">
   {{if and .Error (not .UseEmail)}}
