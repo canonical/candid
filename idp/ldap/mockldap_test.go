@@ -7,7 +7,7 @@ import (
 	"crypto/tls"
 	"fmt"
 
-	"gopkg.in/asn1-ber.v1"
+	ber "gopkg.in/asn1-ber.v1"
 	errgo "gopkg.in/errgo.v1"
 	"gopkg.in/ldap.v2"
 

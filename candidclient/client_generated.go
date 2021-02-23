@@ -5,6 +5,7 @@ package candidclient
 
 import (
 	"context"
+
 	"github.com/canonical/candid/params"
 	"gopkg.in/httprequest.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery"
