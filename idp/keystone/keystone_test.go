@@ -43,7 +43,12 @@ func (s *keystoneSuite) TestKeystoneIdentityProviderDescription(c *qt.C) {
 }
 
 func (s *keystoneSuite) TestIconURL(c *qt.C) {
-	c.Assert(s.idp.IconURL(), qt.Equals, "")
+	idp := keystoneidp.NewIdentityProvider(keystoneidp.Params{})
+	params := s.idptest.InitParams(c, idpPrefix)
+	params.Location = "https://www.example.com/candid"
+	err := idp.Init(s.idptest.Ctx, params)
+	c.Assert(err, qt.IsNil)
+	c.Assert(idp.IconURL(), qt.Equals, "https://www.example.com/candid/static/images/icons/keystone.svg")
 }
 
 func (s *keystoneSuite) TestAbsoluteIconURL(c *qt.C) {

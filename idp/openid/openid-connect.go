@@ -115,6 +115,9 @@ func NewOpenIDConnectIdentityProvider(params OpenIDConnectParams) idp.IdentityPr
 	if params.Description == "" {
 		params.Description = params.Name
 	}
+	if params.Icon == "" {
+		params.Icon = "/static/images/icons/openid.svg"
+	}
 	if len(params.Scopes) == 0 {
 		params.Scopes = []string{oidc.ScopeOpenID}
 	}

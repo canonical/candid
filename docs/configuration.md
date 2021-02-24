@@ -144,6 +144,7 @@ for details on the agent login protocol.
 - type: usso
   name: usso
   domain: external
+  icon: /static/images/usso-icon.bmp
   description: Ubuntu SSO
   launchpad-teams:
     - group1
@@ -169,6 +170,11 @@ The `description` is optional and will be used if the identity provider
 is presented in a human readable form, if this is not set "Ubuntu SSO"
 will be used.
 
+The `icon` is optional and specifies the location of an icon to display
+when presenting the identity-provider options to a user. It this is set
+to URL path then that path should be relative to the candid service's
+location. If this is not set a default icon for Ubuntu SSO will be used.
+
 The `launchpad-teams` contains any private launchpad teams that candid
 needs to know about.
 
@@ -193,6 +199,7 @@ uses a previously obtained UbuntuSSO OAuth token to log in.
   name: canonistack
   domain: canonistack
   description: Canonistack
+  icon: /static/images/keystone-icon.bmp
   url: https://keystone.canonistack.canonical.com:443/
   hidden: false
 ```
@@ -216,6 +223,11 @@ specified the username will remain unchanged.
 The `description` is optional and will be used if the identity provider
 is presented in a human readable form, if this is not set the name
 will be used.
+
+The `icon` is optional and specifies the location of an icon to display
+when presenting the identity-provider options to a user. It this is set
+to URL path then that path should be relative to the candid service's
+location. If this is not set a default icon for keystone will be used.
 
 The `url` is the location of the keystone server that will be used to
 authenticate the user.
@@ -299,6 +311,7 @@ authenticate the user.
 ### Azure OpenID Connect
 ```yaml
 - type: azure
+  icon: /static/images/azure-icon.bmp
   client-id: 43444f68-3666-4f95-bd34-6fc24b108019
   client-secret: tXV2SRFflAGT9sUdxkdIi7mwfmQ=
   hidden: false
@@ -308,6 +321,11 @@ The Azure identity provider uses OpenID Connect to log in using Microsoft
 credentials via https://login.live.com. When a user first logs in with
 this IDP they will be prompted to create a new identity. The new identity
 must have a unique username and will be in the domain "@azure".
+
+The `icon` is optional and specifies the location of an icon to display
+when presenting the identity-provider options to a user. It this is set
+to URL path then that path should be relative to the candid service's
+location. If this is not set a default icon for azure will be used.
 
 The `client-id` and `client-secret` parameters must be specified and
 are created by registering the candid instance as an application at
@@ -323,6 +341,7 @@ performing an interactive login.
 - type: adfs
   name: example
   domain: example
+  icon: /static/images/adfs.bmp
   url: https://adfs.example.com
   client-id: 43444f68-3666-4f95-bd34-6fc24b108019
   client-secret: tXV2SRFflAGT9sUdxkdIi7mwfmQ=
@@ -332,6 +351,11 @@ performing an interactive login.
 
 The ADFS identity provider uses OpenID Connect to authenticate with an
 Active Directory Federation Services deployment.
+
+The `icon` is optional and specifies the location of an icon to display
+when presenting the identity-provider options to a user. It this is set
+to URL path then that path should be relative to the candid service's
+location. If this is not set a default generic OpenID icon will be used.
 
 The required `url` parameter specifies the location of the ADFS OpenID
 Connect service. OpenID Connect Discovery will be performed using this
@@ -358,6 +382,7 @@ provider will be used to perform the login.
 ### Google OpenID Connect
 ```yaml
 - type: google
+  icon: /static/images/google-icon.bmp
   client-id: 483156874216-rh0j89ltslhuqirk7deh70d3mp49kdvq.apps.googleusercontent.com
   client-secret: 8aENrwCL/+PU87ROkXwMB+09xe0=
   hidden: false
@@ -373,6 +398,11 @@ are created by registering the candid instance as an application
 at https://console.developers.google.com/apis/credentials. When
 registering the application the authorized redirect URLs should include
 `$CANDID_URL/login/google/callback`.
+
+The `icon` is optional and specifies the location of an icon to display
+when presenting the identity-provider options to a user. It this is set
+to URL path then that path should be relative to the candid service's
+location. If this is not set a default icon for google will be used.
 
 The `hidden` value is an optional value that can be used to not list
 this identity provider in the list of possible identity providers when
@@ -393,6 +423,11 @@ credentials. When a user first logs in with this IDP they will be prompted
 to create a new identity. The new identity must have a unique username
 and will be in the domain specified "@domain", otherwise default to "@KEYCLOAK".
 
+The `icon` is optional and specifies the location of an icon to display
+when presenting the identity-provider options to a user. It this is set
+to URL path then that path should be relative to the candid service's
+location. If this is not set a default generic OpenID icon will be used.
+
 The 'keycloak-realm and `client-id` parameters must be specified and should be 
 provided by the keycloak service administrator. An optional client-secret may
 also be required which the keycloak service administrator should provide.
@@ -410,6 +445,7 @@ performing an interactive login.
 - type: ldap
   name: ldap
   description: LDAP Login
+  icon: /static/images/ldap-icon.bmp
   domain: example
   url: ldap://ldap.example.com/dc=example,dc=com
   ca-cert: |
@@ -445,6 +481,11 @@ allows them to be identified. The name will be used in the login URL.
 `description` (optional) provides a human readable description of the
 identity provider. If it is not set it will default to the value of
 `name`.
+
+`icon` (optional) specifies the location of an icon to display when
+presenting the identity-provider options to a user. It this is set
+to URL path then that path should be relative to the candid service's
+location. If this is not set a default generic LDAP icon will be used.
 
 `domain` (optional) is the domain in which all identities will be
 created. If this is not set then no domain is used.
@@ -490,6 +531,7 @@ performing an interactive login.
   name: static
   domain: mydomain
   description: Static Identity Provider
+  icon: /static/images/static-icon.bmp
   users:
     user1:
       name: User One
@@ -521,6 +563,11 @@ created. If this is not set then no domain is used.
 `description` (optional) provides a human readable description of the
 identity provider. If it is not set it will default to the value of
 `name`.
+
+`icon` (optional) specifies the location of an icon to display when
+presenting the identity-provider options to a user. It this is set
+to URL path then that path should be relative to the candid service's
+location. If this is not set a default icon will be used.
 
 `users` contains a static mapping of username to user entries for all
 of the users defined by the identity provider.

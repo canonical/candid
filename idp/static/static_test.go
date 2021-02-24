@@ -75,8 +75,12 @@ func (s *staticSuite) TestDescription(c *qt.C) {
 }
 
 func (s *staticSuite) TestIconURL(c *qt.C) {
-	idp := static.NewIdentityProvider(getSampleParams())
-	c.Assert(idp.IconURL(), qt.Equals, "")
+	i := static.NewIdentityProvider(getSampleParams())
+	err := i.Init(context.Background(), idp.InitParams{
+		Location: "https://www.example.com/candid",
+	})
+	c.Assert(err, qt.IsNil)
+	c.Assert(i.IconURL(), qt.Equals, "https://www.example.com/candid/static/images/icons/static.svg")
 }
 
 func (s *staticSuite) TestAbsoluteIconURL(c *qt.C) {

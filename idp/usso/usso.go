@@ -75,6 +75,9 @@ func NewIdentityProvider(p Params) idp.IdentityProvider {
 	if p.Description == "" {
 		p.Description = "Ubuntu SSO"
 	}
+	if p.Icon == "" {
+		p.Icon = "/static/images/icons/usso.svg"
+	}
 	return &identityProvider{
 		groupCache: cache.New(10 * time.Minute),
 		groupMonitor: prometheus.NewSummary(prometheus.SummaryOpts{

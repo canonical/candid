@@ -67,6 +67,9 @@ func NewIdentityProvider(p Params) idp.IdentityProvider {
 	if p.Domain == "" {
 		p.Domain = "google"
 	}
+	if p.Icon == "" {
+		p.Icon = "/static/images/icons/google.svg"
+	}
 	return openid.NewOpenIDConnectIdentityProvider(openid.OpenIDConnectParams{
 		Name:         p.Name,
 		Issuer:       "https://accounts.google.com",

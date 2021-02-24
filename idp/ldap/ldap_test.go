@@ -191,9 +191,13 @@ func (s *ldapSuite) TestDescription(c *qt.C) {
 }
 
 func (s *ldapSuite) TestIconURL(c *qt.C) {
-	idp, err := ldap.NewIdentityProvider(getSampleParams())
+	i, err := ldap.NewIdentityProvider(getSampleParams())
 	c.Assert(err, qt.IsNil)
-	c.Assert(idp.IconURL(), qt.Equals, "")
+	err = i.Init(context.Background(), idp.InitParams{
+		Location: "https://www.example.com/candid",
+	})
+	c.Assert(err, qt.IsNil)
+	c.Assert(i.IconURL(), qt.Equals, "https://www.example.com/candid/static/images/icons/ldap.svg")
 }
 
 func (s *ldapSuite) TestAbsoluteIconURL(c *qt.C) {
