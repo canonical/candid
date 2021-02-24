@@ -81,6 +81,9 @@ func NewIdentityProvider(p Params) idp.IdentityProvider {
 	if p.Description == "" {
 		p.Description = p.Name
 	}
+	if p.Icon == "" {
+		p.Icon = "/static/images/icons/static.svg"
+	}
 	var matchEmailAddr *regexp.Regexp
 	if p.MatchEmailAddr != "" {
 		var err error

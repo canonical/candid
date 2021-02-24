@@ -66,6 +66,9 @@ func NewIdentityProvider(p Params) idp.IdentityProvider {
 	if p.Domain == "" {
 		p.Domain = "azure"
 	}
+	if p.Icon == "" {
+		p.Icon = "/static/images/icons/azure.svg"
+	}
 
 	return openid.NewOpenIDConnectIdentityProvider(openid.OpenIDConnectParams{
 		Name:         p.Name,

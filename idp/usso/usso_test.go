@@ -77,7 +77,12 @@ func (s *ussoSuite) TestDescription(c *qt.C) {
 }
 
 func (s *ussoSuite) TestIconURL(c *qt.C) {
-	c.Assert(s.idp.IconURL(), qt.Equals, "")
+	idp := usso.NewIdentityProvider(usso.Params{})
+	params := s.idptest.InitParams(c, idpPrefix)
+	params.Location = "https://www.example.com/candid"
+	err := idp.Init(s.idptest.Ctx, params)
+	c.Assert(err, qt.IsNil)
+	c.Assert(idp.IconURL(), qt.Equals, "https://www.example.com/candid/static/images/icons/usso.svg")
 }
 
 func (s *ussoSuite) TestAbsoluteIconURL(c *qt.C) {

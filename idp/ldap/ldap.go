@@ -120,6 +120,9 @@ func NewIdentityProvider(p Params) (idp.IdentityProvider, error) {
 	if p.Description == "" {
 		p.Description = p.Name
 	}
+	if p.Icon == "" {
+		p.Icon = "/static/images/icons/ldap.svg"
+	}
 
 	if p.UserQueryAttrs.ID == "" {
 		return nil, errgo.Newf("missing 'id' config parameter in 'user-query-attrs'")

@@ -86,6 +86,9 @@ func newIdentityProvider(p Params) identityProvider {
 	if p.Description == "" {
 		p.Description = p.Name
 	}
+	if p.Icon == "" {
+		p.Icon = "/static/images/icons/keystone.svg"
+	}
 	return identityProvider{
 		params: p,
 		client: keystone.NewClient(p.URL),
