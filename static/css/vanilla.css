@@ -2,11 +2,18 @@
   Import Vanilla framework:
   https://docs.vanillaframework.io/
 */
-@import 'vanilla-framework-version-2.0.1.min.css';
+@import "vanilla-framework-version-2.24.1.min.css";
 
 html {
   overflow-y: hidden;
   height: 100%;
+}
+
+@media only screen and (min-width: 1681px) {
+  html {
+    font-size: 1rem !important;
+    line-height: 1.5rem !important;
+  }
 }
 
 body {
@@ -18,7 +25,66 @@ body {
   -moz-osx-font-smoothing: grayscale;
   height: 100%;
   color: #333;
-  font-family: Ubuntu, Arial, 'libra sans', sans-serif;
+  font-family: Ubuntu, Arial, "libra sans", sans-serif;
   font-size: 16px;
   font-weight: 300;
+}
+
+.logo,
+.login-card {
+  width: 90%;
+  max-width: 439px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.logo {
+  text-align: center;
+}
+
+.logo__image {
+  width: 132px;
+}
+
+.sso-buttons {
+  margin-top: 1.5rem;
+}
+
+.sso-button {
+  border-color: #cdcdcd;
+  padding-bottom: 1rem;
+  padding-top: 1rem;
+  width: 100%;
+}
+
+.sso-icon {
+  margin-bottom: 0.5rem;
+}
+
+.sso-icon__image {
+  height: 32px;
+  width: auto;
+}
+
+@media only screen and (min-width: 620px) {
+  .sso-buttons {
+    overflow: hidden;
+  }
+
+  .sso-button {
+    float: left;
+    height: 125px;
+    width: 125px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .sso-button:nth-child(3n) {
+    margin-right: 0 !important;
+  }
+
+  .sso-button--wide {
+    width: 100%;
+  }
 }
