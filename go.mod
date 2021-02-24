@@ -57,4 +57,4 @@ require (
 	launchpad.net/lpad v0.0.0-20131113112110-000000000065
 )
 
-go 1.15
+go 1.16

@@ -50,7 +50,7 @@ func init() {
 // An IdentityCreator is used to create a candid identity from the
 // OAuth2 token returned by the OAuth2 authentication process.
 type IdentityCreator interface {
-	// Create an identity using the provided token. The identity must 
+	// Create an identity using the provided token. The identity must
 	// include a ProviderID which will remain constant for all
 	// authentications made by the same user, it is recommended that the
 	// ProviderID function is used for this purpose.
@@ -101,7 +101,7 @@ type OpenIDConnectParams struct {
 	// MatchEmailAddr is a regular expression that is used to determine if
 	// this identity provider can be used for a particular user email.
 	MatchEmailAddr string `yaml:"match-email-addr"`
-	
+
 	// IdentityCreator is the IdentityCreator that the identity provider
 	// will use to convert the OAuth2 token into a candid Identity. If
 	// this is nil the default implementation provided by the
@@ -257,7 +257,7 @@ func (idp *openidConnectIdentityProvider) callback(ctx context.Context, w http.R
 	if err != nil {
 		return errgo.Mask(err)
 	}
-	
+
 	existingUser := store.Identity{
 		ProviderID: user.ProviderID,
 	}
@@ -284,14 +284,14 @@ func (idp *openidConnectIdentityProvider) callback(ctx context.Context, w http.R
 	if errgo.Cause(err) != store.ErrNotFound {
 		return errgo.Mask(err)
 	}
-	
+
 	// The user needs to be created.
 	if user.Username != "" {
 		// Attempt to create a user with the preferred username.
 		err := idp.initParams.Store.UpdateIdentity(ctx, &user, store.Update{
 			store.Username: store.Set,
-			store.Name: store.Set,
-			store.Email: store.Set,
+			store.Name:     store.Set,
+			store.Email:    store.Set,
 		})
 		if err == nil {
 			idp.initParams.VisitCompleter.RedirectSuccess(ctx, w, req, ls.ReturnTo, ls.State, &user)
@@ -301,8 +301,8 @@ func (idp *openidConnectIdentityProvider) callback(ctx context.Context, w http.R
 			return errgo.Mask(err)
 		}
 	}
-	
-	// The user needs to register.	
+
+	// The user needs to register.
 	ls.ProviderID = user.ProviderID
 	cookiePath := idputil.CookiePathRelativeToLocation(idputil.LoginCookiePath, idp.initParams.Location, idp.initParams.SkipLocationForCookiePaths)
 	state, err := idp.initParams.Codec.SetCookie(w, idputil.LoginCookieName, cookiePath, ls)
@@ -383,7 +383,7 @@ func (idp *openidConnectIdentityProvider) CreateIdentity(ctx context.Context, to
 	if err != nil {
 		return store.Identity{}, errgo.Mask(err)
 	}
-	
+
 	user := store.Identity{
 		ProviderID: ProviderID(idp.Name(), id),
 	}
@@ -424,6 +424,6 @@ type registrationState struct {
 
 // ProviderID creates a ProviderIdentity using the Subject and Issuer
 //from the given ID token.
-func ProviderID(provider string, id *oidc.IDToken) store.ProviderIdentity{
+func ProviderID(provider string, id *oidc.IDToken) store.ProviderIdentity {
 	return store.MakeProviderIdentity(provider, fmt.Sprintf("%s:%s", id.Issuer, id.Subject))
 }

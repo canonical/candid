@@ -8,7 +8,7 @@ import (
 
 	qt "github.com/frankban/quicktest"
 
-	"github.com/canonical/candid/internal/v1"
+	v1 "github.com/canonical/candid/internal/v1"
 )
 
 func TestGravatarHash(t *testing.T) {

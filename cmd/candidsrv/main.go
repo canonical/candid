@@ -6,7 +6,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"html/template"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -111,10 +110,10 @@ func serveIdentity(conf *config.Config, params candid.ServerParams) error {
 			params.IdentityProviders[i] = idp.IdentityProvider
 		}
 	}
-	params.StaticFileSystem = http.Dir(filepath.Join(conf.ResourcePath, "static"))
+	params.StaticFileSystem = staticFS(conf.ResourcePath)
 
 	var err error
-	params.Template, err = template.New("").ParseGlob(filepath.Join(conf.ResourcePath, "templates", "*"))
+	params.Template, err = loadTemplates(conf.ResourcePath)
 	if err != nil {
 		return errgo.Notef(err, "cannot parse templates")
 	}

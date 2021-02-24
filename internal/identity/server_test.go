@@ -31,7 +31,7 @@ import (
 	"github.com/canonical/candid/internal/debug"
 	"github.com/canonical/candid/internal/discharger"
 	"github.com/canonical/candid/internal/identity"
-	"github.com/canonical/candid/internal/v1"
+	v1 "github.com/canonical/candid/internal/v1"
 	"github.com/canonical/candid/params"
 	"github.com/canonical/candid/store"
 )

@@ -438,20 +438,20 @@ var handleRegisterTests = []struct {
 		Email:      "user1@example.com",
 	},
 }, {
-	name:     "InvalidUsername",
-	username: "!",
-	fullname: "User One",
-	email:    "user1@example.com",
+	name:        "InvalidUsername",
+	username:    "!",
+	fullname:    "User One",
+	email:       "user1@example.com",
 	expectError: "invalid user name. The username must contain only A-Z, a-z, 0-9, &#39;.&#39;, &#39;-&#39;, &amp; &#39;&#43;&#39;, and must start and end with a letter or number.",
 }, {
-	name:     "InvalidUsername",
+	name: "InvalidUsername",
 	storedIdentities: []store.Identity{{
 		ProviderID: "oidc:example.com:user-id-0",
-		Username: "user1@test",
+		Username:   "user1@test",
 	}},
-	username: "user1",
-	fullname: "User One",
-	email:    "user1@example.com",
+	username:    "user1",
+	fullname:    "User One",
+	email:       "user1@example.com",
 	expectError: "Username already taken, please pick a different one.",
 }}
 
