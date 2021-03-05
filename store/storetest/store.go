@@ -13,7 +13,7 @@ import (
 	qt "github.com/frankban/quicktest"
 	"github.com/frankban/quicktest/qtsuite"
 	errgo "gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v2/bakery"
+	"gopkg.in/macaroon-bakery.v3/bakery"
 
 	"github.com/canonical/candid/internal/auth"
 	"github.com/canonical/candid/internal/candidtest"

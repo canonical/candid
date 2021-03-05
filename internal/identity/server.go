@@ -13,14 +13,14 @@ import (
 
 	"github.com/juju/aclstore/v2"
 	"github.com/juju/loggo"
-	"github.com/juju/utils/debugstatus"
+	"github.com/juju/utils/v2/debugstatus"
 	"github.com/julienschmidt/httprouter"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/httprequest.v1"
-	"gopkg.in/macaroon-bakery.v2/bakery"
-	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
+	"gopkg.in/macaroon-bakery.v3/bakery"
+	"gopkg.in/macaroon-bakery.v3/bakery/identchecker"
 
 	"github.com/canonical/candid/idp"
 	"github.com/canonical/candid/internal/auth"

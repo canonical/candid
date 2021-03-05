@@ -11,7 +11,7 @@ import (
 
 	qt "github.com/frankban/quicktest"
 	"github.com/frankban/quicktest/qtsuite"
-	"gopkg.in/macaroon-bakery.v2/bakery"
+	"gopkg.in/macaroon-bakery.v3/bakery"
 
 	"github.com/canonical/candid/candidtest"
 	"github.com/canonical/candid/store"

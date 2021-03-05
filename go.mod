@@ -14,18 +14,18 @@ require (
 	github.com/juju/cmd v0.0.0-20180424151504-9ce53c6f9d00
 	github.com/juju/gnuflag v0.0.0-20171113085948-2ce1bb71843d
 	github.com/juju/go4 v0.0.0-20160222163258-40d72ab9641a // indirect
-	github.com/juju/httpprof v0.0.0-20141217160036-14bf14c30767 // indirect
-	github.com/juju/loggo v0.0.0-20190212223446-d976af380377
-	github.com/juju/mgotest v1.0.1
+	github.com/juju/loggo v0.0.0-20200526014432-9ce3a2e09b5e
+	github.com/juju/mgo/v2 v2.0.0-20210302023703-70d5d206e208
+	github.com/juju/mgotest v1.0.2
 	github.com/juju/names v0.0.0-20160330150533-8a0aa0963bba
 	github.com/juju/persistent-cookiejar v0.0.0-20170428161559-d67418f14c93
 	github.com/juju/postgrestest v1.1.0
 	github.com/juju/qthttptest v0.0.1
 	github.com/juju/schema v1.0.1-0.20190814234152-1f8aaeef0989
-	github.com/juju/simplekv v1.0.0
-	github.com/juju/testing v0.0.0-20191001232224-ce9dec17d28b
+	github.com/juju/simplekv v0.0.0-20210305221510-808444a46610
+	github.com/juju/testing v0.0.0-20210302031854-2c7ee8570c07
 	github.com/juju/usso v1.0.1
-	github.com/juju/utils v0.0.0-20180820210520-bf9cc5bdd62d
+	github.com/juju/utils/v2 v2.0.0-20210305225158-eedbe7b6b3e2
 	github.com/julienschmidt/httprouter v1.3.0
 	github.com/lib/pq v1.3.0
 	github.com/lunixbochs/vtclean v0.0.0-20180621232353-2d01aacdc34a // indirect
@@ -35,8 +35,8 @@ require (
 	github.com/pquerna/cachecontrol v0.0.0-20160421231612-c97913dcbd76 // indirect
 	github.com/prometheus/client_golang v1.5.1
 	github.com/yohcop/openid-go v1.0.0
-	golang.org/x/crypto v0.0.0-20200622213623-75b288015ac9
-	golang.org/x/net v0.0.0-20201021035429-f5854403a974
+	golang.org/x/crypto v0.0.0-20200820211705-5c72a883971a
+	golang.org/x/net v0.0.0-20210226172049-e18ecbb05110
 	golang.org/x/oauth2 v0.0.0-20200107190931-bf48bf16ab8d
 	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
 	gopkg.in/asn1-ber.v1 v1.0.0-20170511165959-379148ca0225
@@ -46,14 +46,13 @@ require (
 	gopkg.in/juju/environschema.v1 v1.0.0
 	gopkg.in/juju/names.v2 v2.0.0-20180621093930-fd59336b4621
 	gopkg.in/ldap.v2 v2.5.0
-	gopkg.in/macaroon-bakery.v2 v2.2.0
+	gopkg.in/macaroon-bakery.v3 v3.0.0-20210305063614-792624751518
 	gopkg.in/macaroon.v2 v2.1.0
-	gopkg.in/mgo.v2 v2.0.0-20180705113604-9856a29383ce
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0-20170531180850-df99d62fd42d
 	gopkg.in/retry.v1 v1.0.3 // indirect
 	gopkg.in/square/go-jose.v2 v2.0.1
-	gopkg.in/tomb.v2 v2.0.0-20140626144623-14b3d72120e8
-	gopkg.in/yaml.v2 v2.2.8
+	gopkg.in/tomb.v2 v2.0.0-20161208151619-d5d1b5820637
+	gopkg.in/yaml.v2 v2.4.0
 	launchpad.net/lpad v0.0.0-20131113112110-000000000065
 )
 

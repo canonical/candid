@@ -10,9 +10,9 @@ import (
 	"time"
 
 	"github.com/juju/aclstore/v2"
-	"github.com/juju/utils/debugstatus"
+	"github.com/juju/utils/v2/debugstatus"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v2/bakery"
+	"gopkg.in/macaroon-bakery.v3/bakery"
 
 	"github.com/canonical/candid/idp"
 	"github.com/canonical/candid/idp/agent"

@@ -8,7 +8,7 @@ import (
 	"sort"
 	"time"
 
-	"github.com/juju/utils/cache"
+	"github.com/juju/utils/v2/cache"
 	"gopkg.in/errgo.v1"
 
 	"github.com/canonical/candid/params"

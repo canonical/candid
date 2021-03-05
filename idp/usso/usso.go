@@ -15,10 +15,10 @@ import (
 	"github.com/juju/names"
 	"github.com/juju/usso"
 	"github.com/juju/usso/openid"
-	"github.com/juju/utils/cache"
+	"github.com/juju/utils/v2/cache"
 	"github.com/prometheus/client_golang/prometheus"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v2/httpbakery"
+	"gopkg.in/macaroon-bakery.v3/httpbakery"
 	"launchpad.net/lpad"
 
 	"github.com/canonical/candid/idp"

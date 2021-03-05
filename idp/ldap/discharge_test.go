@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	qt "github.com/frankban/quicktest"
-	"gopkg.in/macaroon-bakery.v2/httpbakery"
+	"gopkg.in/macaroon-bakery.v3/httpbakery"
 
 	"github.com/canonical/candid/idp"
 	"github.com/canonical/candid/idp/ldap"

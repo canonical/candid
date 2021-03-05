@@ -9,9 +9,9 @@ import (
 	"strings"
 
 	"gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v2/bakery"
-	"gopkg.in/macaroon-bakery.v2/bakery/checkers"
-	"gopkg.in/macaroon-bakery.v2/httpbakery"
+	"gopkg.in/macaroon-bakery.v3/bakery"
+	"gopkg.in/macaroon-bakery.v3/bakery/checkers"
+	"gopkg.in/macaroon-bakery.v3/httpbakery"
 
 	"github.com/canonical/candid/params"
 	"github.com/canonical/candid/store"

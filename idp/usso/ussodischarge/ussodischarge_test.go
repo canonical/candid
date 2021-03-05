@@ -18,9 +18,9 @@ import (
 
 	qt "github.com/frankban/quicktest"
 	"github.com/frankban/quicktest/qtsuite"
-	"gopkg.in/macaroon-bakery.v2/bakery"
-	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
-	"gopkg.in/macaroon-bakery.v2/httpbakery"
+	"gopkg.in/macaroon-bakery.v3/bakery"
+	"gopkg.in/macaroon-bakery.v3/bakery/identchecker"
+	"gopkg.in/macaroon-bakery.v3/httpbakery"
 	macaroon "gopkg.in/macaroon.v2"
 	yaml "gopkg.in/yaml.v2"
 

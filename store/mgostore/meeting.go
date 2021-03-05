@@ -8,10 +8,10 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/juju/utils/debugstatus"
+	"github.com/juju/mgo/v2"
+	"github.com/juju/mgo/v2/bson"
+	"github.com/juju/utils/v2/debugstatus"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/mgo.v2"
-	"gopkg.in/mgo.v2/bson"
 )
 
 type doc struct {

@@ -3,7 +3,7 @@
 
 package debug
 
-import "gopkg.in/macaroon-bakery.v2/bakery"
+import "gopkg.in/macaroon-bakery.v3/bakery"
 
 type (
 	DebugAPIHandler *debugAPIHandler

@@ -7,7 +7,7 @@ import (
 	"context"
 
 	"gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
+	"gopkg.in/macaroon-bakery.v3/bakery/identchecker"
 
 	"github.com/canonical/candid/params"
 )

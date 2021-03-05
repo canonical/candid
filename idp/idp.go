@@ -10,8 +10,8 @@ import (
 	"net/http"
 
 	"github.com/juju/simplekv"
-	"gopkg.in/macaroon-bakery.v2/bakery"
-	"gopkg.in/macaroon-bakery.v2/httpbakery"
+	"gopkg.in/macaroon-bakery.v3/bakery"
+	"gopkg.in/macaroon-bakery.v3/httpbakery"
 
 	"github.com/canonical/candid/idp/idputil/secret"
 	"github.com/canonical/candid/store"

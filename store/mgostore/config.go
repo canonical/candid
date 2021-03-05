@@ -1,8 +1,8 @@
 package mgostore
 
 import (
+	mgo "github.com/juju/mgo/v2"
 	errgo "gopkg.in/errgo.v1"
-	mgo "gopkg.in/mgo.v2"
 
 	"github.com/canonical/candid/store"
 )
