@@ -13,8 +13,8 @@ import (
 	"gopkg.in/macaroon-bakery.v3/bakery"
 	"gopkg.in/macaroon-bakery.v3/httpbakery"
 
-	"github.com/canonical/candid/idp/idputil/secret"
-	"github.com/canonical/candid/store"
+	"github.com/canonical/candid/v2/idp/idputil/secret"
+	"github.com/canonical/candid/v2/store"
 )
 
 // A DischargeTokenCreator is used by the identity providers to create a

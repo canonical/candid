@@ -28,11 +28,11 @@ import (
 	"gopkg.in/macaroon-bakery.v3/bakery/identchecker"
 	"gopkg.in/macaroon-bakery.v3/httpbakery"
 
-	"github.com/canonical/candid/candidclient/ussodischarge"
-	"github.com/canonical/candid/idp"
-	"github.com/canonical/candid/idp/idputil"
-	"github.com/canonical/candid/params"
-	"github.com/canonical/candid/store"
+	"github.com/canonical/candid/v2/candidclient/ussodischarge"
+	"github.com/canonical/candid/v2/idp"
+	"github.com/canonical/candid/v2/idp/idputil"
+	"github.com/canonical/candid/v2/params"
+	"github.com/canonical/candid/v2/store"
 )
 
 var logger = loggo.GetLogger("candid.idp.usso.ussodischarge")

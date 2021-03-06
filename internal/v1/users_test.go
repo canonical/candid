@@ -16,16 +16,16 @@ import (
 	"gopkg.in/macaroon-bakery.v3/httpbakery"
 	macaroon "gopkg.in/macaroon.v2"
 
-	"github.com/canonical/candid/candidclient"
-	"github.com/canonical/candid/idp"
-	"github.com/canonical/candid/idp/static"
-	"github.com/canonical/candid/internal/auth"
-	"github.com/canonical/candid/internal/candidtest"
-	"github.com/canonical/candid/internal/discharger"
-	"github.com/canonical/candid/internal/identity"
-	v1 "github.com/canonical/candid/internal/v1"
-	"github.com/canonical/candid/params"
-	"github.com/canonical/candid/store"
+	"github.com/canonical/candid/v2/candidclient"
+	"github.com/canonical/candid/v2/idp"
+	"github.com/canonical/candid/v2/idp/static"
+	"github.com/canonical/candid/v2/internal/auth"
+	"github.com/canonical/candid/v2/internal/candidtest"
+	"github.com/canonical/candid/v2/internal/discharger"
+	"github.com/canonical/candid/v2/internal/identity"
+	v1 "github.com/canonical/candid/v2/internal/v1"
+	"github.com/canonical/candid/v2/params"
+	"github.com/canonical/candid/v2/store"
 )
 
 func TestUsersAPI(t *testing.T) {

@@ -18,9 +18,9 @@ import (
 	"gopkg.in/juju/names.v2"
 	"gopkg.in/macaroon-bakery.v3/httpbakery"
 
-	"github.com/canonical/candid/idp"
-	"github.com/canonical/candid/idp/idputil"
-	"github.com/canonical/candid/store"
+	"github.com/canonical/candid/v2/idp"
+	"github.com/canonical/candid/v2/idp/idputil"
+	"github.com/canonical/candid/v2/store"
 )
 
 var logger = loggo.GetLogger("candid.idp.openid")

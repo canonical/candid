@@ -17,7 +17,7 @@ import (
 	errgo "gopkg.in/errgo.v1"
 	"gopkg.in/juju/environschema.v1/form"
 
-	"github.com/canonical/candid/candidclient/ussologin"
+	"github.com/canonical/candid/v2/candidclient/ussologin"
 )
 
 func TestPutGetToken(t *testing.T) {

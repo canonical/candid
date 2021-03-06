@@ -15,10 +15,10 @@ import (
 	_ "github.com/lib/pq"
 	errgo "gopkg.in/errgo.v1"
 
-	"github.com/canonical/candid/cmd/migrate-db/internal"
-	"github.com/canonical/candid/store"
-	"github.com/canonical/candid/store/mgostore"
-	"github.com/canonical/candid/store/sqlstore"
+	"github.com/canonical/candid/v2/cmd/migrate-db/internal"
+	"github.com/canonical/candid/v2/store"
+	"github.com/canonical/candid/v2/store/mgostore"
+	"github.com/canonical/candid/v2/store/sqlstore"
 )
 
 var (

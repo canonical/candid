@@ -11,8 +11,8 @@ import (
 	"gopkg.in/macaroon-bakery.v3/bakery/identchecker"
 	"gopkg.in/macaroon-bakery.v3/httpbakery"
 
-	"github.com/canonical/candid/candidclient"
-	"github.com/canonical/candid/candidtest"
+	"github.com/canonical/candid/v2/candidclient"
+	"github.com/canonical/candid/v2/candidtest"
 )
 
 func TestIdentityClient(t *testing.T) {

@@ -8,7 +8,7 @@ import (
 
 	qt "github.com/frankban/quicktest"
 
-	"github.com/canonical/candid/params"
+	"github.com/canonical/candid/v2/params"
 )
 
 var usernameUnmarshalTests = []struct {

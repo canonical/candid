@@ -16,15 +16,15 @@ import (
 	"gopkg.in/macaroon-bakery.v3/bakery"
 	"gopkg.in/macaroon-bakery.v3/httpbakery"
 
-	"github.com/canonical/candid/idp"
-	"github.com/canonical/candid/internal/auth"
-	"github.com/canonical/candid/internal/candidtest"
-	"github.com/canonical/candid/internal/discharger"
-	"github.com/canonical/candid/internal/identity"
-	"github.com/canonical/candid/internal/monitoring"
-	"github.com/canonical/candid/meeting"
-	"github.com/canonical/candid/params"
-	"github.com/canonical/candid/store"
+	"github.com/canonical/candid/v2/idp"
+	"github.com/canonical/candid/v2/internal/auth"
+	"github.com/canonical/candid/v2/internal/candidtest"
+	"github.com/canonical/candid/v2/internal/discharger"
+	"github.com/canonical/candid/v2/internal/identity"
+	"github.com/canonical/candid/v2/internal/monitoring"
+	"github.com/canonical/candid/v2/meeting"
+	"github.com/canonical/candid/v2/params"
+	"github.com/canonical/candid/v2/store"
 )
 
 type idpSuite struct {

@@ -13,7 +13,7 @@ import (
 	"github.com/juju/simplekv"
 	errgo "gopkg.in/errgo.v1"
 
-	"github.com/canonical/candid/store"
+	"github.com/canonical/candid/v2/store"
 )
 
 // IdentityStore is a short-term store for identity information

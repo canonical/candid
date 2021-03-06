@@ -17,8 +17,8 @@ import (
 	"gopkg.in/macaroon-bakery.v3/httpbakery"
 	"gopkg.in/macaroon.v2"
 
-	"github.com/canonical/candid/candidclient"
-	"github.com/canonical/candid/candidclient/ussodischarge"
+	"github.com/canonical/candid/v2/candidclient"
+	"github.com/canonical/candid/v2/candidclient/ussodischarge"
 )
 
 var (

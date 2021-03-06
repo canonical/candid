@@ -11,8 +11,8 @@ import (
 	qt "github.com/frankban/quicktest"
 	"github.com/yohcop/openid-go"
 
-	"github.com/canonical/candid/idp/usso/internal/kvnoncestore"
-	"github.com/canonical/candid/internal/candidtest"
+	"github.com/canonical/candid/v2/idp/usso/internal/kvnoncestore"
+	"github.com/canonical/candid/v2/internal/candidtest"
 )
 
 var _ openid.NonceStore = (*kvnoncestore.Store)(nil)

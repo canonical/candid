@@ -1,5 +1,5 @@
 language: go
-go_import_path: "github.com/canonical/candid"
+go_import_path: "github.com/canonical/candid/v2"
 go: 
   - "1.15.x"
   - "1.16.x"

@@ -11,11 +11,11 @@ import (
 	"gopkg.in/errgo.v1"
 	"gopkg.in/httprequest.v1"
 
-	"github.com/canonical/candid/internal/auth"
-	"github.com/canonical/candid/internal/auth/httpauth"
-	"github.com/canonical/candid/internal/identity"
-	"github.com/canonical/candid/internal/monitoring"
-	"github.com/canonical/candid/params"
+	"github.com/canonical/candid/v2/internal/auth"
+	"github.com/canonical/candid/v2/internal/auth/httpauth"
+	"github.com/canonical/candid/v2/internal/identity"
+	"github.com/canonical/candid/v2/internal/monitoring"
+	"github.com/canonical/candid/v2/params"
 )
 
 var logger = loggo.GetLogger("candid.internal.v1")

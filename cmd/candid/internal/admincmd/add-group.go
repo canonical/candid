@@ -9,7 +9,7 @@ import (
 	"github.com/juju/cmd"
 	"gopkg.in/errgo.v1"
 
-	"github.com/canonical/candid/params"
+	"github.com/canonical/candid/v2/params"
 )
 
 type addGroupCommand struct {

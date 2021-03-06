@@ -13,9 +13,9 @@ import (
 	"github.com/juju/simplekv/memsimplekv"
 	"gopkg.in/macaroon-bakery.v3/bakery"
 
-	"github.com/canonical/candid"
-	"github.com/canonical/candid/store"
-	"github.com/canonical/candid/store/memstore"
+	"github.com/canonical/candid/v2"
+	"github.com/canonical/candid/v2/store"
+	"github.com/canonical/candid/v2/store/memstore"
 )
 
 type Testing interface {

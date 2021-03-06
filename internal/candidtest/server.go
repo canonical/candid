@@ -19,10 +19,10 @@ import (
 	"gopkg.in/macaroon-bakery.v3/httpbakery"
 	"gopkg.in/macaroon-bakery.v3/httpbakery/agent"
 
-	"github.com/canonical/candid/candidclient"
-	"github.com/canonical/candid/internal/auth"
-	"github.com/canonical/candid/internal/identity"
-	"github.com/canonical/candid/store"
+	"github.com/canonical/candid/v2/candidclient"
+	"github.com/canonical/candid/v2/internal/auth"
+	"github.com/canonical/candid/v2/internal/identity"
+	"github.com/canonical/candid/v2/store"
 )
 
 var DefaultTemplate = template.New("")

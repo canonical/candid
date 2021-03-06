@@ -9,11 +9,11 @@ import (
 	qt "github.com/frankban/quicktest"
 	"gopkg.in/macaroon-bakery.v3/httpbakery"
 
-	"github.com/canonical/candid/idp"
-	"github.com/canonical/candid/idp/ldap"
-	"github.com/canonical/candid/internal/candidtest"
-	"github.com/canonical/candid/internal/discharger"
-	"github.com/canonical/candid/internal/identity"
+	"github.com/canonical/candid/v2/idp"
+	"github.com/canonical/candid/v2/idp/ldap"
+	"github.com/canonical/candid/v2/internal/candidtest"
+	"github.com/canonical/candid/v2/internal/discharger"
+	"github.com/canonical/candid/v2/internal/identity"
 )
 
 func TestInteractiveDischarge(t *testing.T) {

@@ -14,8 +14,8 @@ import (
 	"gopkg.in/macaroon-bakery.v3/bakery"
 	"gopkg.in/macaroon-bakery.v3/bakery/postgresrootkeystore"
 
-	"github.com/canonical/candid/meeting"
-	"github.com/canonical/candid/store"
+	"github.com/canonical/candid/v2/meeting"
+	"github.com/canonical/candid/v2/store"
 )
 
 // backend provides a wrapper around an SQL database that can be used

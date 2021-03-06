@@ -22,13 +22,13 @@ import (
 	"gopkg.in/macaroon-bakery.v3/bakery"
 	"gopkg.in/macaroon-bakery.v3/bakery/identchecker"
 
-	"github.com/canonical/candid/idp"
-	"github.com/canonical/candid/internal/auth"
-	"github.com/canonical/candid/internal/auth/httpauth"
-	"github.com/canonical/candid/internal/monitoring"
-	"github.com/canonical/candid/meeting"
-	"github.com/canonical/candid/params"
-	"github.com/canonical/candid/store"
+	"github.com/canonical/candid/v2/idp"
+	"github.com/canonical/candid/v2/internal/auth"
+	"github.com/canonical/candid/v2/internal/auth/httpauth"
+	"github.com/canonical/candid/v2/internal/monitoring"
+	"github.com/canonical/candid/v2/meeting"
+	"github.com/canonical/candid/v2/params"
+	"github.com/canonical/candid/v2/store"
 )
 
 const (

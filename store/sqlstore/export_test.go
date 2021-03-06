@@ -7,7 +7,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/canonical/candid/meeting"
+	"github.com/canonical/candid/v2/meeting"
 )
 
 var PutAtTime = func(ctx context.Context, s meeting.Store, id, address string, now time.Time) error {

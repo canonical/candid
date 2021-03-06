@@ -11,9 +11,9 @@ import (
 	errgo "gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v3/bakery"
 
-	"github.com/canonical/candid/cmd/migrate-db/internal/mongodoc"
-	"github.com/canonical/candid/internal/auth"
-	"github.com/canonical/candid/store"
+	"github.com/canonical/candid/v2/cmd/migrate-db/internal/mongodoc"
+	"github.com/canonical/candid/v2/internal/auth"
+	"github.com/canonical/candid/v2/store"
 )
 
 const (

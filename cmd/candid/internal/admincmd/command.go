@@ -25,9 +25,9 @@ import (
 	"gopkg.in/macaroon-bakery.v3/httpbakery"
 	"gopkg.in/macaroon-bakery.v3/httpbakery/agent"
 
-	"github.com/canonical/candid/candidclient"
-	"github.com/canonical/candid/params"
-	"github.com/canonical/candid/version"
+	"github.com/canonical/candid/v2/candidclient"
+	"github.com/canonical/candid/v2/params"
+	"github.com/canonical/candid/v2/version"
 )
 
 // jujuLoggingConfigEnvKey matches osenv.JujuLoggingConfigEnvKey
