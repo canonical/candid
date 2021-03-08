@@ -10,11 +10,11 @@ import (
 
 	qt "github.com/frankban/quicktest"
 
-	"github.com/canonical/candid/v2/idp"
-	"github.com/canonical/candid/v2/idp/static"
-	"github.com/canonical/candid/v2/internal/candidtest"
-	"github.com/canonical/candid/v2/internal/discharger"
-	"github.com/canonical/candid/v2/internal/identity"
+	"gopkg.in/canonical/candid.v2/idp"
+	"gopkg.in/canonical/candid.v2/idp/static"
+	"gopkg.in/canonical/candid.v2/internal/candidtest"
+	"gopkg.in/canonical/candid.v2/internal/discharger"
+	"gopkg.in/canonical/candid.v2/internal/identity"
 )
 
 const sublocationPath = "/sublocation"

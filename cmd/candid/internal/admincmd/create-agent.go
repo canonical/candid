@@ -15,8 +15,8 @@ import (
 	"gopkg.in/macaroon-bakery.v3/bakery"
 	"gopkg.in/macaroon-bakery.v3/httpbakery/agent"
 
-	"github.com/canonical/candid/v2/internal/auth"
-	"github.com/canonical/candid/v2/params"
+	"gopkg.in/canonical/candid.v2/internal/auth"
+	"gopkg.in/canonical/candid.v2/params"
 )
 
 type createAgentCommand struct {

@@ -12,9 +12,9 @@ import (
 	"gopkg.in/macaroon-bakery.v3/bakery/identchecker"
 	"gopkg.in/macaroon-bakery.v3/httpbakery"
 
-	"github.com/canonical/candid/v2/candidclient"
-	"github.com/canonical/candid/v2/candidtest"
-	candidparams "github.com/canonical/candid/v2/params"
+	"gopkg.in/canonical/candid.v2/candidclient"
+	"gopkg.in/canonical/candid.v2/candidtest"
+	candidparams "gopkg.in/canonical/candid.v2/params"
 )
 
 func TestDischarge(t *testing.T) {

@@ -12,7 +12,7 @@ import (
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v3/bakery"
 
-	"github.com/canonical/candid/v2/params"
+	"gopkg.in/canonical/candid.v2/params"
 )
 
 type showCommand struct {

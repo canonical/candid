@@ -9,7 +9,7 @@ import (
 	"github.com/juju/loggo"
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/canonical/candid/v2/store"
+	"gopkg.in/canonical/candid.v2/store"
 )
 
 var logger = loggo.GetLogger("candid.internal.monitoring")

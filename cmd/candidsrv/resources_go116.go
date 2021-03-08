@@ -11,7 +11,7 @@ import (
 	"net/http"
 	"path/filepath"
 
-	"github.com/canonical/candid/v2"
+	"gopkg.in/canonical/candid.v2"
 )
 
 func loadTemplates(resourcePath string) (*template.Template, error) {

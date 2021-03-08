@@ -10,7 +10,7 @@ import (
 	"gopkg.in/macaroon-bakery.v3/bakery/checkers"
 	"gopkg.in/macaroon-bakery.v3/bakery/identchecker"
 
-	"github.com/canonical/candid/v2/candidclient"
+	"gopkg.in/canonical/candid.v2/candidclient"
 )
 
 // identityClient implement identchecker.IdentityClient. This is used because

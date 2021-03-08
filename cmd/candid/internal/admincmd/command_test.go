@@ -19,14 +19,14 @@ import (
 	"gopkg.in/macaroon-bakery.v3/bakery"
 	"gopkg.in/macaroon-bakery.v3/httpbakery/agent"
 
-	"github.com/canonical/candid/v2"
-	"github.com/canonical/candid/v2/candidtest"
-	"github.com/canonical/candid/v2/cmd/candid/internal/admincmd"
-	"github.com/canonical/candid/v2/idp"
-	"github.com/canonical/candid/v2/idp/static"
-	internalcandidtest "github.com/canonical/candid/v2/internal/candidtest"
-	"github.com/canonical/candid/v2/store"
-	"github.com/canonical/candid/v2/store/memstore"
+	"gopkg.in/canonical/candid.v2"
+	"gopkg.in/canonical/candid.v2/candidtest"
+	"gopkg.in/canonical/candid.v2/cmd/candid/internal/admincmd"
+	"gopkg.in/canonical/candid.v2/idp"
+	"gopkg.in/canonical/candid.v2/idp/static"
+	internalcandidtest "gopkg.in/canonical/candid.v2/internal/candidtest"
+	"gopkg.in/canonical/candid.v2/store"
+	"gopkg.in/canonical/candid.v2/store/memstore"
 )
 
 type fixture struct {

@@ -9,7 +9,7 @@ import (
 	"github.com/juju/cmd"
 	"gopkg.in/errgo.v1"
 
-	"github.com/canonical/candid/v2/params"
+	"gopkg.in/canonical/candid.v2/params"
 )
 
 type removeGroupCommand struct {

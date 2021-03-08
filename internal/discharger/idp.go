@@ -20,14 +20,14 @@ import (
 	"gopkg.in/macaroon-bakery.v3/httpbakery"
 	macaroon "gopkg.in/macaroon.v2"
 
-	"github.com/canonical/candid/v2/candidclient"
-	"github.com/canonical/candid/v2/idp"
-	"github.com/canonical/candid/v2/idp/idputil/secret"
-	"github.com/canonical/candid/v2/internal/auth"
-	"github.com/canonical/candid/v2/internal/discharger/internal"
-	"github.com/canonical/candid/v2/internal/identity"
-	"github.com/canonical/candid/v2/params"
-	"github.com/canonical/candid/v2/store"
+	"gopkg.in/canonical/candid.v2/candidclient"
+	"gopkg.in/canonical/candid.v2/idp"
+	"gopkg.in/canonical/candid.v2/idp/idputil/secret"
+	"gopkg.in/canonical/candid.v2/internal/auth"
+	"gopkg.in/canonical/candid.v2/internal/discharger/internal"
+	"gopkg.in/canonical/candid.v2/internal/identity"
+	"gopkg.in/canonical/candid.v2/params"
+	"gopkg.in/canonical/candid.v2/store"
 )
 
 type initIDPParams struct {

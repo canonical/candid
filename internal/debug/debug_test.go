@@ -17,11 +17,11 @@ import (
 	"github.com/juju/utils/v2/debugstatus"
 	errgo "gopkg.in/errgo.v1"
 
-	"github.com/canonical/candid/v2/internal/candidtest"
-	"github.com/canonical/candid/v2/internal/debug"
-	"github.com/canonical/candid/v2/internal/identity"
-	"github.com/canonical/candid/v2/store/mgostore"
-	buildver "github.com/canonical/candid/v2/version"
+	"gopkg.in/canonical/candid.v2/internal/candidtest"
+	"gopkg.in/canonical/candid.v2/internal/debug"
+	"gopkg.in/canonical/candid.v2/internal/identity"
+	"gopkg.in/canonical/candid.v2/store/mgostore"
+	buildver "gopkg.in/canonical/candid.v2/version"
 )
 
 const (

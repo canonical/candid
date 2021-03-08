@@ -11,10 +11,10 @@ import (
 	"gopkg.in/errgo.v1"
 	"gopkg.in/httprequest.v1"
 
-	"github.com/canonical/candid/v2/idp"
-	"github.com/canonical/candid/v2/idp/idputil"
-	"github.com/canonical/candid/v2/idp/keystone/internal/keystone"
-	"github.com/canonical/candid/v2/params"
+	"gopkg.in/canonical/candid.v2/idp"
+	"gopkg.in/canonical/candid.v2/idp/idputil"
+	"gopkg.in/canonical/candid.v2/idp/keystone/internal/keystone"
+	"gopkg.in/canonical/candid.v2/params"
 )
 
 func init() {

@@ -16,7 +16,7 @@ import (
 	"gopkg.in/macaroon-bakery.v3/httpbakery"
 	"gopkg.in/macaroon-bakery.v3/httpbakery/agent"
 
-	"github.com/canonical/candid/v2/params"
+	"gopkg.in/canonical/candid.v2/params"
 )
 
 // Note: tests for this code are in the server implementation.

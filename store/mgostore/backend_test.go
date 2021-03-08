@@ -9,8 +9,8 @@ import (
 	"github.com/juju/mgotest"
 	errgo "gopkg.in/errgo.v1"
 
-	"github.com/canonical/candid/v2/store"
-	"github.com/canonical/candid/v2/store/mgostore"
+	"gopkg.in/canonical/candid.v2/store"
+	"gopkg.in/canonical/candid.v2/store/mgostore"
 )
 
 func TestNewBackend(t *testing.T) {

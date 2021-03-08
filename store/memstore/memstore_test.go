@@ -7,10 +7,10 @@ import (
 	"github.com/juju/aclstore/v2"
 	"github.com/juju/simplekv/memsimplekv"
 
-	"github.com/canonical/candid/v2/meeting"
-	"github.com/canonical/candid/v2/store"
-	"github.com/canonical/candid/v2/store/memstore"
-	"github.com/canonical/candid/v2/store/storetest"
+	"gopkg.in/canonical/candid.v2/meeting"
+	"gopkg.in/canonical/candid.v2/store"
+	"gopkg.in/canonical/candid.v2/store/memstore"
+	"gopkg.in/canonical/candid.v2/store/storetest"
 )
 
 func TestKeyValueStore(t *testing.T) {

@@ -21,11 +21,11 @@ import (
 	"gopkg.in/macaroon-bakery.v3/httpbakery"
 	"launchpad.net/lpad"
 
-	"github.com/canonical/candid/v2/idp"
-	"github.com/canonical/candid/v2/idp/idputil"
-	"github.com/canonical/candid/v2/idp/usso/internal/kvnoncestore"
-	"github.com/canonical/candid/v2/params"
-	"github.com/canonical/candid/v2/store"
+	"gopkg.in/canonical/candid.v2/idp"
+	"gopkg.in/canonical/candid.v2/idp/idputil"
+	"gopkg.in/canonical/candid.v2/idp/usso/internal/kvnoncestore"
+	"gopkg.in/canonical/candid.v2/params"
+	"gopkg.in/canonical/candid.v2/store"
 )
 
 var logger = loggo.GetLogger("candid.idp.usso")

@@ -18,13 +18,13 @@ import (
 	"gopkg.in/macaroon-bakery.v3/bakery/identchecker"
 	"gopkg.in/macaroon-bakery.v3/httpbakery"
 
-	"github.com/canonical/candid/v2/idp"
-	"github.com/canonical/candid/v2/idp/static"
-	"github.com/canonical/candid/v2/internal/auth"
-	"github.com/canonical/candid/v2/internal/candidtest"
-	"github.com/canonical/candid/v2/internal/discharger"
-	"github.com/canonical/candid/v2/internal/identity"
-	"github.com/canonical/candid/v2/params"
+	"gopkg.in/canonical/candid.v2/idp"
+	"gopkg.in/canonical/candid.v2/idp/static"
+	"gopkg.in/canonical/candid.v2/internal/auth"
+	"gopkg.in/canonical/candid.v2/internal/candidtest"
+	"gopkg.in/canonical/candid.v2/internal/discharger"
+	"gopkg.in/canonical/candid.v2/internal/identity"
+	"gopkg.in/canonical/candid.v2/params"
 )
 
 // loginTemplate contains the template to use in login tests.

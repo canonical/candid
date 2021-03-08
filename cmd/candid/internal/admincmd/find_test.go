@@ -12,8 +12,8 @@ import (
 	qt "github.com/frankban/quicktest"
 	"github.com/frankban/quicktest/qtsuite"
 
-	"github.com/canonical/candid/v2/candidtest"
-	"github.com/canonical/candid/v2/store"
+	"gopkg.in/canonical/candid.v2/candidtest"
+	"gopkg.in/canonical/candid.v2/store"
 )
 
 type findSuite struct {

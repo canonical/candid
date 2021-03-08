@@ -14,8 +14,8 @@ import (
 	"github.com/frankban/quicktest/qtsuite"
 	"gopkg.in/macaroon-bakery.v3/httpbakery/agent"
 
-	"github.com/canonical/candid/v2/cmd/candid/internal/admincmd"
-	"github.com/canonical/candid/v2/store"
+	"gopkg.in/canonical/candid.v2/cmd/candid/internal/admincmd"
+	"gopkg.in/canonical/candid.v2/store"
 )
 
 type createAgentSuite struct {

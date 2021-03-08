@@ -17,7 +17,7 @@ import (
 	"github.com/juju/clock/testclock"
 	"gopkg.in/errgo.v1"
 
-	"github.com/canonical/candid/v2/meeting"
+	"gopkg.in/canonical/candid.v2/meeting"
 )
 
 var epoch = parseTime("2016-01-01T12:00:00Z")

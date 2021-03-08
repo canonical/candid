@@ -18,13 +18,13 @@ import (
 	"gopkg.in/macaroon-bakery.v3/bakery/identchecker"
 	macaroon "gopkg.in/macaroon.v2"
 
-	"github.com/canonical/candid/v2/candidclient"
-	"github.com/canonical/candid/v2/idp"
-	"github.com/canonical/candid/v2/idp/static"
-	"github.com/canonical/candid/v2/internal/auth"
-	"github.com/canonical/candid/v2/internal/candidtest"
-	"github.com/canonical/candid/v2/params"
-	"github.com/canonical/candid/v2/store"
+	"gopkg.in/canonical/candid.v2/candidclient"
+	"gopkg.in/canonical/candid.v2/idp"
+	"gopkg.in/canonical/candid.v2/idp/static"
+	"gopkg.in/canonical/candid.v2/internal/auth"
+	"gopkg.in/canonical/candid.v2/internal/candidtest"
+	"gopkg.in/canonical/candid.v2/params"
+	"gopkg.in/canonical/candid.v2/store"
 )
 
 func TestAuth(t *testing.T) {

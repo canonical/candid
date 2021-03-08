@@ -14,11 +14,11 @@ import (
 	errgo "gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v3/bakery"
 
-	"github.com/canonical/candid/v2/cmd/migrate-db/internal"
-	"github.com/canonical/candid/v2/cmd/migrate-db/internal/mongodoc"
-	"github.com/canonical/candid/v2/internal/auth"
-	"github.com/canonical/candid/v2/store"
-	"github.com/canonical/candid/v2/store/memstore"
+	"gopkg.in/canonical/candid.v2/cmd/migrate-db/internal"
+	"gopkg.in/canonical/candid.v2/cmd/migrate-db/internal/mongodoc"
+	"gopkg.in/canonical/candid.v2/internal/auth"
+	"gopkg.in/canonical/candid.v2/store"
+	"gopkg.in/canonical/candid.v2/store/memstore"
 )
 
 func TestLegacySource(t *testing.T) {

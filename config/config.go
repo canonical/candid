@@ -16,8 +16,8 @@ import (
 	"gopkg.in/macaroon-bakery.v3/bakery"
 	"gopkg.in/yaml.v2"
 
-	"github.com/canonical/candid/v2/idp"
-	"github.com/canonical/candid/v2/store"
+	"gopkg.in/canonical/candid.v2/idp"
+	"gopkg.in/canonical/candid.v2/store"
 )
 
 var logger = loggo.GetLogger("candid.config")

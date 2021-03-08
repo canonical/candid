@@ -15,9 +15,9 @@ import (
 	"github.com/frankban/quicktest/qtsuite"
 	"gopkg.in/yaml.v2"
 
-	"github.com/canonical/candid/v2/config"
-	keystoneidp "github.com/canonical/candid/v2/idp/keystone"
-	"github.com/canonical/candid/v2/store"
+	"gopkg.in/canonical/candid.v2/config"
+	keystoneidp "gopkg.in/canonical/candid.v2/idp/keystone"
+	"gopkg.in/canonical/candid.v2/store"
 )
 
 type tokenSuite struct {

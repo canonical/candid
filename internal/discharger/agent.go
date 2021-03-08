@@ -16,10 +16,10 @@ import (
 	"gopkg.in/macaroon-bakery.v3/httpbakery"
 	"gopkg.in/macaroon-bakery.v3/httpbakery/agent"
 
-	"github.com/canonical/candid/v2/candidclient"
-	"github.com/canonical/candid/v2/internal/auth"
-	"github.com/canonical/candid/v2/params"
-	"github.com/canonical/candid/v2/store"
+	"gopkg.in/canonical/candid.v2/candidclient"
+	"gopkg.in/canonical/candid.v2/internal/auth"
+	"gopkg.in/canonical/candid.v2/params"
+	"gopkg.in/canonical/candid.v2/store"
 )
 
 const (

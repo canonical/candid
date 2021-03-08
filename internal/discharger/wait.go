@@ -15,9 +15,9 @@ import (
 	"gopkg.in/macaroon-bakery.v3/httpbakery"
 	macaroon "gopkg.in/macaroon.v2"
 
-	"github.com/canonical/candid/v2/internal/auth"
-	"github.com/canonical/candid/v2/params"
-	"github.com/canonical/candid/v2/store"
+	"gopkg.in/canonical/candid.v2/internal/auth"
+	"gopkg.in/canonical/candid.v2/params"
+	"gopkg.in/canonical/candid.v2/store"
 )
 
 // waitTokenRequest is the request sent to the server to wait for logins to

@@ -10,7 +10,7 @@ import (
 
 	errgo "gopkg.in/errgo.v1"
 
-	"github.com/canonical/candid/v2/meeting"
+	"gopkg.in/canonical/candid.v2/meeting"
 )
 
 // NewMeetingStore creates a new in-memory meeting.Store implementation.

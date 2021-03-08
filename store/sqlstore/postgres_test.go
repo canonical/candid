@@ -10,10 +10,10 @@ import (
 	errgo "gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v3/bakery"
 
-	"github.com/canonical/candid/v2/meeting"
-	"github.com/canonical/candid/v2/store"
-	"github.com/canonical/candid/v2/store/sqlstore"
-	"github.com/canonical/candid/v2/store/storetest"
+	"gopkg.in/canonical/candid.v2/meeting"
+	"gopkg.in/canonical/candid.v2/store"
+	"gopkg.in/canonical/candid.v2/store/sqlstore"
+	"gopkg.in/canonical/candid.v2/store/storetest"
 )
 
 func TestKeyValueStore(t *testing.T) {

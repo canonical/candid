@@ -11,7 +11,7 @@ import (
 	"gopkg.in/httprequest.v1"
 	"gopkg.in/macaroon-bakery.v3/httpbakery"
 
-	"github.com/canonical/candid/v2/params"
+	"gopkg.in/canonical/candid.v2/params"
 )
 
 // ErrLoginRequired is returned by the /debug/* endpoints when OpenID

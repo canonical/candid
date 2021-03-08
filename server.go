@@ -14,14 +14,14 @@ import (
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v3/bakery"
 
-	"github.com/canonical/candid/v2/idp"
-	"github.com/canonical/candid/v2/idp/agent"
-	"github.com/canonical/candid/v2/internal/debug"
-	"github.com/canonical/candid/v2/internal/discharger"
-	"github.com/canonical/candid/v2/internal/identity"
-	v1 "github.com/canonical/candid/v2/internal/v1"
-	"github.com/canonical/candid/v2/meeting"
-	"github.com/canonical/candid/v2/store"
+	"gopkg.in/canonical/candid.v2/idp"
+	"gopkg.in/canonical/candid.v2/idp/agent"
+	"gopkg.in/canonical/candid.v2/internal/debug"
+	"gopkg.in/canonical/candid.v2/internal/discharger"
+	"gopkg.in/canonical/candid.v2/internal/identity"
+	v1 "gopkg.in/canonical/candid.v2/internal/v1"
+	"gopkg.in/canonical/candid.v2/meeting"
+	"gopkg.in/canonical/candid.v2/store"
 )
 
 // Versions of the API that can be served.

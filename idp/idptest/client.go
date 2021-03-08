@@ -12,9 +12,9 @@ import (
 
 	errgo "gopkg.in/errgo.v1"
 
-	"github.com/canonical/candid/v2/idp"
-	"github.com/canonical/candid/v2/idp/idputil"
-	"github.com/canonical/candid/v2/idp/idputil/secret"
+	"gopkg.in/canonical/candid.v2/idp"
+	"gopkg.in/canonical/candid.v2/idp/idputil"
+	"gopkg.in/canonical/candid.v2/idp/idputil/secret"
 )
 
 // A Client allows tests to simulate sending HTTP requests to an IDP.

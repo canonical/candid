@@ -9,9 +9,9 @@ import (
 	qt "github.com/frankban/quicktest"
 	"gopkg.in/yaml.v2"
 
-	"github.com/canonical/candid/v2/config"
-	"github.com/canonical/candid/v2/idp"
-	"github.com/canonical/candid/v2/idp/agent"
+	"gopkg.in/canonical/candid.v2/config"
+	"gopkg.in/canonical/candid.v2/idp"
+	"gopkg.in/canonical/candid.v2/idp/agent"
 )
 
 func TestConfig(t *testing.T) {

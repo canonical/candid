@@ -12,7 +12,7 @@ import (
 	qt "github.com/frankban/quicktest"
 	"github.com/frankban/quicktest/qtsuite"
 
-	"github.com/canonical/candid/v2/meeting"
+	"gopkg.in/canonical/candid.v2/meeting"
 )
 
 // meetingSuite contains a set of tests for meeting.Store

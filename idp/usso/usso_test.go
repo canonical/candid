@@ -17,14 +17,14 @@ import (
 	"github.com/juju/qthttptest"
 	"gopkg.in/yaml.v2"
 
-	"github.com/canonical/candid/v2/config"
-	"github.com/canonical/candid/v2/idp"
-	"github.com/canonical/candid/v2/idp/idptest"
-	"github.com/canonical/candid/v2/idp/idputil"
-	"github.com/canonical/candid/v2/idp/usso"
-	"github.com/canonical/candid/v2/idp/usso/internal/mockusso"
-	"github.com/canonical/candid/v2/internal/candidtest"
-	"github.com/canonical/candid/v2/store"
+	"gopkg.in/canonical/candid.v2/config"
+	"gopkg.in/canonical/candid.v2/idp"
+	"gopkg.in/canonical/candid.v2/idp/idptest"
+	"gopkg.in/canonical/candid.v2/idp/idputil"
+	"gopkg.in/canonical/candid.v2/idp/usso"
+	"gopkg.in/canonical/candid.v2/idp/usso/internal/mockusso"
+	"gopkg.in/canonical/candid.v2/internal/candidtest"
+	"gopkg.in/canonical/candid.v2/store"
 )
 
 type ussoSuite struct {
