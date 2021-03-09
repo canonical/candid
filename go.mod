@@ -53,7 +53,7 @@ require (
 	gopkg.in/retry.v1 v1.0.3 // indirect
 	gopkg.in/square/go-jose.v2 v2.0.1
 	gopkg.in/tomb.v2 v2.0.0-20140626144623-14b3d72120e8
-	gopkg.in/yaml.v2 v2.2.8
+	gopkg.in/yaml.v2 v2.4.0
 	launchpad.net/lpad v0.0.0-20131113112110-000000000065
 )
 
