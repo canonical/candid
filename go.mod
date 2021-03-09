@@ -5,7 +5,7 @@ require (
 	github.com/coreos/go-oidc v0.0.0-20170119174436-2cc7913f9f6f
 	github.com/frankban/quicktest v1.11.3
 	github.com/garyburd/go-oauth v0.0.0-20150329160146-3131beb69b81
-	github.com/google/go-cmp v0.5.4
+	github.com/google/go-cmp v0.5.5
 	github.com/google/uuid v1.2.0
 	github.com/gorilla/handlers v0.0.0-20170224193955-13d73096a474
 	github.com/juju/aclstore/v2 v2.0.0
