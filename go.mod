@@ -20,7 +20,7 @@ require (
 	github.com/juju/names v0.0.0-20160330150533-8a0aa0963bba
 	github.com/juju/persistent-cookiejar v0.0.0-20170428161559-d67418f14c93
 	github.com/juju/postgrestest v1.1.1
-	github.com/juju/qthttptest v0.0.1
+	github.com/juju/qthttptest v0.1.1
 	github.com/juju/schema v1.0.1-0.20190814234152-1f8aaeef0989
 	github.com/juju/simplekv v1.0.0
 	github.com/juju/testing v0.0.0-20191001232224-ce9dec17d28b
@@ -42,13 +42,13 @@ require (
 	gopkg.in/asn1-ber.v1 v1.0.0-20170511165959-379148ca0225
 	gopkg.in/errgo.v1 v1.0.1
 	gopkg.in/goose.v1 v1.0.0-20161130145116-8f055ce635d6
-	gopkg.in/httprequest.v1 v1.2.0
+	gopkg.in/httprequest.v1 v1.2.1
 	gopkg.in/juju/environschema.v1 v1.0.0
 	gopkg.in/juju/names.v2 v2.0.0-20180621093930-fd59336b4621
 	gopkg.in/ldap.v2 v2.5.0
 	gopkg.in/macaroon-bakery.v2 v2.2.0
 	gopkg.in/macaroon.v2 v2.1.0
-	gopkg.in/mgo.v2 v2.0.0-20180705113604-9856a29383ce
+	gopkg.in/mgo.v2 v2.0.0-20190816093944-a6b53ec6cb22
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0-20170531180850-df99d62fd42d
 	gopkg.in/retry.v1 v1.0.3 // indirect
 	gopkg.in/square/go-jose.v2 v2.0.1
