@@ -84,6 +84,8 @@ github.com/juju/persistent-cookiejar v0.0.0-20170428161559-d67418f14c93 h1:nlmpG
 github.com/juju/persistent-cookiejar v0.0.0-20170428161559-d67418f14c93/go.mod h1:zrbmo4nBKaiP/Ez3F67ewkMbzGYfXyMvRtbOfuAwG0w=
 github.com/juju/postgrestest v1.1.0 h1:jEGPSV72rQuQGSzBZfEU15As6FqThPWgNz8ycKD1d1E=
 github.com/juju/postgrestest v1.1.0/go.mod h1:/n17Y2T6iFozzXwSCO0JYJ5gSiz2caEtSwAjh/uLXDM=
+github.com/juju/postgrestest v1.1.1 h1:N5Lys2LN1/JWh17X3MsGQFVpuFnOmwDbmSQUwIRyxRE=
+github.com/juju/postgrestest v1.1.1/go.mod h1:/n17Y2T6iFozzXwSCO0JYJ5gSiz2caEtSwAjh/uLXDM=
 github.com/juju/qthttptest v0.0.1 h1:pR8nTl6Uo/iI6/ynQf5Cxy9FEICXzaa83NtrBdGMCVQ=
 github.com/juju/qthttptest v0.0.1/go.mod h1://LCf/Ls22/rPw2u1yWukUJvYtfPY4nYpWUl2uZhryo=
 github.com/juju/retry v0.0.0-20160928201858-1998d01ba1c3/go.mod h1:OohPQGsr4pnxwD5YljhQ+TZnuVRYpa5irjugL1Yuif4=

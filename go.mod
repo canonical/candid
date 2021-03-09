@@ -19,7 +19,7 @@ require (
 	github.com/juju/mgotest v1.0.1
 	github.com/juju/names v0.0.0-20160330150533-8a0aa0963bba
 	github.com/juju/persistent-cookiejar v0.0.0-20170428161559-d67418f14c93
-	github.com/juju/postgrestest v1.1.0
+	github.com/juju/postgrestest v1.1.1
 	github.com/juju/qthttptest v0.0.1
 	github.com/juju/schema v1.0.1-0.20190814234152-1f8aaeef0989
 	github.com/juju/simplekv v1.0.0
