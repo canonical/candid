@@ -45,7 +45,7 @@ require (
 	gopkg.in/httprequest.v1 v1.2.1
 	gopkg.in/juju/environschema.v1 v1.0.0
 	gopkg.in/juju/names.v2 v2.0.0-20180621093930-fd59336b4621
-	gopkg.in/ldap.v2 v2.5.0
+	gopkg.in/ldap.v2 v2.5.1
 	gopkg.in/macaroon-bakery.v2 v2.2.0
 	gopkg.in/macaroon.v2 v2.1.0
 	gopkg.in/mgo.v2 v2.0.0-20190816093944-a6b53ec6cb22
