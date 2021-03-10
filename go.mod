@@ -46,7 +46,7 @@ require (
 	gopkg.in/juju/environschema.v1 v1.0.0
 	gopkg.in/juju/names.v2 v2.0.0-20180621093930-fd59336b4621
 	gopkg.in/ldap.v2 v2.5.1
-	gopkg.in/macaroon-bakery.v2 v2.2.0
+	gopkg.in/macaroon-bakery.v2 v2.3.0
 	gopkg.in/macaroon.v2 v2.1.0
 	gopkg.in/mgo.v2 v2.0.0-20190816093944-a6b53ec6cb22
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0-20170531180850-df99d62fd42d
