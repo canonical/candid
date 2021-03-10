@@ -553,6 +553,8 @@ gopkg.in/juju/names.v2 v2.0.0-20180621093930-fd59336b4621 h1:7IcAZvbCvk9R2jC+M0e
 gopkg.in/juju/names.v2 v2.0.0-20180621093930-fd59336b4621/go.mod h1:XXa/v5qG1IsStRg5KTE8JkDMndoDMOKH1YYw0jSUWaM=
 gopkg.in/ldap.v2 v2.5.0 h1:1rO3ojzsHUk+gq4ZYhC4Pg+EzWaaKIV8+DJwExS5/QQ=
 gopkg.in/ldap.v2 v2.5.0/go.mod h1:oI0cpe/D7HRtBQl8aTg+ZmzFUAvu4lsv3eLXMLGFxWk=
+gopkg.in/ldap.v2 v2.5.1 h1:wiu0okdNfjlBzg6UWvd1Hn8Y+Ux17/u/4nlk4CQr6tU=
+gopkg.in/ldap.v2 v2.5.1/go.mod h1:oI0cpe/D7HRtBQl8aTg+ZmzFUAvu4lsv3eLXMLGFxWk=
 gopkg.in/macaroon-bakery.v2 v2.2.0 h1:tgib3W6Nz8GhYfF83vp0FEZmncj6UE1ubIG7a09flkc=
 gopkg.in/macaroon-bakery.v2 v2.2.0/go.mod h1:XyHjEinGUBsCK60Qv+bBejOQD/WklvntpSVGja9utaU=
 gopkg.in/macaroon.v2 v2.1.0 h1:HZcsjBCzq9t0eBPMKqTN/uSN6JOm78ZJ2INbqcBQOUI=
