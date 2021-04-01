@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"time"
@@ -14,6 +15,7 @@ import (
 	"github.com/gorilla/handlers"
 	"github.com/juju/loggo"
 	_ "github.com/lib/pq"
+	"golang.org/x/net/http/httpproxy"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery"
 	"gopkg.in/natefinch/lumberjack.v2"
@@ -81,10 +83,20 @@ func exit(code int) {
 // serve starts the identity service.
 func serve(conf *config.Config) error {
 	if conf.HTTPProxy != "" {
-		os.Setenv("HTTP_PROXY", conf.HTTPProxy)
-	}
-	if conf.NoProxy != "" {
-		os.Setenv("NO_PROXY", conf.NoProxy)
+		logger.Infof("configuring HTTP(S) proxy %s", conf.HTTPProxy)
+		t, ok := http.DefaultTransport.(*http.Transport)
+		if !ok {
+			return errgo.New("http-proxy configured, but DefaultTransport cannot be modified.")
+		}
+		pcfg := httpproxy.Config{
+			HTTPProxy:  conf.HTTPProxy,
+			HTTPSProxy: conf.HTTPProxy,
+			NoProxy:    conf.NoProxy,
+		}
+		pf := pcfg.ProxyFunc()
+		t.Proxy = func(req *http.Request) (*url.URL, error) {
+			return pf(req.URL)
+		}
 	}
 	backend, err := conf.Storage.NewBackend()
 	if err != nil {
