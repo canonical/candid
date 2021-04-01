@@ -4,7 +4,7 @@ summary: Candid Identity Manager
 description: Candid Identity Manager
 grade: stable
 confinement: strict
-base: core
+base: core18
 
 apps:
   candidsrv:
