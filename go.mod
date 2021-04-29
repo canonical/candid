@@ -26,7 +26,7 @@ require (
 	github.com/juju/usso v1.0.1
 	github.com/juju/utils v0.0.0-20180820210520-bf9cc5bdd62d
 	github.com/julienschmidt/httprouter v1.3.0
-	github.com/lib/pq v1.10.0
+	github.com/lib/pq v1.10.1
 	github.com/lunixbochs/vtclean v0.0.0-20180621232353-2d01aacdc34a // indirect
 	github.com/mhilton/openid v0.0.0-20150511103207-7922a4e937d8
 	github.com/pquerna/cachecontrol v0.0.0-20160421231612-c97913dcbd76 // indirect
