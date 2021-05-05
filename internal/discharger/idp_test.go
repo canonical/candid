@@ -7,14 +7,16 @@ import (
 	"context"
 	"encoding/json"
 	"html/template"
+	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"testing"
 	"time"
 
 	qt "github.com/frankban/quicktest"
+	"github.com/frankban/quicktest/qtsuite"
 	errgo "gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery"
-	"gopkg.in/macaroon-bakery.v2/httpbakery"
 
 	"github.com/canonical/candid/idp"
 	"github.com/canonical/candid/internal/auth"
@@ -26,6 +28,10 @@ import (
 	"github.com/canonical/candid/params"
 	"github.com/canonical/candid/store"
 )
+
+func TestIDP(t *testing.T) {
+	qtsuite.Run(qt.New(t), &idpSuite{})
+}
 
 type idpSuite struct {
 	store *candidtest.Store
@@ -69,6 +75,13 @@ func (s *idpSuite) Init(c *qt.C) {
 			MeetingStore: s.store.MeetingStore,
 			RootKeyStore: s.store.BakeryRootKeyStore,
 			Template:     s.template,
+			RedirectLoginWhitelist: []string{
+				"http://example.com/callback",
+			},
+			RedirectLoginTrustedDomains: []string{
+				"www.example.net",
+				"*.example.org",
+			},
 		},
 		MeetingPlace: s.meetingPlace,
 		Oven:         oven,
@@ -113,9 +126,7 @@ func (s *idpSuite) TestLoginFailureWithWait(c *qt.C) {
 	err = json.Unmarshal(d2, &li)
 	c.Assert(err, qt.IsNil)
 	c.Assert(li.ProviderID, qt.Equals, store.ProviderIdentity(""))
-	c.Assert(li.Error, qt.DeepEquals, &httpbakery.Error{
-		Message: "test error",
-	})
+	c.Assert(li.Error.Message, qt.Equals, "test error")
 }
 
 func (s *idpSuite) TestLoginSuccess(c *qt.C) {
@@ -152,7 +163,9 @@ func (s *idpSuite) TestLoginRedirectSuccess(c *qt.C) {
 		Username: "test-user",
 	})
 	resp := rr.Result()
-	c.Assert(resp.StatusCode, qt.Equals, http.StatusTemporaryRedirect)
+	body, err := ioutil.ReadAll(resp.Body)
+	c.Assert(err, qt.IsNil)
+	c.Assert(resp.StatusCode, qt.Equals, http.StatusSeeOther, qt.Commentf("%s", body))
 	loc, err := resp.Location()
 	c.Assert(err, qt.IsNil)
 	v := loc.Query()
@@ -175,7 +188,7 @@ func (s *idpSuite) TestLoginRedirectSuccessInvalidReturnTo(c *qt.C) {
 	c.Assert(err, qt.IsNil)
 	c.Assert(perr, qt.DeepEquals, params.Error{
 		Code:    params.ErrBadRequest,
-		Message: `invalid return_to: parse ::: missing protocol scheme`,
+		Message: `invalid return_to: parse "::": missing protocol scheme`,
 	})
 }
 
@@ -184,6 +197,59 @@ func (s *idpSuite) TestLoginRedirectSuccessReturnToNotInWhitelist(c *qt.C) {
 	c.Assert(err, qt.IsNil)
 	rr := httptest.NewRecorder()
 	s.vc.RedirectSuccess(context.Background(), rr, req, "https://example.com", "1234", &store.Identity{
+		Username: "test-user",
+	})
+	c.Assert(rr.Code, qt.Equals, http.StatusBadRequest)
+	var perr params.Error
+	err = json.Unmarshal(rr.Body.Bytes(), &perr)
+	c.Assert(err, qt.IsNil)
+	c.Assert(perr, qt.DeepEquals, params.Error{
+		Code:    params.ErrBadRequest,
+		Message: `invalid return_to`,
+	})
+}
+
+func (s *idpSuite) TestLoginRedirectSuccessReturnToTrustedDomain(c *qt.C) {
+	req, err := http.NewRequest("GET", "", nil)
+	c.Assert(err, qt.IsNil)
+	rr := httptest.NewRecorder()
+	s.vc.RedirectSuccess(context.Background(), rr, req, "https://www.example.net/callback/path", "1234", &store.Identity{
+		Username: "test-user",
+	})
+	resp := rr.Result()
+	c.Assert(resp.StatusCode, qt.Equals, http.StatusSeeOther)
+	loc, err := resp.Location()
+	c.Assert(err, qt.IsNil)
+	v := loc.Query()
+	loc.RawQuery = ""
+	c.Assert(loc.String(), qt.Equals, "https://www.example.net/callback/path")
+	c.Assert(v.Get("state"), qt.Equals, "1234")
+	c.Assert(v.Get("code"), qt.Not(qt.Equals), "")
+}
+
+func (s *idpSuite) TestLoginRedirectSuccessReturnToTrustedDomainWildcard(c *qt.C) {
+	req, err := http.NewRequest("GET", "", nil)
+	c.Assert(err, qt.IsNil)
+	rr := httptest.NewRecorder()
+	s.vc.RedirectSuccess(context.Background(), rr, req, "https://my.host.example.org/callback/path", "1234", &store.Identity{
+		Username: "test-user",
+	})
+	resp := rr.Result()
+	c.Assert(resp.StatusCode, qt.Equals, http.StatusSeeOther)
+	loc, err := resp.Location()
+	c.Assert(err, qt.IsNil)
+	v := loc.Query()
+	loc.RawQuery = ""
+	c.Assert(loc.String(), qt.Equals, "https://my.host.example.org/callback/path")
+	c.Assert(v.Get("state"), qt.Equals, "1234")
+	c.Assert(v.Get("code"), qt.Not(qt.Equals), "")
+}
+
+func (s *idpSuite) TestLoginRedirectSuccessReturnToTrustedDomainInsecure(c *qt.C) {
+	req, err := http.NewRequest("GET", "", nil)
+	c.Assert(err, qt.IsNil)
+	rr := httptest.NewRecorder()
+	s.vc.RedirectSuccess(context.Background(), rr, req, "http://www.example.net/callback/path", "1234", &store.Identity{
 		Username: "test-user",
 	})
 	c.Assert(rr.Code, qt.Equals, http.StatusBadRequest)
