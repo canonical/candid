@@ -116,6 +116,12 @@ type ServerParams struct {
 	// login.
 	RedirectLoginWhitelist []string
 
+	// RedirectLoginTrustedDomains contains a list of domain names that
+	// are fully trusted to be used as return_to URLs during an
+	// interactive login. If the domain starts with the sequence "*."
+	// then all subdomains of the subsequent domain will be trusted.
+	RedirectLoginTrustedDomains []string
+
 	// APIMacaroonTimeout is the maximum life of an API macaroon.
 	APIMacaroonTimeout time.Duration
 

@@ -91,6 +91,9 @@ no-proxy: localhost,.example.com
 redirect-login-whitelist:
 - https://example.com/1
 - https://example.com/2
+redirect-login-trusted-domains:
+- www.example.com
+- "*.example.net"
 api-macaroon-timeout: 2h
 discharge-macaroon-timeout: 24h
 discharge-token-timeout: 6h
@@ -170,6 +173,10 @@ func TestRead(t *testing.T) {
 		RedirectLoginWhitelist: []string{
 			"https://example.com/1",
 			"https://example.com/2",
+		},
+		RedirectLoginTrustedDomains: []string{
+			"www.example.com",
+			"*.example.net",
 		},
 		APIMacaroonTimeout:       config.DurationString{Duration: 2 * time.Hour},
 		DischargeMacaroonTimeout: config.DurationString{Duration: 24 * time.Hour},

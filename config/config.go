@@ -97,6 +97,11 @@ type Config struct {
 	// login.
 	RedirectLoginWhitelist []string `yaml:"redirect-login-whitelist"`
 
+	// RedirectLoginTrustedDomains contains a list of domains that are
+	// trusted to be used as return_to URLs during an interactive
+	// login.
+	RedirectLoginTrustedDomains []string `yaml:"redirect-login-trusted-domains"`
+
 	// APIMacaroonTimeout is the maximum age an API macaroon can get
 	// before requiring re-authorization.
 	APIMacaroonTimeout DurationString `yaml:"api-macaroon-timeout"`

@@ -188,20 +188,9 @@ func (c *visitCompleter) RedirectFailure(ctx context.Context, w http.ResponseWri
 // will be because the returnTo address is invalid and therefore it will
 // not be possible to redirect to it.
 func (c *visitCompleter) redirect(w http.ResponseWriter, req *http.Request, returnTo string, query url.Values) error {
-	// Check the return to is a whitelisted address, and is a valid URL.
-	var validReturnTo bool
-	if returnTo == c.params.Location+"/login-complete" {
-		validReturnTo = true
-	} else {
-		for _, rurl := range c.params.RedirectLoginWhitelist {
-			if returnTo == rurl {
-				validReturnTo = true
-				break
-			}
-		}
-	}
+	// Check the return to is a valid URL and is an allowed address.
 	u, err := url.Parse(returnTo)
-	if !validReturnTo || err != nil {
+	if err != nil || !c.isValidReturnTo(u) {
 		return errgo.WithCausef(err, params.ErrBadRequest, "invalid return_to")
 	}
 
@@ -212,6 +201,29 @@ func (c *visitCompleter) redirect(w http.ResponseWriter, req *http.Request, retu
 	u.RawQuery = q.Encode()
 	http.Redirect(w, req, u.String(), http.StatusSeeOther)
 	return nil
+}
+
+func (c *visitCompleter) isValidReturnTo(u *url.URL) bool {
+	s := u.String()
+	if s == c.params.Location+"/login-complete" {
+		return true
+	}
+	for _, rurl := range c.params.RedirectLoginWhitelist {
+		if s == rurl {
+			return true
+		}
+	}
+	if u.Scheme != "https" {
+		return false
+	}
+	for _, d := range c.params.RedirectLoginTrustedDomains {
+		if strings.HasPrefix(d, "*.") && strings.HasSuffix(u.Host, d[1:]) {
+			return true
+		} else if u.Host == d {
+			return true
+		}
+	}
+	return false
 }
 
 func usernameFromDischargeToken(dt *httpbakery.DischargeToken) string {
