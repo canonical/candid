@@ -15,13 +15,13 @@ require (
 	github.com/juju/go4 v0.0.0-20160222163258-40d72ab9641a // indirect
 	github.com/juju/httpprof v0.0.0-20141217160036-14bf14c30767 // indirect
 	github.com/juju/loggo v0.0.0-20190212223446-d976af380377
-	github.com/juju/mgotest v1.0.1
+	github.com/juju/mgotest v1.0.2
 	github.com/juju/names v0.0.0-20160330150533-8a0aa0963bba
 	github.com/juju/persistent-cookiejar v0.0.0-20170428161559-d67418f14c93
 	github.com/juju/postgrestest v1.1.1
 	github.com/juju/qthttptest v0.1.1
 	github.com/juju/schema v1.0.1-0.20190814234152-1f8aaeef0989
-	github.com/juju/simplekv v1.0.0
+	github.com/juju/simplekv v1.1.0
 	github.com/juju/testing v0.0.0-20191001232224-ce9dec17d28b
 	github.com/juju/usso v1.0.1
 	github.com/juju/utils v0.0.0-20180820210520-bf9cc5bdd62d
@@ -49,7 +49,7 @@ require (
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0-20170531180850-df99d62fd42d
 	gopkg.in/retry.v1 v1.0.3 // indirect
 	gopkg.in/square/go-jose.v2 v2.5.1
-	gopkg.in/tomb.v2 v2.0.0-20140626144623-14b3d72120e8
+	gopkg.in/tomb.v2 v2.0.0-20161208151619-d5d1b5820637
 	gopkg.in/yaml.v2 v2.4.0
 	launchpad.net/lpad v0.0.0-20131113112110-000000000065
 )
