@@ -89,7 +89,10 @@ def write_config_file():
         config["public-key"] = lc["public-key"]
     if cc["redirect-login-whitelist"]:
         config["redirect-login-whitelist"] = \
-            cc["redirect-login-whitelist"].split(",")
+            _parse_list(cc["redirect-login-whitelist"])
+    if cc["redirect-login-trusted-domains"]:
+        config["redirect-login-trusted-domains"] = \
+            _parse_list(cc["redirect-login-trusted-domains"])
     pg = endpoint_from_flag('postgres.master.available')
     if pg:
         config["storage"] = {
@@ -141,3 +144,9 @@ def configure_nrpe():
 def website_available():
     ep = endpoint_from_flag('website.available')
     ep.configure(8081)
+
+
+def _parse_list(s):
+    if not s:
+        return None
+    return [t.strip() for t in s.split(",")]

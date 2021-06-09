@@ -73,6 +73,13 @@ options:
     description: |
       List of addresses that are whitelisted to return to when using
       the redirect login flow.
+  redirect-login-trusted-domains:
+    type: string
+    default: ""
+    description: |
+      Comma separated list of domains for which all redirect paths
+      are trusted. If a domain starts with "*." that is taken to be a
+      wildcard and will match all subdomains of the specified domain.
   rendezvous-timeout:
     type: string
     default: "10m"
