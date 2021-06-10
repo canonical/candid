@@ -59,7 +59,7 @@ type loginSuite struct {
 func (s *loginSuite) Init(c *qt.C) {
 	s.store = candidtest.NewStore()
 	sp := s.store.ServerParams()
-	sp.RedirectLoginWhitelist = []string{
+	sp.RedirectLoginTrustedURLs = []string{
 		"https://example.com/callback",
 	}
 	sp.IdentityProviders = []idp.IdentityProvider{
@@ -239,7 +239,7 @@ func (s *loginSuite) TestLoginIDPChoiceHidden(c *qt.C) {
 	})
 }
 
-func (s *loginSuite) TestLoginRedirectNotWhitelisted(c *qt.C) {
+func (s *loginSuite) TestLoginRedirectNotTrusted(c *qt.C) {
 	req, err := http.NewRequest("GET", "/login-redirect?return_to=https://example.com/bad-callback&state=12345", nil)
 	c.Assert(err, qt.IsNil)
 	req.Header.Set("Accept", "application/json")

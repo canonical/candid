@@ -26,7 +26,7 @@ import (
 	"github.com/canonical/candid/store"
 )
 
-var blacklistUsernames = map[params.Username]bool{
+var disallowedUsernames = map[params.Username]bool{
 	"admin":            true,
 	"everyone":         true,
 	auth.AdminUsername: true,
@@ -540,7 +540,7 @@ func (h *handler) userFromIdentity(ctx context.Context, id *auth.Identity) (*par
 }
 
 func validateUsername(u *params.SetUserRequest) error {
-	if blacklistUsernames[u.Username] {
+	if disallowedUsernames[u.Username] {
 		return errgo.Newf("username %q is reserved", u.Username)
 	}
 	if u.User.Owner != "" && !strings.HasSuffix(string(u.Username), "@"+string(u.User.Owner)) {

@@ -92,10 +92,10 @@ type Config struct {
 	// in the same form as the NO_PROXY environment variable.
 	NoProxy string `yaml:"no-proxy"`
 
-	// RedirectLoginWhitelist contains a list of URLs that are
+	// RedirectLoginTrustedURLs contains a list of URLs that are
 	// trusted to be used as return_to URLs during an interactive
 	// login.
-	RedirectLoginWhitelist []string `yaml:"redirect-login-whitelist"`
+	RedirectLoginTrustedURLs []string `yaml:"redirect-login-trusted-urls"`
 
 	// RedirectLoginTrustedDomains contains a list of domains that are
 	// trusted to be used as return_to URLs during an interactive
