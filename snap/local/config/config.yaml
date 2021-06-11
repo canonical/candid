@@ -1,4 +1,4 @@
-## Documentation can be found here: https://github.com/CanonicalLtd/candid/blob/master/docs/configuration.md
+## Documentation can be found here: https://github.com/canonical/candid/blob/master/docs/configuration.md
 
 ## Server URLs and ports
 listen-address: :8081

@@ -67,12 +67,12 @@ options:
     description: |
       Base64 encoded 256-bit Ed25519 public key, this should match the
       private key.
-  redirect-login-whitelist:
+  redirect-login-trusted-urls:
     type: string
     default: ""
     description: |
-      List of addresses that are whitelisted to return to when using
-      the redirect login flow.
+      List of URLs that are trusted to return to when using the redirect
+      login flow.
   redirect-login-trusted-domains:
     type: string
     default: ""

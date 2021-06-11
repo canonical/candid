@@ -75,7 +75,7 @@ func (s *idpSuite) Init(c *qt.C) {
 			MeetingStore: s.store.MeetingStore,
 			RootKeyStore: s.store.BakeryRootKeyStore,
 			Template:     s.template,
-			RedirectLoginWhitelist: []string{
+			RedirectLoginTrustedURLs: []string{
 				"http://example.com/callback",
 			},
 			RedirectLoginTrustedDomains: []string{
@@ -192,7 +192,7 @@ func (s *idpSuite) TestLoginRedirectSuccessInvalidReturnTo(c *qt.C) {
 	})
 }
 
-func (s *idpSuite) TestLoginRedirectSuccessReturnToNotInWhitelist(c *qt.C) {
+func (s *idpSuite) TestLoginRedirectSuccessReturnToNotTrusted(c *qt.C) {
 	req, err := http.NewRequest("GET", "", nil)
 	c.Assert(err, qt.IsNil)
 	rr := httptest.NewRecorder()

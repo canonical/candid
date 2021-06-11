@@ -208,7 +208,7 @@ func (c *visitCompleter) isValidReturnTo(u *url.URL) bool {
 	if s == c.params.Location+"/login-complete" {
 		return true
 	}
-	for _, rurl := range c.params.RedirectLoginWhitelist {
+	for _, rurl := range c.params.RedirectLoginTrustedURLs {
 		if s == rurl {
 			return true
 		}

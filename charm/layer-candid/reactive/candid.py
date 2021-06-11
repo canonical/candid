@@ -87,9 +87,9 @@ def write_config_file():
         config["public-key"] = cc["public-key"]
     elif lc.get("public-key"):
         config["public-key"] = lc["public-key"]
-    if cc["redirect-login-whitelist"]:
-        config["redirect-login-whitelist"] = \
-            _parse_list(cc["redirect-login-whitelist"])
+    if cc["redirect-login-trusted-urls"]:
+        config["redirect-login-trusted-urls"] = \
+            _parse_list(cc["redirect-login-trusted-urls"])
     if cc["redirect-login-trusted-domains"]:
         config["redirect-login-trusted-domains"] = \
             _parse_list(cc["redirect-login-trusted-domains"])

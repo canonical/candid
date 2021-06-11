@@ -23,7 +23,7 @@ func TestUnmarshal(c *qt.C, configYAML string) {
 	c.Assert(err, qt.IsNil)
 	defer backend.Close()
 
-	// Sanity check that the backend can actually be used.
+	// Check that the backend can actually be used.
 
 	kv, err := backend.ProviderDataStore().KeyValueStore(ctx, "test")
 	c.Assert(err, qt.IsNil)

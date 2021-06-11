@@ -88,7 +88,7 @@ tls-key: |
 resource-path: /resources
 http-proxy: http://proxy.example.com:3128
 no-proxy: localhost,.example.com
-redirect-login-whitelist:
+redirect-login-trusted-urls:
 - https://example.com/1
 - https://example.com/2
 redirect-login-trusted-domains:
@@ -170,7 +170,7 @@ func TestRead(t *testing.T) {
 		ResourcePath:        "/resources",
 		HTTPProxy:           "http://proxy.example.com:3128",
 		NoProxy:             "localhost,.example.com",
-		RedirectLoginWhitelist: []string{
+		RedirectLoginTrustedURLs: []string{
 			"https://example.com/1",
 			"https://example.com/2",
 		},

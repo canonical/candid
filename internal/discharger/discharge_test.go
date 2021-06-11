@@ -106,7 +106,7 @@ func (s *dischargeSuite) Init(c *qt.C) {
 			},
 		}),
 	}
-	sp.RedirectLoginWhitelist = []string{
+	sp.RedirectLoginTrustedURLs = []string{
 		"https://www.example.com/callback",
 	}
 	s.srv = candidtest.NewServer(c, sp, map[string]identity.NewAPIHandlerFunc{
@@ -853,7 +853,7 @@ func (s *dischargeSuite) TestDischargeBrowserRedirectLogin(c *qt.C) {
 	s.dischargeCreator.AssertMacaroon(c, ms, identchecker.LoginOp, "")
 }
 
-func (s *dischargeSuite) TestDischargeBrowserRedirectLoginNotWhitelisted(c *qt.C) {
+func (s *dischargeSuite) TestDischargeBrowserRedirectLoginNotTrusted(c *qt.C) {
 	interactor := new(redirect.Interactor)
 	_, err := s.dischargeCreator.Discharge(c, "is-authenticated-user", s.srv.Client(interactor))
 	c.Assert(httpbakery.IsInteractionError(errgo.Cause(err)), qt.Equals, true, qt.Commentf("%v", errgo.Details(errgo.Cause(err))))

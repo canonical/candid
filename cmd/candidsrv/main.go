@@ -139,7 +139,7 @@ func serveIdentity(conf *config.Config, params candid.ServerParams) error {
 	params.Location = conf.Location
 	params.PrivateAddr = conf.PrivateAddr
 	params.AdminAgentPublicKey = conf.AdminAgentPublicKey
-	params.RedirectLoginWhitelist = conf.RedirectLoginWhitelist
+	params.RedirectLoginTrustedURLs = conf.RedirectLoginTrustedURLs
 	params.RedirectLoginTrustedDomains = conf.RedirectLoginTrustedDomains
 	params.APIMacaroonTimeout = conf.APIMacaroonTimeout.Duration
 	params.DischargeMacaroonTimeout = conf.DischargeMacaroonTimeout.Duration
