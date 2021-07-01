@@ -79,6 +79,9 @@ type Params struct {
 	// LDAP server as DN.
 	Password string `yaml:"password"`
 
+	// Require2FA indicates if this provider requires the use of 2FA
+	Require2FA bool `yaml:"required-mfa"`
+
 	// UserQueryFilter defines the filter for searching users.
 	UserQueryFilter string `yaml:"user-query-filter"`
 

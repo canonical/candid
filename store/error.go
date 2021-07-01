@@ -17,6 +17,10 @@ var (
 	// ErrDuplicateUsername is the error cause used when an update
 	// attempts to set a username that is already in use.
 	ErrDuplicateUsername = errgo.New("duplicate username")
+
+	// ErrDuplicateCredential is the error cause used when we try to
+	// store user credential with a name that is already in use.
+	ErrDuplicateCredential = errgo.New("duplicate credential name")
 )
 
 // NotFoundError creates a new error with a cause of ErrNotFound and an

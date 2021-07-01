@@ -8,6 +8,7 @@ package storetest
 import (
 	"context"
 	"fmt"
+	"sort"
 	"time"
 
 	qt "github.com/frankban/quicktest"
@@ -1453,4 +1454,87 @@ func (s *storeSuite) TestIdentityCounts(c *qt.C) {
 		"b": 2,
 		"c": 1,
 	})
+}
+
+func (s *storeSuite) TestUserCredentials(c *qt.C) {
+	// add an identity
+	identity := store.Identity{
+		ProviderID: store.MakeProviderIdentity("test", "existing-user"),
+		Username:   "test-user",
+	}
+	err := s.Store.UpdateIdentity(
+		s.ctx,
+		&identity,
+		store.Update{
+			store.Username: store.Set,
+		},
+	)
+	c.Assert(err, qt.IsNil)
+
+	// no credentials exist for the created user
+	creds, err := s.Store.UserMFACredentials(s.ctx, identity.ID)
+	c.Assert(err, qt.IsNil)
+	c.Assert(creds, qt.DeepEquals, []store.MFACredential(nil))
+
+	// add a credential for the created user
+	cred := store.MFACredential{
+		ID:                     []byte("test id 1"),
+		ProviderID:             identity.ProviderID,
+		Name:                   "test credential 1",
+		PublicKey:              []byte("public key 1"),
+		AttestationType:        "test attestation type",
+		AuthenticatorGUID:      []byte("guid 1"),
+		AuthenticatorSignCount: 1,
+	}
+	err = s.Store.AddMFACredential(s.ctx, cred)
+	c.Assert(err, qt.IsNil)
+
+	// try fetching credentials for the test user
+	creds, err = s.Store.UserMFACredentials(s.ctx, string(identity.ProviderID))
+	c.Assert(err, qt.IsNil)
+	c.Assert(creds, qt.DeepEquals, []store.MFACredential{cred})
+
+	// try adding a credential with a duplicate name
+	cred1 := cred
+	cred1.ID = []byte("test id 2")
+	err = s.Store.AddMFACredential(s.ctx, cred1)
+	c.Assert(errgo.Cause(err), qt.Equals, store.ErrDuplicateCredential)
+
+	cred2 := store.MFACredential{
+		ID:                     []byte("test id 3"),
+		ProviderID:             identity.ProviderID,
+		Name:                   "test credential 2",
+		PublicKey:              []byte("public key 2"),
+		AttestationType:        "test attestation type",
+		AuthenticatorGUID:      []byte("guid 2"),
+		AuthenticatorSignCount: 2,
+	}
+	err = s.Store.AddMFACredential(s.ctx, cred2)
+	c.Assert(err, qt.IsNil)
+
+	// try fetching credentials for the test user
+	creds, err = s.Store.UserMFACredentials(s.ctx, string(identity.ProviderID))
+	c.Assert(err, qt.IsNil)
+	sort.Slice(creds, func(i, j int) bool {
+		return creds[i].Name < creds[j].Name
+	})
+	c.Assert(creds, qt.DeepEquals, []store.MFACredential{cred, cred2})
+
+	err = s.Store.IncrementMFACredentialSignCount(s.ctx, cred.ID)
+	c.Assert(err, qt.IsNil)
+	err = s.Store.IncrementMFACredentialSignCount(s.ctx, cred2.ID)
+	c.Assert(err, qt.IsNil)
+	err = s.Store.IncrementMFACredentialSignCount(s.ctx, cred2.ID)
+	c.Assert(err, qt.IsNil)
+
+	// fetch the user credentials and verify sign counts match
+	// expected values
+	cred.AuthenticatorSignCount = 2
+	cred2.AuthenticatorSignCount = 4
+	creds, err = s.Store.UserMFACredentials(s.ctx, string(identity.ProviderID))
+	c.Assert(err, qt.IsNil)
+	sort.Slice(creds, func(i, j int) bool {
+		return creds[i].Name < creds[j].Name
+	})
+	c.Assert(creds, qt.DeepEquals, []store.MFACredential{cred, cred2})
 }

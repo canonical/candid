@@ -129,6 +129,10 @@ const (
 	tmplFindMeetings
 	tmplRemoveMeetings
 	tmplIdentityCounts
+	tmplInsertUserCredentials
+	tmplGetUserCredentials
+	tmplRemoveUserCredentials
+	tmplIncrementCredentialSignCount
 	numTmpl
 )
 
