@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html dir="ltr" lang="en">
+<head>
+  <title>Candid - MFA Login</title>
+
+  <meta http-equiv="x-ua-compatible" content="IE=edge">
+  <meta charset="utf-8">
+
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="">
+  <meta name="author" content="Juju team">
+  <link rel="shortcut icon" href="../../static/favicon.ico">
+  <link rel="stylesheet" href="../../static/css/vanilla.css">
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.0/jquery.min.js"></script>
+</head>
+<body>
+  <div class="p-strip">
+    <div class="row">
+      <div class="col-2 col-start-large-6 col-small-2 col-medium-3">
+        <img src="../../static/images/logo-canonical-aubergine.svg" alt="Canonical" />
+      </div>
+    </div>
+  </div>
+    <div class="p-strip">
+    <div class="row">
+      <div class="col-6 col-start-large-4">
+        <div class="p-card--highlighted">
+          <div class="p-card__thumbnail">
+            <h1 class="p-heading--four">MFA Login</h1>
+          </div>
+          <hr class="u-sv1">
+          {{if .Error}}
+            <div class="p-notification--negative">
+              <p class="p-notification__response">
+                <span class="p-notification__status">Error:</span>{{.Error}}
+              </p>
+            </div>
+          {{end}}
+        </div>
+      </div>
+    </div>
+  </div>
+  
+<script>
+$(document).ready(function () {
+  console.log("ready");
+  // check whether current browser supports WebAuthn
+  if (!window.PublicKeyCredential) {
+      alert("Error: this browser does not support WebAuthn");
+      return;
+  } else {
+    console.log("running user login");
+    loginUser();
+  }
+});
+
+function loginUser() {
+  mfa_state = {{.MFAState}}
+  fetch({{.BeginLogin}} + "&mfa-state=" + mfa_state)
+    .then(response => response.json())
+    .then((credentialRequestOptions) => {
+      mfa_state = credentialRequestOptions.mfastate;
+      credentialRequestOptions.publicKey.challenge = bufferDecode(credentialRequestOptions.publicKey.challenge);
+      credentialRequestOptions.publicKey.allowCredentials.forEach(function (listItem) {
+        listItem.id = bufferDecode(listItem.id)
+      });
+      return navigator.credentials.get({
+        publicKey: credentialRequestOptions.publicKey
+      })
+    })
+    .then((assertion) => {
+      let authData = assertion.response.authenticatorData;
+      let clientDataJSON = assertion.response.clientDataJSON;
+      let rawId = assertion.rawId;
+      let sig = assertion.response.signature;
+      let userHandle = assertion.response.userHandle;
+      return JSON.stringify({
+        id: assertion.id,
+        rawId: bufferEncode(rawId),
+        type: assertion.type,
+        response: {
+          authenticatorData: bufferEncode(authData),
+          clientDataJSON: bufferEncode(clientDataJSON),
+          signature: bufferEncode(sig),
+          userHandle: bufferEncode(userHandle),
+        },
+      })
+    })
+    .then((assertionData) =>{
+      fetch({{.FinishLogin}} + "&mfa-state=" + mfa_state, {
+        method: 'POST', 
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: assertionData,
+      })
+      .then((success) => {
+        return "successfuly logged in"
+      })
+      .catch((error) => {
+        return Promise.reject("login failed")
+      })
+    })
+    .then((success) => {
+        alert("successfully logged in!")
+        return
+    })
+    .catch((error) => {
+      console.log(error)
+      alert("login failed.")
+    })
+}
+
+    // Base64 to ArrayBuffer
+    function bufferDecode(value) {
+      return Uint8Array.from(atob(value), c => c.charCodeAt(0));
+    }
+
+    // ArrayBuffer to URLBase64
+    function bufferEncode(value) {
+      return btoa(String.fromCharCode.apply(null, new Uint8Array(value)))
+        .replace(/\+/g, "-")
+        .replace(/\//g, "_")
+        .replace(/=/g, "");;
+    }
+  </script>
+</body>
+</html>
