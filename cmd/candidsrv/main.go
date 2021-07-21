@@ -178,7 +178,6 @@ func serveIdentity(conf *config.Config, params candid.ServerParams) error {
 		Handler:   server,
 		TLSConfig: conf.TLSConfig(),
 	}
-	fmt.Println("START")
 	if conf.TLSConfig() != nil {
 		return httpServer.ListenAndServeTLS("", "")
 	}

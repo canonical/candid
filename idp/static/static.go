@@ -7,10 +7,13 @@ package static
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"regexp"
 	"strings"
 
+	"github.com/duo-labs/webauthn/protocol"
+	"github.com/duo-labs/webauthn/webauthn"
 	"github.com/juju/loggo"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
@@ -63,6 +66,15 @@ type Params struct {
 	// MatchEmailAddr is a regular expression that is used to determine if
 	// this identity provider can be used for a particular user email.
 	MatchEmailAddr string `yaml:"match-email-addr"`
+
+	// Required2FA indicates if this provider requires the user of 2FA
+	Required2FA bool `yaml:"required-2fa"`
+
+	RPDisplayName string `yaml:"rp-display-name"`
+
+	RPID string `yaml:"rp-id"`
+
+	RPOrigin string `yaml:"rp-origin"`
 }
 
 type UserInfo struct {
@@ -74,6 +86,18 @@ type UserInfo struct {
 	Email string `yaml:"email"`
 	// Groups is the list of groups the user belongs to.
 	Groups []string `yaml:"groups"`
+	// MFACredentials store multi-factor authentication credentials
+	// associated with the user
+	MFACredentials []MFACredential `yaml:"mfa-credentials"`
+}
+
+// MFACredential stores data about a multi-factore credential.
+type MFACredential struct {
+	ID                     []byte `yaml:"id"`
+	PublicKey              []byte `yaml:"public-key"`
+	AttestationType        string `yaml:"attestation-type"`
+	AuthenticatorGUID      []byte `yaml:"authenticator-guid"`
+	AuthenticatorSignCount uint32 `yaml:"authenticator-sign-count"`
 }
 
 // NewIdentityProvider creates a new static identity provider.
@@ -96,16 +120,37 @@ func NewIdentityProvider(p Params) idp.IdentityProvider {
 		}
 	}
 
-	return &identityProvider{
+	var auth *webauthn.WebAuthn
+	if p.Required2FA {
+		var err error
+		auth, err = webauthn.New(&webauthn.Config{
+			RPDisplayName: p.RPDisplayName,
+			RPID:          p.RPID,
+			RPOrigin:      p.RPOrigin,
+		})
+		if err != nil {
+			logger.Errorf("cannot set up webauthn: %s", err)
+		}
+	}
+
+	idp := &identityProvider{
 		params:         p,
 		matchEmailAddr: matchEmailAddr,
 	}
+	idp.authenticator = &idputil.MultiFactorAuthenticator{
+		Authenticator:                      auth,
+		GetIdentity:                        idp.getIdentity,
+		AddUserCredential:                  idp.addUserCredential,
+		IncrementUserAuthenticatorSigCount: idp.incrementUserAuthenticatorSigCount,
+	}
+	return idp
 }
 
 type identityProvider struct {
 	params         Params
 	initParams     idp.InitParams
 	matchEmailAddr *regexp.Regexp
+	authenticator  *idputil.MultiFactorAuthenticator
 }
 
 // Name implements idp.IdentityProvider.Name.
@@ -150,6 +195,11 @@ func (idp *identityProvider) IsForEmailAddr(addr string) bool {
 // Init implements idp.IdentityProvider.Init.
 func (idp *identityProvider) Init(ctx context.Context, params idp.InitParams) error {
 	idp.initParams = params
+	if idp.authenticator != nil {
+		idp.authenticator.Location = params.Location
+		idp.authenticator.SkipLocationForCookiePaths = params.SkipLocationForCookiePaths
+		idp.authenticator.CookieCodec = params.Codec
+	}
 	return nil
 }
 
@@ -174,15 +224,71 @@ func (idp *identityProvider) GetGroups(ctx context.Context, identity *store.Iden
 	return []string{}, nil
 }
 
+func (idp *identityProvider) getIdentity(username string) (*store.Identity, error) {
+	userData, ok := idp.params.Users[username]
+	if !ok {
+		return nil, errgo.WithCausef(nil, store.ErrNotFound, "user not found")
+	}
+	id := &store.Identity{
+		ProviderID: store.MakeProviderIdentity(idp.params.Name, username),
+		Username:   username,
+		Name:       userData.Name,
+		Email:      userData.Email,
+	}
+	id.MFACredentials = make([]store.MFACredential, len(userData.MFACredentials))
+	for i, c := range userData.MFACredentials {
+		id.MFACredentials[i] = store.MFACredential{
+			ID:                     c.ID,
+			PublicKey:              c.PublicKey,
+			AttestationType:        c.AttestationType,
+			AuthenticatorGUID:      c.AuthenticatorGUID,
+			AuthenticatorSignCount: c.AuthenticatorSignCount,
+		}
+	}
+	return id, nil
+}
+
+func (idp *identityProvider) addUserCredential(username string, credential *webauthn.Credential) error {
+	userData, ok := idp.params.Users[username]
+	if !ok {
+		return errgo.WithCausef(nil, store.ErrNotFound, "user not found")
+	}
+	userData.MFACredentials = append(userData.MFACredentials, MFACredential{
+		ID:                     credential.ID,
+		PublicKey:              credential.PublicKey,
+		AttestationType:        credential.AttestationType,
+		AuthenticatorGUID:      credential.Authenticator.AAGUID,
+		AuthenticatorSignCount: credential.Authenticator.SignCount,
+	})
+	idp.params.Users[username] = userData
+	return nil
+}
+
+func (idp *identityProvider) incrementUserAuthenticatorSigCount(username string, cred *webauthn.Credential) error {
+	userData, ok := idp.params.Users[username]
+	if !ok {
+		return errgo.WithCausef(nil, store.ErrNotFound, "user not found")
+	}
+	for i, cred := range userData.MFACredentials {
+		if string(cred.ID) == string(cred.ID) {
+			cred.AuthenticatorSignCount = cred.AuthenticatorSignCount + 1
+			userData.MFACredentials[i] = cred
+			break
+		}
+	}
+	idp.params.Users[username] = userData
+	return nil
+
+}
+
 // Handle implements idp.IdentityProvider.Handle.
 func (idp *identityProvider) Handle(ctx context.Context, w http.ResponseWriter, req *http.Request) {
 	var ls idputil.LoginState
 	if err := idp.initParams.Codec.Cookie(req, idputil.LoginCookieName, req.Form.Get("state"), &ls); err != nil {
-		logger.Infof("Invalid login state: %s", err)
-		idputil.BadRequestf(w, "Login failed: invalid login state")
+		logger.Infof("invalid login state: %s", err)
+		idputil.BadRequestf(w, "login failed: invalid login state")
 		return
 	}
-
 	switch strings.TrimPrefix(req.URL.Path, idp.initParams.URLPrefix) {
 	case "/login":
 		idpChoice := params.IDPChoiceDetails{
@@ -196,9 +302,102 @@ func (idp *identityProvider) Handle(ctx context.Context, w http.ResponseWriter, 
 			idp.initParams.VisitCompleter.RedirectFailure(ctx, w, req, ls.ReturnTo, ls.State, err)
 		}
 		if id != nil {
-			idp.initParams.VisitCompleter.RedirectSuccess(ctx, w, req, ls.ReturnTo, ls.State, id)
+			mfaLoginState := idputil.MFALoginState{
+				ID:       id.ID,
+				Username: id.Username,
+			}
+			cookiePath := idputil.CookiePathRelativeToLocation(idputil.MFACookiePath, idp.initParams.Location, idp.initParams.SkipLocationForCookiePaths)
+			mfaState, err := idp.initParams.Codec.SetCookie(w, idputil.MFACookieName, cookiePath, mfaLoginState)
+			if err != nil {
+				idp.initParams.VisitCompleter.RedirectFailure(ctx, w, req, ls.ReturnTo, ls.State, err)
+			}
+			if idp.params.Required2FA {
+				if len(id.MFACredentials) == 0 {
+					err = idputil.PresentForm(
+						ctx,
+						w,
+						"mfa-register",
+						mfaParams{
+							MFAState:           mfaState,
+							Note:               "Identity provide requires MFA. Please register a security key.",
+							Email:              id.Email,
+							BeginRegistration:  idputil.RedirectURL(idp.initParams.URLPrefix, "/register/begin", req.Form.Get("state")),
+							FinishRegistration: idputil.RedirectURL(idp.initParams.URLPrefix, "/register/finish", req.Form.Get("state")),
+						},
+						idp.initParams.Template,
+					)
+					if err != nil {
+						idp.initParams.VisitCompleter.RedirectFailure(ctx, w, req, ls.ReturnTo, ls.State, err)
+					}
+				} else {
+					err = idputil.PresentForm(
+						ctx,
+						w,
+						"mfa-login",
+						mfaParams{
+							MFAState:    mfaState,
+							Email:       id.Email,
+							BeginLogin:  idputil.RedirectURL(idp.initParams.URLPrefix, "/login/begin", req.Form.Get("state")),
+							FinishLogin: idputil.RedirectURL(idp.initParams.URLPrefix, "/login/finish", req.Form.Get("state")),
+						},
+						idp.initParams.Template,
+					)
+					if err != nil {
+						idp.initParams.VisitCompleter.RedirectFailure(ctx, w, req, ls.ReturnTo, ls.State, err)
+					}
+				}
+			} else {
+				idp.initParams.VisitCompleter.RedirectSuccess(ctx, w, req, ls.ReturnTo, ls.State, id)
+			}
+		}
+	case "/register/begin":
+		if idp.authenticator != nil {
+			idp.authenticator.BeginSecurityDeviceRegistration(ctx, w, req)
+		} else {
+			idputil.JsonResponse(w, fmt.Errorf("2fa not supported"), http.StatusBadRequest)
+		}
+	case "/register/finish":
+		if idp.authenticator != nil {
+			idp.authenticator.FinishSecurityDeviceRegistration(ctx, w, req)
+		} else {
+			idputil.JsonResponse(w, fmt.Errorf("2fa not supported"), http.StatusBadRequest)
+		}
+	case "/login/begin":
+		if idp.authenticator != nil {
+			idp.authenticator.BeginLogin(ctx, w, req)
+		} else {
+			idputil.JsonResponse(w, fmt.Errorf("2fa not supported"), http.StatusBadRequest)
+		}
+	case "/login/finish":
+		if idp.authenticator != nil {
+			idp.authenticator.FinishLogin(ctx, w, req)
+		} else {
+			idputil.JsonResponse(w, fmt.Errorf("2fa not supported"), http.StatusBadRequest)
 		}
 	}
+}
+
+type mfaParams struct {
+	BeginRegistration  string
+	BeginLogin         string
+	Email              string
+	Error              string
+	FinishRegistration string
+	FinishLogin        string
+	MFAState           string
+	Note               string
+}
+
+type webauthnCredentialAssertion struct {
+	*protocol.CredentialAssertion
+
+	MFAState string `json:"mfastate"`
+}
+
+type webauthnCredentialCreation struct {
+	*protocol.CredentialCreation
+
+	MFAState string `json:"mfastate"`
 }
 
 func (idp *identityProvider) loginUser(ctx context.Context, user, password string) (*store.Identity, error) {
@@ -210,6 +409,16 @@ func (idp *identityProvider) loginUser(ctx context.Context, user, password strin
 				Username:   username,
 				Name:       userData.Name,
 				Email:      userData.Email,
+			}
+			id.MFACredentials = make([]store.MFACredential, len(userData.MFACredentials))
+			for i, c := range userData.MFACredentials {
+				id.MFACredentials[i] = store.MFACredential{
+					ID:                     c.ID,
+					PublicKey:              c.PublicKey,
+					AttestationType:        c.AttestationType,
+					AuthenticatorGUID:      c.AuthenticatorGUID,
+					AuthenticatorSignCount: c.AuthenticatorSignCount,
+				}
 			}
 			err := idp.initParams.Store.UpdateIdentity(ctx, id, store.Update{
 				store.Username: store.Set,

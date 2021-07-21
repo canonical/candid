@@ -7,6 +7,7 @@ package idputil
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"html/template"
 	"net/http"
@@ -14,10 +15,13 @@ import (
 	"path"
 	"time"
 
+	"github.com/duo-labs/webauthn/protocol"
+	"github.com/duo-labs/webauthn/webauthn"
 	"github.com/juju/loggo"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/httprequest.v1"
 
+	"github.com/canonical/candid/idp/idputil/secret"
 	"github.com/canonical/candid/params"
 	"github.com/canonical/candid/store"
 )
@@ -214,6 +218,17 @@ func HandleLoginForm(
 	return nil, errgo.Mask(tmpl.ExecuteTemplate(w, "login-form", data))
 }
 
+func PresentForm(ctx context.Context, w http.ResponseWriter, templateName string, params interface{}, t *template.Template) error {
+	t = t.Lookup(templateName)
+	if t == nil {
+		return errgo.Newf("template %q not found", templateName)
+	}
+	if err := t.Execute(w, params); err != nil {
+		return errgo.Notef(err, "cannot execute the %q template", templateName)
+	}
+	return nil
+}
+
 // ServiceURL determines the URL within the specified location. If the
 // given dest is a relative URL then a new url is calculated relative to
 // location, otherwise it is returned unchanged.
@@ -253,4 +268,309 @@ func CookiePathRelativeToLocation(cookiePath, location string, skipLocation bool
 		return cookiePath
 	}
 	return u.Path + cookiePath
+}
+
+// JsonResponse mashals the provided to JSON and writes it
+// to the provided response writer.
+func JsonResponse(w http.ResponseWriter, data interface{}, c int) {
+	dj, err := json.Marshal(data)
+	if err != nil {
+		http.Error(w, "failed to create a json response", http.StatusInternalServerError)
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(c)
+	fmt.Fprintf(w, "%s", dj)
+}
+
+// WebAuthnUserFromIdentity converts the provided store Identity to
+// a type that implements the webauthn.User interface.
+func WebAuthnUserFromIdentity(id *store.Identity) webauthn.User {
+	return &webauthnUser{
+		Identity: id,
+	}
+}
+
+type webauthnUser struct {
+	*store.Identity
+}
+
+// WebAuthnID implements the webauthn.User interface.
+func (u *webauthnUser) WebAuthnID() []byte {
+	return []byte(u.Identity.Username)
+}
+
+// WebAuthnName implements the webauthn.User interface.
+func (u *webauthnUser) WebAuthnName() string {
+	return u.Identity.Username
+}
+
+// WebAuthnDisplayName implements the webauthn.User interface.
+func (u *webauthnUser) WebAuthnDisplayName() string {
+	return u.Identity.Name
+}
+
+// WebAuthnIcon implements the webauthn.User interface.
+func (u *webauthnUser) WebAuthnIcon() string {
+	return ""
+}
+
+// WebAuthnCredentials implements the webauthn.User interface.
+func (u *webauthnUser) WebAuthnCredentials() []webauthn.Credential {
+	var creds []webauthn.Credential
+	for _, c := range u.Identity.MFACredentials {
+		creds = append(creds, webauthn.Credential{
+			ID:              c.ID,
+			PublicKey:       c.PublicKey,
+			AttestationType: c.AttestationType,
+			Authenticator: webauthn.Authenticator{
+				AAGUID:    c.AuthenticatorGUID,
+				SignCount: c.AuthenticatorSignCount,
+			},
+		})
+	}
+	return creds
+}
+
+// MFACookieName holds the name of the multi-factor authentication
+// cookie.
+const MFACookieName = "candid-login-mfa"
+
+// MFACookiePath is the path to associate with the cookie storing the
+// current multi-factor authentication state.
+const MFACookiePath = "/login"
+
+// LoginState holds the state of the current multi-factor
+// authentication loging process.
+type MFALoginState struct {
+	// ID holds the ID of the user that entered the
+	// correct username-password combination.
+	ID string
+	// Username holds the username of the user that
+	// entered the correct username-password
+	// combination
+	Username string
+	// SessionData holds data associated with the
+	// ongoing 2FA process.
+	SessionData string
+}
+
+type webauthnCredentialAssertion struct {
+	*protocol.CredentialAssertion
+
+	MFAState string `json:"mfastate"`
+}
+
+type webauthnCredentialCreation struct {
+	*protocol.CredentialCreation
+
+	MFAState string `json:"mfastate"`
+}
+
+// MultiFactorAuthenticator implements methods needed for 2FA.
+type MultiFactorAuthenticator struct {
+	// Location contains the root location of the candid server.
+	Location string
+	// SkipLocationForCookiePaths instructs if the Cookie Paths are to
+	// be set relative to the Location Path or not.
+	SkipLocationForCookiePaths bool
+	// Authenticator holds the webauthn authenticator.
+	Authenticator *webauthn.WebAuthn
+	// CookieCodec hold the coded used to encode/decode
+	// session cookies in the login flow
+	CookieCodec *secret.Codec
+	// GetIdentity holds the method used by the authenticator
+	// to fetch user identities.
+	GetIdentity func(username string) (*store.Identity, error)
+	// AddUserCredential holds the method used by the authenticator
+	// to add user 2FA credentials.
+	AddUserCredential func(string, *webauthn.Credential) error
+	// IncrementAuthenticatorSigCount holds the method used to incremet
+	// the sig count of the authenticator that verified the valid credential
+	// during login.
+	IncrementUserAuthenticatorSigCount func(string, *webauthn.Credential) error
+}
+
+// BeginSecurityDeviceRegistration method is used to begin the 2FA security device registration.
+func (a *MultiFactorAuthenticator) BeginSecurityDeviceRegistration(ctx context.Context, w http.ResponseWriter, req *http.Request) {
+	var mfa MFALoginState
+	if err := a.CookieCodec.Cookie(req, MFACookieName, req.Form.Get("mfa-state"), &mfa); err != nil {
+		logger.Infof("invalid mfa login state: %s", err)
+		BadRequestf(w, "login failed: invalid 2fa login state")
+		return
+	}
+	id, err := a.GetIdentity(mfa.Username)
+	if err != nil {
+		if errgo.Cause(err) == store.ErrNotFound {
+			JsonResponse(w, "forbidden", http.StatusForbidden)
+			return
+		} else {
+			JsonResponse(w, "internal error", http.StatusInternalServerError)
+		}
+
+	}
+	user := WebAuthnUserFromIdentity(id)
+	options, sessionData, err := a.Authenticator.BeginRegistration(
+		user,
+		webauthn.WithAuthenticatorSelection(
+			protocol.AuthenticatorSelection{
+				RequireResidentKey: protocol.ResidentKeyUnrequired(),
+				UserVerification:   protocol.VerificationDiscouraged,
+			}),
+		webauthn.WithConveyancePreference(protocol.PreferNoAttestation),
+	)
+	if err != nil {
+		JsonResponse(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	data, err := json.Marshal(sessionData)
+	if err != nil {
+		JsonResponse(w, fmt.Errorf("failed to marshal session data"), http.StatusInternalServerError)
+		return
+	}
+	mfa.SessionData = string(data)
+
+	cookiePath := CookiePathRelativeToLocation(MFACookiePath, a.Location, a.SkipLocationForCookiePaths)
+	mfaState, err := a.CookieCodec.SetCookie(w, MFACookieName, cookiePath, mfa)
+	if err != nil {
+		JsonResponse(w, fmt.Errorf("failed to set a cookie"), http.StatusInternalServerError)
+		return
+	}
+	opts := webauthnCredentialCreation{
+		CredentialCreation: options,
+		MFAState:           mfaState,
+	}
+	JsonResponse(w, opts, http.StatusOK)
+}
+
+// FinishSecurityDeviceRegistration method is used to finish the 2FA security device registration.
+func (a *MultiFactorAuthenticator) FinishSecurityDeviceRegistration(ctx context.Context, w http.ResponseWriter, req *http.Request) {
+	var mfa MFALoginState
+	if err := a.CookieCodec.Cookie(req, MFACookieName, req.Form.Get("mfa-state"), &mfa); err != nil {
+		logger.Infof("invalid 2fa login state: %s", err)
+		JsonResponse(w, "login failed: invalid 2fa login state", http.StatusBadRequest)
+		return
+	}
+	id, err := a.GetIdentity(mfa.Username)
+	if err != nil {
+		if errgo.Cause(err) == store.ErrNotFound {
+			JsonResponse(w, "forbidden", http.StatusForbidden)
+			return
+		} else {
+			JsonResponse(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+	}
+	user := WebAuthnUserFromIdentity(id)
+	var sessionData webauthn.SessionData
+	err = json.Unmarshal([]byte(mfa.SessionData), &sessionData)
+	if err != nil {
+		JsonResponse(w, "could not unmarshal session data", http.StatusInternalServerError)
+		return
+	}
+	credential, err := a.Authenticator.FinishRegistration(user, sessionData, req)
+	if err != nil {
+		perr, ok := err.(*protocol.Error)
+		if ok {
+			logger.Errorf("failed to finish security device registration", perr.Details, perr.DevInfo)
+		}
+		JsonResponse(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	err = a.AddUserCredential(mfa.Username, credential)
+	if err != nil {
+		JsonResponse(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	JsonResponse(w, "security key registered", http.StatusOK)
+}
+
+// BeginLogin method is used to begin the 2FA part of the login process.
+func (a *MultiFactorAuthenticator) BeginLogin(ctx context.Context, w http.ResponseWriter, req *http.Request) {
+	var mfa MFALoginState
+	if err := a.CookieCodec.Cookie(req, MFACookieName, req.Form.Get("mfa-state"), &mfa); err != nil {
+		logger.Infof("invalid 2fa login state: %s", err)
+		JsonResponse(w, "login failed: invalid 2fa login state", http.StatusBadRequest)
+		return
+	}
+	id, err := a.GetIdentity(mfa.Username)
+	if err != nil {
+		if errgo.Cause(err) == store.ErrNotFound {
+			JsonResponse(w, "forbidden", http.StatusForbidden)
+			return
+		} else {
+			JsonResponse(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+	}
+	user := WebAuthnUserFromIdentity(id)
+	options, sessionData, err := a.Authenticator.BeginLogin(
+		user,
+		webauthn.WithUserVerification(protocol.VerificationDiscouraged),
+	)
+	if err != nil {
+		JsonResponse(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	data, err := json.Marshal(sessionData)
+	if err != nil {
+		JsonResponse(w, fmt.Errorf("failed to marshal session data"), http.StatusInternalServerError)
+		return
+	}
+	mfa.SessionData = string(data)
+	cookiePath := CookiePathRelativeToLocation(MFACookiePath, a.Location, a.SkipLocationForCookiePaths)
+	mfaState, err := a.CookieCodec.SetCookie(w, MFACookieName, cookiePath, mfa)
+	if err != nil {
+		JsonResponse(w, fmt.Errorf("failed to set a cookie"), http.StatusInternalServerError)
+		return
+	}
+
+	opts := webauthnCredentialAssertion{
+		CredentialAssertion: options,
+		MFAState:            mfaState,
+	}
+	JsonResponse(w, opts, http.StatusOK)
+}
+
+// FinishLogin method is used to finish the 2FA part of the login process.
+func (a *MultiFactorAuthenticator) FinishLogin(ctx context.Context, w http.ResponseWriter, req *http.Request) {
+	var mfa MFALoginState
+	if err := a.CookieCodec.Cookie(req, MFACookieName, req.Form.Get("mfa-state"), &mfa); err != nil {
+		logger.Infof("invalid 2fa login state: %s", err)
+		JsonResponse(w, "login failed: invalid 2fa login state", http.StatusBadRequest)
+		return
+	}
+	id, err := a.GetIdentity(mfa.Username)
+	if err != nil {
+		if errgo.Cause(err) == store.ErrNotFound {
+			JsonResponse(w, "forbidden", http.StatusForbidden)
+			return
+		} else {
+			JsonResponse(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+	}
+	user := WebAuthnUserFromIdentity(id)
+	var sessionData webauthn.SessionData
+	err = json.Unmarshal([]byte(mfa.SessionData), &sessionData)
+	if err != nil {
+		JsonResponse(w, "could not unmarshal session data", http.StatusInternalServerError)
+		return
+	}
+	validCredential, err := a.Authenticator.FinishLogin(user, sessionData, req)
+	if err != nil {
+		perr, ok := err.(*protocol.Error)
+		if ok {
+			logger.Errorf("failed to finish 2fa login", perr.Details, perr.DevInfo)
+		}
+		JsonResponse(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	// update authenticator sig count
+	err = a.IncrementUserAuthenticatorSigCount(mfa.Username, validCredential)
+	if err != nil {
+		JsonResponse(w, "failed to increment authenticator sig count", http.StatusInternalServerError)
+		return
+	}
+	JsonResponse(w, "login success", http.StatusOK)
 }

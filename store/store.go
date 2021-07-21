@@ -234,4 +234,17 @@ type Identity struct {
 	// Owner contains the ProviderIdentity of the identity that owns
 	// this one.
 	Owner ProviderIdentity
+
+	// MFACredentials stores multi-factor authentication credentials
+	// associated with this identity.
+	MFACredentials []MFACredential
+}
+
+// MFACredential stores data about a multi-factore credential.
+type MFACredential struct {
+	ID                     []byte
+	PublicKey              []byte
+	AttestationType        string
+	AuthenticatorGUID      []byte
+	AuthenticatorSignCount uint32
 }
