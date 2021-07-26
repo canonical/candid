@@ -884,7 +884,7 @@ func (s *dischargeSuite) TestDischargeBrowserRedirectLoginNotTrusted(c *qt.C) {
 	var perr params.Error
 	err = httprequest.UnmarshalJSONResponse(resp, &perr)
 	c.Assert(err, qt.IsNil)
-	c.Assert(&perr, qt.ErrorMatches, "invalid return_to")
+	c.Assert(&perr, qt.ErrorMatches, `invalid return_to "https://www.example.com/callback2"`)
 }
 
 func (s *dischargeSuite) TestDischargeUserID(c *qt.C) {

@@ -191,7 +191,7 @@ func (c *visitCompleter) redirect(w http.ResponseWriter, req *http.Request, retu
 	// Check the return to is a valid URL and is an allowed address.
 	u, err := url.Parse(returnTo)
 	if err != nil || !c.isValidReturnTo(u) {
-		return errgo.WithCausef(err, params.ErrBadRequest, "invalid return_to")
+		return errgo.WithCausef(err, params.ErrBadRequest, "invalid return_to %q", returnTo)
 	}
 
 	q := u.Query()
