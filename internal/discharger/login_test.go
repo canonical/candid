@@ -271,7 +271,7 @@ func (s *loginSuite) TestLoginRedirectNotTrusted(c *qt.C) {
 	c.Assert(err, qt.IsNil)
 	c.Assert(perr, qt.Equals, params.Error{
 		Code:    "bad request",
-		Message: "invalid return_to",
+		Message: `invalid return_to "https://example.com/bad-callback"`,
 	})
 }
 
