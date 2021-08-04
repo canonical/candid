@@ -25,6 +25,7 @@ import (
 	"github.com/canonical/candid/idp"
 	"github.com/canonical/candid/internal/auth"
 	"github.com/canonical/candid/internal/auth/httpauth"
+	"github.com/canonical/candid/internal/mfa"
 	"github.com/canonical/candid/internal/monitoring"
 	"github.com/canonical/candid/meeting"
 	"github.com/canonical/candid/params"
@@ -238,6 +239,9 @@ type ServerParams struct {
 	// IdentityProviders contains the set of identity providers that
 	// should be initialised by the service.
 	IdentityProviders []idp.IdentityProvider
+
+	// MFAAuthenticator holds the multi-factor authenticator.
+	MFAAuthenticator *mfa.Authenticator
 
 	// DebugTeams contains the set of launchpad teams that may access
 	// the restricted debug endpoints.

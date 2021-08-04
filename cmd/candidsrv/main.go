@@ -34,6 +34,7 @@ import (
 	"github.com/canonical/candid/idp/usso"
 	_ "github.com/canonical/candid/idp/usso/ussodischarge"
 	_ "github.com/canonical/candid/idp/usso/ussooauth"
+	"github.com/canonical/candid/internal/mfa"
 	_ "github.com/canonical/candid/store/memstore"
 	_ "github.com/canonical/candid/store/mgostore"
 	_ "github.com/canonical/candid/store/sqlstore"
@@ -130,6 +131,16 @@ func serveIdentity(conf *config.Config, params candid.ServerParams) error {
 		return errgo.Notef(err, "cannot parse templates")
 	}
 
+	if conf.MFARPDisplayName != "" && conf.MFARPID != "" && conf.MFARPOrigin != "" {
+		authenticator, err := mfa.NewAuthenticator(conf.MFARPID, conf.MFARPDisplayName, conf.MFARPOrigin)
+		if err != nil {
+			return errgo.Mask(err)
+		}
+		params.MFAAuthenticator = authenticator
+	} else {
+		logger.Infof("multi-factor authentication not enabled")
+	}
+
 	params.AdminPassword = conf.AdminPassword
 	params.Key = &bakery.KeyPair{
 		Private: *conf.PrivateKey,
@@ -178,6 +189,7 @@ func serveIdentity(conf *config.Config, params candid.ServerParams) error {
 		Handler:   server,
 		TLSConfig: conf.TLSConfig(),
 	}
+	fmt.Println("START")
 	if conf.TLSConfig() != nil {
 		return httpServer.ListenAndServeTLS("", "")
 	}

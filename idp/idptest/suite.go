@@ -316,6 +316,11 @@ func (l *visitCompleter) RedirectFailure(_ context.Context, w http.ResponseWrite
 	http.Redirect(w, req, u.String(), http.StatusSeeOther)
 }
 
+func (l *visitCompleter) RedirectMFA(ctx context.Context, w http.ResponseWriter, req *http.Request, require2FA bool, returnTo, returnToState, state string, id *store.Identity) {
+	// NOTE: mfa is currently not tested via unit-tests.
+	l.RedirectSuccess(ctx, w, req, returnTo, returnToState, id)
+}
+
 func (f *Fixture) Reset() {
 	f.visitCompleter.called = false
 	f.visitCompleter.dischargeID = ""

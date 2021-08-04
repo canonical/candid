@@ -11,15 +11,12 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/duo-labs/webauthn/webauthn"
 	"github.com/juju/loggo"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/httprequest.v1"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
 
 	"github.com/canonical/candid/idp"
 	"github.com/canonical/candid/idp/idputil"
-	"github.com/canonical/candid/idp/idputil/mfa"
 	"github.com/canonical/candid/params"
 	"github.com/canonical/candid/store"
 )
@@ -69,15 +66,6 @@ type Params struct {
 
 	// Require2FA indicates if this provider requires the use of 2FA
 	Require2FA bool `yaml:"require-2fa"`
-
-	// RPDisplayName holds the relying party display name for 2FA.
-	RPDisplayName string `yaml:"rp-display-name"`
-
-	// RPID holds the relying party id for MFA.
-	RPID string `yaml:"rp-id"`
-
-	// RPOrigin holds the relying party origin for MFA.
-	RPOrigin string `yaml:"rp-origin"`
 }
 
 type UserInfo struct {
@@ -111,34 +99,16 @@ func NewIdentityProvider(p Params) idp.IdentityProvider {
 		}
 	}
 
-	idp := &identityProvider{
+	return &identityProvider{
 		params:         p,
 		matchEmailAddr: matchEmailAddr,
 	}
-
-	if p.Require2FA {
-		var err error
-		auth, err := webauthn.New(&webauthn.Config{
-			RPDisplayName: p.RPDisplayName,
-			RPID:          p.RPID,
-			RPOrigin:      p.RPOrigin,
-		})
-		if err != nil {
-			logger.Errorf("cannot set up webauthn: %s", err)
-		}
-		idp.authenticator = &mfa.MultiFactorAuthenticator{
-			Authenticator: auth,
-		}
-	}
-
-	return idp
 }
 
 type identityProvider struct {
 	params         Params
 	initParams     idp.InitParams
 	matchEmailAddr *regexp.Regexp
-	authenticator  *mfa.MultiFactorAuthenticator
 }
 
 // Name implements idp.IdentityProvider.Name.
@@ -183,9 +153,6 @@ func (idp *identityProvider) IsForEmailAddr(addr string) bool {
 // Init implements idp.IdentityProvider.Init.
 func (idp *identityProvider) Init(ctx context.Context, params idp.InitParams) error {
 	idp.initParams = params
-	if idp.authenticator != nil {
-		idp.authenticator.Params = params
-	}
 	return nil
 }
 
@@ -210,28 +177,17 @@ func (idp *identityProvider) GetGroups(ctx context.Context, identity *store.Iden
 	return []string{}, nil
 }
 
-// message holds a message to be json encoded and written to the response writer.
-type message struct {
-	Message string `json:"message"`
-}
-
 // Handle implements idp.IdentityProvider.Handle.
 func (idp *identityProvider) Handle(ctx context.Context, w http.ResponseWriter, req *http.Request) {
 	var ls idputil.LoginState
-	if err := idp.initParams.Codec.Cookie(req, idputil.LoginCookieName, req.Form.Get("state"), &ls); err != nil {
+	state := req.Form.Get("state")
+	if err := idp.initParams.Codec.Cookie(req, idputil.LoginCookieName, state, &ls); err != nil {
 		logger.Infof("invalid login state: %s", err)
 		idputil.BadRequestf(w, "login failed: invalid login state")
 		return
 	}
 	switch strings.TrimPrefix(req.URL.Path, idp.initParams.URLPrefix) {
 	case "/login":
-		// if idp requires 2fa, but the authenticator has not been set up
-		// the login will fail
-		if idp.params.Require2FA && idp.authenticator == nil {
-			idp.initParams.VisitCompleter.RedirectFailure(ctx, w, req, ls.ReturnTo, ls.State, errgo.New("2fa required, but not configured"))
-			return
-		}
-
 		idpChoice := params.IDPChoiceDetails{
 			Domain:      idp.params.Domain,
 			Description: idp.params.Description,
@@ -243,61 +199,9 @@ func (idp *identityProvider) Handle(ctx context.Context, w http.ResponseWriter, 
 			idp.initParams.VisitCompleter.RedirectFailure(ctx, w, req, ls.ReturnTo, ls.State, err)
 			return
 		}
-		if id == nil {
+		if id != nil {
+			idp.initParams.VisitCompleter.RedirectMFA(ctx, w, req, idp.params.Require2FA, ls.ReturnTo, ls.State, state, id)
 			return
-		}
-		if !idp.params.Require2FA {
-			idp.initParams.VisitCompleter.RedirectSuccess(ctx, w, req, ls.ReturnTo, ls.State, id)
-			return
-		}
-
-		data := mfa.MFAFormParams{
-			RegistrationURL: idputil.RedirectURL(idp.initParams.URLPrefix, "/mfa/register", req.Form.Get("state")),
-			LoginURL:        idputil.RedirectURL(idp.initParams.URLPrefix, "/mfa/login", req.Form.Get("state")),
-		}
-		err = idp.authenticator.FormData(ctx, w, req, string(id.ProviderID), &data)
-		if err != nil {
-			idp.initParams.VisitCompleter.RedirectFailure(ctx, w, req, ls.ReturnTo, ls.State, err)
-			return
-		}
-
-		err = idp.initParams.Template.ExecuteTemplate(w, "mfa", data)
-		if err != nil {
-			idp.initParams.VisitCompleter.RedirectFailure(ctx, w, req, ls.ReturnTo, ls.State, err)
-		}
-	case "/mfa/remove":
-		if idp.authenticator != nil {
-			idp.authenticator.RemoveCredential(ctx, w, req)
-		} else {
-			httprequest.WriteJSON(w, http.StatusBadRequest, message{Message: "2fa not supported"})
-		}
-	case "/mfa/register":
-		if idp.authenticator != nil {
-			idp.authenticator.FinishSecurityDeviceRegistration(ctx, w, req)
-		} else {
-			httprequest.WriteJSON(w, http.StatusBadRequest, message{Message: "2fa not supported"})
-
-		}
-	case "/mfa/login":
-		switch req.Method {
-		case "POST":
-			if idp.authenticator != nil {
-				idp.authenticator.Login(ctx, w, req)
-			} else {
-				httprequest.WriteJSON(w, http.StatusBadRequest, message{Message: "2fa not supported"})
-			}
-		case "GET":
-			if idp.authenticator != nil {
-				id, err := idp.authenticator.VerifyLogin(ctx, req)
-				if err != nil {
-					idp.initParams.VisitCompleter.RedirectFailure(ctx, w, req, ls.ReturnTo, ls.State, errgo.New("2fa credentials not presented"))
-					return
-				}
-				idp.initParams.VisitCompleter.RedirectSuccess(ctx, w, req, ls.ReturnTo, ls.State, id)
-				return
-			} else {
-				idp.initParams.VisitCompleter.RedirectFailure(ctx, w, req, ls.ReturnTo, ls.State, errgo.New("2fa not supported"))
-			}
 		}
 	}
 }

@@ -131,6 +131,22 @@ func (s errorStore) IdentityCounts(_ context.Context) (map[string]int, error) {
 	return nil, s.err
 }
 
+func (s errorStore) AddMFACredential(ctx context.Context, cred store.MFACredential) error {
+	return s.err
+}
+
+func (s errorStore) RemoveMFACredential(ctx context.Context, providerID, name string) error {
+	return s.err
+}
+
+func (s errorStore) UserMFACredentials(ctx context.Context, providerID string) ([]store.MFACredential, error) {
+	return nil, s.err
+}
+
+func (s errorStore) IncrementMFACredentialSignCount(ctx context.Context, credentialID []byte) error {
+	return s.err
+}
+
 func TestCopy(t *testing.T) {
 	c := qt.New(t)
 	defer c.Done()

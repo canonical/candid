@@ -37,7 +37,10 @@ func (s *memStore) RemoveMFACredential(ctx context.Context, providerID, name str
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	key := fmt.Sprintf("%s-%s", providerID, name)
+	key := mfaCredentialKey(store.MFACredential{
+		ProviderID: store.ProviderIdentity(providerID),
+		Name:       name,
+	})
 	delete(s.credentials, key)
 	return nil
 }
