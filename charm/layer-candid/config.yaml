@@ -94,3 +94,19 @@ options:
     description: |
       If true, it leaves cookies' Path value absolute, instead of
       seeting it relative to the path in the location config.
+  mfa-rp-display-name:
+    type: string
+    default: ""
+    description: |
+      Display name for the multi-factor authentication relying party.
+  mfa-rp-id:
+    type: string
+    default: ""
+    description: |
+      ID of the multi-factor authentication relying party 
+      (usually the FQDN for your site).
+  mfa-rp-origin:
+    type: string
+    default: ""
+    description: |
+      Origin of the multi-factor authentication WebAuthn requrests.
