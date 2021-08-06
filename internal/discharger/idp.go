@@ -26,6 +26,7 @@ import (
 	"github.com/canonical/candid/internal/auth"
 	"github.com/canonical/candid/internal/discharger/internal"
 	"github.com/canonical/candid/internal/identity"
+	"github.com/canonical/candid/internal/mfa"
 	"github.com/canonical/candid/params"
 	"github.com/canonical/candid/store"
 )
@@ -76,6 +77,21 @@ func newIDPHandler(params identity.HandlerParams, idp idp.IdentityProvider) http
 	}
 }
 
+func newMFAHandler(params identity.HandlerParams, authorizer *mfa.Authenticator) httprouter.Handle {
+	return func(w http.ResponseWriter, req *http.Request, p httprouter.Params) {
+		t := trace.New("identity.internal.v1", "mfa")
+		defer t.Finish()
+		ctx := trace.NewContext(context.Background(), t)
+		ctx, close := params.Store.Context(ctx)
+		defer close()
+		ctx, close = params.MeetingStore.Context(ctx)
+		defer close()
+		req.URL.Path = strings.TrimPrefix(req.URL.Path, "/login/mfa")
+		req.ParseForm()
+		authorizer.Handle(ctx, w, req)
+	}
+}
+
 type dischargeTokenCreator struct {
 	params identity.HandlerParams
 }
@@ -111,9 +127,10 @@ func (d *dischargeTokenCreator) DischargeToken(ctx context.Context, id *store.Id
 
 // A visitCompleter is an implementation of idp.VisitCompleter.
 type visitCompleter struct {
-	params        identity.HandlerParams
-	identityStore *internal.IdentityStore
-	place         *place
+	params                identity.HandlerParams
+	identityStore         *internal.IdentityStore
+	place                 *place
+	setMFAStateProviderID func(w http.ResponseWriter, providerID string) (string, error)
 }
 
 // Success implements idp.VisitCompleter.Success.
@@ -166,6 +183,35 @@ func (c *visitCompleter) RedirectSuccess(ctx context.Context, w http.ResponseWri
 	return
 }
 
+// RedirectMFA implements idp.VisitCompleter.RedirectMFA.
+func (c *visitCompleter) RedirectMFA(ctx context.Context, w http.ResponseWriter, req *http.Request, require2FA bool, returnTo, returnToState, state string, id *store.Identity) {
+	if !require2FA {
+		c.RedirectSuccess(ctx, w, req, returnTo, returnToState, id)
+		return
+	}
+
+	if c.setMFAStateProviderID == nil {
+		c.RedirectFailure(ctx, w, req, returnTo, returnToState, errgo.New("invalid 2fa configuration"))
+		return
+	}
+	mfaState, err := c.setMFAStateProviderID(w, string(id.ProviderID))
+	if err != nil {
+		c.RedirectFailure(ctx, w, req, returnTo, returnToState, err)
+		return
+	}
+	v := url.Values{}
+	if state != "" {
+		v.Set("state", state)
+	}
+	if mfaState != "" {
+		v.Set(mfa.StateName, mfaState)
+	}
+	if err := c.redirect(w, req, c.params.Location+"/login/mfa/login", v); err != nil {
+		identity.WriteError(ctx, w, err)
+	}
+	return
+}
+
 // RedirectFailure implements idp.VisitCompleter.RedirectFailure.
 func (c *visitCompleter) RedirectFailure(ctx context.Context, w http.ResponseWriter, req *http.Request, returnTo, state string, err error) {
 	v := url.Values{
@@ -191,7 +237,7 @@ func (c *visitCompleter) redirect(w http.ResponseWriter, req *http.Request, retu
 	// Check the return to is a valid URL and is an allowed address.
 	u, err := url.Parse(returnTo)
 	if err != nil || !c.isValidReturnTo(u) {
-		return errgo.WithCausef(err, params.ErrBadRequest, "invalid return_to")
+		return errgo.WithCausef(err, params.ErrBadRequest, "invalid return_to %q", returnTo)
 	}
 
 	q := u.Query()
@@ -206,6 +252,9 @@ func (c *visitCompleter) redirect(w http.ResponseWriter, req *http.Request, retu
 func (c *visitCompleter) isValidReturnTo(u *url.URL) bool {
 	s := u.String()
 	if s == c.params.Location+"/login-complete" {
+		return true
+	}
+	if s == c.params.Location+"/login/mfa/login" {
 		return true
 	}
 	for _, rurl := range c.params.RedirectLoginTrustedURLs {

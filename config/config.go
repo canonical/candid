@@ -121,6 +121,15 @@ type Config struct {
 	// EnableEmailLogin enables the login with email address link on the
 	// authentication required page.
 	EnableEmailLogin bool `yaml:"enable-email-login"`
+
+	// MFARPDisplayName holds the relying party display name for MFA.
+	MFARPDisplayName string `yaml:"mfa-rp-display-name"`
+
+	// MFARPID holds the relying party id for MFA.
+	MFARPID string `yaml:"mfa-rp-id"`
+
+	// MFARPOrigin holds the relying party origin for MFA.
+	MFARPOrigin string `yaml:"mfa-rp-origin"`
 }
 
 // TLSConfig returns a TLS configuration to be used for serving

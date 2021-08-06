@@ -14,6 +14,7 @@ import (
 	"gopkg.in/httprequest.v1"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
 
+	"github.com/canonical/candid/idp"
 	"github.com/canonical/candid/idp/idputil/secret"
 	"github.com/canonical/candid/internal/auth/httpauth"
 	"github.com/canonical/candid/internal/discharger/internal"
@@ -51,6 +52,19 @@ func NewAPIHandler(params identity.HandlerParams) ([]httprequest.Handler, error)
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}
+	if params.MFAAuthenticator != nil {
+		params.MFAAuthenticator.Init(idp.InitParams{
+			Store:                      params.Store,
+			Oven:                       params.Oven,
+			Codec:                      codec,
+			Location:                   params.Location,
+			URLPrefix:                  params.Location + "/login/mfa",
+			VisitCompleter:             vc,
+			Template:                   params.Template,
+			SkipLocationForCookiePaths: params.SkipLocationForCookiePaths,
+		})
+		vc.setMFAStateProviderID = params.MFAAuthenticator.SetMFAStateProviderID
+	}
 	checker := &thirdPartyCaveatChecker{
 		params:  params,
 		place:   place,
@@ -82,6 +96,7 @@ func NewAPIHandler(params identity.HandlerParams) ([]httprequest.Handler, error)
 		})
 	}
 	handlers = append(handlers, idpHandlers(params)...)
+	handlers = append(handlers, mfaHandlers(params)...)
 	return handlers, nil
 }
 
@@ -169,5 +184,34 @@ func idpHandlers(params identity.HandlerParams) []httprequest.Handler {
 			},
 		)
 	}
+	return handlers
+}
+
+func mfaHandlers(params identity.HandlerParams) []httprequest.Handler {
+	if params.MFAAuthenticator == nil {
+		return nil
+	}
+
+	handlers := []httprequest.Handler{}
+	path := "/login/mfa/*path"
+	hfunc := newMFAHandler(params, params.MFAAuthenticator)
+	handlers = append(handlers,
+		httprequest.Handler{
+			Method: "GET",
+			Path:   path,
+			Handle: hfunc,
+		},
+		httprequest.Handler{
+			Method: "POST",
+			Path:   path,
+			Handle: hfunc,
+		},
+		httprequest.Handler{
+			Method: "DELETE",
+			Path:   path,
+			Handle: hfunc,
+		},
+	)
+
 	return handlers
 }

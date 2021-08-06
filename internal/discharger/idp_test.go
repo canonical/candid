@@ -188,7 +188,7 @@ func (s *idpSuite) TestLoginRedirectSuccessInvalidReturnTo(c *qt.C) {
 	c.Assert(err, qt.IsNil)
 	c.Assert(perr, qt.DeepEquals, params.Error{
 		Code:    params.ErrBadRequest,
-		Message: `invalid return_to: parse "::": missing protocol scheme`,
+		Message: `invalid return_to "::": parse "::": missing protocol scheme`,
 	})
 }
 
@@ -205,7 +205,7 @@ func (s *idpSuite) TestLoginRedirectSuccessReturnToNotTrusted(c *qt.C) {
 	c.Assert(err, qt.IsNil)
 	c.Assert(perr, qt.DeepEquals, params.Error{
 		Code:    params.ErrBadRequest,
-		Message: `invalid return_to`,
+		Message: `invalid return_to "https://example.com"`,
 	})
 }
 
@@ -258,7 +258,7 @@ func (s *idpSuite) TestLoginRedirectSuccessReturnToTrustedDomainInsecure(c *qt.C
 	c.Assert(err, qt.IsNil)
 	c.Assert(perr, qt.DeepEquals, params.Error{
 		Code:    params.ErrBadRequest,
-		Message: `invalid return_to`,
+		Message: `invalid return_to "http://www.example.net/callback/path"`,
 	})
 }
 
