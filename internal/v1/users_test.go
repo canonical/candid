@@ -4,6 +4,7 @@
 package v1_test
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"testing"
@@ -63,6 +64,60 @@ func (s *usersSuite) Init(c *qt.C) {
 	s.interactor = httpbakery.WebBrowserInteractor{
 		OpenWebBrowser: candidtest.PasswordLogin(c, "bob", "bobpassword"),
 	}
+}
+
+func (s *usersSuite) TestRemoveUserMFACredentials(c *qt.C) {
+	user := params.User{
+		Username:   "jbloggs",
+		ExternalID: "test:http://example.com/jbloggs",
+		FullName:   "Joe Bloggs",
+		Email:      "jbloggs@example.com",
+		IDPGroups: []string{
+			"test",
+		},
+	}
+	s.addUser(c, user)
+
+	cred := store.MFACredential{
+		ID:                     []byte("test-id"),
+		Name:                   "test credential",
+		ProviderID:             store.ProviderIdentity(user.ExternalID),
+		AttestationType:        "test",
+		AuthenticatorGUID:      []byte("test guid"),
+		AuthenticatorSignCount: 1,
+	}
+	err := s.store.Store.AddMFACredential(context.Background(), cred)
+	c.Assert(err, qt.Equals, nil)
+
+	creds, err := s.store.Store.UserMFACredentials(context.Background(), user.ExternalID)
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(creds, qt.DeepEquals, []store.MFACredential{cred})
+
+	err = s.adminClient.ClearUserMFACredentials(context.Background(),
+		&params.ClearUserMFACredentialsRequest{
+			Username: user.Username,
+		},
+	)
+	c.Assert(err, qt.Equals, nil)
+
+	creds, err = s.store.Store.UserMFACredentials(context.Background(), user.ExternalID)
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(creds, qt.HasLen, 0)
+
+	err = s.adminClient.ClearUserMFACredentials(context.Background(),
+		&params.ClearUserMFACredentialsRequest{
+			Username: user.Username,
+		},
+	)
+	c.Assert(err, qt.Equals, nil)
+
+	client := s.srv.IdentityClient(c, "a-bob@candid", "bob")
+	err = client.ClearUserMFACredentials(context.Background(),
+		&params.ClearUserMFACredentialsRequest{
+			Username: user.Username,
+		},
+	)
+	c.Assert(err, qt.ErrorMatches, ".* permission denied")
 }
 
 func (s *usersSuite) TestRoundTripUser(c *qt.C) {

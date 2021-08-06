@@ -343,3 +343,10 @@ type GetUserGroupsWithIDRequest struct {
 type GroupsResponse struct {
 	Groups []string `json:"groups"`
 }
+
+// ClearUserMFACredentialsRequest is a request to delete
+// all MFA credentials for a user.
+type ClearUserMFACredentialsRequest struct {
+	httprequest.Route `httprequest:"DELETE /v1/mfa/:username"`
+	Username          Username `httprequest:"username,path"`
+}

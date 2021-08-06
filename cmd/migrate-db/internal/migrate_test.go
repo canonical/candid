@@ -147,6 +147,10 @@ func (s errorStore) IncrementMFACredentialSignCount(ctx context.Context, credent
 	return s.err
 }
 
+func (s errorStore) ClearMFACredentials(ctx context.Context, providerID string) error {
+	return s.err
+}
+
 func TestCopy(t *testing.T) {
 	c := qt.New(t)
 	defer c.Done()

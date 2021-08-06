@@ -5,7 +5,6 @@ package meeting
 
 import (
 	"context"
-
 	"gopkg.in/httprequest.v1"
 )
 

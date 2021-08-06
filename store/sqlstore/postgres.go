@@ -165,16 +165,19 @@ var postgresTmpls = [numTmpl]string{
 	tmplIdentityCounts: `
 		SELECT substring(providerid, '^[^:]*') as idp, COUNT(1) 
 		FROM identities GROUP BY idp`,
-	tmplInsertUserCredentials: `
+	tmplInsertMFACredential: `
 		INSERT INTO credentials (id, providerid, name, public_key, attestation_type, authenticator_guid, authenticator_sign_count)
 		VALUES ({{.ID | .Arg}}, {{.ProviderID | .Arg}}, {{.Name | .Arg}}, {{.PublicKey | .Arg}}, {{.AttestationType | .Arg}}, {{.AuthenticatorGUID | .Arg}}, {{.AuthenticatorSignCount | .Arg}})`,
-	tmplRemoveUserCredentials: `
+	tmplRemoveMFACredential: `
 		DELETE FROM credentials
 		WHERE providerid={{.ProviderID | .Arg}} AND name={{.Name | .Arg}}`,
-	tmplGetUserCredentials: `
+	tmplClearMFACredentials: `
+		DELETE FROM credentials
+		WHERE providerid={{.ProviderID | .Arg}}`,
+	tmplGetMFACredentials: `
 		SELECT id, providerid, name, public_key, attestation_type, authenticator_guid, authenticator_sign_count FROM credentials
 		WHERE providerid={{.ProviderID | .Arg}}`,
-	tmplIncrementCredentialSignCount: `
+	tmplIncrementMFACredentialSignCount: `
 		UPDATE credentials
 		SET authenticator_sign_count = authenticator_sign_count + 1
 		WHERE id={{.ID | .Arg}} AND id={{.ID | .Arg}}`,

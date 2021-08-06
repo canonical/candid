@@ -61,6 +61,18 @@ func (s *identityStore) RemoveMFACredential(ctx context.Context, providerID, nam
 	return nil
 }
 
+// ClearMFACredentials removes all multi-factor credentials for the specified user.
+func (s *identityStore) ClearMFACredentials(ctx context.Context, providerID string) error {
+	coll := s.b.c(ctx, credentialCollection)
+	defer coll.Database.Session.Close()
+
+	_, err := coll.RemoveAll(bson.M{"provider-id": store.ProviderIdentity(providerID)})
+	if err != nil {
+		return errgo.Mask(err)
+	}
+	return nil
+}
+
 // UserMFACredentials returns all multi-factor credentials for the specified user.
 func (s *identityStore) UserMFACredentials(ctx context.Context, providerID string) ([]store.MFACredential, error) {
 	coll := s.b.c(ctx, credentialCollection)

@@ -5,7 +5,6 @@ package candidclient
 
 import (
 	"context"
-
 	"github.com/canonical/candid/params"
 	"gopkg.in/httprequest.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery"
@@ -13,6 +12,11 @@ import (
 
 type client struct {
 	Client httprequest.Client
+}
+
+// ClearUserMFACredentials removes all MFA credentials for a user.
+func (c *client) ClearUserMFACredentials(ctx context.Context, p *params.ClearUserMFACredentialsRequest) error {
+	return c.Client.Call(ctx, p, nil)
 }
 
 // CreateAgent creates a new agent and returns the newly chosen username

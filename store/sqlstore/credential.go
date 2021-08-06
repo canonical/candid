@@ -35,7 +35,7 @@ func (s *identityStore) AddMFACredential(ctx context.Context, cred store.MFACred
 		AuthenticatorGUID:      cred.AuthenticatorGUID,
 		AuthenticatorSignCount: cred.AuthenticatorSignCount,
 	}
-	_, err := s.driver.exec(s.db, tmplInsertUserCredentials, params)
+	_, err := s.driver.exec(s.db, tmplInsertMFACredential, params)
 	if err != nil {
 		if postgresIsDuplicate(errgo.Cause(err)) {
 			return errgo.WithCausef(nil, store.ErrDuplicateCredential, "credential with name %q already exists", cred.Name)
@@ -53,7 +53,20 @@ func (s *identityStore) RemoveMFACredential(ctx context.Context, providerID, nam
 		ProviderID: store.ProviderIdentity(providerID),
 		Name:       name,
 	}
-	_, err := s.driver.exec(s.db, tmplRemoveUserCredentials, params)
+	_, err := s.driver.exec(s.db, tmplRemoveMFACredential, params)
+	if err != nil {
+		return errgo.Mask(err)
+	}
+	return nil
+}
+
+// ClearMFACredentials removes all multi-factor credentials for the specified user.
+func (s *identityStore) ClearMFACredentials(ctx context.Context, providerID string) error {
+	params := &userCredentialParams{
+		argBuilder: s.driver.argBuilderFunc(),
+		ProviderID: store.ProviderIdentity(providerID),
+	}
+	_, err := s.driver.exec(s.db, tmplClearMFACredentials, params)
 	if err != nil {
 		return errgo.Mask(err)
 	}
@@ -66,7 +79,7 @@ func (s *identityStore) UserMFACredentials(ctx context.Context, providerID strin
 		argBuilder: s.driver.argBuilderFunc(),
 		ProviderID: store.ProviderIdentity(providerID),
 	}
-	rows, err := s.driver.query(s.db, tmplGetUserCredentials, params)
+	rows, err := s.driver.query(s.db, tmplGetMFACredentials, params)
 	if err != nil {
 		return nil, errgo.Mask(err)
 	}
@@ -98,7 +111,7 @@ func (s *identityStore) IncrementMFACredentialSignCount(ctx context.Context, cre
 		argBuilder: s.driver.argBuilderFunc(),
 		ID:         credentialID,
 	}
-	_, err := s.driver.exec(s.db, tmplIncrementCredentialSignCount, params)
+	_, err := s.driver.exec(s.db, tmplIncrementMFACredentialSignCount, params)
 	if err != nil {
 		return errgo.Mask(err)
 	}
