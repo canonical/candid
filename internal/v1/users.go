@@ -92,6 +92,23 @@ func (h *handler) QueryUsers(p httprequest.Params, r *params.QueryUsersRequest) 
 	return usernames, nil
 }
 
+// ClearUserMFACredentials removes all MFA credentials for a user.
+func (h *handler) ClearUserMFACredentials(p httprequest.Params, r *params.ClearUserMFACredentialsRequest) error {
+	logger.Tracef("User %#v", r)
+
+	id, err := h.params.Authorizer.Identity(p.Context, &store.Identity{
+		Username: string(r.Username),
+	})
+	if err != nil {
+		return errgo.Mask(err)
+	}
+	err = h.params.Store.ClearMFACredentials(p.Context, string(id.ProviderID))
+	if err != nil {
+		return errgo.Mask(err)
+	}
+	return nil
+}
+
 // User returns the user information for the request user.
 func (h *handler) User(p httprequest.Params, r *params.UserRequest) (*params.User, error) {
 	logger.Tracef("User %#v", r)

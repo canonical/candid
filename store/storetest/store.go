@@ -1471,6 +1471,9 @@ func (s *storeSuite) TestUserCredentials(c *qt.C) {
 	)
 	c.Assert(err, qt.IsNil)
 
+	err = s.Store.ClearMFACredentials(s.ctx, string(identity.ProviderID))
+	c.Assert(err, qt.Equals, nil)
+
 	// no credentials exist for the created user
 	creds, err := s.Store.UserMFACredentials(s.ctx, identity.ID)
 	c.Assert(err, qt.IsNil)
@@ -1537,4 +1540,10 @@ func (s *storeSuite) TestUserCredentials(c *qt.C) {
 		return creds[i].Name < creds[j].Name
 	})
 	c.Assert(creds, qt.DeepEquals, []store.MFACredential{cred, cred2})
+
+	err = s.Store.ClearMFACredentials(s.ctx, string(identity.ProviderID))
+	c.Assert(err, qt.Equals, nil)
+	creds, err = s.Store.UserMFACredentials(s.ctx, string(identity.ProviderID))
+	c.Assert(err, qt.IsNil)
+	c.Assert(creds, qt.HasLen, 0)
 }

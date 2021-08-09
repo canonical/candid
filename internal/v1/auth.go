@@ -70,6 +70,8 @@ func opForRequest(r interface{}) bakery.Op {
 		return auth.UserIDOp(r.UserID, auth.ActionRead)
 	case *params.GetUserGroupsWithIDRequest:
 		return auth.UserIDOp(r.UserID, auth.ActionReadGroups)
+	case *params.ClearUserMFACredentialsRequest:
+		return auth.GlobalOp(auth.ActionClearUserMFACredentials)
 	default:
 		logger.Infof("unknown API argument type %#v", r)
 	}

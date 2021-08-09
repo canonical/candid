@@ -159,6 +159,9 @@ type Store interface {
 
 	// IncrementMFACredentialSignCount increments the multi-factor credential sign count.
 	IncrementMFACredentialSignCount(ctx context.Context, credentialID []byte) error
+
+	// ClearMFACredentials removes all multi-factor credentials for the specified user.
+	ClearMFACredentials(ctx context.Context, providerID string) error
 }
 
 // A ProviderIdentity is a provider-specific unique identity.

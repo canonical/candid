@@ -45,6 +45,23 @@ func (s *memStore) RemoveMFACredential(ctx context.Context, providerID, name str
 	return nil
 }
 
+// ClearMFACredentials removes all multi-factor credentials for the specified user.
+func (s *memStore) ClearMFACredentials(ctx context.Context, providerID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	keys := []string{}
+	for key, cred := range s.credentials {
+		if string(cred.ProviderID) == providerID {
+			keys = append(keys, key)
+		}
+	}
+	for _, key := range keys {
+		delete(s.credentials, key)
+	}
+	return nil
+}
+
 // UserMFACredentials returns all multi-factor credentials for the specified user.
 func (s *memStore) UserMFACredentials(ctx context.Context, providerID string) ([]store.MFACredential, error) {
 	s.mu.Lock()
