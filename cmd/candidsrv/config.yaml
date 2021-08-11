@@ -18,7 +18,7 @@ identity-providers:
 - type: static
   name: static
   description: Default identity provider
-  require-2fa: true
+  require-mfa: true
   users:
     user1:
       name: User One

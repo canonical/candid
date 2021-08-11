@@ -64,8 +64,8 @@ type Params struct {
 	// this identity provider can be used for a particular user email.
 	MatchEmailAddr string `yaml:"match-email-addr"`
 
-	// Require2FA indicates if this provider requires the use of 2FA
-	Require2FA bool `yaml:"require-2fa"`
+	// RequireMFA indicates if this provider requires the use of MFA
+	RequireMFA bool `yaml:"require-mfa"`
 }
 
 type UserInfo struct {
@@ -200,7 +200,7 @@ func (idp *identityProvider) Handle(ctx context.Context, w http.ResponseWriter, 
 			return
 		}
 		if id != nil {
-			idp.initParams.VisitCompleter.RedirectMFA(ctx, w, req, idp.params.Require2FA, ls.ReturnTo, ls.State, state, id)
+			idp.initParams.VisitCompleter.RedirectMFA(ctx, w, req, idp.params.RequireMFA, ls.ReturnTo, ls.State, state, id)
 			return
 		}
 	}
