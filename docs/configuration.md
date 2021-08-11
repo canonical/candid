@@ -29,22 +29,26 @@ options. Some less useful options are omitted here - the remaining
 ones are all documented [here](https://godoc.org/github.com/CanonicalLtd/candid/config#Config).
 
 ### listen-address
+
 (Required) This is the address that the service will listen on. This consists of
 an optional host followed by a port. If the host is omitted then the
 server will listen on all interface addresses. The port may be a well
 known service name for example ":http".
 
 ### location
+
 (Required) This is the externally addressable location of the Candid server API.
 Candid needs to know its own address so that it can add third-party
 caveats addressed to itself and to create response addresses for identity
 providers such as OpenID that use browser redirection for communication.
 
 ### storage
+
 Storage holds configuration for the storage backend used by the
 server. See below for documentation on the supported storage backends.
 
 ### public-key & private-key
+
 (Required) Services wishing to discharge caveats against this identity manager
 encrypt their third party caveats using this public-key. The private
 key is needed for the identity manager to be able to discharge those
@@ -53,32 +57,51 @@ with `go install gopkg.in/macaroon-bakery.v2/cmd/bakery-keygen` to generate
 a suitable key pair.
 
 ### access-log
+
 The access-log configures the name of a file used to record all
 accesses to the identity manager. If this is not configured then no
 logging will take place.
 
 ### identity-providers
+
 This is a list of the configured identity providers with their
 configuration. See below for the supported identity providers. If this
 is not configured then a default set of providers will be used
 containing the Ubuntu SSO and Agent identity providers.
 
 ### api-macaroon-timeout
+
 This is the maximum time a login to the /v1 API will remain logged
-in for. As candid uses itself as it's authentication provider,
+in for. As candid uses itself as its authentication provider, 
 for all practical purpose the login time will be the minimum of
-`api-macaroon-timeout` and `discharge-macaroon-timeout`. The default
+`api-macaroon-timeout` and `discharge-macaroon-timeout` . The default
 value is 24 hours.
 
 ### discharge-macaroon-timeout
+
 This is the maximum time the discharge macaroon will be valid for on
 the target service. This is the maximum time the client will be able to
 access the target service without requiring re-authentication. Note that
-the target service may also have it's own maximum time.
+the target service may also have its own maximum time.
 
 ### discharge-token-timeout
+
 This is the maximum time that the discharge token issued to the client
 can be used to discharge tokens without requiring re-authentication.
+
+### mfa-rp-display-name
+
+This is the name of the candid as a relying party for the multi-factor
+authentication.
+
+### mfa-rp-id
+
+This is the id of candid as a relying party for the multi-factor 
+authentication - in general this should be set to the FQDN of candid.
+
+### mfa-rp-origin
+
+This is the origin url of the WebAuthn requests for candid.
 
 Storage Backends
 -----------
@@ -103,10 +126,10 @@ all data ephemerally in RAM.
 
 This uses MongoDB for the backend. It has two parameters:
 
-`address` (required) is the address of the mongoDB server to connect to,
+`address` (required) is the address of the mongoDB server to connect to, 
 in `host:port` form.
 
-`database` holds the database name to use. If not specified, this will default to `candid`.
+`database` holds the database name to use. If not specified, this will default to `candid` .
 
 ### postgres
 
@@ -121,7 +144,7 @@ for details.
 Identity Providers
 ------------------
 The identity manager can support a number of different identity
-providers. These can be broken loosely into two categories,
+providers. These can be broken loosely into two categories, 
 interactive and custom. Interactive providers use html based forms in
 some way to authorize the user and are compatible with the most basic
 supported clients. Custom providers use a protocol not necessarily
@@ -133,6 +156,7 @@ not make sense as the identity manager will only use the first one
 that is found.
 
 ### Agent
+
 The agent identity provider is a custom provider that is always configured, and allows non-interactive
 logins to clients using public-key authentication.
 the agent protocol to log in. See
@@ -140,6 +164,7 @@ https://github.com/canonical/candid/blob/master/docs/login.txt
 for details on the agent login protocol.
 
 ### UbuntuSSO
+
 ```yaml
 - type: usso
   name: usso
@@ -186,6 +211,7 @@ SSO will not be automatically reflected when a user authenticates. The
 username in candid will remain fixed to the username that is first used.
 
 ### UbuntuSSO OAuth
+
 ```yaml
 - type: usso_oauth
 ```
@@ -194,6 +220,7 @@ The UbuntuSSO OAuth identity provider is an custom identity provider that
 uses a previously obtained UbuntuSSO OAuth token to log in.
 
 ### Keystone
+
 ```yaml
 - type: keystone
   name: canonistack
@@ -237,6 +264,7 @@ this identity provider in the list of possible identity providers when
 performing an interactive login.
 
 ### Keystone Token
+
 ```yaml
 - type: keystone_token
   name: jujugui
@@ -273,6 +301,7 @@ The `url` is the location of the keystone server that will be used to
 authenticate the user.
 
 ### Keystone Userpass
+
 ```yaml
 - type: keystone_userpass
   name: form
@@ -309,6 +338,7 @@ The `url` is the location of the keystone server that will be used to
 authenticate the user.
 
 ### Azure OpenID Connect
+
 ```yaml
 - type: azure
   icon: /static/images/azure-icon.bmp
@@ -330,13 +360,14 @@ location. If this is not set a default icon for azure will be used.
 The `client-id` and `client-secret` parameters must be specified and
 are created by registering the candid instance as an application at
 https://apps.dev.microsoft.com. When registering the application the
-redirect URLs should include `$CANDID_URL/login/azure/callback`.
+redirect URLs should include `$CANDID_URL/login/azure/callback` .
 
 The `hidden` value is an optional value that can be used to not list
 this identity provider in the list of possible identity providers when
 performing an interactive login.
 
 ### ADFS OpenID Connect
+
 ```yaml
 - type: adfs
   name: example
@@ -365,7 +396,7 @@ required to successfully perform OpenID Connect authentication.
 The `client-id` and `client-secret` parameters must be specified and
 are created by registering the candid instance as an application on the
 ADFS service. When  registering the application the redirect URLs should
-include `$CANDID_URL/login/{name}/callback`. When authenticating candid
+include `$CANDID_URL/login/{name}/callback` . When authenticating candid
 requests the "email" and "profile" scopes in addition to the "openid"
 scope in order to retrieve the required profile information.
 
@@ -380,6 +411,7 @@ checked against the regular expression and if they match the identity
 provider will be used to perform the login.
 
 ### Google OpenID Connect
+
 ```yaml
 - type: google
   icon: /static/images/google-icon.bmp
@@ -397,7 +429,7 @@ The `client-id` and `client-secret` parameters must be specified and
 are created by registering the candid instance as an application
 at https://console.developers.google.com/apis/credentials. When
 registering the application the authorized redirect URLs should include
-`$CANDID_URL/login/google/callback`.
+`$CANDID_URL/login/google/callback` .
 
 The `icon` is optional and specifies the location of an icon to display
 when presenting the identity-provider options to a user. It this is set
@@ -409,6 +441,7 @@ this identity provider in the list of possible identity providers when
 performing an interactive login.
 
 ### Keycloak OpenID Connect
+
 ```yaml
 - type: keycloak
   domain: example
@@ -433,14 +466,16 @@ provided by the keycloak service administrator. An optional client-secret may
 also be required which the keycloak service administrator should provide.
 
 When registering the application the authorized redirect URLs should include
-`$CANDID_URL/login/keycloak/callback`.
+`$CANDID_URL/login/keycloak/callback` .
 
 The `hidden` value is an optional value that can be used to not list
 this identity provider in the list of possible identity providers when
 performing an interactive login.
+
 ```
 
 ### LDAP
+
 ```yaml
 - type: ldap
   name: ldap
@@ -480,7 +515,7 @@ allows them to be identified. The name will be used in the login URL.
 
 `description` (optional) provides a human readable description of the
 identity provider. If it is not set it will default to the value of
-`name`.
+`name` .
 
 `icon` (optional) specifies the location of an icon to display when
 presenting the identity-provider options to a user. It this is set
@@ -517,7 +552,8 @@ the created identity.
 
 `group-query-filter` contains the filter candid uses when finding
 group memberships for a user.  The filter is specified as a template
-(see https://golang.org/pkg/text/template) where the value of `.User`
+(see https://golang.org/pkg/text/template) where the value of `. User`
+
 will be replaced with the DN of the user for whom candid is attempting
 to find group memberships.
 
@@ -525,7 +561,11 @@ The `hidden` value is an optional value that can be used to not list
 this identity provider in the list of possible identity providers when
 performing an interactive login.
 
+If `require-2fa` is set to `true` candid will require users to present
+valid 2fa credentials when logging in.
+
 ### Static identity provider
+
 ```yaml
 - type: static
   name: static
@@ -562,7 +602,7 @@ created. If this is not set then no domain is used.
 
 `description` (optional) provides a human readable description of the
 identity provider. If it is not set it will default to the value of
-`name`.
+`name` .
 
 `icon` (optional) specifies the location of an icon to display when
 presenting the identity-provider options to a user. It this is set
@@ -581,6 +621,9 @@ select the identity provider using an email address. If configured when
 a user attempts to login via an email address the address will be
 checked against the regular expression and if they match the identity
 provider will be used to perform the login.
+
+If `require-2fa` is set to `true` candid will require users to present
+valid 2fa credentials when loggin in.
 
 Charm Configuration
 -------------------
