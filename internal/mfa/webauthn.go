@@ -100,17 +100,17 @@ type LoginState struct {
 	// correct username-password combination.
 	ProviderID string
 	// RegistrationSessionData holds data associated with the
-	// ongoing 2FA security device registration process.
+	// ongoing mfa security device registration process.
 	RegistrationSessionData string
 	// LoginSessionData holds data associated with the
-	// ongoing 2FA login process.
+	// ongoing mfa login process.
 	LoginSessionData string
 	// ValidCredentialID holds the ID of the presented
 	// valid credential.
 	ValidCredentialID []byte
 }
 
-// formCredentialParams holds the name of the 2fa credential along with the url
+// formCredentialParams holds the name of the mfa credential along with the url
 // where the user may remove the credential.
 type formCredentialParams struct {
 	Name      string `json:"name"`
@@ -128,7 +128,7 @@ type formParams struct {
 	RegistrationData string
 }
 
-// Authenticator implements methods needed for 2FA.
+// Authenticator implements methods needed for mfa.
 type Authenticator struct {
 	// Params holds the parameters passed to the identity provider.
 	Params idp.InitParams
@@ -219,7 +219,7 @@ func (a *Authenticator) Handle(ctx context.Context, w http.ResponseWriter, req *
 				}
 				return
 			}
-			a.Params.VisitCompleter.RedirectFailure(ctx, w, req, loginState.ReturnTo, loginState.State, errgo.New("2fa credentials not presented"))
+			a.Params.VisitCompleter.RedirectFailure(ctx, w, req, loginState.ReturnTo, loginState.State, errgo.New("mfa credentials not presented"))
 			return
 		}
 	case "/remove":
@@ -337,7 +337,7 @@ func (a *Authenticator) prepareFormData(ctx context.Context, w http.ResponseWrit
 	}
 
 	// if user has no previously registered credentials or the user
-	// has already presented a valid 2fa credential, we allow additional
+	// has already presented a valid mfa credential, we allow additional
 	// device registration
 	if len(user.WebAuthnCredentials()) == 0 {
 		registrationData, registrationSessionData, err := a.registrationData(ctx, user)
@@ -378,7 +378,7 @@ func (a *Authenticator) prepareFormData(ctx context.Context, w http.ResponseWrit
 	return &data, nil
 }
 
-// credentialRegistration method is used to finish the 2FA security device registration.
+// credentialRegistration method is used to finish the mfa security device registration.
 func (a *Authenticator) credentialRegistration(ctx context.Context, w http.ResponseWriter, req *http.Request) {
 	// get the credential name from the request
 	credentialName := req.Form.Get("credential-name")
@@ -389,7 +389,7 @@ func (a *Authenticator) credentialRegistration(ctx context.Context, w http.Respo
 	// get the login state
 	var state LoginState
 	if err := a.Params.Codec.Cookie(req, CookieName, req.Form.Get(StateName), &state); err != nil {
-		a.returnError(w, params.NewError(params.ErrBadRequest, "invalid 2fa login state"))
+		a.returnError(w, params.NewError(params.ErrBadRequest, "invalid mfa login state"))
 		return
 	}
 	// get the user specified in the login state
@@ -470,7 +470,7 @@ func (a *Authenticator) credentialRegistration(ctx context.Context, w http.Respo
 	httprequest.WriteJSON(w, http.StatusOK, data)
 }
 
-// verifyLogin returns an error if the user has not yet presented valid 2fa credentials.
+// verifyLogin returns an error if the user has not yet presented valid mfa credentials.
 func (a *Authenticator) verifyLogin(ctx context.Context, req *http.Request) (*store.Identity, error) {
 	// get the login state
 	var state LoginState
@@ -492,12 +492,12 @@ func (a *Authenticator) verifyLogin(ctx context.Context, req *http.Request) (*st
 	return &id, nil
 }
 
-// login method is used to complete the 2FA part of the login process.
+// login method is used to complete the mfa part of the login process.
 func (a *Authenticator) login(ctx context.Context, w http.ResponseWriter, req *http.Request) {
 	// get the login state
 	var state LoginState
 	if err := a.Params.Codec.Cookie(req, CookieName, req.Form.Get(StateName), &state); err != nil {
-		a.returnError(w, params.NewError(params.ErrBadRequest, "invalid 2fa login state"))
+		a.returnError(w, params.NewError(params.ErrBadRequest, "invalid mfa login state"))
 		return
 	}
 	// get the user specified in the login state
@@ -563,7 +563,7 @@ func (a *Authenticator) login(ctx context.Context, w http.ResponseWriter, req *h
 	httprequest.WriteJSON(w, http.StatusOK, data)
 }
 
-// removeCredential removes the user's 2FA security device.
+// removeCredential removes the user's mfa security device.
 func (a *Authenticator) removeCredential(ctx context.Context, w http.ResponseWriter, req *http.Request) {
 	// get the login state
 	var state LoginState

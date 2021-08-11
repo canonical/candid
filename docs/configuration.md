@@ -561,8 +561,8 @@ The `hidden` value is an optional value that can be used to not list
 this identity provider in the list of possible identity providers when
 performing an interactive login.
 
-If `require-2fa` is set to `true` candid will require users to present
-valid 2fa credentials when logging in.
+If `require-mfa` is set to `true` candid will require users to present
+valid MFA credentials when logging in.
 
 ### Static identity provider
 
@@ -622,8 +622,8 @@ a user attempts to login via an email address the address will be
 checked against the regular expression and if they match the identity
 provider will be used to perform the login.
 
-If `require-2fa` is set to `true` candid will require users to present
-valid 2fa credentials when loggin in.
+If `require-mfa` is set to `true` candid will require users to present
+valid MFA credentials when loggin in.
 
 Charm Configuration
 -------------------

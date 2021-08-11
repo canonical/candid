@@ -184,14 +184,14 @@ func (c *visitCompleter) RedirectSuccess(ctx context.Context, w http.ResponseWri
 }
 
 // RedirectMFA implements idp.VisitCompleter.RedirectMFA.
-func (c *visitCompleter) RedirectMFA(ctx context.Context, w http.ResponseWriter, req *http.Request, require2FA bool, returnTo, returnToState, state string, id *store.Identity) {
-	if !require2FA {
+func (c *visitCompleter) RedirectMFA(ctx context.Context, w http.ResponseWriter, req *http.Request, requireMFA bool, returnTo, returnToState, state string, id *store.Identity) {
+	if !requireMFA {
 		c.RedirectSuccess(ctx, w, req, returnTo, returnToState, id)
 		return
 	}
 
 	if c.setMFAStateProviderID == nil {
-		c.RedirectFailure(ctx, w, req, returnTo, returnToState, errgo.New("invalid 2fa configuration"))
+		c.RedirectFailure(ctx, w, req, returnTo, returnToState, errgo.New("invalid mfa configuration"))
 		return
 	}
 	mfaState, err := c.setMFAStateProviderID(w, string(id.ProviderID))

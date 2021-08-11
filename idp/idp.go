@@ -45,7 +45,7 @@ type VisitCompleter interface {
 	RedirectSuccess(ctx context.Context, w http.ResponseWriter, req *http.Request, returnTo, state string, id *store.Identity)
 
 	// RedirectMFA redirects the user to the multi-factor login flow.
-	RedirectMFA(ctx context.Context, w http.ResponseWriter, req *http.Request, require2FA bool, returnTo, returnToState, state string, id *store.Identity)
+	RedirectMFA(ctx context.Context, w http.ResponseWriter, req *http.Request, requireMFA bool, returnTo, returnToState, state string, id *store.Identity)
 }
 
 // InitParams are passed to the identity provider to initialise it.
