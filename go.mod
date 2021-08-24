@@ -2,7 +2,7 @@ module github.com/canonical/candid
 
 require (
 	github.com/coreos/go-oidc v0.0.0-20170119174436-2cc7913f9f6f
-	github.com/frankban/quicktest v1.13.0
+	github.com/frankban/quicktest v1.13.1
 	github.com/garyburd/go-oauth v0.0.0-20150329160146-3131beb69b81
 	github.com/google/go-cmp v0.5.6
 	github.com/google/uuid v1.3.0
