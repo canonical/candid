@@ -143,11 +143,15 @@ function registerSecurityKey() {
           mfaState = data.state;
           registrationData = data.registrationdata;
           credentials = data.credentials;
-          document.getElementById("note").innerHTML = "You are now logged in.";
+          /* 
+          Successful registration = Log in complete -> it should redirect
+          to the last template "login". No need to print the keys here...
+          */
+          //document.getElementById("note").innerHTML = "You are now logged in.";
           //document.getElementById("login-button").disabled = false;
-          document.getElementById("credentialName").value = "";
+          //document.getElementById("credentialName").value = "";
 
-          printSecurityKeys(credentials);
+          //printSecurityKeys(credentials);
         })
         .catch((error) => {
           return Promise.reject("login failed");
@@ -174,16 +178,6 @@ function printSecurityKeys(credentials) {
       item.name +
       `</div>
     `;
-    if (credentials.length > 1) {
-      div.classList.add("security-keys__item--removable");
-      innerHtml += `
-      <button class="remove-security-key-button u-no-margin--bottom" onclick="removeCredential('` +
-        item.removeurl +
-        `')">
-        <i class="p-icon--delete"></i>
-      </button>
-    `;
-    }
     div.innerHTML = innerHtml; 
     credentialsDIV.appendChild(div);
   });

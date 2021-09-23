@@ -59,9 +59,10 @@ $(document).ready(function () {
     return;
   }
   if (loginData !== JSON.stringify({})) {
+    /* Before running the login, we should show the list of security keys */ 
     loginUser();
   } else {
-    document.getElementById("registration-button").disabled = false;
+    /* This would never happens */ 
   }
 });
 
@@ -144,16 +145,6 @@ function printSecurityKeys(credentials) {
       item.name +
       `</div>
     `;
-    if (credentials.length > 1) {
-      div.classList.add("security-keys__item--removable");
-      innerHtml += `
-      <button class="remove-security-key-button u-no-margin--bottom" onclick="removeCredential('` +
-        item.removeurl +
-        `')">
-        <i class="p-icon--delete"></i>
-      </button>
-    `;
-    }
     div.innerHTML = innerHtml; 
     credentialsDIV.appendChild(div);
   });
