@@ -27,7 +27,7 @@
     <div class="row">
       <div class="col-6 col-start-large-4">
         <div class="p-card--highlighted">
-          <h1 class="p-heading--four">Manage security keys</h1>
+          <h1 class="p-heading--four">Authentication</h1>
           {{if .Error}}
             <div class="p-notification--negative">
               <p class="p-notification__response">
@@ -36,12 +36,12 @@
             </div>
           {{end}}
           <p class="p-text" id='note'>{{.Note}}</p>
+          <h2 class="p-heading--five">Your registered security keys</h2>
           <ul class="p-list--divided" id="credentials"></ul>
-          <div class="row">
-            <label for="security-key">New security key</label>
-            <input type="text" id="credentialName" name="security-key" placeholder="Credential name" maxlength="44" required>
-          </div>
-          <button class="p-button--positive u-no-margin--bottom" onclick="registerSecurityKey()" disabled id="registration-button">Register</button>
+          <hr class="u-sv1">
+          <p class="u-no-margin--bottom">
+            <i class="p-icon--information"></i>Use a registered security key to log in. You can manage your keys when logged in.
+          </p>
         </div>
       </div>
     </div>
@@ -58,16 +58,8 @@ $(document).ready(function () {
     document.getElementById("note").innerHTML = "Your browser does not support WebAuthn.";
     return;
   }
-
   if (loginData !== JSON.stringify({})) {
-    /* 
-    If there is already at least 1 key, 
-    we must redirect to mfa-have-keys
-
-    window.location.replace("/mfa-have-keys"); might need arguments
-    */
-    //loginUser();
-    
+    loginUser();
   } else {
     document.getElementById("registration-button").disabled = false;
   }
@@ -77,89 +69,67 @@ function finishLogin() {
   window.location.replace({{.LoginURL}} + "&mfa-state=" + mfaState);
 }
 
-function registerSecurityKey() {
-  var credentialName = document.getElementById("credentialName").value;
-  var credential = null;
-
-  makeCredentialOptions = JSON.parse(registrationData);
-
-  makeCredentialOptions.publicKey.challenge = bufferDecode(
-    makeCredentialOptions.publicKey.challenge
+function loginUser() {
+  credentialRequestOptions = JSON.parse(loginData);
+  credentialRequestOptions.publicKey.challenge = bufferDecode(
+    credentialRequestOptions.publicKey.challenge
   );
-  makeCredentialOptions.publicKey.user.id = bufferDecode(
-    makeCredentialOptions.publicKey.user.id
-  );
-  if (makeCredentialOptions.publicKey.excludeCredentials) {
-    for (
-      var i = 0;
-      i < makeCredentialOptions.publicKey.excludeCredentials.length;
-      i++
-    ) {
-      makeCredentialOptions.publicKey.excludeCredentials[i].id = bufferDecode(
-        makeCredentialOptions.publicKey.excludeCredentials[i].id
-      );
-    }
-  }
+  credentialRequestOptions.publicKey.allowCredentials.forEach(function (
+    listItem
+  ) {
+    listItem.id = bufferDecode(listItem.id);
+  });
   navigator.credentials
-    .create({
-      publicKey: makeCredentialOptions.publicKey,
+    .get({
+      publicKey: credentialRequestOptions.publicKey,
     })
-    .then(function (newCredential) {
-      let attestationObject = new Uint8Array(
-        newCredential.response.attestationObject
-      );
-      let clientDataJSON = new Uint8Array(
-        newCredential.response.clientDataJSON
-      );
-      let rawId = new Uint8Array(newCredential.rawId);
-      fetch({{.RegistrationURL}} + "&mfa-state=" + mfaState + "&credential-name=" + credentialName, {
+    .then((assertion) => {
+      let authData = assertion.response.authenticatorData;
+      let clientDataJSON = assertion.response.clientDataJSON;
+      let rawId = assertion.rawId;
+      let sig = assertion.response.signature;
+      let userHandle = assertion.response.userHandle;
+      assertionData = JSON.stringify({
+        id: assertion.id,
+        rawId: bufferEncode(rawId),
+        type: assertion.type,
+        response: {
+          authenticatorData: bufferEncode(authData),
+          clientDataJSON: bufferEncode(clientDataJSON),
+          signature: bufferEncode(sig),
+          userHandle: bufferEncode(userHandle),
+        },
+      });
+      fetch({{.LoginURL}} + "&mfa-state=" + mfaState, {
         method: "POST",
         headers: {
-          Accept: "application/json",
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          id: newCredential.id,
-          rawId: bufferEncode(rawId),
-          type: newCredential.type,
-          response: {
-            attestationObject: bufferEncode(attestationObject),
-            clientDataJSON: bufferEncode(clientDataJSON),
-          },
-        }),
-        contentType: "application/json; charset=utf-8",
-        dataType: "json",
+        body: assertionData,
       })
-        .then((response) => {
-          if (!response.ok) {
-            document.getElementById("note").innerHTML =
-              "Failed to register the security device: " + response.statusText;
-            return Promise.reject(response.statusText);
-          } else {
-            return response.json();
-          }
-        })
-        .then((data) => {
-          mfaState = data.state;
-          registrationData = data.registrationdata;
-          credentials = data.credentials;
-          document.getElementById("note").innerHTML = "You are now logged in.";
-          //document.getElementById("login-button").disabled = false;
-          document.getElementById("credentialName").value = "";
-
-          printSecurityKeys(credentials);
-        })
-        .catch((error) => {
-          return Promise.reject("login failed");
-        });
+      .then((response) => {
+        if (!response.ok) {
+          document.getElementById("note").innerHTML =
+            "Login failed: " + response.statusText;
+          return Promise.reject(response.statusText);
+        } else {
+          return response.json();
+        }
+      })
+      .then((data) => {
+        // Successfully logged in
+        mfaState = data.state;
+        registrationData = data.registrationdata;
+        credentials = data.credentials;
+        finishLogin();
+      })
+      .catch((error) => {
+        return Promise.reject("login failed");
+      });
     })
-    .then((response) => {
+    .catch((error) => {
       document.getElementById("note").innerHTML =
-        "Successfully registed the security device";
-    })
-    .catch(function (err) {
-      document.getElementById("note").innerHTML =
-        "Failed to register the security device" + err;
+        "Login failed: " + error;
     });
 }
 

@@ -1,0 +1,6 @@
+.p-list__item .list-item__link {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 1rem;
+    align-items: center;
+}

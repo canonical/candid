@@ -12,7 +12,7 @@
   
   <link rel="shortcut icon" href="../../static/favicon.ico">
   <link rel="stylesheet" href="../../static/css/vanilla.css">
-  <link rel="stylesheet" href="../../static/css/mfa.css">
+  <link rel="stylesheet" href="../../static/css/manage-keys.css">
   <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.0/jquery.min.js"></script>
 </head>
 <body>
@@ -36,12 +36,15 @@
             </div>
           {{end}}
           <p class="p-text" id='note'>{{.Note}}</p>
+          <h2 class="p-heading--five">Your registered security keys</h2>
           <ul class="p-list--divided" id="credentials"></ul>
           <div class="row">
             <label for="security-key">New security key</label>
             <input type="text" id="credentialName" name="security-key" placeholder="Credential name" maxlength="44" required>
           </div>
           <button class="p-button--positive u-no-margin--bottom" onclick="registerSecurityKey()" disabled id="registration-button">Register</button>
+          <hr class="u-sv1">
+          <div class="logged-meesage">You are logged in. You can close this window.</div>
         </div>
       </div>
     </div>
@@ -58,23 +61,36 @@ $(document).ready(function () {
     document.getElementById("note").innerHTML = "Your browser does not support WebAuthn.";
     return;
   }
-
   if (loginData !== JSON.stringify({})) {
-    /* 
-    If there is already at least 1 key, 
-    we must redirect to mfa-have-keys
-
-    window.location.replace("/mfa-have-keys"); might need arguments
-    */
-    //loginUser();
-    
-  } else {
     document.getElementById("registration-button").disabled = false;
+  } else {
+    window.location.replace("/login");
   }
 });
 
-function finishLogin() {
-  window.location.replace({{.LoginURL}} + "&mfa-state=" + mfaState);
+function removeCredential(url) {
+  fetch(url + "&mfa-state=" + mfaState, {method: "POST"}) 
+    .then((response) => {
+      if (!response.ok) {
+        document.getElementById("note").innerHTML = "Failed to remove the security device: " + response.statusText;  
+        return Promise.reject(response.statusText);
+      } else {
+        document.getElementById("note").innerHTML = "Security device removed.";
+        return response.json()
+      }
+    })
+    .then((data) => {
+      console.log(data)
+      credentials = data.credentials;
+
+      printSecurityKeys(credentials);
+      if (credentials.length === 0) {
+        document.getElementById("login-button").disabled = true;
+      }
+    })
+    .catch(function (err) {
+      document.getElementById("note").innerHTML = "Failed to remove the security device: " + err;
+    });
 }
 
 function registerSecurityKey() {
@@ -144,7 +160,6 @@ function registerSecurityKey() {
           registrationData = data.registrationdata;
           credentials = data.credentials;
           document.getElementById("note").innerHTML = "You are now logged in.";
-          //document.getElementById("login-button").disabled = false;
           document.getElementById("credentialName").value = "";
 
           printSecurityKeys(credentials);
@@ -188,6 +203,7 @@ function printSecurityKeys(credentials) {
     credentialsDIV.appendChild(div);
   });
 }
+
 
 // Base64 to ArrayBuffer
 function bufferDecode(value) {

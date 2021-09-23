@@ -1,0 +1,28 @@
+.security-keys__item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: .25rem .5rem;
+    transition: all linear .2s;
+}
+
+.security-keys__item--removable {
+    cursor: pointer;  
+}
+
+.security-keys__item--removable:hover {
+    background-color: rgba(0, 0, 0, 0.05);
+}
+
+.remove-security-key-button {
+    border: none;
+    background: transparent;
+    opacity: 0;
+    visibility: hidden;
+    transition: all linear .2s;
+}
+
+.security-keys__item--removable:hover .remove-security-key-button {
+    opacity: 1;
+    visibility: visible;
+}

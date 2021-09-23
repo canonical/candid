@@ -25,11 +25,15 @@
     <div class="row">
       <div class="col-6 col-start-large-4">
         <div class="p-card--highlighted">
-          <div class="p-card__thumbnail">
-            <h1 class="p-heading--four">You're logged in as {{.Username}}</h1>
+          <h1 class="p-heading--four">
+            You're logged in as {{.Username}}<br>
+            You can now close this window.
+          </h1>
+          <div class="p-card__content">
+            Logged in using the following security key:
+            <div class="used-security-key">{{.SecurityKey}}</div>
           </div>
-          <hr class="u-sv1">
-          <p>You can now close this window.</p>
+          <a href="/manage-keys">Manage security keys</a>
         </div>
       </div>
     </div>

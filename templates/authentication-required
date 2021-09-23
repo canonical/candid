@@ -12,6 +12,7 @@
   <link rel="shortcut icon" href="static/favicon.ico">
   <link rel="stylesheet" href="static/css/vanilla-framework-version-2.24.1.min.css">
   <link rel="stylesheet" href="static/css/vanilla.css">
+  <link rel="stylesheet" href="static/css/authentication-required.css">
 </head>
 
 <body cz-shortcut-listen="true">
@@ -23,53 +24,53 @@
   <div class="p-strip">
     <div class="login-card">
       <div class="p-card--highlighted">
-        <div class="p-card__thumbnail">
-          <h1 class="p-heading--four">Log in {{ if .UseEmail }}with email address{{ end }}</h1>
-        </div>
-        <hr class="u-sv1">
+        <h1 class="p-heading--four">Login {{ if .UseEmail }}with email address{{ end }}</h1>
 {{if and .Error (not .UseEmail)}}
-          <div class="p-notification--negative">
-            <p class="p-notification__response">
-              <span class="p-notification__status">Error:</span>{{.Error}}
-            </p>
-          </div>
+        <div class="p-notification--negative">
+          <p class="p-notification__response">
+            <span class="p-notification__status">Error:</span>{{.Error}}
+          </p>
+        </div>
 {{end}}
 {{ if .UseEmail }}
-          <form method="post" action="{{ .WithEmailURL }}">
-            <div class="p-form-validation {{ if .Error  }}is-error{{ end }}">
-              <label for="email">Email address</label>
-              <div style="display: flex; justify-content: space-between;">
-                <div style="width: 100%;">
-                  <input type="email" id="email" name="email" class="p-form-validation__input" style="width: 100%;" required>
-                  {{ if .Error }}
-                    <p class="p-form-validation__message" role="alert">
-                      <strong>Error:</strong> {{.Error}}
-                    </p>
-                  {{ end }}
-                </div>
-                <div>
-                  <button type="submit" class="p-button--positive u-no-margin--bottom" style="margin-left: 0.5rem;">Login</button>
-                </div>
+        <form method="post" action="{{ .WithEmailURL }}">
+          <div class="p-form-validation {{ if .Error  }}is-error{{ end }}">
+            <label for="email">Email address</label>
+            <div style="display: flex; justify-content: space-between;">
+              <div style="width: 100%;">
+                <input type="email" id="email" name="email" class="p-form-validation__input" style="width: 100%;" required>
+                {{ if .Error }}
+                  <p class="p-form-validation__message" role="alert">
+                    <strong>Error:</strong> {{.Error}}
+                  </p>
+                {{ end }}
+              </div>
+              <div>
+                <button type="submit" class="p-button--positive u-no-margin--bottom" style="margin-left: 0.5rem;">Login</button>
               </div>
             </div>
-          </form>
-          <p>Or continue with...</p>
+          </div>
+        </form>
+        <p>Or continue with...</p>
 {{ end }}
-<div class="sso-buttons">
-        {{ $length := len .IDPs }}
-        {{ range .IDPs }}
-                <a href="{{.URL}}" class="p-button--neutral sso-button {{ if eq $length 1 }}sso-button--wide{{ end }}" data-idp-name="{{.Name}}" data-idp-domain="{{.Domain}}">
-                  <div class="u-truncate" title="{{.Description}}">
-                    {{ if .Icon }}<p class="sso-icon"><img class="sso-icon__image" src="{{.Icon}}" alt="" width="32" height="32"></p>{{ end }}
-                        {{.Description}}
-                  </div>
-                </a>
-        {{ end }}
-</div>
-
-{{ if .ShowEmailLink }}
-        <a href="{{.WithEmailURL}}">Or login with email address</a>
-{{ end }}
+        <ul class="p-list--divided">
+          {{ $length := len .IDPs }}
+          {{ range .IDPs }}
+            <li class="p-list__item">
+              <a href="{{.URL}}" class="list-item__link p-link--soft" data-idp-name="{{.Name}}" data-idp-domain="{{.Domain}}">
+                {{ if .Icon }}<img class="sso-icon__image" src="{{.Icon}}" alt="" width="32" height="32">{{ end }}
+                  {{.Description}}
+              </a>
+            </li>
+          {{ end }}
+          {{ if .ShowEmailLink }}
+            <li class="p-list__item">
+              <a href="{{.WithEmailURL}}" class="list-item__link p-link--soft">
+                <i class="p-icon--email"></i><span>With email address</span>
+              </a>
+            </li>
+          {{ end }}
+        </ul>
       </div>
     </div>
   </div>

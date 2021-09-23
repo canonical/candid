@@ -11,6 +11,7 @@
   <meta name="author" content="Juju team">
   <link rel="shortcut icon" href="../../static/favicon.ico">
   <link rel="stylesheet" href="../../static/css/vanilla.css">
+  <link rel="stylesheet" href="../../static/css/login-form.css">
 </head>
 
 <body>
@@ -22,25 +23,23 @@
   <div class="p-strip">
     <div class="login-card">
       <div class="p-card--highlighted">
-        <div class="p-card__thumbnail">
-          <h1 class="p-heading--four">Login</h1>
-        </div>
+        <a href="/login" class="p-link--soft back-button"><i class="p-icon--chevron-up"></i>Back</a>
         <hr class="u-sv1">
+        <h1 class="p-heading--four">Login</h1>
         {{if .Error}}
-          <div class="p-notification--negative">
-            <p class="p-notification__response">
-              <span class="p-notification__status">Error:</span>{{.Error}}
-            </p>
-          </div>
+        <div class="p-notification--negative">
+          <p class="p-notification__response">
+            <span class="p-notification__status">Error:</span>{{.Error}}
+          </p>
+        </div>
         {{end}}
         <form class="p-form" method="post" action="{{.Action}}">
           <label for="username">Username</label>
           <input type="text" id="username" name="username" autocomplete="off">
           <label for="password">Password</label>
           <input type="password" id="password" name="password" autocomplete="off">
-          <br /><br />
-          <a href="/login" class="p-button--neutral u-float-left u-no-margin--bottom">Back</a>
-          <button type="submit" class="p-button--positive u-float-right u-no-margin--bottom">Login</button>
+          <hr class="u-sv1">
+          <button type="submit" class="p-button--positive u-no-margin--bottom">Login</button>
         </form>
       </div>
       <div class="login__message"></div>
