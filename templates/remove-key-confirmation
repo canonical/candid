@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html dir="ltr" lang="en">
+<head>
+  <title>Candid - MFA Registration</title>
+
+  <meta http-equiv="x-ua-compatible" content="IE=edge">
+  <meta charset="utf-8">
+
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="">
+  <meta name="author" content="Juju team">
+  
+  <link rel="shortcut icon" href="../../static/favicon.ico">
+  <link rel="stylesheet" href="../../static/css/vanilla.css">
+  <link rel="stylesheet" href="../../static/css/mfa-manage.css">
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.0/jquery.min.js"></script>
+</head>
+<body>
+  <div class="p-strip">
+    <div class="row">
+      <div class="col-2 col-start-large-6 col-small-2 col-medium-3">
+        <img src="../../static/images/logo-canonical-aubergine.svg" alt="Canonical" />
+      </div>
+    </div>
+  </div>
+    <div class="p-strip">
+    <div class="row">
+      <div class="col-6 col-start-large-4">
+        <div class="p-card--highlighted">
+          <h1 class="p-heading--four">Remove security key</h1>
+          <p class="p-text">You are going to remove the following security key:</p>
+          <div class="security-keys__item security-keys__item--remove-confirm">
+            <div class="security-keys__key-name">{{.Name}}</div>
+          </div>
+          <p class="p-text">Are you sure?</p>
+          <hr class="u-sv2">
+          <div class="confirmation-row">
+            <a class="p-button u-no-margin--bottom is-inline" href="" id="cancel-button">Cancel</a>
+            <button class="p-button--negative is-inline u-no-margin--bottom" onclick="removeCredential()" id="confirm-button">Remove key</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+<script>
+var mfaState = {{.MFAState}};
+var registrationData = {{.RegistrationData}};
+
+$(document).ready(function () {
+  // check whether current browser supports WebAuthn
+  if (!window.PublicKeyCredential) {
+    document.getElementById("note").innerHTML =
+      "Your browser does not support WebAuthn.";
+    return;
+  }
+});
+
+function removeCredential(url) {
+  fetch(url + "&mfa-state=" + mfaState, {
+    method: "POST",
+  })
+    .then((response) => {
+      if (!response.ok) {
+        document.getElementById("note").innerHTML =
+          "Failed to remove the security device: " + response.statusText;
+        return Promise.reject(response.statusText);
+      } else {
+        document.getElementById("note").innerHTML = "Security device removed.";
+        return response.json();
+      }
+    })
+    .then((data) => {
+      console.log(data);
+      credentials = data.credentials;
+
+      printSecurityKeys(credentials);
+    })
+    .catch(function (err) {
+      document.getElementById("note").innerHTML =
+        "Failed to remove the security device: " + err;
+    });
+}
+
+// Base64 to ArrayBuffer
+function bufferDecode(value) {
+  return Uint8Array.from(atob(value), (c) => c.charCodeAt(0));
+}
+
+// ArrayBuffer to URLBase64
+function bufferEncode(value) {
+  return btoa(String.fromCharCode.apply(null, new Uint8Array(value)))
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=/g, "");
+}
+
+</script>
+
+</body>
+</html>
