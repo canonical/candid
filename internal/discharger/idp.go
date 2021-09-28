@@ -133,6 +133,12 @@ type visitCompleter struct {
 	setMFAStateProviderID func(w http.ResponseWriter, providerID string) (string, error)
 }
 
+type idWithMFACredentials struct {
+	*store.Identity
+
+	ManageURL string
+}
+
 // Success implements idp.VisitCompleter.Success.
 func (c *visitCompleter) Success(ctx context.Context, w http.ResponseWriter, req *http.Request, dischargeID string, id *store.Identity) {
 	if dischargeID != "" {
@@ -142,13 +148,30 @@ func (c *visitCompleter) Success(ctx context.Context, w http.ResponseWriter, req
 		}
 	}
 
+	var mfaState string
+	var err error
+	if c.setMFAStateProviderID != nil {
+		mfaState, err = c.setMFAStateProviderID(w, string(id.ProviderID))
+		if err != nil {
+			logger.Errorf("failed to set MFA state: %s", err)
+		}
+	}
+
+	v := url.Values{}
+	if mfaState != "" {
+		v.Set(mfa.StateName, mfaState)
+	}
+
 	t := c.params.Template.Lookup("login")
 	if t == nil {
 		fmt.Fprintf(w, "Login successful as %s", id.Username)
 		return
 	}
 	w.Header().Set("Content-Type", "text/html;charset=utf-8")
-	if err := t.Execute(w, id); err != nil {
+	if err := t.Execute(w, idWithMFACredentials{
+		Identity:  id,
+		ManageURL: c.params.Location + "/login/mfa/manage?" + v.Encode(),
+	}); err != nil {
 		logger.Errorf("error processing login template: %s", err)
 	}
 }

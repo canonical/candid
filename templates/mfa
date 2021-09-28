@@ -29,37 +29,19 @@
           <div class="p-card__thumbnail">
             <h1 class="p-heading--four">Security keys</h1>
           </div>
-          {{if .Error}}
-            <div class="p-notification--negative">
-              <p class="p-notification__response">
-                <span class="p-notification__status">Error:</span>{{.Error}}
-              </p>
-            </div>
-          {{end}}
-          <div class="p-notification--information">
-            <p class="p-notification__response">
-              <label id='note'>{{.Note}}<label>
-            </p>
-          </div>
-          <div class="row" id="credentials">
-          </div>
           <hr class="u-sv1">
-          <div class="row">
-            <h5 class="col-4">Register new security key</h5>
-          </div>
-          <div class="row">
-            <input type="text"
-              name="credentialName"
-              id="credentialName"
-              class="form-control col-4"
-              maxlength="44"
-              placeholder="Credential name"
-              required>
-            <button class="p-button--positive is-inline col-2" onclick="registerSecurityKey()" disabled id="registration-button">Register</button>
-          </div>
-          <div class="row">
-            <button class="p-button--positive is-inline col-2" onclick="finishLogin()" disabled id="login-button">Login</button>
-          </div>
+          {{if .MustRegister}}
+            <p class="p-text" id='note'>Identity provider requires you to register a 2FA security key.</p>
+            <div class="row">
+              <label for="security-key">Security key name</label>
+            </div>
+            <div class="row">
+              <input type="text" id="credentialName" name="security-key" placeholder="Credential name" maxlength="44" class="form-control col-4" required>
+              <button class="p-button--positive is-inline col-2" onclick="registerSecurityKey()" disabled id="registration-button">Register</button>
+            </div>
+          {{else}}
+            <p class="p-text" id='note'>Please complete the MFA login.</p>
+          {{end}}
         </div>
       </div>
     </div>
@@ -84,42 +66,6 @@ $(document).ready(function () {
 });
 
 
-function removeCredential(url) {
-  fetch(url + "&mfa-state=" + mfaState, {method: "POST"}) 
-    .then((response) => {
-      if (!response.ok) {
-        document.getElementById("note").innerHTML = "Failed to remove the security device: " + response.statusText;  
-        return Promise.reject(response.statusText);
-      } else {
-        document.getElementById("note").innerHTML = "Security device removed.";
-        return response.json()
-      }
-    })
-    .then((data) => {
-      console.log(data)
-      credentials = data.credentials;
-
-      document.getElementById("credentials").innerHTML = '';
-      for (let i = 0; i < credentials.length; i++) {
-        let div = document.createElement("div");
-        div.classList.add("row");
-        div.innerHTML =
-          `<h5 class="col-4">` +
-          credentials[i].name +
-          `</h5>
-          <button class="p-button--negative is-inline col-2" onclick="removeCredential('` +
-          credentials[i].removeurl +
-          `')">Remove</button>`;
-        document.getElementById("credentials").appendChild(div);
-      }
-      if (credentials.length === 0) {
-        document.getElementById("login-button").disabled = true;
-      }
-    })
-    .catch(function (err) {
-      document.getElementById("note").innerHTML = "Failed to remove the security device: " + err;
-    });
-}
 
 function finishLogin() {
   window.location.replace({{.LoginURL}} + "&mfa-state=" + mfaState);
@@ -176,23 +122,8 @@ function loginUser() {
           mfaState = data.state;
           registrationData = data.registrationdata;
           credentials = data.credentials;
-          document.getElementById("note").innerHTML = "You are logged in.";
-          document.getElementById("login-button").disabled = false;
-          document.getElementById("registration-button").disabled = false;
 
-          document.getElementById("credentials").innerHTML = '';
-          for (let i = 0; i < credentials.length; i++) {
-            let div = document.createElement("div");
-            div.classList.add("row");
-            div.innerHTML =
-              `<h5 class="col-4">` +
-              credentials[i].name +
-              `</h5>
-            <button class="p-button--negative is-inline col-2" onclick="removeCredential('` +
-              credentials[i].removeurl +
-              `')">Remove</button>`;
-            document.getElementById("credentials").appendChild(div);
-          }
+          finishLogin();
         })
         .catch((error) => {
           return Promise.reject("login failed");
@@ -270,23 +201,8 @@ function registerSecurityKey() {
           mfaState = data.state;
           registrationData = data.registrationdata;
           credentials = data.credentials;
-          document.getElementById("note").innerHTML = "You are now logged in.";
-          document.getElementById("login-button").disabled = false;
-          document.getElementById("credentialName").value = "";
 
-          document.getElementById("credentials").innerHTML = '';
-          for (let i = 0; i < credentials.length; i++) {
-            let div = document.createElement("div");
-            div.classList.add("row");
-            div.innerHTML =
-              `<h5 class="col-4">` +
-              credentials[i].name +
-              `</h5>
-          <button class="p-button--negative is-inline col-2" onclick="removeCredential('` +
-              credentials[i].removeurl +
-              `')">Remove</button>`;
-            document.getElementById("credentials").appendChild(div);
-          }
+          finishLogin();
         })
         .catch((error) => {
           return Promise.reject("login failed");
@@ -301,7 +217,6 @@ function registerSecurityKey() {
         "Failed to register the security device" + err;
     });
 }
-
 
 // Base64 to ArrayBuffer
 function bufferDecode(value) {
