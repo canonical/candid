@@ -965,26 +965,41 @@ func (s *storeSuite) TestIdentity(c *qt.C) {
 	})
 	c.Assert(err, qt.IsNil)
 
+	cred := store.MFACredential{
+		ID:                     []byte("test id 1"),
+		ProviderID:             identity.ProviderID,
+		Name:                   "test credential 1",
+		PublicKey:              []byte("public key 1"),
+		AttestationType:        "test attestation type",
+		AuthenticatorGUID:      []byte("guid 1"),
+		AuthenticatorSignCount: 1,
+	}
+	err = s.Store.AddMFACredential(s.ctx, cred)
+	c.Assert(err, qt.IsNil)
+
+	expectedIdentity := identity
+	expectedIdentity.Credentials = []store.MFACredential{cred}
+
 	identity2 := store.Identity{
 		ID: identity.ID,
 	}
 	err = s.Store.Identity(s.ctx, &identity2)
 	c.Assert(err, qt.IsNil)
-	c.Assert(identity2, qt.DeepEquals, identity)
+	c.Assert(identity2, qt.DeepEquals, expectedIdentity)
 
 	identity3 := store.Identity{
 		ProviderID: identity.ProviderID,
 	}
 	err = s.Store.Identity(s.ctx, &identity3)
 	c.Assert(err, qt.IsNil)
-	c.Assert(identity3, qt.DeepEquals, identity)
+	c.Assert(identity3, qt.DeepEquals, expectedIdentity)
 
 	identity4 := store.Identity{
 		Username: identity.Username,
 	}
 	err = s.Store.Identity(s.ctx, &identity4)
 	c.Assert(err, qt.IsNil)
-	c.Assert(identity4, qt.DeepEquals, identity)
+	c.Assert(identity4, qt.DeepEquals, expectedIdentity)
 }
 
 func (s *storeSuite) TestIdentityNotFound(c *qt.C) {

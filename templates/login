@@ -31,8 +31,14 @@
           <hr class="u-sv1">
           <p>You can now close this window.</p>
         </div>
+        {{if .ManageURL}}
+          <div class="col-2 col-start-large-2">
+            <a href={{.ManageURL}} class="p-button--positive" >Manage MFA Credentials</a>
+          </div>
+        {{end}}
       </div>
     </div>
   </div>
 </body>
+
 </html>

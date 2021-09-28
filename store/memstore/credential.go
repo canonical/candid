@@ -67,6 +67,10 @@ func (s *memStore) UserMFACredentials(ctx context.Context, providerID string) ([
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	return s.userMFACredentials(ctx, providerID)
+}
+
+func (s *memStore) userMFACredentials(ctx context.Context, providerID string) ([]store.MFACredential, error) {
 	var credentials []store.MFACredential
 	for _, cred := range s.credentials {
 		if string(cred.ProviderID) == providerID {

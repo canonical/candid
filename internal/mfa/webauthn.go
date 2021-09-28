@@ -6,7 +6,6 @@
 package mfa
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"net/http"
@@ -125,7 +124,9 @@ type formParams struct {
 	MFAState         string
 	Note             string
 	LoginData        string
+	MustRegister     bool
 	RegistrationData string
+	Credentials      []formCredentialParams
 }
 
 // Authenticator implements methods needed for mfa.
@@ -193,17 +194,18 @@ func (a *Authenticator) returnError(w http.ResponseWriter, err error) {
 
 // Handle servers incoming http requests.
 func (a *Authenticator) Handle(ctx context.Context, w http.ResponseWriter, req *http.Request) {
-	var loginState idputil.LoginState
-	if err := a.Params.Codec.Cookie(req, idputil.LoginCookieName, req.Form.Get("state"), &loginState); err != nil {
-		idputil.BadRequestf(w, "login failed: invalid login state")
-		return
-	}
 	switch strings.TrimPrefix(req.URL.Path, a.Params.URLPrefix) {
 	case "/login":
 		switch req.Method {
 		case "POST":
 			a.login(ctx, w, req)
 		case "GET":
+			var loginState idputil.LoginState
+			if err := a.Params.Codec.Cookie(req, idputil.LoginCookieName, req.Form.Get("state"), &loginState); err != nil {
+				idputil.BadRequestf(w, "login failed: invalid login state")
+				return
+			}
+
 			id, err := a.verifyLogin(ctx, req)
 			if err == nil {
 				a.Params.VisitCompleter.RedirectSuccess(ctx, w, req, loginState.ReturnTo, loginState.State, id)
@@ -226,6 +228,8 @@ func (a *Authenticator) Handle(ctx context.Context, w http.ResponseWriter, req *
 		a.removeCredential(ctx, w, req)
 	case "/register":
 		a.credentialRegistration(ctx, w, req)
+	case "/manage":
+		a.manage(ctx, w, req)
 	}
 }
 
@@ -256,7 +260,6 @@ func (a *Authenticator) userCredentials(req *http.Request, user *webauthnUser) [
 	creds := make([]formCredentialParams, len(user.Credentials))
 	for i, cred := range user.Credentials {
 		v := url.Values{
-			"state":           {req.Form.Get("state")},
 			"credential-name": {cred.Name},
 		}
 		creds[i] = formCredentialParams{
@@ -334,22 +337,16 @@ func (a *Authenticator) prepareFormData(ctx context.Context, w http.ResponseWrit
 	data := formParams{
 		RegistrationURL: idputil.RedirectURL(a.Params.URLPrefix, "/register", req.Form.Get("state")),
 		LoginURL:        idputil.RedirectURL(a.Params.URLPrefix, "/login", req.Form.Get("state")),
+		Credentials:     a.userCredentials(req, user),
 	}
 
-	// if user has no previously registered credentials or the user
-	// has already presented a valid mfa credential, we allow additional
-	// device registration
-	if len(user.WebAuthnCredentials()) == 0 {
-		registrationData, registrationSessionData, err := a.registrationData(ctx, user)
-		if err != nil {
-			return nil, errgo.Mask(err)
-		}
-
-		state.RegistrationSessionData = registrationSessionData
-		data.RegistrationData = registrationData
-	} else {
-		data.RegistrationData = "{}"
+	registrationData, registrationSessionData, err := a.registrationData(ctx, user)
+	if err != nil {
+		return nil, errgo.Mask(err)
 	}
+
+	state.RegistrationSessionData = registrationSessionData
+	data.RegistrationData = registrationData
 
 	// if the user already has registered security devices, we
 	// enable login using any of them
@@ -362,6 +359,7 @@ func (a *Authenticator) prepareFormData(ctx context.Context, w http.ResponseWrit
 		data.LoginData = loginData
 	} else {
 		data.LoginData = "{}"
+		data.MustRegister = true
 	}
 
 	cookiePath := idputil.CookiePathRelativeToLocation(CookiePath, a.Params.Location, a.Params.SkipLocationForCookiePaths)
@@ -571,11 +569,6 @@ func (a *Authenticator) removeCredential(ctx context.Context, w http.ResponseWri
 		a.returnError(w, params.NewError(params.ErrInternalServer, err.Error()))
 		return
 	}
-	// verify that the user has presented valid credentials
-	if len(state.ValidCredentialID) == 0 {
-		a.returnError(w, params.NewError(params.ErrForbidden, "forbidden"))
-		return
-	}
 
 	// get the credential name from the request
 	credentialName := req.Form.Get("credential-name")
@@ -589,15 +582,6 @@ func (a *Authenticator) removeCredential(ctx context.Context, w http.ResponseWri
 		}
 		a.returnError(w, params.NewError(params.ErrInternalServer, err.Error()))
 		return
-	}
-
-	// check user credentials
-	for _, cred := range user.Credentials {
-		// we do not allow users to remove credentials that were used to log in
-		if cred.Name == credentialName && bytes.Compare(cred.ID, state.ValidCredentialID) == 0 {
-			a.returnError(w, params.NewError(params.ErrBadRequest, "cannot remove credentials that were used to log in"))
-			return
-		}
 	}
 
 	// remove credentials
@@ -621,4 +605,18 @@ func (a *Authenticator) removeCredential(ctx context.Context, w http.ResponseWri
 	}
 
 	httprequest.WriteJSON(w, http.StatusOK, data)
+}
+
+func (a *Authenticator) manage(ctx context.Context, w http.ResponseWriter, req *http.Request) {
+	data, err := a.prepareFormData(ctx, w, req)
+	if err != nil {
+		a.returnError(w, params.NewError(params.ErrInternalServer, err.Error()))
+		return
+	}
+
+	err = a.Params.Template.ExecuteTemplate(w, "mfa-manage", data)
+	if err != nil {
+		a.returnError(w, params.NewError(params.ErrInternalServer, err.Error()))
+		return
+	}
 }
