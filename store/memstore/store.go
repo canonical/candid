@@ -59,7 +59,7 @@ func (s *memStore) RemoveAll() {
 }
 
 // Identity implements store.Store.Identity.
-func (s *memStore) Identity(ctx context.Context, identity *store.Identity) error {
+func (s *memStore) Identity(_ context.Context, identity *store.Identity) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	var id *store.Identity
@@ -82,12 +82,6 @@ func (s *memStore) Identity(ctx context.Context, identity *store.Identity) error
 		}
 	default:
 		return store.NotFoundError("", "", "")
-	}
-
-	var err error
-	id.Credentials, err = s.userMFACredentials(ctx, string(id.ProviderID))
-	if err != nil {
-		return errgo.Mask(err)
 	}
 	copyIdentity(identity, id)
 	return nil
@@ -472,7 +466,6 @@ func copyIdentity(dst, src *store.Identity) {
 	dst.PublicKeys = updateKeys(nil, src.PublicKeys, store.Set)
 	dst.ProviderInfo = updateMap(make(map[string][]string), src.ProviderInfo, store.Set)
 	dst.ExtraInfo = updateMap(make(map[string][]string), src.ExtraInfo, store.Set)
-	dst.Credentials = src.Credentials
 }
 
 // IdentityCounts implements store.Store.IdentityCounts.

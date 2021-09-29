@@ -12,7 +12,11 @@
   
   <link rel="shortcut icon" href="../../static/favicon.ico">
   <link rel="stylesheet" href="../../static/css/vanilla.css">
+<<<<<<< HEAD
   <link rel="stylesheet" href="../../static/css/manage-keys.css">
+=======
+  <link rel="stylesheet" href="../../static/css/mfa-manage.css">
+>>>>>>> rayito/mfa-refactored-template-fixes
   <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.0/jquery.min.js"></script>
 </head>
 <body>
@@ -29,12 +33,12 @@
         <div class="p-card--highlighted">
           <h1 class="p-heading--four">Manage security keys</h1>
           <p class="p-text" id='note'>{{.Note}}</p>
-          <h2 class="p-heading--five">Your registered security keys</h2>
+          <h2 class="p-heading--five u-no-padding--top">Your registered security keys</h2>
           <ul class="p-list--divided" id="credentials">
             {{range .Credentials}}
                 <div class="security-keys__item p-list__item security-keys__item--removable">
                     <div class="security-keys__key-name">{{.Name}}</div>
-                    <button class="remove-security-key-button u-no-margin--bottom is-inline has-icon" onclick="removeCredential('{{.RemoveURL}}')">
+                    <button class="remove-security-key-button u-no-margin--bottom is-inline" onclick="removeCredential('{{.RemoveURL}}')">
                         <i class="p-icon--delete"></i>
                     </button>
                 </div>
@@ -45,7 +49,7 @@
             <input type="text" id="credentialName" name="security-key" placeholder="Credential name" maxlength="44" required>
           </div>
           <button class="p-button--positive u-no-margin--bottom" onclick="registerSecurityKey()" id="registration-button">Register</button>
-          <hr class="u-sv1">
+          <hr class="u-sv2">
           <div class="logged-meesage">You are logged in. You can close this window.</div>
         </div>
       </div>
@@ -66,6 +70,7 @@ $(document).ready(function () {
 });
 
 function removeCredential(url) {
+  // This function should actually redirect to remove-key-confirmation 
   fetch(url + "&mfa-state=" + mfaState, {
     method: "POST",
   })
@@ -193,13 +198,13 @@ function printSecurityKeys(credentials) {
       `</div>
     `;
     div.classList.add("security-keys__item--removable");
-    innerHtml +=
-      `
-    <button class="remove-security-key-button u-no-margin--bottom is-inline has-icon" onclick="removeCredential('` +
-      item.removeurl +
-      `')">
-      <i class="p-icon--delete"></i>
-    </button>
+      innerHtml +=
+        `
+      <button class="remove-security-key-button u-no-margin--bottom" onclick="removeCredential('` +
+        item.removeurl +
+        `')">
+        <i class="p-icon--delete"></i>
+      </button>
     `;
     div.innerHTML = innerHtml;
     credentialsDIV.appendChild(div);

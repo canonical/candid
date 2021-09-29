@@ -204,10 +204,6 @@ func (s *identityStore) completeIdentity(tx *sql.Tx, identity *store.Identity) e
 	if err != nil {
 		return errgo.Mask(err)
 	}
-	identity.Credentials, err = s.UserMFACredentials(context.Background(), string(identity.ProviderID))
-	if err != nil {
-		return errgo.Mask(err)
-	}
 	return nil
 }
 

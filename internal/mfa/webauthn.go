@@ -171,6 +171,16 @@ func (a *Authenticator) SetMFAStateProviderID(w http.ResponseWriter, providerID 
 	return mfaState, nil
 }
 
+// HasMFACredentials returns true, if the user with the specified providerID has
+// any registered MFA credentials.
+func (a *Authenticator) HasMFACredentials(ctx context.Context, providerID string) (bool, error) {
+	creds, err := a.Params.Store.UserMFACredentials(ctx, providerID)
+	if err != nil {
+		return false, errgo.Mask(err)
+	}
+	return len(creds) > 0, nil
+}
+
 func (a *Authenticator) returnError(w http.ResponseWriter, err error) {
 	perr, ok := err.(*params.Error)
 	if !ok {

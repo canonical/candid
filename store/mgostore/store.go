@@ -53,13 +53,6 @@ func (s *identityStore) Identity(ctx context.Context, identity *store.Identity) 
 	identity.ProviderInfo = doc.ProviderInfo
 	identity.ExtraInfo = doc.ExtraInfo
 	identity.Owner = store.ProviderIdentity(doc.Owner)
-
-	var err error
-	identity.Credentials, err = s.UserMFACredentials(ctx, doc.ProviderID)
-	if err != nil {
-		return errgo.Mask(err)
-	}
-
 	return nil
 }
 
