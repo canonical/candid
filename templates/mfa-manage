@@ -12,11 +12,7 @@
   
   <link rel="shortcut icon" href="../../static/favicon.ico">
   <link rel="stylesheet" href="../../static/css/vanilla.css">
-<<<<<<< HEAD
-  <link rel="stylesheet" href="../../static/css/manage-keys.css">
-=======
   <link rel="stylesheet" href="../../static/css/mfa-manage.css">
->>>>>>> rayito/mfa-refactored-template-fixes
   <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.0/jquery.min.js"></script>
 </head>
 <body>
@@ -70,30 +66,7 @@ $(document).ready(function () {
 });
 
 function removeCredential(url) {
-  // This function should actually redirect to remove-key-confirmation 
-  fetch(url + "&mfa-state=" + mfaState, {
-    method: "POST",
-  })
-    .then((response) => {
-      if (!response.ok) {
-        document.getElementById("note").innerHTML =
-          "Failed to remove the security device: " + response.statusText;
-        return Promise.reject(response.statusText);
-      } else {
-        document.getElementById("note").innerHTML = "Security device removed.";
-        return response.json();
-      }
-    })
-    .then((data) => {
-      console.log(data);
-      credentials = data.credentials;
-
-      printSecurityKeys(credentials);
-    })
-    .catch(function (err) {
-      document.getElementById("note").innerHTML =
-        "Failed to remove the security device: " + err;
-    });
+  window.location.replace(url + "&mfa-state=" + mfaState);
 }
 
 function registerSecurityKey() {
@@ -171,6 +144,7 @@ function registerSecurityKey() {
           credentials = data.credentials;
 
           printSecurityKeys(credentials);
+          document.getElementById("credentialName").value = ''
         })
         .catch((error) => {
           return Promise.reject("login failed");

@@ -236,6 +236,8 @@ func (a *Authenticator) Handle(ctx context.Context, w http.ResponseWriter, req *
 		}
 	case "/remove":
 		a.removeCredential(ctx, w, req)
+	case "/remove-complete":
+		a.removeCredentialComplete(ctx, w, req)
 	case "/register":
 		a.credentialRegistration(ctx, w, req)
 	case "/manage":
@@ -571,8 +573,37 @@ func (a *Authenticator) login(ctx context.Context, w http.ResponseWriter, req *h
 	httprequest.WriteJSON(w, http.StatusOK, data)
 }
 
-// removeCredential removes the user's mfa security device.
+type removeCredentialParams struct {
+	Name      string
+	MFAState  string
+	RemoveURL string
+	ManageURL string
+}
+
+// removeCredential renders the removal confirmation template.
 func (a *Authenticator) removeCredential(ctx context.Context, w http.ResponseWriter, req *http.Request) {
+
+	// get the credential name from the request
+	credentialName := req.Form.Get("credential-name")
+	v := url.Values{
+		"credential-name": []string{credentialName},
+	}
+	data := removeCredentialParams{
+		MFAState:  req.Form.Get(StateName),
+		Name:      credentialName,
+		RemoveURL: a.Params.URLPrefix + "/remove-complete?" + v.Encode(),
+		ManageURL: a.Params.URLPrefix + "/manage",
+	}
+
+	err := a.Params.Template.ExecuteTemplate(w, "remove-credential-confirmation", data)
+	if err != nil {
+		a.returnError(w, params.NewError(params.ErrInternalServer, err.Error()))
+		return
+	}
+}
+
+// removeCredentialComplete removes the user's mfa security device.
+func (a *Authenticator) removeCredentialComplete(ctx context.Context, w http.ResponseWriter, req *http.Request) {
 	// get the login state
 	var state LoginState
 	if err := a.Params.Codec.Cookie(req, CookieName, req.Form.Get(StateName), &state); err != nil {
