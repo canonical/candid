@@ -63,7 +63,7 @@ func NewAPIHandler(params identity.HandlerParams) ([]httprequest.Handler, error)
 			Template:                   params.Template,
 			SkipLocationForCookiePaths: params.SkipLocationForCookiePaths,
 		})
-		vc.setMFAStateProviderID = params.MFAAuthenticator.SetMFAStateProviderID
+		vc.mfaAuthenticator = params.MFAAuthenticator
 	}
 	checker := &thirdPartyCaveatChecker{
 		params:  params,
