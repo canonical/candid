@@ -28,6 +28,7 @@ const (
 	ErrNoAdminCredsProvided ErrorCode = "no admin credentials provided"
 	ErrMethodNotAllowed     ErrorCode = "method not allowed"
 	ErrServiceUnavailable   ErrorCode = "service unavailable"
+	ErrInternalServer       ErrorCode = "internal server error"
 )
 
 // Error represents an error - it is returned for any response that fails.

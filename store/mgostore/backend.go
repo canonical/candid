@@ -44,6 +44,9 @@ func NewBackend(db *mgo.Database) (_ store.Backend, err error) {
 	if err := ensureIdentityIndexes(db); err != nil {
 		return nil, errgo.Mask(err)
 	}
+	if err := ensureCredentialsIndexes(db); err != nil {
+		return nil, errgo.Mask(err)
+	}
 	if err := ensureMeetingIndexes(db); err != nil {
 		return nil, errgo.Mask(err)
 	}
@@ -148,6 +151,7 @@ func (c collector) Collections() []*mgo.Collection {
 		c.db.C(meetingCollection),
 		c.db.C(identitiesCollection),
 		c.db.C(aclsCollection),
+		c.db.C(credentialCollection),
 	}
 }
 

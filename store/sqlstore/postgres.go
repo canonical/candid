@@ -85,6 +85,17 @@ CREATE TABLE IF NOT EXISTS meetings (
 	address TEXT NOT NULL,
 	created TIMESTAMP WITH TIME ZONE NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS credentials ( 
+	id BYTEA PRIMARY KEY,
+	providerid TEXT NOT NULL REFERENCES identities(providerid),
+	name TEXT NOT NULL, 
+	public_key BYTEA NOT NULL,
+	attestation_type TEXT NOT NULL,
+	authenticator_guid BYTEA NOT NULL,
+	authenticator_sign_count INTEGER,
+	UNIQUE (providerid, name)
+);
 `
 
 var postgresTmpls = [numTmpl]string{
@@ -154,6 +165,22 @@ var postgresTmpls = [numTmpl]string{
 	tmplIdentityCounts: `
 		SELECT substring(providerid, '^[^:]*') as idp, COUNT(1) 
 		FROM identities GROUP BY idp`,
+	tmplInsertMFACredential: `
+		INSERT INTO credentials (id, providerid, name, public_key, attestation_type, authenticator_guid, authenticator_sign_count)
+		VALUES ({{.ID | .Arg}}, {{.ProviderID | .Arg}}, {{.Name | .Arg}}, {{.PublicKey | .Arg}}, {{.AttestationType | .Arg}}, {{.AuthenticatorGUID | .Arg}}, {{.AuthenticatorSignCount | .Arg}})`,
+	tmplRemoveMFACredential: `
+		DELETE FROM credentials
+		WHERE providerid={{.ProviderID | .Arg}} AND name={{.Name | .Arg}}`,
+	tmplClearMFACredentials: `
+		DELETE FROM credentials
+		WHERE providerid={{.ProviderID | .Arg}}`,
+	tmplGetMFACredentials: `
+		SELECT id, providerid, name, public_key, attestation_type, authenticator_guid, authenticator_sign_count FROM credentials
+		WHERE providerid={{.ProviderID | .Arg}}`,
+	tmplIncrementMFACredentialSignCount: `
+		UPDATE credentials
+		SET authenticator_sign_count = authenticator_sign_count + 1
+		WHERE id={{.ID | .Arg}} AND id={{.ID | .Arg}}`,
 }
 
 // newPostgresDriver creates a postgres driver using the given DB.

@@ -40,38 +40,41 @@ const (
 
 // The following constants define possible operation actions.
 const (
-	ActionRead               = "read"
-	ActionVerify             = "verify"
-	ActionDischargeFor       = "dischargeFor"
-	ActionDischarge          = "discharge"
-	ActionCreateAgent        = "createAgent"
-	ActionCreateParentAgent  = "createParentAgent"
-	ActionReadAdmin          = "readAdmin"
-	ActionWriteAdmin         = "writeAdmin"
-	ActionReadGroups         = "readGroups"
-	ActionWriteGroups        = "writeGroups"
-	ActionReadSSHKeys        = "readSSHKeys"
-	ActionWriteSSHKeys       = "writeSSHKeys"
-	ActionLogin              = "login"
-	ActionReadDischargeToken = "read-discharge-token"
+	ActionRead                    = "read"
+	ActionVerify                  = "verify"
+	ActionDischargeFor            = "dischargeFor"
+	ActionDischarge               = "discharge"
+	ActionCreateAgent             = "createAgent"
+	ActionCreateParentAgent       = "createParentAgent"
+	ActionReadAdmin               = "readAdmin"
+	ActionWriteAdmin              = "writeAdmin"
+	ActionReadGroups              = "readGroups"
+	ActionWriteGroups             = "writeGroups"
+	ActionReadSSHKeys             = "readSSHKeys"
+	ActionWriteSSHKeys            = "writeSSHKeys"
+	ActionLogin                   = "login"
+	ActionReadDischargeToken      = "read-discharge-token"
+	ActionClearUserMFACredentials = "clearUserMFACredentials"
 )
 
 const (
-	dischargeForUserACL = "discharge-for-user"
-	readUserACL         = "read-user"
-	readUserGroupsACL   = "read-user-groups"
-	readUserSSHKeysACL  = "read-user-ssh-keys"
-	writeUserACL        = "write-user"
-	writeUserSSHKeysACL = "write-user-ssh-keys"
+	dischargeForUserACL        = "discharge-for-user"
+	readUserACL                = "read-user"
+	readUserGroupsACL          = "read-user-groups"
+	readUserSSHKeysACL         = "read-user-ssh-keys"
+	writeUserACL               = "write-user"
+	writeUserSSHKeysACL        = "write-user-ssh-keys"
+	clearUserMFACredentialsACL = "clear-user-mfa-credentials"
 )
 
 var aclDefaults = map[string][]string{
-	dischargeForUserACL: {AdminUsername},
-	readUserACL:         {AdminUsername, UserInformationGroup},
-	readUserGroupsACL:   {AdminUsername, GroupListGroup, UserInformationGroup},
-	readUserSSHKeysACL:  {AdminUsername, SSHKeyGetterGroup, UserInformationGroup},
-	writeUserACL:        {AdminUsername},
-	writeUserSSHKeysACL: {AdminUsername},
+	dischargeForUserACL:        {AdminUsername},
+	readUserACL:                {AdminUsername, UserInformationGroup},
+	readUserGroupsACL:          {AdminUsername, GroupListGroup, UserInformationGroup},
+	readUserSSHKeysACL:         {AdminUsername, SSHKeyGetterGroup, UserInformationGroup},
+	writeUserACL:               {AdminUsername},
+	writeUserSSHKeysACL:        {AdminUsername},
+	clearUserMFACredentialsACL: {AdminUsername},
 }
 
 // An Authorizer is used to authorize operations in the identity server.
@@ -180,6 +183,9 @@ func (a *Authorizer) aclForOp(ctx context.Context, op bakery.Op) (acl []string, 
 			return []string{identchecker.Everyone}, false, nil
 		case ActionCreateParentAgent:
 			acl, err := a.aclManager.ACL(ctx, writeUserACL)
+			return acl, false, errgo.Mask(err)
+		case ActionClearUserMFACredentials:
+			acl, err := a.aclManager.ACL(ctx, clearUserMFACredentialsACL)
 			return acl, false, errgo.Mask(err)
 		}
 	case kindUser:

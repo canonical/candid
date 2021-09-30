@@ -26,6 +26,7 @@ import (
 	"github.com/canonical/candid/internal/auth"
 	"github.com/canonical/candid/internal/discharger/internal"
 	"github.com/canonical/candid/internal/identity"
+	"github.com/canonical/candid/internal/mfa"
 	"github.com/canonical/candid/params"
 	"github.com/canonical/candid/store"
 )
@@ -76,6 +77,21 @@ func newIDPHandler(params identity.HandlerParams, idp idp.IdentityProvider) http
 	}
 }
 
+func newMFAHandler(params identity.HandlerParams, authorizer *mfa.Authenticator) httprouter.Handle {
+	return func(w http.ResponseWriter, req *http.Request, p httprouter.Params) {
+		t := trace.New("identity.internal.v1", "mfa")
+		defer t.Finish()
+		ctx := trace.NewContext(context.Background(), t)
+		ctx, close := params.Store.Context(ctx)
+		defer close()
+		ctx, close = params.MeetingStore.Context(ctx)
+		defer close()
+		req.URL.Path = strings.TrimPrefix(req.URL.Path, "/login/mfa")
+		req.ParseForm()
+		authorizer.Handle(ctx, w, req)
+	}
+}
+
 type dischargeTokenCreator struct {
 	params identity.HandlerParams
 }
@@ -109,11 +125,51 @@ func (d *dischargeTokenCreator) DischargeToken(ctx context.Context, id *store.Id
 	}, nil
 }
 
+// MFAAuthenticator defines the interface used by the visitCompleter to
+// interact with the MFA authentication flow.
+type MFAAuthenticator interface {
+	// SetMFAStateProviderID sets the provider id in the mfa login state cookie.
+	SetMFAStateProviderID(w http.ResponseWriter, providerID string) (string, error)
+	// HasMFACredentials returns true, if the user with the specified providerID has
+	// any registered MFA credentials.
+	HasMFACredentials(ctx context.Context, providerID string) (bool, error)
+}
+
 // A visitCompleter is an implementation of idp.VisitCompleter.
 type visitCompleter struct {
-	params        identity.HandlerParams
-	identityStore *internal.IdentityStore
-	place         *place
+	params           identity.HandlerParams
+	identityStore    *internal.IdentityStore
+	place            *place
+	mfaAuthenticator MFAAuthenticator
+}
+
+type idWithMFACredentials struct {
+	*store.Identity
+
+	ManageURL string
+}
+
+func (c *visitCompleter) manageURL(ctx context.Context, w http.ResponseWriter, id *store.Identity) (string, error) {
+	if c.mfaAuthenticator == nil {
+		return "", errgo.New("MFA authenticator not specified")
+	}
+	hasCredentials, err := c.mfaAuthenticator.HasMFACredentials(ctx, string(id.ProviderID))
+	if err != nil {
+		return "", errgo.Notef(err, "failed to retrieve use MFA credentials")
+	}
+	if !hasCredentials {
+		return "", nil
+	}
+	var mfaState string
+	mfaState, err = c.mfaAuthenticator.SetMFAStateProviderID(w, string(id.ProviderID))
+	if err != nil {
+		return "", errgo.Notef(err, "failed to set MFA state")
+	}
+	v := url.Values{}
+	if mfaState != "" {
+		v.Set(mfa.StateName, mfaState)
+	}
+	return c.params.Location + "/login/mfa/manage?" + v.Encode(), nil
 }
 
 // Success implements idp.VisitCompleter.Success.
@@ -125,13 +181,22 @@ func (c *visitCompleter) Success(ctx context.Context, w http.ResponseWriter, req
 		}
 	}
 
+	data := idWithMFACredentials{
+		Identity: id,
+	}
+	manageURL, err := c.manageURL(ctx, w, id)
+	if err != nil {
+		logger.Warningf(err.Error())
+	}
+	data.ManageURL = manageURL
+
 	t := c.params.Template.Lookup("login")
 	if t == nil {
 		fmt.Fprintf(w, "Login successful as %s", id.Username)
 		return
 	}
 	w.Header().Set("Content-Type", "text/html;charset=utf-8")
-	if err := t.Execute(w, id); err != nil {
+	if err := t.Execute(w, data); err != nil {
 		logger.Errorf("error processing login template: %s", err)
 	}
 }
@@ -161,6 +226,35 @@ func (c *visitCompleter) RedirectSuccess(ctx context.Context, w http.ResponseWri
 		v.Set("state", state)
 	}
 	if err := c.redirect(w, req, returnTo, v); err != nil {
+		identity.WriteError(ctx, w, err)
+	}
+	return
+}
+
+// RedirectMFA implements idp.VisitCompleter.RedirectMFA.
+func (c *visitCompleter) RedirectMFA(ctx context.Context, w http.ResponseWriter, req *http.Request, requireMFA bool, returnTo, returnToState, state string, id *store.Identity) {
+	if !requireMFA {
+		c.RedirectSuccess(ctx, w, req, returnTo, returnToState, id)
+		return
+	}
+
+	if c.mfaAuthenticator == nil {
+		c.RedirectFailure(ctx, w, req, returnTo, returnToState, errgo.New("invalid mfa configuration"))
+		return
+	}
+	mfaState, err := c.mfaAuthenticator.SetMFAStateProviderID(w, string(id.ProviderID))
+	if err != nil {
+		c.RedirectFailure(ctx, w, req, returnTo, returnToState, err)
+		return
+	}
+	v := url.Values{}
+	if state != "" {
+		v.Set("state", state)
+	}
+	if mfaState != "" {
+		v.Set(mfa.StateName, mfaState)
+	}
+	if err := c.redirect(w, req, c.params.Location+"/login/mfa/login", v); err != nil {
 		identity.WriteError(ctx, w, err)
 	}
 	return
@@ -206,6 +300,9 @@ func (c *visitCompleter) redirect(w http.ResponseWriter, req *http.Request, retu
 func (c *visitCompleter) isValidReturnTo(u *url.URL) bool {
 	s := u.String()
 	if s == c.params.Location+"/login-complete" {
+		return true
+	}
+	if s == c.params.Location+"/login/mfa/login" {
 		return true
 	}
 	for _, rurl := range c.params.RedirectLoginTrustedURLs {

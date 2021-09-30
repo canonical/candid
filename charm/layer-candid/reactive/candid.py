@@ -93,6 +93,12 @@ def write_config_file():
     if cc["redirect-login-trusted-domains"]:
         config["redirect-login-trusted-domains"] = \
             _parse_list(cc["redirect-login-trusted-domains"])
+    if cc["mfa-rp-id"]:
+        config["mfa-rp-id"] =  cc["mfa-rp-id"]
+    if cc["mfa-rp-display-name"]:
+        config["mfa-rp-display-name"] =  cc["mfa-rp-display-name"]
+    if cc["mfa-rp-origin"]:
+        config["mfa-rp-origin"] =  cc["mfa-rp-origin"]
     pg = endpoint_from_flag('postgres.master.available')
     if pg:
         config["storage"] = {

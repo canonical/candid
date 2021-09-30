@@ -21,13 +21,16 @@ import (
 )
 
 type memStore struct {
-	mu         sync.Mutex
-	identities []*store.Identity
+	mu          sync.Mutex
+	identities  []*store.Identity
+	credentials map[string]store.MFACredential
 }
 
 // NewStore creates a new in-memory store.Store instance.
 func NewStore() store.Store {
-	return &memStore{}
+	return &memStore{
+		credentials: make(map[string]store.MFACredential),
+	}
 }
 
 // Context implements store.Store.Context by returning the given context
@@ -340,6 +343,19 @@ func updateProviderIdentity(dst, src store.ProviderIdentity, op store.Operation)
 		return src
 	case store.Clear:
 		return ""
+	default:
+		panic("unsupported operation requested on store.ProviderIdentity field")
+	}
+}
+
+func updateMFACredentials(dst, src []store.MFACredential, op store.Operation) []store.MFACredential {
+	switch op {
+	case store.NoUpdate:
+		return dst
+	case store.Set:
+		return src
+	case store.Clear:
+		return nil
 	default:
 		panic("unsupported operation requested on store.ProviderIdentity field")
 	}

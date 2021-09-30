@@ -146,6 +146,22 @@ type Store interface {
 	// IdentityCounts returns the number of identities stored in the
 	// store split by provider ID.
 	IdentityCounts(ctx context.Context) (map[string]int, error)
+
+	// AddMFACredential stores the specified multi-factor credential.
+	AddMFACredential(ctx context.Context, cred MFACredential) error
+
+	// RemoveMFACredential removes the multi-factor credential with the
+	// specified username and credential name.
+	RemoveMFACredential(ctx context.Context, providerID, name string) error
+
+	// UserMFACredentials returns all multi-factor credentials for the specified user.
+	UserMFACredentials(ctx context.Context, providerID string) ([]MFACredential, error)
+
+	// IncrementMFACredentialSignCount increments the multi-factor credential sign count.
+	IncrementMFACredentialSignCount(ctx context.Context, credentialID []byte) error
+
+	// ClearMFACredentials removes all multi-factor credentials for the specified user.
+	ClearMFACredentials(ctx context.Context, providerID string) error
 }
 
 // A ProviderIdentity is a provider-specific unique identity.
@@ -234,4 +250,24 @@ type Identity struct {
 	// Owner contains the ProviderIdentity of the identity that owns
 	// this one.
 	Owner ProviderIdentity
+}
+
+// MFACredential stores data about a multi-factor credential.
+type MFACredential struct {
+	// ProviderID contains the provider ID of the user to which the
+	// multi-factor credential belongs.
+	ProviderID ProviderIdentity
+	// Name contains a human readable name of the multi-factor credential.
+	Name string
+	// ID contains the ID of the multi-factor credential.
+	ID []byte
+	// PublicKey contains the public key of the multi-factor credential.
+	PublicKey []byte
+	// AttenstationType holds the attestation type.
+	AttestationType string
+	// AuthenticatorGUID holds the GUID of the security device used
+	// to generate the muti-factor credential.
+	AuthenticatorGUID []byte
+	// AuthenticatorSignCount holds the sign count of the security device.
+	AuthenticatorSignCount uint32
 }

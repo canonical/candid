@@ -112,23 +112,28 @@ func (b *backend) withTx(f func(*sql.Tx) error) error {
 type tmplID int
 
 const (
-	tmplIdentityFrom tmplID = iota
-	tmplSelectIdentitySet
+	tmplClearIdentitySet tmplID = iota
+	tmplClearMFACredentials
 	tmplFindIdentities
-	tmplUpdateIdentity
-	tmplIdentityID
-	tmplUpsertIdentity
-	tmplClearIdentitySet
-	tmplPushIdentitySet
-	tmplPullIdentitySet
+	tmplFindMeetings
+	tmplGetMeeting
+	tmplGetMFACredentials
 	tmplGetProviderData
 	tmplGetProviderDataForUpdate
-	tmplInsertProviderData
-	tmplGetMeeting
-	tmplPutMeeting
-	tmplFindMeetings
-	tmplRemoveMeetings
 	tmplIdentityCounts
+	tmplIdentityFrom
+	tmplIdentityID
+	tmplIncrementMFACredentialSignCount
+	tmplInsertMFACredential
+	tmplInsertProviderData
+	tmplPullIdentitySet
+	tmplPushIdentitySet
+	tmplPutMeeting
+	tmplRemoveMeetings
+	tmplRemoveMFACredential
+	tmplSelectIdentitySet
+	tmplUpdateIdentity
+	tmplUpsertIdentity
 	numTmpl
 )
 

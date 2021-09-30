@@ -63,6 +63,9 @@ type Params struct {
 	// MatchEmailAddr is a regular expression that is used to determine if
 	// this identity provider can be used for a particular user email.
 	MatchEmailAddr string `yaml:"match-email-addr"`
+
+	// RequireMFA indicates if this provider requires the use of MFA
+	RequireMFA bool `yaml:"require-mfa"`
 }
 
 type UserInfo struct {
@@ -177,12 +180,12 @@ func (idp *identityProvider) GetGroups(ctx context.Context, identity *store.Iden
 // Handle implements idp.IdentityProvider.Handle.
 func (idp *identityProvider) Handle(ctx context.Context, w http.ResponseWriter, req *http.Request) {
 	var ls idputil.LoginState
-	if err := idp.initParams.Codec.Cookie(req, idputil.LoginCookieName, req.Form.Get("state"), &ls); err != nil {
-		logger.Infof("Invalid login state: %s", err)
-		idputil.BadRequestf(w, "Login failed: invalid login state")
+	state := req.Form.Get("state")
+	if err := idp.initParams.Codec.Cookie(req, idputil.LoginCookieName, state, &ls); err != nil {
+		logger.Infof("invalid login state: %s", err)
+		idputil.BadRequestf(w, "login failed: invalid login state")
 		return
 	}
-
 	switch strings.TrimPrefix(req.URL.Path, idp.initParams.URLPrefix) {
 	case "/login":
 		idpChoice := params.IDPChoiceDetails{
@@ -194,9 +197,11 @@ func (idp *identityProvider) Handle(ctx context.Context, w http.ResponseWriter, 
 		id, err := idputil.HandleLoginForm(ctx, w, req, idpChoice, idp.initParams.Template, idp.loginUser)
 		if err != nil {
 			idp.initParams.VisitCompleter.RedirectFailure(ctx, w, req, ls.ReturnTo, ls.State, err)
+			return
 		}
 		if id != nil {
-			idp.initParams.VisitCompleter.RedirectSuccess(ctx, w, req, ls.ReturnTo, ls.State, id)
+			idp.initParams.VisitCompleter.RedirectMFA(ctx, w, req, idp.params.RequireMFA, ls.ReturnTo, ls.State, state, id)
+			return
 		}
 	}
 }
@@ -219,6 +224,7 @@ func (idp *identityProvider) loginUser(ctx context.Context, user, password strin
 			if err != nil {
 				return nil, errgo.Mask(err)
 			}
+
 			return id, nil
 		}
 	}

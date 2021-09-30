@@ -71,6 +71,7 @@ func New() cmd.Command {
 	supercmd.Register(newFindCommand(c))
 	supercmd.Register(newRemoveGroupCommand(c))
 	supercmd.Register(newShowCommand(c))
+	supercmd.Register(newClearMFACredentialsCommand(c))
 	return supercmd
 }
 

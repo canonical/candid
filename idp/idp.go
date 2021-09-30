@@ -43,6 +43,9 @@ type VisitCompleter interface {
 	// providing a code which can be used by the client to obtain a
 	// disharge token for the given id.
 	RedirectSuccess(ctx context.Context, w http.ResponseWriter, req *http.Request, returnTo, state string, id *store.Identity)
+
+	// RedirectMFA redirects the user to the multi-factor login flow.
+	RedirectMFA(ctx context.Context, w http.ResponseWriter, req *http.Request, requireMFA bool, returnTo, returnToState, state string, id *store.Identity)
 }
 
 // InitParams are passed to the identity provider to initialise it.

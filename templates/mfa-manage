@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html dir="ltr" lang="en">
+<head>
+  <title>Candid - MFA Registration</title>
+
+  <meta http-equiv="x-ua-compatible" content="IE=edge">
+  <meta charset="utf-8">
+
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="">
+  <meta name="author" content="Juju team">
+  
+  <link rel="shortcut icon" href="../../static/favicon.ico">
+  <link rel="stylesheet" href="../../static/css/vanilla.css">
+  <link rel="stylesheet" href="../../static/css/mfa-manage.css">
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.0/jquery.min.js"></script>
+</head>
+<body>
+  <div class="p-strip">
+    <div class="row">
+      <div class="col-2 col-start-large-6 col-small-2 col-medium-3">
+        <img src="../../static/images/logo-canonical-aubergine.svg" alt="Canonical" />
+      </div>
+    </div>
+  </div>
+    <div class="p-strip">
+    <div class="row">
+      <div class="col-6 col-start-large-4">
+        <div class="p-card--highlighted">
+          <h1 class="p-heading--four">Manage security keys</h1>
+          <p class="p-text" id='note'>{{.Note}}</p>
+          <h2 class="p-heading--five u-no-padding--top">Your registered security keys</h2>
+          <ul class="p-list--divided" id="credentials">
+            {{range .Credentials}}
+                <div class="security-keys__item p-list__item security-keys__item--removable">
+                    <div class="security-keys__key-name">{{.Name}}</div>
+                    <button class="remove-security-key-button u-no-margin--bottom is-inline" onclick="removeCredential('{{.RemoveURL}}')">
+                        <i class="p-icon--delete"></i>
+                    </button>
+                </div>
+            {{end}}
+          </ul>
+          <div class="row">
+            <label for="security-key">New security key</label>
+            <input type="text" id="credentialName" name="security-key" placeholder="Credential name" maxlength="44" required>
+          </div>
+          <button class="p-button--positive u-no-margin--bottom" onclick="registerSecurityKey()" id="registration-button">Register</button>
+          <hr class="u-sv2">
+          <div class="logged-meesage">You are logged in. You can close this window.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+<script>
+var mfaState = {{.MFAState}};
+var registrationData = {{.RegistrationData}};
+
+$(document).ready(function () {
+  // check whether current browser supports WebAuthn
+  if (!window.PublicKeyCredential) {
+    document.getElementById("note").innerHTML =
+      "Your browser does not support WebAuthn.";
+    return;
+  }
+});
+
+function removeCredential(url) {
+  window.location.replace(url + "&mfa-state=" + mfaState);
+}
+
+function registerSecurityKey() {
+  var credentialName = document.getElementById("credentialName").value;
+  var credential = null;
+
+  makeCredentialOptions = JSON.parse(registrationData);
+
+  makeCredentialOptions.publicKey.challenge = bufferDecode(
+    makeCredentialOptions.publicKey.challenge
+  );
+  makeCredentialOptions.publicKey.user.id = bufferDecode(
+    makeCredentialOptions.publicKey.user.id
+  );
+  if (makeCredentialOptions.publicKey.excludeCredentials) {
+    for (
+      var i = 0;
+      i < makeCredentialOptions.publicKey.excludeCredentials.length;
+      i++
+    ) {
+      makeCredentialOptions.publicKey.excludeCredentials[i].id = bufferDecode(
+        makeCredentialOptions.publicKey.excludeCredentials[i].id
+      );
+    }
+  }
+  navigator.credentials
+    .create({
+      publicKey: makeCredentialOptions.publicKey,
+    })
+    .then(function (newCredential) {
+      let attestationObject = new Uint8Array(
+        newCredential.response.attestationObject
+      );
+      let clientDataJSON = new Uint8Array(
+        newCredential.response.clientDataJSON
+      );
+      let rawId = new Uint8Array(newCredential.rawId);
+      fetch(
+        {{.RegistrationURL}} +
+          "&mfa-state=" +
+          mfaState +
+          "&credential-name=" +
+          credentialName,
+        {
+          method: "POST",
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            id: newCredential.id,
+            rawId: bufferEncode(rawId),
+            type: newCredential.type,
+            response: {
+              attestationObject: bufferEncode(attestationObject),
+              clientDataJSON: bufferEncode(clientDataJSON),
+            },
+          }),
+          contentType: "application/json; charset=utf-8",
+          dataType: "json",
+        }
+      )
+        .then((response) => {
+          if (!response.ok) {
+            document.getElementById("note").innerHTML =
+              "Failed to register the security device: " + response.statusText;
+            return Promise.reject(response.statusText);
+          } else {
+            return response.json();
+          }
+        })
+        .then((data) => {
+          mfaState = data.state;
+          registrationData = data.registrationdata;
+          credentials = data.credentials;
+
+          printSecurityKeys(credentials);
+          document.getElementById("credentialName").value = ''
+        })
+        .catch((error) => {
+          return Promise.reject("login failed");
+        });
+    })
+    .then((response) => {
+      document.getElementById("note").innerHTML =
+        "Successfully registed the security device";
+    })
+    .catch(function (err) {
+      document.getElementById("note").innerHTML =
+        "Failed to register the security device" + err;
+    });
+}
+
+function printSecurityKeys(credentials) {
+  let credentialsDIV = document.getElementById("credentials");
+  credentialsDIV.innerHTML = "";
+  credentials.forEach((item) => {
+    let div = document.createElement("div");
+    div.classList.add("security-keys__item", "p-list__item");
+    let innerHtml =
+      `<div class="security-keys__key-name">` +
+      item.name +
+      `</div>
+    `;
+    div.classList.add("security-keys__item--removable");
+      innerHtml +=
+        `
+      <button class="remove-security-key-button u-no-margin--bottom" onclick="removeCredential('` +
+        item.removeurl +
+        `')">
+        <i class="p-icon--delete"></i>
+      </button>
+    `;
+    div.innerHTML = innerHtml;
+    credentialsDIV.appendChild(div);
+  });
+}
+
+// Base64 to ArrayBuffer
+function bufferDecode(value) {
+  return Uint8Array.from(atob(value), (c) => c.charCodeAt(0));
+}
+
+// ArrayBuffer to URLBase64
+function bufferEncode(value) {
+  return btoa(String.fromCharCode.apply(null, new Uint8Array(value)))
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=/g, "");
+}
+
+</script>
+
+</body>
+</html>
