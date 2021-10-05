@@ -7,7 +7,7 @@ require (
 	github.com/coreos/etcd v3.3.17+incompatible // indirect
 	github.com/coreos/go-oidc v0.0.0-20170119174436-2cc7913f9f6f
 	github.com/cpuguy83/go-md2man/v2 v2.0.0 // indirect
-	github.com/duo-labs/webauthn v0.0.0-20200714211715-1daaee874e43
+	github.com/duo-labs/webauthn v0.0.0-20210727191636-9f1b88ef44cc
 	github.com/frankban/quicktest v1.13.1
 	github.com/garyburd/go-oauth v0.0.0-20150329160146-3131beb69b81
 	github.com/gogo/protobuf v1.3.1 // indirect
@@ -89,5 +89,7 @@ require (
 	sigs.k8s.io/yaml v1.1.0 // indirect
 	sourcegraph.com/sqs/pbtypes v1.0.0 // indirect
 )
+
+replace github.com/duo-labs/webauthn => github.com/alesstimec/webauthn v0.0.0-20210930101207-bd736a0e2a37
 
 go 1.16
