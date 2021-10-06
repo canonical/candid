@@ -503,6 +503,7 @@ performing an interactive login.
     display-name: displayName
   group-query-filter: (&(objectClass=groupOfNames)(member={{.User}}))
   hidden: false
+  require-mfa: true
 ```
 
 The LDAP identity provider allows a user to login using an LDAP server.
@@ -585,6 +586,7 @@ valid MFA credentials when logging in.
       groups: [group3, group4]
   hidden: false
   match-email-addr: @example.com$
+  require-mfa: true
 ```
 
 The `static` identity provider is meant for testing and allows defining a set of

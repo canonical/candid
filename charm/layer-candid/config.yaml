@@ -109,4 +109,4 @@ options:
     type: string
     default: ""
     description: |
-      Origin of the multi-factor authentication WebAuthn requrests.
+      Origin of the multi-factor authentication WebAuthn requests.
