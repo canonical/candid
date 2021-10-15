@@ -89,6 +89,36 @@ the target service may also have its own maximum time.
 This is the maximum time that the discharge token issued to the client
 can be used to discharge tokens without requiring re-authentication.
 
+### redirect-login-trusted-urls
+
+This is a list of trusted return-to addresses for use in the
+redirect-based login process. If a redirect-based login is attempted
+with a return-to address that does not match an entry in either
+`redirect-login-trusted-urls` or `redirect-login-trusted-domains` then
+candid will show an error page rather than redirect the user's browser.
+
+To match an entry in redirect-login-trusted-urls the return-to address
+must match exactly.
+
+### redirect-login-trusted-domains
+
+This is a list of trusted domains that are used in return-to addresses
+for use in the redirect-based login process. If a redirect-based login is
+attempted with a return-to address that does not match an entry in either
+`redirect-login-trusted-domains` or `redirect-login-trusted-urls` then
+candid will show an error page rather than redirect the user's browser.
+
+Entries in the the `redirect-login-trusted-domains` list take the form
+of either a full host name (e.g `www.example.com`) or a wildcard domain
+(e.g. `*.example.com`). The former type causes all return-to URLs with
+a host part that exactly matches the entry to be trusted. The latter
+type causes all return-to URLs with a host part that is a subdomain of
+the specified domain to be trusted.
+
+Please note that all paths in a `redirect-login-trusted-domain` are
+trusted, so these should only be used where a trusted party controls
+the entire domain.
+
 ### mfa-rp-display-name
 
 This is the name of the candid as a relying party for the multi-factor
