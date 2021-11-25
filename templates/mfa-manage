@@ -152,7 +152,7 @@ function registerSecurityKey() {
     })
     .then((response) => {
       document.getElementById("note").innerHTML =
-        "Successfully registed the security device";
+        "Successfully registered the security device";
     })
     .catch(function (err) {
       document.getElementById("note").innerHTML =
