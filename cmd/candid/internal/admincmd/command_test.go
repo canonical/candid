@@ -14,7 +14,7 @@ import (
 
 	qt "github.com/frankban/quicktest"
 	"github.com/juju/aclstore/v2"
-	"github.com/juju/cmd"
+	"github.com/juju/cmd/v3"
 	"github.com/juju/simplekv/memsimplekv"
 	"gopkg.in/macaroon-bakery.v2/bakery"
 	"gopkg.in/macaroon-bakery.v2/httpbakery/agent"

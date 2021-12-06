@@ -16,7 +16,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/juju/cmd"
+	"github.com/juju/cmd/v3"
 	"github.com/juju/gnuflag"
 	cookiejar "github.com/juju/persistent-cookiejar"
 	"golang.org/x/net/publicsuffix"

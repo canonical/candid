@@ -6,7 +6,7 @@ package admincmd
 import (
 	"context"
 
-	"github.com/juju/cmd"
+	"github.com/juju/cmd/v3"
 	"gopkg.in/errgo.v1"
 
 	"github.com/canonical/candid/params"

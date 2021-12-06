@@ -5,7 +5,7 @@ package main
 import (
 	"os"
 
-	"github.com/juju/cmd"
+	"github.com/juju/cmd/v3"
 
 	"github.com/canonical/candid/cmd/candid/internal/admincmd"
 )
