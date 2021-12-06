@@ -13,10 +13,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/juju/names/v4"
 	"golang.org/x/net/trace"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/httprequest.v1"
-	"gopkg.in/juju/names.v2"
 	"gopkg.in/macaroon-bakery.v2/bakery"
 	"gopkg.in/macaroon-bakery.v2/bakery/checkers"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"

@@ -32,7 +32,7 @@ require (
 	github.com/juju/go4 v0.0.0-20160222163258-40d72ab9641a // indirect
 	github.com/juju/loggo v0.0.0-20210728185423-eebad3a902c4
 	github.com/juju/mgotest v1.0.1
-	github.com/juju/names v0.0.0-20160330150533-8a0aa0963bba
+	github.com/juju/names/v4 v4.0.0-20200929085019-be23e191fee0
 	github.com/juju/persistent-cookiejar v0.0.0-20170428161559-d67418f14c93
 	github.com/juju/postgrestest v1.1.1
 	github.com/juju/qthttptest v0.1.1
@@ -70,7 +70,6 @@ require (
 	gopkg.in/goose.v1 v1.0.0-20161130145116-8f055ce635d6
 	gopkg.in/httprequest.v1 v1.2.1
 	gopkg.in/juju/environschema.v1 v1.0.0
-	gopkg.in/juju/names.v2 v2.0.0-20180621093930-fd59336b4621
 	gopkg.in/ldap.v2 v2.5.1
 	gopkg.in/macaroon-bakery.v2 v2.3.0
 	gopkg.in/macaroon.v2 v2.1.0
