@@ -10,7 +10,7 @@ import (
 
 	qt "github.com/frankban/quicktest"
 	"github.com/frankban/quicktest/qtsuite"
-	"github.com/garyburd/go-oauth/oauth"
+	"github.com/gomodule/oauth1/oauth"
 	"gopkg.in/yaml.v2"
 
 	"github.com/canonical/candid/config"

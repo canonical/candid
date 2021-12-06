@@ -25,7 +25,7 @@ var timeUnmarshalJSONTests = []struct {
 	expect: time.Date(2015, 9, 22, 10, 38, 15, 0, time.UTC),
 }, {
 	json:        `"yesterday"`,
-	expectError: `parsing time ""yesterday"" as ""2006-01-02T15:04:05"": cannot parse "yesterday"" as "2006"`,
+	expectError: `parsing time.*cannot parse.*as "2006"`,
 }}
 
 func TestTimeUnmarshalJSON(t *testing.T) {

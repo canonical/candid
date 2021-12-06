@@ -9,13 +9,13 @@ require (
 	github.com/cpuguy83/go-md2man/v2 v2.0.0 // indirect
 	github.com/duo-labs/webauthn v0.0.0-20210727191636-9f1b88ef44cc
 	github.com/frankban/quicktest v1.14.0
-	github.com/garyburd/go-oauth v0.0.0-20150329160146-3131beb69b81
 	github.com/gogo/protobuf v1.3.1 // indirect
 	github.com/golang/groupcache v0.0.0-20191027212112-611e8accdfc9 // indirect
 	github.com/golang/mock v1.3.1 // indirect
 	github.com/golangci/gocyclo v0.0.0-20180528144436-0a533e8fa43d // indirect
 	github.com/golangci/golangci-lint v1.21.0 // indirect
 	github.com/golangci/revgrep v0.0.0-20180812185044-276a5c0a1039 // indirect
+	github.com/gomodule/oauth1 v0.2.0
 	github.com/google/certificate-transparency-go v1.1.0 // indirect
 	github.com/google/go-cmp v0.5.6
 	github.com/google/monologue v0.0.0-20191105172128-0324c8b45f6f // indirect
