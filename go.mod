@@ -44,7 +44,7 @@ require (
 	github.com/juju/usso v1.0.1
 	github.com/juju/utils v0.0.0-20180820210520-bf9cc5bdd62d
 	github.com/julienschmidt/httprouter v1.3.0
-	github.com/lib/pq v1.10.3
+	github.com/lib/pq v1.10.4
 	github.com/lunixbochs/vtclean v0.0.0-20180621232353-2d01aacdc34a // indirect
 	github.com/mattn/go-isatty v0.0.10 // indirect
 	github.com/mattn/go-runewidth v0.0.6 // indirect
