@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/juju/loggo"
-	"github.com/juju/names"
+	"github.com/juju/names/v4"
 	"github.com/juju/usso"
 	"github.com/juju/usso/openid"
 	"github.com/juju/utils/cache"
