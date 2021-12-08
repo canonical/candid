@@ -267,7 +267,7 @@ func newDischargeID() (string, error) {
 	if _, err := rand.Read(b[:]); err != nil {
 		return "", errgo.Notef(err, "cannot read random bytes for discharge id")
 	}
-	return fmt.Sprintf("%x", b[:]), nil
+	return fmt.Sprintf("%xID", b[:]), nil
 }
 
 type dischargeTokenRequest struct {

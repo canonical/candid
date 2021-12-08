@@ -7,7 +7,7 @@ import (
 	"context"
 
 	"github.com/juju/aclstore/v2/aclclient"
-	"github.com/juju/cmd"
+	"github.com/juju/cmd/v3"
 	"github.com/juju/gnuflag"
 	errgo "gopkg.in/errgo.v1"
 )
@@ -52,7 +52,7 @@ func (c *aclShowCommand) Info() *cmd.Info {
 
 func (c *aclShowCommand) SetFlags(f *gnuflag.FlagSet) {
 	c.candidCommand.SetFlags(f)
-	c.out.AddFlags(f, "smart", cmd.DefaultFormatters)
+	c.out.AddFlags(f, "smart", cmd.DefaultFormatters.Formatters())
 }
 
 func (c *aclShowCommand) Init(args []string) error {

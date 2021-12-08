@@ -7,7 +7,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/juju/cmd"
+	"github.com/juju/cmd/v3"
 	"github.com/juju/gnuflag"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/bakery"
@@ -44,7 +44,7 @@ func (c *showCommand) Info() *cmd.Info {
 func (c *showCommand) SetFlags(f *gnuflag.FlagSet) {
 	c.userCommand.SetFlags(f)
 
-	c.out.AddFlags(f, "smart", cmd.DefaultFormatters)
+	c.out.AddFlags(f, "smart", cmd.DefaultFormatters.Formatters())
 }
 
 func (c *showCommand) Run(ctxt *cmd.Context) error {
