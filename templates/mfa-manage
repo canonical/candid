@@ -17,11 +17,14 @@
 </head>
 <body>
   <div class="p-strip">
-    <div class="row">
-      <div class="col-2 col-start-large-6 col-small-2 col-medium-3">
-        <img src="../../static/images/logo-canonical-aubergine.svg" alt="Canonical" />
-      </div>
+    <div class="logo">
+      <img class="logo__image" src="/static/images/logo-canonical-aubergine.svg" alt="Canonical" width="480" height="65" />
     </div>
+    {{if .BrandLogoLocation}}
+    <div class="logo">
+      <img class="logo_image" src="{{.BrandLogoLocation}}" alt="{{.BrandName}}" width="480" height="65"/>
+    </div>
+    {{end}}
   </div>
     <div class="p-strip">
     <div class="row">
