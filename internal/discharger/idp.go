@@ -145,6 +145,7 @@ type visitCompleter struct {
 
 type idWithMFACredentials struct {
 	*store.Identity
+	params.TemplateBrandParameters
 
 	ManageURL string
 }
@@ -196,6 +197,7 @@ func (c *visitCompleter) Success(ctx context.Context, w http.ResponseWriter, req
 		return
 	}
 	w.Header().Set("Content-Type", "text/html;charset=utf-8")
+	data.TemplateBrandParameters = params.BrandParameters()
 	if err := t.Execute(w, data); err != nil {
 		logger.Errorf("error processing login template: %s", err)
 	}
