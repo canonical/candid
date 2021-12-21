@@ -161,6 +161,7 @@ func (h *handler) authChoice(w http.ResponseWriter, req *http.Request, state, do
 		return nil
 	}
 	type authenticationRequiredParams struct {
+		params.TemplateBrandParameters
 		IDPs          []params.IDPChoiceDetails
 		Error         string
 		UseEmail      bool
@@ -168,11 +169,12 @@ func (h *handler) authChoice(w http.ResponseWriter, req *http.Request, state, do
 		WithEmailURL  string
 	}
 	authParams := authenticationRequiredParams{
-		IDPs:          idps,
-		Error:         errorMessage,
-		UseEmail:      useEmail,
-		ShowEmailLink: h.params.EnableEmailLogin && domain == "" && !useEmail,
-		WithEmailURL:  h.params.Location + "/login-email?state=" + state,
+		TemplateBrandParameters: params.BrandParameters(),
+		IDPs:                    idps,
+		Error:                   errorMessage,
+		UseEmail:                useEmail,
+		ShowEmailLink:           h.params.EnableEmailLogin && domain == "" && !useEmail,
+		WithEmailURL:            h.params.Location + "/login-email?state=" + state,
 	}
 	if err := h.params.Template.ExecuteTemplate(w, "authentication-required", authParams); err != nil {
 		return errgo.Mask(err)

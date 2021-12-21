@@ -17,6 +17,7 @@ import (
 	"gopkg.in/yaml.v2"
 
 	"github.com/canonical/candid/idp"
+	"github.com/canonical/candid/params"
 	"github.com/canonical/candid/store"
 )
 
@@ -130,6 +131,12 @@ type Config struct {
 
 	// MFARPOrigin holds the relying party origin for MFA.
 	MFARPOrigin string `yaml:"mfa-rp-origin"`
+
+	// BrandName holds the name of the entity running candid.
+	BrandName string `yaml:"brand-name"`
+	// BrandLogoLocation holds the location of the logo of the entity
+	// running candid.
+	BrandLogoLocation string `yaml:"brand-logo-location"`
 }
 
 // TLSConfig returns a TLS configuration to be used for serving
@@ -198,6 +205,8 @@ func Read(path string) (*Config, error) {
 	if err := conf.validate(); err != nil {
 		return nil, errgo.Mask(err)
 	}
+	params.BrandName = conf.BrandName
+	params.BrandLogoLocation = conf.BrandLogoLocation
 	return &conf, nil
 }
 

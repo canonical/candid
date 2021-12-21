@@ -350,3 +350,30 @@ type ClearUserMFACredentialsRequest struct {
 	httprequest.Route `httprequest:"DELETE /v1/mfa/:username"`
 	Username          Username `httprequest:"username,path"`
 }
+
+var (
+	// BrandName holds the brand name of the entity running Candid.
+	BrandName string
+	// BrandLogoLocation holds the logo location of the entity running
+	// Candid.
+	BrandLogoLocation string
+)
+
+// TemplateBrandParameters holds branding information for the entity
+// running Candid.
+type TemplateBrandParameters struct {
+	// BrandName holds the brand name of the entity running Candid.
+	BrandName string
+	// LogoLocation holds the logo location of the entity running
+	// Candid.
+	BrandLogoLocation string
+}
+
+// BrandParameters returns branding information for the entity
+// running Candid.
+func BrandParameters() TemplateBrandParameters {
+	return TemplateBrandParameters{
+		BrandName:         BrandName,
+		BrandLogoLocation: BrandLogoLocation,
+	}
+}

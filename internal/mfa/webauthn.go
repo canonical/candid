@@ -118,6 +118,7 @@ type formCredentialParams struct {
 
 // formParams holds parameters for the "mfa" template.
 type formParams struct {
+	params.TemplateBrandParameters
 	Error            string
 	RegistrationURL  string
 	LoginURL         string
@@ -385,6 +386,7 @@ func (a *Authenticator) prepareFormData(ctx context.Context, w http.ResponseWrit
 		data.Note = "Identity provider requires MFA. Please register a security key."
 	}
 
+	data.TemplateBrandParameters = params.BrandParameters()
 	return &data, nil
 }
 
@@ -574,6 +576,7 @@ func (a *Authenticator) login(ctx context.Context, w http.ResponseWriter, req *h
 }
 
 type removeCredentialParams struct {
+	params.TemplateBrandParameters
 	Name      string
 	MFAState  string
 	RemoveURL string
@@ -589,10 +592,11 @@ func (a *Authenticator) removeCredential(ctx context.Context, w http.ResponseWri
 		"credential-name": []string{credentialName},
 	}
 	data := removeCredentialParams{
-		MFAState:  req.Form.Get(StateName),
-		Name:      credentialName,
-		RemoveURL: a.Params.URLPrefix + "/remove-complete?" + v.Encode(),
-		ManageURL: a.Params.URLPrefix + "/manage",
+		TemplateBrandParameters: params.BrandParameters(),
+		MFAState:                req.Form.Get(StateName),
+		Name:                    credentialName,
+		RemoveURL:               a.Params.URLPrefix + "/remove-complete?" + v.Encode(),
+		ManageURL:               a.Params.URLPrefix + "/manage",
 	}
 
 	err := a.Params.Template.ExecuteTemplate(w, "remove-credential-confirmation", data)

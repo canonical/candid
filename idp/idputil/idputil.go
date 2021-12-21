@@ -88,6 +88,8 @@ func RedirectURL(prefix, path, state string) string {
 }
 
 type RegistrationParams struct {
+	params.TemplateBrandParameters
+
 	// State contains some opaque state for the registration. It can
 	// be used to pass arbitrary data back to the idp once the
 	// registration is processed.
@@ -115,13 +117,14 @@ type RegistrationParams struct {
 
 // RegistrationForm writes a registration form to the given writer using
 // the given parameters.
-func RegistrationForm(ctx context.Context, w http.ResponseWriter, params RegistrationParams, t *template.Template) error {
+func RegistrationForm(ctx context.Context, w http.ResponseWriter, args RegistrationParams, t *template.Template) error {
 	t = t.Lookup("register")
 	if t == nil {
 		errgo.New("registration template not found")
 	}
 	w.Header().Set("Content-Type", "text/html;charset=utf-8")
-	if err := t.Execute(w, params); err != nil {
+	args.TemplateBrandParameters = params.BrandParameters()
+	if err := t.Execute(w, args); err != nil {
 		return errgo.Notef(err, "cannot process registration template")
 	}
 	return nil
@@ -176,6 +179,7 @@ func BadRequestf(w http.ResponseWriter, f string, args ...interface{}) {
 // template.
 type LoginFormParams struct {
 	params.IDPChoiceDetails
+	params.TemplateBrandParameters
 
 	// Action contains the action parameter for the form.
 	Action string
@@ -207,9 +211,10 @@ func HandleLoginForm(
 	case "GET":
 	}
 	data := LoginFormParams{
-		IDPChoiceDetails: idpChoice,
-		Action:           idpChoice.URL,
-		Error:            errorMessage,
+		IDPChoiceDetails:        idpChoice,
+		TemplateBrandParameters: params.BrandParameters(),
+		Action:                  idpChoice.URL,
+		Error:                   errorMessage,
 	}
 	return nil, errgo.Mask(tmpl.ExecuteTemplate(w, "login-form", data))
 }

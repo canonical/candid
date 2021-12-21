@@ -65,14 +65,14 @@ func migrate(ctx context.Context) error {
 	case "legacy":
 		s, err := mgo.Dial(addr)
 		if err != nil {
-			return errgo.Notef(err, "cannot connnect to mongodb server")
+			return errgo.Notef(err, "cannot connect to mongodb server")
 		}
 		defer s.Close()
 		source = internal.NewLegacySource(s.DB(""))
 	case "mgo":
 		s, err := mgo.Dial(addr)
 		if err != nil {
-			return errgo.Notef(err, "cannot connnect to mongodb server")
+			return errgo.Notef(err, "cannot connect to mongodb server")
 		}
 		defer s.Close()
 		backend, err := mgostore.NewBackend(s.DB(""))
@@ -103,7 +103,7 @@ func migrate(ctx context.Context) error {
 	case "mgo":
 		s, err := mgo.Dial(addr)
 		if err != nil {
-			return errgo.Notef(err, "cannot connnect to mongodb server")
+			return errgo.Notef(err, "cannot connect to mongodb server")
 		}
 		defer s.Close()
 		backend, err := mgostore.NewBackend(s.DB(""))
