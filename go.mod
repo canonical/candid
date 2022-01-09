@@ -31,13 +31,13 @@ require (
 	github.com/juju/gnuflag v0.0.0-20171113085948-2ce1bb71843d
 	github.com/juju/go4 v0.0.0-20160222163258-40d72ab9641a // indirect
 	github.com/juju/loggo v0.0.0-20210728185423-eebad3a902c4
-	github.com/juju/mgotest v1.0.1
+	github.com/juju/mgotest v1.0.2
 	github.com/juju/names/v4 v4.0.0-20200929085019-be23e191fee0
 	github.com/juju/persistent-cookiejar v0.0.0-20170428161559-d67418f14c93
 	github.com/juju/postgrestest v1.1.1
 	github.com/juju/qthttptest v0.1.1
 	github.com/juju/schema v1.0.1-0.20190814234152-1f8aaeef0989
-	github.com/juju/simplekv v1.0.0
+	github.com/juju/simplekv v1.1.0
 	github.com/juju/testing v0.0.0-20210302031854-2c7ee8570c07
 	github.com/juju/usso v1.0.1
 	github.com/juju/utils v0.0.0-20200116185830-d40c2fe10647
