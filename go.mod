@@ -17,7 +17,7 @@ require (
 	github.com/golangci/revgrep v0.0.0-20180812185044-276a5c0a1039 // indirect
 	github.com/gomodule/oauth1 v0.2.0
 	github.com/google/certificate-transparency-go v1.1.0 // indirect
-	github.com/google/go-cmp v0.5.6
+	github.com/google/go-cmp v0.5.7
 	github.com/google/monologue v0.0.0-20191105172128-0324c8b45f6f // indirect
 	github.com/google/uuid v1.3.0
 	github.com/gorilla/handlers v0.0.0-20170224193955-13d73096a474
