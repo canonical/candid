@@ -32,7 +32,7 @@ jobs:
           --health-retries 5
     steps:
     - uses: actions/checkout@v2.4.0
-    - uses: actions/setup-go@v2.1.5
+    - uses: actions/setup-go@v2.2.0
       with:
         go-version: ${{ matrix.go }}
         stable: false
