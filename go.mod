@@ -8,7 +8,7 @@ require (
 	github.com/coreos/go-oidc v0.0.0-20170119174436-2cc7913f9f6f
 	github.com/cpuguy83/go-md2man/v2 v2.0.0 // indirect
 	github.com/duo-labs/webauthn v0.0.0-20210727191636-9f1b88ef44cc
-	github.com/frankban/quicktest v1.14.2
+	github.com/frankban/quicktest v1.14.3
 	github.com/gogo/protobuf v1.3.1 // indirect
 	github.com/golangci/gocyclo v0.0.0-20180528144436-0a533e8fa43d // indirect
 	github.com/golangci/golangci-lint v1.21.0 // indirect
