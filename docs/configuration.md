@@ -502,8 +502,6 @@ The `hidden` value is an optional value that can be used to not list
 this identity provider in the list of possible identity providers when
 performing an interactive login.
 
-```
-
 ### LDAP
 
 ```yaml
@@ -595,7 +593,7 @@ performing an interactive login.
 If `require-mfa` is set to `true` candid will require users to present
 valid MFA credentials when logging in.
 
-### Static identity provider
+### Static Identity Provider
 
 ```yaml
 - type: static
