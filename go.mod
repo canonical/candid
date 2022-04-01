@@ -8,7 +8,7 @@ require (
 	github.com/coreos/go-oidc v0.0.0-20170119174436-2cc7913f9f6f
 	github.com/cpuguy83/go-md2man/v2 v2.0.0 // indirect
 	github.com/duo-labs/webauthn v0.0.0-20210727191636-9f1b88ef44cc
-	github.com/frankban/quicktest v1.14.0
+	github.com/frankban/quicktest v1.14.3
 	github.com/gogo/protobuf v1.3.1 // indirect
 	github.com/golangci/gocyclo v0.0.0-20180528144436-0a533e8fa43d // indirect
 	github.com/golangci/golangci-lint v1.21.0 // indirect
@@ -33,7 +33,7 @@ require (
 	github.com/juju/names/v4 v4.0.0-20200929085019-be23e191fee0
 	github.com/juju/persistent-cookiejar v0.0.0-20170428161559-d67418f14c93
 	github.com/juju/postgrestest v1.1.1
-	github.com/juju/qthttptest v0.1.1
+	github.com/juju/qthttptest v0.1.3
 	github.com/juju/schema v1.0.1-0.20190814234152-1f8aaeef0989
 	github.com/juju/simplekv v1.1.0
 	github.com/juju/testing v0.0.0-20210302031854-2c7ee8570c07
@@ -46,7 +46,7 @@ require (
 	github.com/olekukonko/tablewriter v0.0.2 // indirect
 	github.com/pelletier/go-toml v1.6.0 // indirect
 	github.com/pquerna/cachecontrol v0.0.0-20160421231612-c97913dcbd76 // indirect
-	github.com/prometheus/client_golang v1.12.0
+	github.com/prometheus/client_golang v1.12.1
 	github.com/securego/gosec v0.0.0-20191119104125-df484bfa9e9f // indirect
 	github.com/spf13/afero v1.2.2 // indirect
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
