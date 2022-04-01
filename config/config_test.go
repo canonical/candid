@@ -10,7 +10,7 @@ import (
 	"time"
 
 	qt "github.com/frankban/quicktest"
-	"gopkg.in/macaroon-bakery.v2/bakery"
+	"gopkg.in/macaroon-bakery.v3/bakery"
 
 	"github.com/canonical/candid/config"
 	"github.com/canonical/candid/idp"

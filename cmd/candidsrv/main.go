@@ -17,7 +17,7 @@ import (
 	_ "github.com/lib/pq"
 	"golang.org/x/net/http/httpproxy"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v2/bakery"
+	"gopkg.in/macaroon-bakery.v3/bakery"
 	"gopkg.in/natefinch/lumberjack.v2"
 
 	"github.com/canonical/candid"

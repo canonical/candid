@@ -8,8 +8,8 @@ import (
 	"strings"
 
 	errgo "gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v2/bakery"
-	mgo "gopkg.in/mgo.v2"
+	"gopkg.in/macaroon-bakery.v3/bakery"
+	mgo "github.com/juju/mgo/v2"
 
 	"github.com/canonical/candid/cmd/migrate-db/internal/mongodoc"
 	"github.com/canonical/candid/internal/auth"

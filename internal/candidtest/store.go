@@ -11,7 +11,7 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	aclstore "github.com/juju/aclstore/v2"
 	"github.com/juju/simplekv/memsimplekv"
-	"gopkg.in/macaroon-bakery.v2/bakery"
+	"gopkg.in/macaroon-bakery.v3/bakery"
 
 	"github.com/canonical/candid/internal/identity"
 	"github.com/canonical/candid/meeting"

@@ -8,9 +8,9 @@ import (
 	"net/http"
 
 	"github.com/juju/loggo"
-	"github.com/juju/utils/debugstatus"
+	"github.com/juju/utils/v2/debugstatus"
 	"gopkg.in/httprequest.v1"
-	"gopkg.in/macaroon-bakery.v2/bakery"
+	"gopkg.in/macaroon-bakery.v3/bakery"
 
 	"github.com/canonical/candid/internal/identity"
 	"github.com/canonical/candid/version"

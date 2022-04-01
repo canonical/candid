@@ -12,8 +12,8 @@ import (
 	"github.com/juju/cmd/v3"
 	"github.com/juju/gnuflag"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v2/bakery"
-	"gopkg.in/macaroon-bakery.v2/httpbakery/agent"
+	"gopkg.in/macaroon-bakery.v3/bakery"
+	"gopkg.in/macaroon-bakery.v3/httpbakery/agent"
 
 	"github.com/canonical/candid/internal/auth"
 	"github.com/canonical/candid/params"

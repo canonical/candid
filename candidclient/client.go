@@ -11,10 +11,10 @@ import (
 
 	"gopkg.in/errgo.v1"
 	"gopkg.in/httprequest.v1"
-	"gopkg.in/macaroon-bakery.v2/bakery/checkers"
-	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
-	"gopkg.in/macaroon-bakery.v2/httpbakery"
-	"gopkg.in/macaroon-bakery.v2/httpbakery/agent"
+	"gopkg.in/macaroon-bakery.v3/bakery/checkers"
+	"gopkg.in/macaroon-bakery.v3/bakery/identchecker"
+	"gopkg.in/macaroon-bakery.v3/httpbakery"
+	"gopkg.in/macaroon-bakery.v3/httpbakery/agent"
 
 	"github.com/canonical/candid/params"
 )

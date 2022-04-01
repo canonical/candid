@@ -6,9 +6,9 @@ package mgostore
 import (
 	"context"
 
+	mgo "github.com/juju/mgo/v2"
 	errgo "gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v2/bakery/mgorootkeystore"
-	mgo "gopkg.in/mgo.v2"
+	"gopkg.in/macaroon-bakery.v3/bakery/mgorootkeystore"
 )
 
 const macaroonCollection = "macaroons"

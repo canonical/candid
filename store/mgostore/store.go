@@ -8,9 +8,9 @@ import (
 	"fmt"
 
 	errgo "gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v2/bakery"
-	mgo "gopkg.in/mgo.v2"
-	"gopkg.in/mgo.v2/bson"
+	"gopkg.in/macaroon-bakery.v3/bakery"
+	mgo "github.com/juju/mgo/v2"
+	"github.com/juju/mgo/v2/bson"
 
 	"github.com/canonical/candid/store"
 )

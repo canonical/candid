@@ -11,7 +11,7 @@ import (
 
 	"gopkg.in/errgo.v1"
 	"gopkg.in/httprequest.v1"
-	"gopkg.in/macaroon-bakery.v2/httpbakery/agent"
+	"gopkg.in/macaroon-bakery.v3/httpbakery/agent"
 
 	"github.com/canonical/candid/idp/idputil"
 	"github.com/canonical/candid/params"

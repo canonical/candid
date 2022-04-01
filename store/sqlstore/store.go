@@ -9,7 +9,7 @@ import (
 
 	"github.com/juju/loggo"
 	errgo "gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v2/bakery"
+	"gopkg.in/macaroon-bakery.v3/bakery"
 
 	"github.com/canonical/candid/store"
 )

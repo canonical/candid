@@ -13,7 +13,7 @@ import (
 
 	_ "github.com/lib/pq"
 	errgo "gopkg.in/errgo.v1"
-	mgo "gopkg.in/mgo.v2"
+	mgo "github.com/juju/mgo/v2"
 
 	"github.com/canonical/candid/cmd/migrate-db/internal"
 	"github.com/canonical/candid/store"

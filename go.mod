@@ -2,6 +2,7 @@ module github.com/canonical/candid
 
 require (
 	github.com/bombsimon/wsl v1.2.8 // indirect
+	github.com/cespare/xxhash/v2 v2.1.2 // indirect
 	github.com/cloudflare/cfssl v1.4.1 // indirect
 	github.com/coreos/bbolt v1.3.3 // indirect
 	github.com/coreos/etcd v3.3.17+incompatible // indirect
@@ -10,6 +11,9 @@ require (
 	github.com/duo-labs/webauthn v0.0.0-20210727191636-9f1b88ef44cc
 	github.com/frankban/quicktest v1.14.3
 	github.com/gogo/protobuf v1.3.1 // indirect
+	github.com/golang/groupcache v0.0.0-20200121045136-8c9f03a8e57e // indirect
+	github.com/golang/mock v1.4.4 // indirect
+	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/golangci/gocyclo v0.0.0-20180528144436-0a533e8fa43d // indirect
 	github.com/golangci/golangci-lint v1.21.0 // indirect
 	github.com/golangci/revgrep v0.0.0-20180812185044-276a5c0a1039 // indirect
@@ -23,22 +27,24 @@ require (
 	github.com/gostaticanalysis/analysisutil v0.0.3 // indirect
 	github.com/grpc-ecosystem/go-grpc-middleware v1.1.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway v1.12.1 // indirect
+	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/juju/aclstore/v2 v2.0.0
 	github.com/juju/clock v0.0.0-20190205081909-9c5c9712527c
 	github.com/juju/cmd/v3 v3.0.0-20210809234809-65029dab4cd0
 	github.com/juju/gnuflag v0.0.0-20171113085948-2ce1bb71843d
 	github.com/juju/go4 v0.0.0-20160222163258-40d72ab9641a // indirect
 	github.com/juju/loggo v0.0.0-20210728185423-eebad3a902c4
-	github.com/juju/mgotest v1.0.1
+	github.com/juju/mgo/v2 v2.0.0-20210302023703-70d5d206e208
+	github.com/juju/mgotest v1.0.2
 	github.com/juju/names/v4 v4.0.0-20200929085019-be23e191fee0
 	github.com/juju/persistent-cookiejar v0.0.0-20170428161559-d67418f14c93
 	github.com/juju/postgrestest v1.1.1
 	github.com/juju/qthttptest v0.1.3
 	github.com/juju/schema v1.0.1-0.20190814234152-1f8aaeef0989
-	github.com/juju/simplekv v1.0.0
+	github.com/juju/simplekv v1.1.0
 	github.com/juju/testing v0.0.0-20210302031854-2c7ee8570c07
 	github.com/juju/usso v1.0.1
-	github.com/juju/utils v0.0.0-20200116185830-d40c2fe10647
+	github.com/juju/utils/v2 v2.0.0-20210305225158-eedbe7b6b3e2
 	github.com/julienschmidt/httprouter v1.3.0
 	github.com/lib/pq v1.10.4
 	github.com/mattn/go-runewidth v0.0.6 // indirect
@@ -46,11 +52,13 @@ require (
 	github.com/olekukonko/tablewriter v0.0.2 // indirect
 	github.com/pelletier/go-toml v1.6.0 // indirect
 	github.com/pquerna/cachecontrol v0.0.0-20160421231612-c97913dcbd76 // indirect
-	github.com/prometheus/client_golang v1.12.1
+	github.com/prometheus/client_golang v1.11.1
+	github.com/prometheus/procfs v0.7.3 // indirect
 	github.com/securego/gosec v0.0.0-20191119104125-df484bfa9e9f // indirect
 	github.com/spf13/afero v1.2.2 // indirect
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
 	github.com/spf13/viper v1.5.0 // indirect
+	github.com/stretchr/testify v1.5.1 // indirect
 	github.com/urfave/cli v1.22.1 // indirect
 	github.com/uudashr/gocognit v1.0.0 // indirect
 	github.com/yohcop/openid-go v1.0.0
@@ -58,29 +66,34 @@ require (
 	go.uber.org/multierr v1.4.0 // indirect
 	go.uber.org/zap v1.13.0 // indirect
 	golang.org/x/crypto v0.0.0-20210711020723-a769d52b0f97
+	golang.org/x/lint v0.0.0-20200302205851-738671d3881b // indirect
 	golang.org/x/net v0.0.0-20210805182204-aaa1db679c0d
-	golang.org/x/oauth2 v0.0.0-20210514164344-f6687ab2804c
-	google.golang.org/grpc/examples v0.0.0-20220120193159-9cb411380883 // indirect
+	golang.org/x/oauth2 v0.0.0-20200107190931-bf48bf16ab8d
+	golang.org/x/sys v0.0.0-20220114195835-da31bd327af9 // indirect
+	golang.org/x/time v0.0.0-20191024005414-555d28b269f0 // indirect
+	golang.org/x/tools v0.0.0-20200825202427-b303f430e36d // indirect
+	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
+	google.golang.org/appengine v1.6.6 // indirect
+	google.golang.org/genproto v0.0.0-20200825200019-8632dd797987 // indirect
+	google.golang.org/grpc v1.29.1 // indirect
 	gopkg.in/asn1-ber.v1 v1.0.0-20170511165959-379148ca0225
 	gopkg.in/errgo.v1 v1.0.1
 	gopkg.in/goose.v1 v1.0.0-20161130145116-8f055ce635d6
 	gopkg.in/httprequest.v1 v1.2.1
 	gopkg.in/juju/environschema.v1 v1.0.0
 	gopkg.in/ldap.v2 v2.5.1
-	gopkg.in/macaroon-bakery.v2 v2.3.0
+	gopkg.in/macaroon-bakery.v3 v3.0.0
 	gopkg.in/macaroon.v2 v2.1.0
-	gopkg.in/mgo.v2 v2.0.0-20190816093944-a6b53ec6cb22
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0-20170531180850-df99d62fd42d
 	gopkg.in/retry.v1 v1.0.3 // indirect
 	gopkg.in/square/go-jose.v2 v2.6.0
 	gopkg.in/tomb.v2 v2.0.0-20161208151619-d5d1b5820637
 	gopkg.in/yaml.v2 v2.4.0
+	honnef.co/go/tools v0.0.1-2020.1.4 // indirect
 	launchpad.net/lpad v0.0.0-20131113112110-000000000065
 	mvdan.cc/unparam v0.0.0-20191111180625-960b1ec0f2c2 // indirect
 	sigs.k8s.io/yaml v1.1.0 // indirect
 	sourcegraph.com/sqs/pbtypes v1.0.0 // indirect
 )
-
-replace github.com/duo-labs/webauthn => github.com/alesstimec/webauthn v0.0.0-20210930101207-bd736a0e2a37
 
 go 1.16

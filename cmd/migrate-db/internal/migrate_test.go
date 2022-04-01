@@ -10,7 +10,7 @@ import (
 
 	qt "github.com/frankban/quicktest"
 	errgo "gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v2/bakery"
+	"gopkg.in/macaroon-bakery.v3/bakery"
 
 	"github.com/canonical/candid/cmd/migrate-db/internal"
 	"github.com/canonical/candid/store"
