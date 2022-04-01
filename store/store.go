@@ -10,7 +10,7 @@ import (
 	"time"
 
 	errgo "gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v2/bakery"
+	"gopkg.in/macaroon-bakery.v3/bakery"
 )
 
 // Field represents a field in an identity record.

@@ -4,7 +4,7 @@
 package discharger
 
 import (
-	"gopkg.in/macaroon-bakery.v2/bakery"
+	"gopkg.in/macaroon-bakery.v3/bakery"
 
 	"github.com/canonical/candid/internal/auth"
 )

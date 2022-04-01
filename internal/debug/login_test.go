@@ -17,7 +17,7 @@ import (
 	"github.com/juju/qthttptest"
 	"golang.org/x/crypto/nacl/box"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v2/bakery"
+	"gopkg.in/macaroon-bakery.v3/bakery"
 
 	"github.com/canonical/candid/internal/candidtest"
 	"github.com/canonical/candid/internal/debug"

@@ -13,9 +13,9 @@ import (
 	"github.com/frankban/quicktest/qtsuite"
 	"github.com/juju/aclstore/v2"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v2/bakery"
-	"gopkg.in/macaroon-bakery.v2/bakery/identchecker"
-	"gopkg.in/macaroon-bakery.v2/httpbakery"
+	"gopkg.in/macaroon-bakery.v3/bakery"
+	"gopkg.in/macaroon-bakery.v3/bakery/identchecker"
+	"gopkg.in/macaroon-bakery.v3/httpbakery"
 
 	"github.com/canonical/candid/internal/auth"
 	"github.com/canonical/candid/internal/auth/httpauth"

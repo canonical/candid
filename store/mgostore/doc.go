@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/juju/loggo"
-	"gopkg.in/macaroon-bakery.v2/bakery"
-	"gopkg.in/mgo.v2/bson"
+	"gopkg.in/macaroon-bakery.v3/bakery"
+	"github.com/juju/mgo/v2/bson"
 
 	"github.com/canonical/candid/store"
 )

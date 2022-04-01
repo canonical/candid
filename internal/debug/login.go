@@ -17,7 +17,7 @@ import (
 	"github.com/julienschmidt/httprouter"
 	"golang.org/x/crypto/nacl/box"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v2/bakery"
+	"gopkg.in/macaroon-bakery.v3/bakery"
 
 	"github.com/canonical/candid/internal/identity"
 	"github.com/canonical/candid/params"

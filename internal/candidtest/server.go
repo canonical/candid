@@ -15,9 +15,9 @@ import (
 	aclstore "github.com/juju/aclstore/v2"
 	"github.com/juju/simplekv/memsimplekv"
 	errgo "gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v2/bakery"
-	"gopkg.in/macaroon-bakery.v2/httpbakery"
-	"gopkg.in/macaroon-bakery.v2/httpbakery/agent"
+	"gopkg.in/macaroon-bakery.v3/bakery"
+	"gopkg.in/macaroon-bakery.v3/httpbakery"
+	"gopkg.in/macaroon-bakery.v3/httpbakery/agent"
 
 	"github.com/canonical/candid/candidclient"
 	"github.com/canonical/candid/internal/auth"

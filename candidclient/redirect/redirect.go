@@ -11,7 +11,7 @@ import (
 
 	errgo "gopkg.in/errgo.v1"
 	httprequest "gopkg.in/httprequest.v1"
-	"gopkg.in/macaroon-bakery.v2/httpbakery"
+	"gopkg.in/macaroon-bakery.v3/httpbakery"
 
 	"github.com/canonical/candid/params"
 )
