@@ -23,7 +23,8 @@ require (
 	github.com/gostaticanalysis/analysisutil v0.0.3 // indirect
 	github.com/grpc-ecosystem/go-grpc-middleware v1.1.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway v1.12.1 // indirect
-	github.com/juju/aclstore/v2 v2.0.0
+	github.com/juju/aclstore v0.0.0-20180706073322-7fc1cdaacf01 // indirect
+	github.com/juju/aclstore/v2 v2.1.0
 	github.com/juju/clock v0.0.0-20190205081909-9c5c9712527c
 	github.com/juju/cmd/v3 v3.0.0-20210809234809-65029dab4cd0
 	github.com/juju/gnuflag v0.0.0-20171113085948-2ce1bb71843d
@@ -59,7 +60,7 @@ require (
 	go.uber.org/multierr v1.4.0 // indirect
 	go.uber.org/zap v1.13.0 // indirect
 	golang.org/x/crypto v0.0.0-20210711020723-a769d52b0f97
-	golang.org/x/net v0.0.0-20210805182204-aaa1db679c0d
+	golang.org/x/net v0.0.0-20220403103023-749bd193bc2b
 	golang.org/x/oauth2 v0.0.0-20210514164344-f6687ab2804c
 	google.golang.org/grpc/examples v0.0.0-20220401201435-0066bf69deb3 // indirect
 	gopkg.in/asn1-ber.v1 v1.0.0-20170511165959-379148ca0225
