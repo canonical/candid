@@ -23,7 +23,6 @@ require (
 	github.com/gostaticanalysis/analysisutil v0.0.3 // indirect
 	github.com/grpc-ecosystem/go-grpc-middleware v1.1.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway v1.12.1 // indirect
-	github.com/juju/aclstore v0.0.0-20180706073322-7fc1cdaacf01 // indirect
 	github.com/juju/aclstore/v2 v2.1.0
 	github.com/juju/clock v0.0.0-20190205081909-9c5c9712527c
 	github.com/juju/cmd/v3 v3.0.0-20210809234809-65029dab4cd0
@@ -42,7 +41,7 @@ require (
 	github.com/juju/usso v1.0.1
 	github.com/juju/utils/v2 v2.0.0-20210305225158-eedbe7b6b3e2
 	github.com/julienschmidt/httprouter v1.3.0
-	github.com/lib/pq v1.10.4
+	github.com/lib/pq v1.10.5
 	github.com/mattn/go-runewidth v0.0.6 // indirect
 	github.com/mhilton/openid v0.0.0-20150511103207-7922a4e937d8
 	github.com/olekukonko/tablewriter v0.0.2 // indirect
