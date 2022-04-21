@@ -9,8 +9,3 @@ Please describe what functionality this feature pertains to.
 <!-- 
 Please describe why you feel this feature should be included in Candid. 
 -->
-
-
-
-
-
