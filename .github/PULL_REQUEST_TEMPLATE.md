@@ -12,8 +12,6 @@ Fixes *JIRA/GitHub issue number*
 - [ ] Covered by integration tests
 - [ ] Independent change*
 
- _* For example, it does not require an sfproxy release before it can be merged._
-
 ## Test instructions
 
 <!-- *(optional* Describe any non-standard test instructions and configuration settings. -->

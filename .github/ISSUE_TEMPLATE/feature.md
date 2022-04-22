@@ -1,11 +1,6 @@
 # Issue: Feature
-> Note: The quickest way to see a new feature would be to submit a pull request, which will be reviewed when possible.
-## What feature?
+> Note: If you believe this feature request would be a small change, please feel free to propose a PR, which will be reviewed as soon as possible.
+## Feature description
 <!--
 Please describe what functionality this feature pertains to.
--->
-
-## Why include this feature?
-<!-- 
-Please describe why you feel this feature should be included in Candid. 
 -->
