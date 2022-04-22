@@ -2,7 +2,7 @@
 
 The what and why - include a summary of the change, describe what it does, and include relevant motivation and context.
 
-Fixes *JIRA/GitHub issue number*
+Addresses *JIRA/GitHub issue number*
 
 ## Engineering checklist
 *Check only items that apply*
