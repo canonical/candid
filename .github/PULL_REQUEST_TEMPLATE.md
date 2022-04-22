@@ -2,7 +2,8 @@
 
 The what and why - include a summary of the change, describe what it does, and include relevant motivation and context.
 
-Addresses *JIRA/GitHub issue number*
+<!-- If this PR addresses a particular issue, please uncomment the line below: -->
+<!-- Addresses *JIRA/GitHub issue number* -->
 
 ## Engineering checklist
 *Check only items that apply*
