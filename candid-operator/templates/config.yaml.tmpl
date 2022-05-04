@@ -1,0 +1,47 @@
+access-log: /root/logs/access.log
+auth-username: admin
+listen-address: :8081
+max-mgo-sessions: 300
+request-timeout: 2s
+resource-path: /root/www
+{%- if POSTGRESQL_DSN %}
+storage:
+    type: postgres
+    connection-string: {{ POSTGRESQL_DSN }}
+{%- else %}
+storage:
+    type: memory
+{%- endif %}
+{%- if LOCATION %}
+location: {{ LOCATION }}
+{%- endif %}
+{%- if PRIVATE_KEY %}
+private-key: {{ PRIVATE_KEY }}
+{%- endif %}
+{%- if PUBLIC_KEY %}
+public-key: {{ PUBLIC_KEY }}
+{%- endif %}
+{%- if PRIVATE_ADDRESS%}
+private-addr: {{ PRIVATE_ADDRESS }}
+{%- else %}
+private-addr: localhost
+{%- endif %}
+{%- if ADMIN_AGENT_PUBLIC_KEY %}
+admin-agent-private-key: {{ ADMIN_AGENT_PUBLIC_KEY }}
+{%- endif %}
+{%- if MFA_RP_DISPLAY_NAME %}
+mfa-rp-display-name: {{ MFA_RP_DISPLAY_NAME }}
+{%- endif %}
+{%- if MFA_RP_ID %}
+mfa-rp-id: {{ MFA_RP_ID }}
+{%- endif %}
+{%- if MFA_RP_ORIGIN %}
+mfa-rp-origin: {{ MFA_RP_ORIGIN }}
+{%- endif %}
+{%- if IDENTITY_PROVIDERS %}
+identity-providers:
+{{ IDENTITY_PROVIDERS }}
+{%- endif %}
+{%- if ENABLE_EMAIL_LOGIN %}
+enable-email-login: {{ ENABLE_EMAIL_LOGIN }}
+{%- endif %}
