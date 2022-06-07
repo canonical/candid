@@ -12,6 +12,8 @@ import (
 	"regexp"
 
 	"github.com/coreos/go-oidc"
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/juju/loggo"
 	"github.com/juju/names/v4"
 	"golang.org/x/oauth2"
@@ -216,8 +218,8 @@ func (idp *openidConnectIdentityProvider) SetInteraction(ierr *httpbakery.Error,
 }
 
 //  GetGroups implements idp.IdentityProvider.GetGroups.
-func (*openidConnectIdentityProvider) GetGroups(context.Context, *store.Identity) ([]string, error) {
-	return nil, nil
+func (idp *openidConnectIdentityProvider) GetGroups(_ context.Context, identity *store.Identity) ([]string, error) {
+	return identity.Groups, nil
 }
 
 // Handle implements idp.IdentityProvider.Handle.
@@ -276,6 +278,10 @@ func (idp *openidConnectIdentityProvider) callback(ctx context.Context, w http.R
 			existingUser.Email = user.Email
 			upd[store.Email] = store.Set
 		}
+		if !cmp.Equal(user.Groups, existingUser.Groups, cmpopts.SortSlices(func(a, b string) bool { return a < b })) {
+			existingUser.Groups = user.Groups
+			upd[store.Groups] = store.Set
+		}
 		if (upd != store.Update{}) {
 			err = idp.initParams.Store.UpdateIdentity(ctx, &existingUser, upd)
 		}
@@ -295,6 +301,7 @@ func (idp *openidConnectIdentityProvider) callback(ctx context.Context, w http.R
 			store.Username: store.Set,
 			store.Name:     store.Set,
 			store.Email:    store.Set,
+			store.Groups:   store.Set,
 		})
 		if err == nil {
 			idp.initParams.VisitCompleter.RedirectSuccess(ctx, w, req, ls.ReturnTo, ls.State, &user)
@@ -358,6 +365,7 @@ func (idp *openidConnectIdentityProvider) registerUser(ctx context.Context, user
 		store.Username: store.Set,
 		store.Name:     store.Set,
 		store.Email:    store.Set,
+		store.Groups:   store.Set,
 	})
 	if err == nil {
 		return nil
@@ -397,6 +405,7 @@ func (idp *openidConnectIdentityProvider) CreateIdentity(ctx context.Context, to
 		}
 		user.Email = claims.Email
 		user.Name = claims.FullName
+		user.Groups = claims.Groups
 	}
 	return user, nil
 }
@@ -404,9 +413,10 @@ func (idp *openidConnectIdentityProvider) CreateIdentity(ctx context.Context, to
 // claims contains the set of claims possibly returned in the OpenID
 // token.
 type claims struct {
-	FullName          string `json:"name"`
-	Email             string `json:"email"`
-	PreferredUsername string `json:"preferred_username"`
+	FullName          string   `json:"name"`
+	Email             string   `json:"email"`
+	PreferredUsername string   `json:"preferred_username"`
+	Groups            []string `json:"groups"`
 }
 
 // joinDomain creates a new params.Username with the given name and

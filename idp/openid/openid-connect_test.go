@@ -331,6 +331,7 @@ var handleCallbackTests = []struct {
 		"preferred_username": "user0",
 		"email":              "user0@example.com",
 		"name":               "User Zero",
+		"groups":             []string{"group1", "group2"},
 	},
 	expectIdentity: func(s string) store.Identity {
 		return store.Identity{
@@ -338,6 +339,7 @@ var handleCallbackTests = []struct {
 			Username:   "user1",
 			Email:      "user0@example.com",
 			Name:       "User Zero",
+			Groups:     []string{"group1", "group2"},
 		}
 	},
 }, {
@@ -387,6 +389,7 @@ func TestHandleCallback(t *testing.T) {
 						store.Username: store.Set,
 						store.Email:    store.Set,
 						store.Name:     store.Set,
+						store.Groups:   store.Set,
 					})
 					c.Assert(err, qt.IsNil)
 				}
