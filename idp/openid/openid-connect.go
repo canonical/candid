@@ -71,7 +71,7 @@ type IdentityCreator interface {
 // A GroupsRetriever is used to retrieve a list of user groups from the
 // OpenID token returned by the OpenID authentication process.
 type GroupsRetriever interface {
-	// Retrieve groups from the OpenID token.
+	// RetrieveGroups retrieves groups from the OpenID token.
 	RetrieveGroups(context.Context, *oauth2.Token, func(interface{}) error) ([]string, error)
 }
 
