@@ -68,6 +68,13 @@ type IdentityCreator interface {
 	CreateIdentity(context.Context, *oauth2.Token) (store.Identity, error)
 }
 
+// A GroupsRetriever is used to retrieve a list of user groups from the
+// OpenID token returned by the OpenID authentication process.
+type GroupsRetriever interface {
+	// Retrieve groups from the OpenID token.
+	RetrieveGroups(context.Context, *oauth2.Token, func(interface{}) error) ([]string, error)
+}
+
 type OpenIDConnectParams struct {
 	// Name is the name that will be given to the identity provider.
 	Name string `yaml:"name"`
@@ -109,6 +116,12 @@ type OpenIDConnectParams struct {
 	// this is nil the default implementation provided by the
 	// openIDConnect identity provider will be used.
 	IdentityCreator IdentityCreator
+
+	// GroupsRetriever is the GroupsRetriever that the identity provider
+	// will use to retrieve a list of groups from the OAuth2 token. If
+	// this is nil the default implementation provided by the
+	// openIDConnect identity provider will be used.
+	GroupsRetriever GroupsRetriever
 }
 
 // NewOpenIDConnectIdentityProvider creates a new identity provider using
@@ -405,9 +418,22 @@ func (idp *openidConnectIdentityProvider) CreateIdentity(ctx context.Context, to
 		}
 		user.Email = claims.Email
 		user.Name = claims.FullName
-		user.Groups = claims.Groups
+		user.Groups, err = idp.RetrieveGroups(ctx, tok, &claims, id.Claims)
+		if err != nil {
+			return store.Identity{}, errgo.Newf("failed to retrieve groups from an OpenID response")
+		}
 	}
+
 	return user, nil
+}
+
+// Retrieve groups from the OpenID token
+func (idp *openidConnectIdentityProvider) RetrieveGroups(ctx context.Context, tok *oauth2.Token, claims *claims, claimsUnmarshaler func(interface{}) error) ([]string, error) {
+	if idp.params.GroupsRetriever != nil {
+		return idp.params.GroupsRetriever.RetrieveGroups(ctx, tok, claimsUnmarshaler)
+	}
+
+	return claims.Groups, nil
 }
 
 // claims contains the set of claims possibly returned in the OpenID

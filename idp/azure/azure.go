@@ -9,6 +9,7 @@ import (
 	"gopkg.in/errgo.v1"
 
 	"github.com/canonical/candid/idp"
+	"github.com/canonical/candid/idp/idputil"
 	"github.com/canonical/candid/idp/openid"
 )
 
@@ -70,15 +71,18 @@ func NewIdentityProvider(p Params) idp.IdentityProvider {
 		p.Icon = "/static/images/icons/azure.svg"
 	}
 
+	var groupsRetriever idputil.MsGraphGroupsRetriever
+
 	return openid.NewOpenIDConnectIdentityProvider(openid.OpenIDConnectParams{
-		Name:         p.Name,
-		Issuer:       "https://login.live.com",
-		Description:  p.Description,
-		Icon:         p.Icon,
-		Domain:       p.Domain,
-		Scopes:       []string{oidc.ScopeOpenID, "profile"},
-		ClientID:     p.ClientID,
-		ClientSecret: p.ClientSecret,
-		Hidden:       p.Hidden,
+		Name:            p.Name,
+		Issuer:          "https://login.live.com",
+		Description:     p.Description,
+		Icon:            p.Icon,
+		Domain:          p.Domain,
+		Scopes:          []string{oidc.ScopeOpenID, "profile"},
+		ClientID:        p.ClientID,
+		ClientSecret:    p.ClientSecret,
+		Hidden:          p.Hidden,
+		GroupsRetriever: &groupsRetriever,
 	})
 }
