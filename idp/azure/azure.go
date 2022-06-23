@@ -71,8 +71,6 @@ func NewIdentityProvider(p Params) idp.IdentityProvider {
 		p.Icon = "/static/images/icons/azure.svg"
 	}
 
-	var groupsRetriever msgraph.MsGraphGroupsRetriever
-
 	return openid.NewOpenIDConnectIdentityProvider(openid.OpenIDConnectParams{
 		Name:            p.Name,
 		Issuer:          "https://login.live.com",
@@ -83,6 +81,6 @@ func NewIdentityProvider(p Params) idp.IdentityProvider {
 		ClientID:        p.ClientID,
 		ClientSecret:    p.ClientSecret,
 		Hidden:          p.Hidden,
-		GroupsRetriever: &groupsRetriever,
+		GroupsRetriever: &msgraph.MsGraphGroupsRetriever{},
 	})
 }

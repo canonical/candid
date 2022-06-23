@@ -80,8 +80,6 @@ func NewIdentityProvider(p Params) idp.IdentityProvider {
 		p.Domain = p.Name
 	}
 
-	var groupsRetriever msgraph.MsGraphGroupsRetriever
-
 	return openid.NewOpenIDConnectIdentityProvider(openid.OpenIDConnectParams{
 		Name:            p.Name,
 		Issuer:          p.URL,
@@ -93,7 +91,7 @@ func NewIdentityProvider(p Params) idp.IdentityProvider {
 		ClientSecret:    p.ClientSecret,
 		Hidden:          p.Hidden,
 		MatchEmailAddr:  p.MatchEmailAddr,
-		GroupsRetriever: &groupsRetriever,
+		GroupsRetriever: &msgraph.MsGraphGroupsRetriever{},
 	})
 
 }
