@@ -7,11 +7,13 @@ package idputil
 
 import (
 	"context"
+	"encoding/csv"
 	"fmt"
 	"html/template"
 	"net/http"
 	"net/url"
 	"path"
+	"strings"
 	"time"
 
 	"github.com/juju/loggo"
@@ -113,6 +115,10 @@ type RegistrationParams struct {
 	// Email contains the email address of the user. This is used to
 	// populate the email input.
 	Email string
+
+	// Groups contains a CSV formatted list of groups the user is
+	// a member of. This is used to populate the group input.
+	Groups string
 }
 
 // RegistrationForm writes a registration form to the given writer using
@@ -258,4 +264,43 @@ func CookiePathRelativeToLocation(cookiePath, location string, skipLocation bool
 		return cookiePath
 	}
 	return u.Path + cookiePath
+}
+
+// ReadGroupsFromCSV parses a CSV string with user groups
+// and returns groups as a slice
+func ReadGroupsFromCSV(src string) ([]string, error) {
+	r := csv.NewReader(strings.NewReader(src))
+	t, err := r.ReadAll()
+	if err != nil {
+		return nil, err
+	}
+
+	if t == nil {
+		return nil, nil
+	}
+
+	return t[0], nil
+}
+
+// WriteGroupsToCSV writes a slice of user groups to
+// a CSV string
+func WriteGroupsToCSV(groups []string) (string, error) {
+	if len(groups) == 0 {
+		return "", nil
+	}
+
+	b := strings.Builder{}
+	w := csv.NewWriter(&b)
+
+	if err := w.Write(groups); err != nil {
+		return "", errgo.Notef(err, "error writing record to csv")
+	}
+
+	// Write any buffered data to the underlying writer
+	w.Flush()
+	if err := w.Error(); err != nil {
+		return "", errgo.Notef(err, "error flushing buffered csv data to a writer")
+	}
+
+	return b.String(), nil
 }

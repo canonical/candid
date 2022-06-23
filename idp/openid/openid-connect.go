@@ -332,21 +332,33 @@ func (idp *openidConnectIdentityProvider) callback(ctx context.Context, w http.R
 	if err != nil {
 		return errgo.Mask(err)
 	}
+
+	groups, err := idputil.WriteGroupsToCSV(user.Groups)
+	if err != nil {
+		return errgo.Mask(err)
+	}
 	return errgo.Mask(idputil.RegistrationForm(ctx, w, idputil.RegistrationParams{
 		State:    state,
 		Domain:   idp.params.Domain,
 		FullName: user.Name,
 		Email:    user.Email,
+		Groups:   groups,
 	}, idp.initParams.Template))
 }
 
 func (idp *openidConnectIdentityProvider) register(ctx context.Context, w http.ResponseWriter, req *http.Request, ls idputil.LoginState) error {
+	groups, err := idputil.ReadGroupsFromCSV(req.Form.Get("groups"))
+	if err != nil {
+		return errgo.Mask(err)
+	}
+
 	u := &store.Identity{
 		ProviderID: ls.ProviderID,
 		Name:       req.Form.Get("fullname"),
 		Email:      req.Form.Get("email"),
+		Groups:     groups,
 	}
-	err := idp.registerUser(ctx, req.Form.Get("username"), u)
+	err = idp.registerUser(ctx, req.Form.Get("username"), u)
 	if err == nil {
 		idp.initParams.VisitCompleter.RedirectSuccess(ctx, w, req, ls.ReturnTo, ls.State, u)
 		return nil
@@ -361,6 +373,7 @@ func (idp *openidConnectIdentityProvider) register(ctx context.Context, w http.R
 		Domain:   idp.params.Domain,
 		FullName: req.Form.Get("fullname"),
 		Email:    req.Form.Get("email"),
+		Groups:   req.Form.Get("groups"),
 	}, idp.initParams.Template))
 }
 
@@ -418,22 +431,17 @@ func (idp *openidConnectIdentityProvider) CreateIdentity(ctx context.Context, to
 		}
 		user.Email = claims.Email
 		user.Name = claims.FullName
-		user.Groups, err = idp.RetrieveGroups(ctx, tok, &claims, id.Claims)
-		if err != nil {
-			return store.Identity{}, errgo.Newf("failed to retrieve groups from an OpenID response")
+
+		if idp.params.GroupsRetriever != nil {
+			if user.Groups, err = idp.params.GroupsRetriever.RetrieveGroups(ctx, tok, id.Claims); err != nil {
+				return store.Identity{}, errgo.Notef(err, "failed to retrieve groups from an OpenID response")
+			}
+		} else {
+			user.Groups = claims.Groups
 		}
 	}
 
 	return user, nil
-}
-
-// Retrieve groups from the OpenID token
-func (idp *openidConnectIdentityProvider) RetrieveGroups(ctx context.Context, tok *oauth2.Token, claims *claims, claimsUnmarshaler func(interface{}) error) ([]string, error) {
-	if idp.params.GroupsRetriever != nil {
-		return idp.params.GroupsRetriever.RetrieveGroups(ctx, tok, claimsUnmarshaler)
-	}
-
-	return claims.Groups, nil
 }
 
 // claims contains the set of claims possibly returned in the OpenID

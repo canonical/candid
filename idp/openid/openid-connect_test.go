@@ -427,6 +427,7 @@ var handleRegisterTests = []struct {
 	username         string
 	fullname         string
 	email            string
+	groups           []string
 	expectIdentity   store.Identity
 	expectError      string
 }{{
@@ -434,11 +435,13 @@ var handleRegisterTests = []struct {
 	username: "user1",
 	fullname: "User One",
 	email:    "user1@example.com",
+	groups:   []string{"group1", "group2"},
 	expectIdentity: store.Identity{
 		ProviderID: "oidc:example.com:user-id-1",
 		Username:   "user1@test",
 		Name:       "User One",
 		Email:      "user1@example.com",
+		Groups:     []string{"group1", "group2"},
 	},
 }, {
 	name:        "InvalidUsername",
@@ -484,6 +487,7 @@ func TestHandleRegister(t *testing.T) {
 					store.Username: store.Set,
 					store.Email:    store.Set,
 					store.Name:     store.Set,
+					store.Groups:   store.Set,
 				})
 				c.Assert(err, qt.IsNil)
 			}
@@ -504,6 +508,9 @@ func TestHandleRegister(t *testing.T) {
 			}
 			if test.email != "" {
 				vs.Set("email", test.email)
+			}
+			if test.groups != nil {
+				vs.Set("groups", strings.Join(test.groups, ","))
 			}
 			req, err := http.NewRequest("POST", "/register", strings.NewReader(vs.Encode()))
 			c.Assert(err, qt.IsNil)

@@ -1,9 +1,9 @@
 // Copyright 2022 Canonical Ltd.
 // Licensed under the AGPLv3, see LICENCE file for details.
 
-// Package idputil contains utility routines common to many identity
-// providers.
-package idputil
+// Package msgraph contains Microsoft Graph API utility routines
+// common to Azure and ADFS providers.
+package msgraph
 
 import (
 	"bytes"
@@ -34,7 +34,7 @@ type MsGraphGroupsRetriever struct{}
 // If the user is a member of more than 150 groups (SAML) or 200 groups (JWT), groups must be explicitly
 // retrieved using the Microsoft Graph API.
 // See https://docs.microsoft.com/en-us/azure/active-directory/develop/access-tokens
-func (adfs *MsGraphGroupsRetriever) RetrieveGroups(ctx context.Context, token *oauth2.Token, claimsUnmarshaler func(interface{}) error) ([]string, error) {
+func (msgr *MsGraphGroupsRetriever) RetrieveGroups(ctx context.Context, token *oauth2.Token, claimsUnmarshaler func(interface{}) error) ([]string, error) {
 	var claims msGraphClaims
 	err := claimsUnmarshaler(&claims)
 	if err != nil {
@@ -65,12 +65,12 @@ func (adfs *MsGraphGroupsRetriever) RetrieveGroups(ctx context.Context, token *o
 	}
 
 	url := replacer.Replace(claimSource.Endpoint)
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer(reqBodyJson))
+	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(reqBodyJson))
 	if err != nil {
 		return nil, errgo.Notef(err, "Failed to create a POST request.")
 	}
 
-	req.Header.Set("Authorization", "Bearer "+token.AccessToken)
+	token.SetAuthHeader(req)
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := http.DefaultClient.Do(req)

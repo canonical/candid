@@ -10,7 +10,7 @@ import (
 	"gopkg.in/errgo.v1"
 
 	"github.com/canonical/candid/idp"
-	"github.com/canonical/candid/idp/idputil"
+	"github.com/canonical/candid/idp/idputil/msgraph"
 	"github.com/canonical/candid/idp/openid"
 )
 
@@ -80,7 +80,7 @@ func NewIdentityProvider(p Params) idp.IdentityProvider {
 		p.Domain = p.Name
 	}
 
-	var groupsRetriever idputil.MsGraphGroupsRetriever
+	var groupsRetriever msgraph.MsGraphGroupsRetriever
 
 	return openid.NewOpenIDConnectIdentityProvider(openid.OpenIDConnectParams{
 		Name:            p.Name,
