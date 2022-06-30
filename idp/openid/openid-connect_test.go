@@ -510,7 +510,9 @@ func TestHandleRegister(t *testing.T) {
 				vs.Set("email", test.email)
 			}
 			if test.groups != nil {
-				vs.Set("groups", strings.Join(test.groups, ","))
+				data, err := json.Marshal(test.groups)
+				c.Assert(err, qt.IsNil)
+				vs.Set("groups", string(data))
 			}
 			req, err := http.NewRequest("POST", "/register", strings.NewReader(vs.Encode()))
 			c.Assert(err, qt.IsNil)

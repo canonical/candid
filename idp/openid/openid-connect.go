@@ -7,6 +7,7 @@ package openid
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"regexp"
@@ -333,9 +334,13 @@ func (idp *openidConnectIdentityProvider) callback(ctx context.Context, w http.R
 		return errgo.Mask(err)
 	}
 
-	groups, err := idputil.WriteGroupsToCSV(user.Groups)
-	if err != nil {
-		return errgo.Mask(err)
+	var groups string
+	if len(user.Groups) > 0 {
+		groupData, err := json.Marshal(user.Groups)
+		if err != nil {
+			return errgo.Mask(err)
+		}
+		groups = string(groupData)
 	}
 	return errgo.Mask(idputil.RegistrationForm(ctx, w, idputil.RegistrationParams{
 		State:    state,
@@ -347,9 +352,13 @@ func (idp *openidConnectIdentityProvider) callback(ctx context.Context, w http.R
 }
 
 func (idp *openidConnectIdentityProvider) register(ctx context.Context, w http.ResponseWriter, req *http.Request, ls idputil.LoginState) error {
-	groups, err := idputil.ReadGroupsFromCSV(req.Form.Get("groups"))
-	if err != nil {
-		return errgo.Mask(err)
+	var groups []string
+	groupsString := req.Form.Get("groups")
+	if groupsString != "" {
+		err := json.Unmarshal([]byte(groupsString), &groups)
+		if err != nil {
+			return errgo.Mask(err)
+		}
 	}
 
 	u := &store.Identity{
@@ -358,7 +367,7 @@ func (idp *openidConnectIdentityProvider) register(ctx context.Context, w http.R
 		Email:      req.Form.Get("email"),
 		Groups:     groups,
 	}
-	err = idp.registerUser(ctx, req.Form.Get("username"), u)
+	err := idp.registerUser(ctx, req.Form.Get("username"), u)
 	if err == nil {
 		idp.initParams.VisitCompleter.RedirectSuccess(ctx, w, req, ls.ReturnTo, ls.State, u)
 		return nil

@@ -7,13 +7,11 @@ package idputil
 
 import (
 	"context"
-	"encoding/csv"
 	"fmt"
 	"html/template"
 	"net/http"
 	"net/url"
 	"path"
-	"strings"
 	"time"
 
 	"github.com/juju/loggo"
@@ -264,43 +262,4 @@ func CookiePathRelativeToLocation(cookiePath, location string, skipLocation bool
 		return cookiePath
 	}
 	return u.Path + cookiePath
-}
-
-// ReadGroupsFromCSV parses a CSV string with user groups
-// and returns groups as a slice
-func ReadGroupsFromCSV(src string) ([]string, error) {
-	r := csv.NewReader(strings.NewReader(src))
-	t, err := r.ReadAll()
-	if err != nil {
-		return nil, err
-	}
-
-	if t == nil {
-		return nil, nil
-	}
-
-	return t[0], nil
-}
-
-// WriteGroupsToCSV writes a slice of user groups to
-// a CSV string
-func WriteGroupsToCSV(groups []string) (string, error) {
-	if len(groups) == 0 {
-		return "", nil
-	}
-
-	b := strings.Builder{}
-	w := csv.NewWriter(&b)
-
-	if err := w.Write(groups); err != nil {
-		return "", errgo.Notef(err, "error writing record to csv")
-	}
-
-	// Write any buffered data to the underlying writer
-	w.Flush()
-	if err := w.Error(); err != nil {
-		return "", errgo.Notef(err, "error flushing buffered csv data to a writer")
-	}
-
-	return b.String(), nil
 }
