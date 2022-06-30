@@ -113,6 +113,10 @@ type RegistrationParams struct {
 	// Email contains the email address of the user. This is used to
 	// populate the email input.
 	Email string
+
+	// Groups contains a CSV formatted list of groups the user is
+	// a member of. This is used to populate the group input.
+	Groups string
 }
 
 // RegistrationForm writes a registration form to the given writer using

@@ -7,11 +7,14 @@ package openid
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"regexp"
 
 	"github.com/coreos/go-oidc"
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/juju/loggo"
 	"github.com/juju/names/v4"
 	"golang.org/x/oauth2"
@@ -66,6 +69,13 @@ type IdentityCreator interface {
 	CreateIdentity(context.Context, *oauth2.Token) (store.Identity, error)
 }
 
+// A GroupsRetriever is used to retrieve a list of user groups from the
+// OpenID token returned by the OpenID authentication process.
+type GroupsRetriever interface {
+	// RetrieveGroups retrieves groups from the OpenID token.
+	RetrieveGroups(context.Context, *oauth2.Token, func(interface{}) error) ([]string, error)
+}
+
 type OpenIDConnectParams struct {
 	// Name is the name that will be given to the identity provider.
 	Name string `yaml:"name"`
@@ -107,6 +117,12 @@ type OpenIDConnectParams struct {
 	// this is nil the default implementation provided by the
 	// openIDConnect identity provider will be used.
 	IdentityCreator IdentityCreator
+
+	// GroupsRetriever is the GroupsRetriever that the identity provider
+	// will use to retrieve a list of groups from the OAuth2 token. If
+	// this is nil the default implementation provided by the
+	// openIDConnect identity provider will be used.
+	GroupsRetriever GroupsRetriever
 }
 
 // NewOpenIDConnectIdentityProvider creates a new identity provider using
@@ -216,8 +232,8 @@ func (idp *openidConnectIdentityProvider) SetInteraction(ierr *httpbakery.Error,
 }
 
 //  GetGroups implements idp.IdentityProvider.GetGroups.
-func (*openidConnectIdentityProvider) GetGroups(context.Context, *store.Identity) ([]string, error) {
-	return nil, nil
+func (idp *openidConnectIdentityProvider) GetGroups(_ context.Context, identity *store.Identity) ([]string, error) {
+	return identity.Groups, nil
 }
 
 // Handle implements idp.IdentityProvider.Handle.
@@ -276,6 +292,10 @@ func (idp *openidConnectIdentityProvider) callback(ctx context.Context, w http.R
 			existingUser.Email = user.Email
 			upd[store.Email] = store.Set
 		}
+		if !cmp.Equal(user.Groups, existingUser.Groups, cmpopts.SortSlices(func(a, b string) bool { return a < b })) {
+			existingUser.Groups = user.Groups
+			upd[store.Groups] = store.Set
+		}
 		if (upd != store.Update{}) {
 			err = idp.initParams.Store.UpdateIdentity(ctx, &existingUser, upd)
 		}
@@ -295,6 +315,7 @@ func (idp *openidConnectIdentityProvider) callback(ctx context.Context, w http.R
 			store.Username: store.Set,
 			store.Name:     store.Set,
 			store.Email:    store.Set,
+			store.Groups:   store.Set,
 		})
 		if err == nil {
 			idp.initParams.VisitCompleter.RedirectSuccess(ctx, w, req, ls.ReturnTo, ls.State, &user)
@@ -312,19 +333,39 @@ func (idp *openidConnectIdentityProvider) callback(ctx context.Context, w http.R
 	if err != nil {
 		return errgo.Mask(err)
 	}
+
+	var groups string
+	if len(user.Groups) > 0 {
+		groupData, err := json.Marshal(user.Groups)
+		if err != nil {
+			return errgo.Mask(err)
+		}
+		groups = string(groupData)
+	}
 	return errgo.Mask(idputil.RegistrationForm(ctx, w, idputil.RegistrationParams{
 		State:    state,
 		Domain:   idp.params.Domain,
 		FullName: user.Name,
 		Email:    user.Email,
+		Groups:   groups,
 	}, idp.initParams.Template))
 }
 
 func (idp *openidConnectIdentityProvider) register(ctx context.Context, w http.ResponseWriter, req *http.Request, ls idputil.LoginState) error {
+	var groups []string
+	groupsString := req.Form.Get("groups")
+	if groupsString != "" {
+		err := json.Unmarshal([]byte(groupsString), &groups)
+		if err != nil {
+			return errgo.Mask(err)
+		}
+	}
+
 	u := &store.Identity{
 		ProviderID: ls.ProviderID,
 		Name:       req.Form.Get("fullname"),
 		Email:      req.Form.Get("email"),
+		Groups:     groups,
 	}
 	err := idp.registerUser(ctx, req.Form.Get("username"), u)
 	if err == nil {
@@ -341,6 +382,7 @@ func (idp *openidConnectIdentityProvider) register(ctx context.Context, w http.R
 		Domain:   idp.params.Domain,
 		FullName: req.Form.Get("fullname"),
 		Email:    req.Form.Get("email"),
+		Groups:   req.Form.Get("groups"),
 	}, idp.initParams.Template))
 }
 
@@ -358,6 +400,7 @@ func (idp *openidConnectIdentityProvider) registerUser(ctx context.Context, user
 		store.Username: store.Set,
 		store.Name:     store.Set,
 		store.Email:    store.Set,
+		store.Groups:   store.Set,
 	})
 	if err == nil {
 		return nil
@@ -397,16 +440,26 @@ func (idp *openidConnectIdentityProvider) CreateIdentity(ctx context.Context, to
 		}
 		user.Email = claims.Email
 		user.Name = claims.FullName
+
+		if idp.params.GroupsRetriever != nil {
+			if user.Groups, err = idp.params.GroupsRetriever.RetrieveGroups(ctx, tok, id.Claims); err != nil {
+				return store.Identity{}, errgo.Notef(err, "failed to retrieve groups from an OpenID response")
+			}
+		} else {
+			user.Groups = claims.Groups
+		}
 	}
+
 	return user, nil
 }
 
 // claims contains the set of claims possibly returned in the OpenID
 // token.
 type claims struct {
-	FullName          string `json:"name"`
-	Email             string `json:"email"`
-	PreferredUsername string `json:"preferred_username"`
+	FullName          string   `json:"name"`
+	Email             string   `json:"email"`
+	PreferredUsername string   `json:"preferred_username"`
+	Groups            []string `json:"groups"`
 }
 
 // joinDomain creates a new params.Username with the given name and

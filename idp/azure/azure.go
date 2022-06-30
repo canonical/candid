@@ -9,6 +9,7 @@ import (
 	"gopkg.in/errgo.v1"
 
 	"github.com/canonical/candid/idp"
+	"github.com/canonical/candid/idp/idputil/msgraph"
 	"github.com/canonical/candid/idp/openid"
 )
 
@@ -71,14 +72,15 @@ func NewIdentityProvider(p Params) idp.IdentityProvider {
 	}
 
 	return openid.NewOpenIDConnectIdentityProvider(openid.OpenIDConnectParams{
-		Name:         p.Name,
-		Issuer:       "https://login.live.com",
-		Description:  p.Description,
-		Icon:         p.Icon,
-		Domain:       p.Domain,
-		Scopes:       []string{oidc.ScopeOpenID, "profile"},
-		ClientID:     p.ClientID,
-		ClientSecret: p.ClientSecret,
-		Hidden:       p.Hidden,
+		Name:            p.Name,
+		Issuer:          "https://login.live.com",
+		Description:     p.Description,
+		Icon:            p.Icon,
+		Domain:          p.Domain,
+		Scopes:          []string{oidc.ScopeOpenID, "profile"},
+		ClientID:        p.ClientID,
+		ClientSecret:    p.ClientSecret,
+		Hidden:          p.Hidden,
+		GroupsRetriever: &msgraph.MsGraphGroupsRetriever{},
 	})
 }

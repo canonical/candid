@@ -41,6 +41,7 @@
           {{end}}
           <form class="p-form" method="post" action="register">
             <input type="hidden" name="state" value="{{.State}}">
+            <input type="hidden" name="groups" value="{{.Groups}}">
             <label for="username">Username</label>
             <input type="text" id="username" name="username" class="js_username_input" autocomplete="off">
             <p class="p-form-help-text"><span class="js_username_output"></span>@{{.Domain}}</p>
