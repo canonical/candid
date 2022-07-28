@@ -57,10 +57,10 @@ type Params struct {
 	// prompts.
 	Hidden bool `yaml:"hidden"`
 
-	//The Azure login URL
+	//LoginURL is the Azure login URL
 	//For Azure AD it should be set to https://login.microsoftonline.com/${TENANT_ID} or https://sts.windows.net/${TENANT_ID}/
 	//Default to "https://login.live.com" (consumer account login)
-	LoginUrl string `yam:"loginurl"`
+	LoginURL string `yam:"loginurl"`
 }
 
 // NewIdentityProvider creates an azure identity provider with the
@@ -75,13 +75,13 @@ func NewIdentityProvider(p Params) idp.IdentityProvider {
 	if p.Icon == "" {
 		p.Icon = "/static/images/icons/azure.svg"
 	}
-	if p.LoginUrl == "" {
-		p.LoginUrl = "https://login.live.com/"
+	if p.LoginURL == "" {
+		p.LoginURL = "https://login.live.com/"
 	}
 
 	return openid.NewOpenIDConnectIdentityProvider(openid.OpenIDConnectParams{
 		Name:            p.Name,
-		Issuer:          p.LoginUrl,
+		Issuer:          p.LoginURL,
 		Description:     p.Description,
 		Icon:            p.Icon,
 		Domain:          p.Domain,
