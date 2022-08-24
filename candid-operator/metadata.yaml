@@ -4,8 +4,8 @@
 # For a complete list of supported options, see:
 # https://juju.is/docs/sdk/metadata-reference
 
-name: candid
-display-name: candid
+name: candid-k8s
+display-name: Candid
 summary: Candid identity server.
 maintainer: JAAS Developers <jaas-dev@lists.launchpad.net>
 description: |
@@ -23,6 +23,10 @@ peers:
 provides:
   website:
     interface: http
+
+requires:
+  ingress:
+    interface: ingress
 
 containers:
   candid:
