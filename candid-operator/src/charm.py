@@ -18,16 +18,15 @@ import functools
 import json
 import logging
 import os
+
 import yaml
-
+from charms.nginx_ingress_integrator.v0.ingress import IngressRequires
 from jinja2 import Environment, FileSystemLoader
-
-
+from ops import pebble
 from ops.charm import CharmBase
 from ops.framework import StoredState
 from ops.main import main
 from ops.model import ActiveStatus, BlockedStatus, WaitingStatus
-from ops import pebble
 
 
 class IdentityProvidersParseError(Exception):
@@ -80,6 +79,12 @@ class CandidOperatorCharm(CharmBase):
         self.framework.observe(self.on.start, self._on_start)
         self.framework.observe(self.on.stop, self._on_stop)
         self.framework.observe(self.on.website_relation_joined, self._on_website_relation_joined)
+        hostname = self.config.get('location', '').lstrip('https://')
+        self.ingress = IngressRequires(self, {
+            "service-hostname": hostname,
+            "service-name": self.app.name,
+            "service-port": 8081
+        })
         self._config_filename = "/root/config.yaml"
 
     @log_event_handler
@@ -139,15 +144,12 @@ class CandidOperatorCharm(CharmBase):
         if not candid_relation:
             return
 
-        if self.app not in candid_relation.data:
-            return
-
         if 'public-key' in candid_relation.data[self.app]:
             # if public and private keys are already set
             # there is nothing to do.
             return
 
-        key = self._generate_keypair()
+        key = self._generate_keypair(event)
         candid_relation.data[self.app].update({'public-key': key['public']})
         candid_relation.data[self.app].update({'private-key': key['private']})
 
@@ -165,7 +167,19 @@ class CandidOperatorCharm(CharmBase):
         '''' Update workload with all available configuration
         data. '''
 
+        hostname = self.config.get('location', '').lstrip('https://')
+        self.ingress.update_config({"service-hostname": hostname})
+
         container = self.unit.get_container(WORKLOAD_CONTAINER)
+
+        private_key = self.config.get('private-key', '')
+        public_key = self.config.get('public-key', '')
+
+        candid_relation = self.model.get_relation("candid")
+        if candid_relation:
+            private_key = candid_relation.data[self.app].get('private-key', '')
+            public_key = candid_relation.data[self.app].get('public-key', '')
+            print('public {} private {}'.format(public_key, private_key))
 
         config_values = {
             'ADMIN_AGENT_PUBLIC_KEY': self.config.get('admin-agent-public-key', ''),
@@ -178,8 +192,8 @@ class CandidOperatorCharm(CharmBase):
             'LOGGING_CONFIG': self.config.get('logging-config'),
             'IDENTITY_PROVIDERS': self.config.get('identity-providers'),
             'NO_PROXY': self.config.get('no-proxy', ''),
-            'PRIVATE_KEY': self.config.get('private-key', ''),
-            'PUBLIC_KEY': self.config.get('public-key', ''),
+            'PRIVATE_KEY': private_key,
+            'PUBLIC_KEY': public_key,
             'REDIRECT_LOGIN_TRUSTED_URLS': self.config.get('redirect-login-trusted-urls', ''),
             'REDIRECT_LOGIN_TRUSTED_DOMAINS': self.config.get(
                 'redirect-login-trusted-domains',
@@ -303,7 +317,7 @@ class CandidOperatorCharm(CharmBase):
         env = Environment(loader=loader)
         return env.get_template(name).render(**kwargs)
 
-    def _generate_keypair(self):
+    def _generate_keypair(self, event):
         """ Create a default keypair shared by all units in the application,
             if a keypair is not explicitely configured. """
         container = self.unit.get_container(WORKLOAD_CONTAINER)
@@ -318,6 +332,9 @@ class CandidOperatorCharm(CharmBase):
                 logger.error('error generating keypair %d. Stderr:', e.exit_code)
                 for line in e.stderr.splitlines():
                     logger.error('    %s', line)
+        else:
+            logger.info('workload container not ready - defering')
+            event.defer()
 
     def _parse_identity_providers(self, idps):
         """ parse the identity-providers configuration option. """

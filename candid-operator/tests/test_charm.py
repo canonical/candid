@@ -32,7 +32,7 @@ MINIMAL_CONFIG = {
       groups:
        - group1
        - group3''',
-    'location': 'test-location',
+    'location': 'https://test-location',
     'private-key': 'test-private-key',
     'public-key': 'test-public-key',
     'rendezvous-timeout': '5m',
@@ -56,6 +56,9 @@ class TestCharm(unittest.TestCase):
         self.harness.disable_hooks()
         self.harness.add_oci_resource("candid-image")
         self.harness.begin()
+
+        rel_id = self.harness.add_relation('ingress', 'nginx-ingress')
+        self.harness.add_relation_unit(rel_id, 'nginx-ingress/0')
 
         self.tempdir = tempfile.TemporaryDirectory()
         self.addCleanup(self.tempdir.cleanup)
@@ -105,7 +108,7 @@ class TestCharm(unittest.TestCase):
       groups:
        - group1
        - group3''',
-                        'LOCATION': 'test-location',
+                        'LOCATION': 'https://test-location',
                         'LOGGING_CONFIG': 'INFO',
                         'POSTGRESQL_DSN': 'test-postgresql-dsn',
                         'PRIVATE_KEY': 'new-private-key',
@@ -127,7 +130,7 @@ class TestCharm(unittest.TestCase):
                             storage:
                                 type: postgres
                                 connection-string: test-postgresql-dsn
-                            location: test-location
+                            location: https://test-location
                             private-key: new-private-key
                             public-key: new-public-key
                             private-addr: localhost
@@ -183,7 +186,7 @@ class TestCharm(unittest.TestCase):
       groups:
        - group1
        - group3''',
-                        'LOCATION': 'test-location',
+                        'LOCATION': 'https://test-location',
                         'LOGGING_CONFIG': 'INFO',
                         'POSTGRESQL_DSN': 'test-postgresql-dsn',
                         'PRIVATE_KEY': 'test-private-key',
@@ -205,7 +208,7 @@ class TestCharm(unittest.TestCase):
                             storage:
                                 type: postgres
                                 connection-string: test-postgresql-dsn
-                            location: test-location
+                            location: https://test-location
                             private-key: test-private-key
                             public-key: test-public-key
                             private-addr: localhost
@@ -236,7 +239,7 @@ class TestCharm(unittest.TestCase):
             'discharge-macaroon-timeout': '20m',
             'discharge-token-timeout': '30m',
             'identity-providers': 'test-identity-providers',
-            'location': 'test-location',
+            'location': 'https://test-location',
             'rendezvous-timeout': '5m',
             'postgresql-dsn': 'test-postgresql-dsn',
         })
@@ -263,7 +266,7 @@ class TestCharm(unittest.TestCase):
                         'DISCHARGE_MACAROON_TIMEOUT': '20m',
                         'DISCHARGE_TOKEN_TIMEOUT': '30m',
                         'IDENTITY_PROVIDERS': 'test-identity-providers',
-                        'LOCATION': 'test-location',
+                        'LOCATION': 'https://test-location',
                         'LOGGING_CONFIG': 'INFO',
                         'POSTGRESQL_DSN': 'test-postgresql-dsn',
                         'PRIVATE_KEY': 'generated-private-key',
@@ -274,7 +277,7 @@ class TestCharm(unittest.TestCase):
             }}
         )
 
-        self.assertEqual(self.harness.get_relation_data(rel_id, "candid"), {
+        self.assertEqual(self.harness.get_relation_data(rel_id, "candid-k8s"), {
             'private-key': 'generated-private-key',
             'public-key': 'generated-public-key'
         })
@@ -284,20 +287,22 @@ class TestCharm(unittest.TestCase):
             'no-proxy': '192.168.0.1'
         })
 
-        rel_id = self.harness.add_relation('candid', 'candid')
-        self.harness.add_relation_unit(rel_id, 'candid/1')
+        rel_id = self.harness.add_relation('candid', 'candid-k8s')
+        self.harness.add_relation_unit(rel_id, 'candid-k8s/1')
 
         self.harness.set_leader(False)
-        self.harness.update_relation_data(rel_id, 'candid', {
+        self.harness.update_relation_data(rel_id, 'candid-k8s', {
             'private-key': 'generated-private-key',
             'public-key': 'generated-public-key'
         })
-        self.harness.update_relation_data(rel_id, 'candid/1', {
+        self.harness.update_relation_data(rel_id, 'candid-k8s/1', {
             'private-address': '192.168.0.2',
         })
 
         container = self.harness.model.unit.get_container("candid")
         self.harness.charm.on.candid_pebble_ready.emit(container)
+
+        self.harness.update_config({})
 
         # Check the that the plan was updated
         plan = self.harness.get_container_pebble_plan("candid")
