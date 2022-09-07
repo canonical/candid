@@ -4,27 +4,16 @@ summary: Candid Identity Manager
 description: Candid Identity Manager
 grade: stable
 confinement: strict
-base: core18
-
-apps:
-  candidsrv:
-    command: wrappers/candidsrv
-    daemon: simple
-    plugs:
-     - network
-     - network-bind
-  candid:
-    command: wrappers/candid
-    plugs:
-     - home
-     - network
+base: core20
 
 parts:
   # Candid
   candid:
     plugin: nil
-    source: .
-    source-type: git
+    source: ./
+    source-type: local
+    organize:
+      candidsrv: bin/
     build-packages:
      - bzr
      - gcc
@@ -47,26 +36,6 @@ parts:
       GOBIN=${SNAPCRAFT_PART_INSTALL}/bin/ go install github.com/canonical/candid/cmd/candidsrv
       GOBIN=${SNAPCRAFT_PART_INSTALL}/bin/ go install gopkg.in/macaroon-bakery.v2/cmd/bakery-keygen@latest
 
-  jq:
-    plugin: dump
-    source: .
-    stage-packages:
-     - jq
-    organize:
-      usr/bin/: bin/
-      usr/lib/: lib/
-    prime:
-     - bin/jq
-     - lib/*/libonig.so*
-     - lib/*/libjq.so*
-
-  local:
-    plugin: dump
-    source: snap/local/
-    prime:
-     - config
-     - wrappers
-
   www:
     plugin: dump
     source: .
@@ -75,3 +44,47 @@ parts:
       templates: www/templates/
     prime:
      - www
+
+  # Dump scripts required to configure candidsrv
+  scripts:
+    plugin: dump
+    source: ./snap/local/scripts
+    organize: 
+      # Place wrapper in bin such that it can be called easily
+      wrapper.sh: bin/
+      manage_config.sh: scripts/
+      handle_schema_upgrade.sh: bin/
+      handle_schema_version_check.sh: bin/
+    filesets: 
+      include:
+        - bin/wrapper.sh
+        - scripts/manage_config.sh
+        - bin/handle_schema_upgrade.sh
+        - bin/handle_schema_version_check.sh
+    stage:
+      - $include
+
+  # Dump hooks, allow us to run preliminary hooks if we require such behaviour
+  hooks:
+    plugin: dump
+    source: ./snap/local/hooks
+    stage-snaps:
+    - yq
+    stage-packages:
+    - jq
+    organize: 
+      configure: snap/hooks/
+
+apps:
+  candidsrv:
+    command: bin/wrapper.sh
+    daemon: simple
+    install-mode: disable
+    plugs:
+      - "network" # Enables net interface writing (clients)
+      - "network-bind" # Enables socket binding
+  candid:
+    command: bin/candid
+    plugs:
+     - home
+     - network
