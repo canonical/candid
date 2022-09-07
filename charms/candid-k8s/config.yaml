@@ -112,6 +112,3 @@ options:
     default: ""
     description: |
       Origin of the multi-factor authentication WebAuthn requests.
-  postgresql-dsn:
-    type: string
-    description: Postgresql DSN string.

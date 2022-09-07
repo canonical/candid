@@ -27,6 +27,9 @@ provides:
 requires:
   ingress:
     interface: ingress
+  db:
+    interface: pgsql
+    limit: 1
 
 containers:
   candid:

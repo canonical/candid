@@ -19,6 +19,7 @@ import json
 import logging
 import os
 
+import pgsql
 import yaml
 from charms.nginx_ingress_integrator.v0.ingress import IngressRequires
 from jinja2 import Environment, FileSystemLoader
@@ -71,6 +72,17 @@ class CandidOperatorCharm(CharmBase):
 
     def __init__(self, *args):
         super().__init__(*args)
+
+        self.db = pgsql.PostgreSQLClient(self, "db")
+        self.framework.observe(
+            self.db.on.database_relation_joined,
+            self._on_database_relation_joined
+        )
+        self.framework.observe(
+            self.db.on.master_changed,
+            self._on_master_changed
+        )
+
         self.framework.observe(self.on.candid_pebble_ready, self._on_candid_pebble_ready)
         self.framework.observe(self.on.config_changed, self._on_config_changed)
         self.framework.observe(self.on.update_status, self._on_update_status)
@@ -86,6 +98,7 @@ class CandidOperatorCharm(CharmBase):
             "service-port": 8081
         })
         self._config_filename = "/root/config.yaml"
+        self._stored.set_default(db_uri=None)
 
     @log_event_handler
     def _on_candid_pebble_ready(self, event):
@@ -163,6 +176,32 @@ class CandidOperatorCharm(CharmBase):
             return
         self._update_workload({}, event)
 
+    def _on_database_relation_joined(self, event: pgsql.DatabaseRelationJoinedEvent) -> None:
+        """
+        Handles determining if the database has finished setup, once setup is complete
+        a master/standby may join / change in consequent events.
+        """
+        logging.info("(postgresql) RELATION_JOINED event fired.")
+
+        if self.model.unit.is_leader():
+            event.database = "candid"
+        elif event.database != "candid":
+            event.defer()
+
+    def _on_master_changed(self, event: pgsql.MasterChangedEvent) -> None:
+        """
+        Handles master units of postgres joining / changing.
+        The internal snap configuration is updated to reflect this.
+        """
+        logging.info("(postgresql) MASTER_CHANGED event fired.")
+
+        if event.database != "candid":
+            logging.debug("Database setup not complete yet, returning.")
+            return
+
+        if event.master:
+            self._stored.db_uri = str(event.master.uri)
+
     def _update_workload(self, envdata: dict, event):
         '''' Update workload with all available configuration
         data. '''
@@ -179,7 +218,6 @@ class CandidOperatorCharm(CharmBase):
         if candid_relation:
             private_key = candid_relation.data[self.app].get('private-key', '')
             public_key = candid_relation.data[self.app].get('public-key', '')
-            print('public {} private {}'.format(public_key, private_key))
 
         config_values = {
             'ADMIN_AGENT_PUBLIC_KEY': self.config.get('admin-agent-public-key', ''),
@@ -207,7 +245,7 @@ class CandidOperatorCharm(CharmBase):
             'MFA_RP_DISPLAY_NAME': self.config.get('mfa-rp-display-name', ''),
             'MFA_RP_ID': self.config.get('mfa-rp-id', ''),
             'MFA_RP_ORIGIN': self.config.get('mfa-rp-origin', ''),
-            'POSTGRESQL_DSN': self.config.get('postgresql-dsn', ''),
+            'POSTGRESQL_DSN': self._stored.db_uri
         }
 
         # apply specified environment data
