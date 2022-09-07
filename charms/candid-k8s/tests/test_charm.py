@@ -9,7 +9,7 @@ import shutil
 import tempfile
 import textwrap
 import unittest
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from charm import CandidOperatorCharm
 from ops.testing import Harness
@@ -35,8 +35,7 @@ MINIMAL_CONFIG = {
     'location': 'https://test-location',
     'private-key': 'test-private-key',
     'public-key': 'test-public-key',
-    'rendezvous-timeout': '5m',
-    'postgresql-dsn': 'test-postgresql-dsn'
+    'rendezvous-timeout': '5m'
 }
 
 
@@ -110,7 +109,6 @@ class TestCharm(unittest.TestCase):
        - group3''',
                         'LOCATION': 'https://test-location',
                         'LOGGING_CONFIG': 'INFO',
-                        'POSTGRESQL_DSN': 'test-postgresql-dsn',
                         'PRIVATE_KEY': 'new-private-key',
                         'PUBLIC_KEY': 'new-public-key',
                         'RENDEZVOUS_TIMEOUT': '5m'
@@ -128,8 +126,7 @@ class TestCharm(unittest.TestCase):
                             request-timeout: 2s
                             resource-path: /root/www
                             storage:
-                                type: postgres
-                                connection-string: test-postgresql-dsn
+                                type: memory
                             location: https://test-location
                             private-key: new-private-key
                             public-key: new-public-key
@@ -188,7 +185,6 @@ class TestCharm(unittest.TestCase):
        - group3''',
                         'LOCATION': 'https://test-location',
                         'LOGGING_CONFIG': 'INFO',
-                        'POSTGRESQL_DSN': 'test-postgresql-dsn',
                         'PRIVATE_KEY': 'test-private-key',
                         'PUBLIC_KEY': 'test-public-key',
                         'RENDEZVOUS_TIMEOUT': '5m'
@@ -206,8 +202,7 @@ class TestCharm(unittest.TestCase):
                             request-timeout: 2s
                             resource-path: /root/www
                             storage:
-                                type: postgres
-                                connection-string: test-postgresql-dsn
+                                type: memory
                             location: https://test-location
                             private-key: test-private-key
                             public-key: test-public-key
@@ -232,6 +227,7 @@ class TestCharm(unittest.TestCase):
     @patch('ops.model.Container.exec')
     def test_on_leader_elected(self, exec):
         exec.return_value = test_process()
+        self.harness.charm.db = MagicMock()
 
         self.harness.update_config({
             'admin-agent-public-key': 'test-admin-public-key',
@@ -241,7 +237,6 @@ class TestCharm(unittest.TestCase):
             'identity-providers': 'test-identity-providers',
             'location': 'https://test-location',
             'rendezvous-timeout': '5m',
-            'postgresql-dsn': 'test-postgresql-dsn',
         })
 
         rel_id = self.harness.add_relation('candid', 'candid')
@@ -268,7 +263,6 @@ class TestCharm(unittest.TestCase):
                         'IDENTITY_PROVIDERS': 'test-identity-providers',
                         'LOCATION': 'https://test-location',
                         'LOGGING_CONFIG': 'INFO',
-                        'POSTGRESQL_DSN': 'test-postgresql-dsn',
                         'PRIVATE_KEY': 'generated-private-key',
                         'PUBLIC_KEY': 'generated-public-key',
                         'RENDEZVOUS_TIMEOUT': '5m'
