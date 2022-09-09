@@ -1,0 +1,40 @@
+access-log: /var/snap/candid/common/logs/candid.access.log
+admin-agent-public-key: test-public-key
+api-macaroon-timeout: 48h
+discharge-macaroon-timeout: 48h
+discharge-token-timeout: 48h
+identity-providers:
+  - type: static
+    name: static
+    domain: stimec
+    description: Default identity provider
+    users:
+      admin:
+        name: User One
+        email: admin
+        password: password1
+        groups:
+          - group1
+      user1:
+        name: User Two
+        email: user1
+        password: password1
+        groups:
+          - group2
+      my-user:
+        name: User Three
+        email: my-user
+        password: password1
+        groups:
+          - group2
+listen-address: :8081
+location: https://candid.canonical.stimec.net
+logging-config: INFO
+private-addr: 127.0.0.1
+private-key: private key
+public-key: public key
+rendezvous-timeout: 10m
+resource-path: /snap/candid/current/www/
+storage:
+  connection-string: postgresql://juju_candid:9Wwq3mG4RcK4PwZ4pnt38xCmj6VcLKh5x6BNGbLm8pRG@10.165.44.243:5432/candid
+  type: postgres
