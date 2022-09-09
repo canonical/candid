@@ -5,7 +5,7 @@ require (
 	github.com/duo-labs/webauthn v0.0.0-20220815211337-00c9fb5711f5
 	github.com/frankban/quicktest v1.14.3
 	github.com/gomodule/oauth1 v0.2.0
-	github.com/google/go-cmp v0.5.8
+	github.com/google/go-cmp v0.5.9
 	github.com/google/uuid v1.3.0
 	github.com/gorilla/handlers v0.0.0-20170224193955-13d73096a474
 	github.com/juju/aclstore/v2 v2.1.0
