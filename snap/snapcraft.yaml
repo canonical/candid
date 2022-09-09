@@ -36,14 +36,18 @@ parts:
       GOBIN=${SNAPCRAFT_PART_INSTALL}/bin/ go install github.com/canonical/candid/cmd/candidsrv
       GOBIN=${SNAPCRAFT_PART_INSTALL}/bin/ go install gopkg.in/macaroon-bakery.v2/cmd/bakery-keygen@latest
 
-  www:
+  www-static:
     plugin: dump
-    source: .
+    source: ./static
     organize:
       static: www/static/
+
+  www-templates:
+    plugin: dump
+    source: ./templates
+    organize:
       templates: www/templates/
-    prime:
-     - www
+
 
   # Dump scripts required to configure candidsrv
   scripts:

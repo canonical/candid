@@ -1,0 +1,68 @@
+applications:
+  candid:
+    charm: {{ charm_path }}
+    num_units: 1
+    options:
+      location: canonical.candid.test
+      identity-providers: |-
+        - type: static
+          name: static
+          domain: test
+          description: Default identity provider
+          users:
+            admin:
+              name: User Admin
+              email: admin
+              password: admin_password
+              groups:
+               - group1
+            userOne:
+              name: User One
+              email: user.one@candid.test
+              password: password1
+              groups:
+               - groupOne
+            userTwo:
+              name: User Two
+              email: user.two@candid.test
+              password: password2
+              groups:
+              - groupTwo
+      private-key: 'zq+I3tQhxabqcDYRe2glUWnfynn5T0eDRPCv/EA+XoY='
+      public-key: 'bSwdHDgXZq/yH2NUp5PBGeGuXXnrixDUsUM3T46neWc='
+      admin-agent-public-key: 'bSwdHDgXZq/yH2NUp5PBGeGuXXnrixDUsUM3T46neWc='
+    resources:
+      candid: {{ snap_path }}
+  haproxy:
+    charm: cs:haproxy
+    channel: stable
+    num_units: 1
+    expose: true
+    series: bionic
+    options:
+      default_mode: tcp
+      enable_monitoring: True
+      services: |-
+        - service_name: app-jimm
+          service_host: "0.0.0.0"
+          service_port: 443
+          service_options:
+            - mode http
+            - balance leastconn
+            - cookie SRVNAME insert
+            - option httpchk GET /debug/info HTTP/1.0
+            - acl metrics path -i /metrics
+            - http-request deny if metrics
+          server_options: check inter 2000 rise 2 fall 5 maxconn 4096
+          crts: [DEFAULT]
+        - service_name: api_http
+          service_host: "0.0.0.0"
+          service_port: 80
+          service_options:
+            - mode http
+            - http-request redirect scheme https
+      peering_mode: active-active
+  postgresql:
+    charm: ch:postgresql
+    channel: stable
+    num_units: 1

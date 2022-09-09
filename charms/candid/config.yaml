@@ -45,7 +45,7 @@ options:
     type: string
     default: ""
     description: |
-      Publicly accessable URL of the identity manager (defaults to public
+      Publicly accessible URL of the identity manager (defaults to public
       address of unit).
   logging-config:
     type: string
@@ -93,7 +93,7 @@ options:
     default: false
     description: |
       If true, it leaves cookies' Path value absolute, instead of
-      seeting it relative to the path in the location config.
+      setting it relative to the path in the location config.
   mfa-rp-display-name:
     type: string
     default: ""

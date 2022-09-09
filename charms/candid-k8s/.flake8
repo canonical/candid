@@ -2,6 +2,7 @@
 max-line-length = 99
 select: E,W,F,C,N
 exclude:
+  .tox
   venv
   .git
   build

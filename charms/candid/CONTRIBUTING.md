@@ -28,7 +28,14 @@ hoping for or planning on, please add a Roadmap or TODO here
 
 ## Testing
 
-The Python operator framework includes a very nice harness for testing
-operator behaviour without full deployment. Just `run_tests`:
+To run unit test run:
 
-    ./run_tests
+```
+tox -e unit
+```
+
+To run integration tests run:
+
+```
+tox -e integration
+```

@@ -104,11 +104,14 @@ class CandidCharm(CharmBase):
         """
         Starts candidsrv service
         """
-        if self._check_config(event):
-            self.set_status_and_log("Starting candid", WaitingStatus)
-            self.snap.start(["candidsrv"])
-            if self.snap_running:
-                self.set_status_and_log("Ready ", ActiveStatus)
+        if not self._check_config(event):
+            event.defer()
+            return
+
+        self.set_status_and_log("Starting candid", WaitingStatus)
+        self.snap.start(["candidsrv"])
+        if self.snap_running:
+            self.set_status_and_log("Ready", ActiveStatus)
 
     def _config_changed(self, event: StartEvent):
         """
@@ -131,13 +134,6 @@ class CandidCharm(CharmBase):
         else:
             logging.info("db_uri not stored")
 
-        # convert identity-providers to json
-        # ids = config_values.get("identity-providers", "")
-        # if ids:
-        #    config_values["identity-providers"] = base64.b64encode(
-        #        ids.encode("utf-8")
-        #    ).decode("utf-8")
-
         logging.info("setting config values {}".format(config_values))
 
         config_values = flatten_dict(config_values)
@@ -153,7 +149,12 @@ class CandidCharm(CharmBase):
                 "error setting snap configuration values: {}".format(e)
             )
         self.set_status_and_log("Restarting.", WaitingStatus)
-        self.snap.restart(["candidsrv"])
+
+        if self.snap_running:
+            self.snap.restart(["candidsrv"])
+        else:
+            self.snap.start(services=["candidsrv"])
+
         if self.snap_running:
             self.set_status_and_log("Ready", ActiveStatus)
 
@@ -170,14 +171,12 @@ class CandidCharm(CharmBase):
             self.set_status_and_log(
                 "Waiting for postgres relation.", BlockedStatus
             )
-            event.defer()
             return False
 
         if self._stored.db_uri is None:
             self.set_status_and_log(
                 "Waiting for postgres connection string", WaitingStatus
             )
-            event.defer()
             return False
 
         for setting in REQUIRED_SETTINGS:
@@ -278,10 +277,11 @@ class CandidCharm(CharmBase):
             )
 
 
+# flatten_dict copied from ops.model
 def flatten_dict(
     input: dict, parent_key: str = None, output: dict = None
 ) -> dict:
-    """Turn a nested dictionary into a flattened dictionary, using '.' as a key seperator.
+    """Turn a nested dictionary into a flattened dictionary, using '.' as a key separator.
     This is used to allow nested dictionaries to be translated into the dotted format required by
     the Juju `action-set` hook tool in order to set nested data on an action.
     Additionally, this method performs some validation on keys to ensure they only use permitted

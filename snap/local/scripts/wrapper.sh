@@ -3,4 +3,4 @@
 . "$SNAP/scripts/manage_config.sh"
 
 echo "Starting candid ..."
-"$SNAP/bin/candidsrv $SNAP_COMMON/config.yaml" 
+$SNAP/bin/candidsrv $SNAP_COMMON/config.yaml

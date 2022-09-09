@@ -1,5 +1,6 @@
 [flake8]
 max-line-length = 99
+ignore = W503
 select: E,W,F,C,N
 exclude:
   venv
