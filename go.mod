@@ -5,7 +5,7 @@ require (
 	github.com/duo-labs/webauthn v0.0.0-20220815211337-00c9fb5711f5
 	github.com/frankban/quicktest v1.14.3
 	github.com/gomodule/oauth1 v0.2.0
-	github.com/google/go-cmp v0.5.8
+	github.com/google/go-cmp v0.5.9
 	github.com/google/uuid v1.3.0
 	github.com/gorilla/handlers v0.0.0-20170224193955-13d73096a474
 	github.com/juju/aclstore/v2 v2.1.0
@@ -25,7 +25,7 @@ require (
 	github.com/juju/usso v1.0.1
 	github.com/juju/utils/v2 v2.0.0-20210305225158-eedbe7b6b3e2
 	github.com/julienschmidt/httprouter v1.3.0
-	github.com/lib/pq v1.10.6
+	github.com/lib/pq v1.10.7
 	github.com/mhilton/openid v0.0.0-20150511103207-7922a4e937d8
 	github.com/prometheus/client_golang v1.13.0
 	github.com/yohcop/openid-go v1.0.0
