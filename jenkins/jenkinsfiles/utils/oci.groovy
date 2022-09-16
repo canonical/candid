@@ -12,7 +12,7 @@ void buildImage() {
             --build-arg https_proxy=${params.http_proxy} \
             --secret id=ghuser,env=GITHUB_PAT_AUTH_USR \
             --secret id=ghpat,env=GITHUB_PAT_AUTH_PSW \
-            . -f ./docker/Dockerfile -t candid:latest
+            . -f ./Dockerfile -t candid:latest
     """
 }
 
