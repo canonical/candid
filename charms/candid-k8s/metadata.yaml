@@ -20,10 +20,6 @@ peers:
   candid:
     interface: candid
 
-provides:
-  website:
-    interface: http
-
 requires:
   ingress:
     interface: ingress

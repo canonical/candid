@@ -1,0 +1,2 @@
+ops >= 1.4.0
+ops-lib-pgsql

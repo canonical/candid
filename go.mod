@@ -36,7 +36,7 @@ require (
 	gopkg.in/errgo.v1 v1.0.1
 	gopkg.in/goose.v1 v1.0.0-20161130145116-8f055ce635d6
 	gopkg.in/httprequest.v1 v1.2.1
-	gopkg.in/juju/environschema.v1 v1.0.0
+	gopkg.in/juju/environschema.v1 v1.0.1
 	gopkg.in/ldap.v2 v2.5.1
 	gopkg.in/macaroon-bakery.v3 v3.0.0
 	gopkg.in/macaroon.v2 v2.1.0

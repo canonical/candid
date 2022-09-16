@@ -50,3 +50,4 @@ fi
 cwd=/home/ubuntu/src lxd_exec_ubuntu snapcraft --destructive-mode $target
 snapfile=`lxd_exec_ubuntu find /home/ubuntu/src -name "${snap_name}_*.snap"| head -1`
 lxc file pull $container$snapfile .
+echo $snapfile

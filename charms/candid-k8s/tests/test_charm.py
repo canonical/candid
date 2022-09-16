@@ -15,11 +15,11 @@ from charm import CandidOperatorCharm
 from ops.testing import Harness
 
 MINIMAL_CONFIG = {
-    'admin-agent-public-key': 'test-admin-public-key',
-    'api-macaroon-timeout': '10m',
-    'discharge-macaroon-timeout': '20m',
-    'discharge-token-timeout': '30m',
-    'identity-providers': '''\
+    "admin-agent-public-key": "test-admin-public-key",
+    "api-macaroon-timeout": "10m",
+    "discharge-macaroon-timeout": "20m",
+    "discharge-token-timeout": "30m",
+    "identity-providers": """\
 - type: static
   name: static
   description: Default identity provider
@@ -31,20 +31,23 @@ MINIMAL_CONFIG = {
       password: password1
       groups:
        - group1
-       - group3''',
-    'location': 'https://test-location',
-    'private-key': 'test-private-key',
-    'public-key': 'test-public-key',
-    'rendezvous-timeout': '5m'
+       - group3""",
+    "location": "https://test-location",
+    "private-key": "test-private-key",
+    "public-key": "test-public-key",
+    "rendezvous-timeout": "5m",
 }
 
 
 class test_process:
     def wait_output(self):
-        return '''{
+        return (
+            """{
             "private": "generated-private-key",
             "public": "generated-public-key"
-        }''', '''{'a'}'''
+        }""",
+            """{'a'}""",
+        )
 
 
 class TestCharm(unittest.TestCase):
@@ -56,24 +59,27 @@ class TestCharm(unittest.TestCase):
         self.harness.add_oci_resource("candid-image")
         self.harness.begin()
 
-        rel_id = self.harness.add_relation('ingress', 'nginx-ingress')
-        self.harness.add_relation_unit(rel_id, 'nginx-ingress/0')
+        rel_id = self.harness.add_relation("ingress", "nginx-ingress")
+        self.harness.add_relation_unit(rel_id, "nginx-ingress/0")
 
         self.tempdir = tempfile.TemporaryDirectory()
         self.addCleanup(self.tempdir.cleanup)
-        shutil.copytree(os.path.join(self.harness.charm.charm_dir, "templates"),
-                        os.path.join(self.tempdir.name, "templates"))
-        self.harness.charm.framework.charm_dir = pathlib.Path(self.tempdir.name)
+        shutil.copytree(
+            os.path.join(self.harness.charm.charm_dir, "templates"),
+            os.path.join(self.tempdir.name, "templates"),
+        )
+        self.harness.charm.framework.charm_dir = pathlib.Path(
+            self.tempdir.name
+        )
 
-        self.harness.container_pebble_ready('candid')
+        self.harness.container_pebble_ready("candid")
 
     def test_on_pebble_ready(self):
         self.harness.update_config(MINIMAL_CONFIG)
 
-        self.harness.update_config({
-            'private-key': 'new-private-key',
-            'public-key': 'new-public-key'
-        })
+        self.harness.update_config(
+            {"private-key": "new-private-key", "public-key": "new-public-key"}
+        )
 
         container = self.harness.model.unit.get_container("candid")
         # Emit the pebble-ready event for jimm
@@ -83,18 +89,19 @@ class TestCharm(unittest.TestCase):
         plan = self.harness.get_container_pebble_plan("candid")
         self.assertEqual(
             plan.to_dict(),
-            {'services': {
-                'candid': {
-                    'summary': 'Candid Identity Service',
-                    'startup': 'disabled',
-                    'override': 'merge',
-                    'command': '/root/candidsrv /root/config.yaml',
-                    'environment': {
-                        'ADMIN_AGENT_PUBLIC_KEY': 'test-admin-public-key',
-                        'API_MACAROON_TIMEOUT': '10m',
-                        'DISCHARGE_MACAROON_TIMEOUT': '20m',
-                        'DISCHARGE_TOKEN_TIMEOUT': '30m',
-                        'IDENTITY_PROVIDERS': '''\
+            {
+                "services": {
+                    "candid": {
+                        "summary": "Candid Identity Service",
+                        "startup": "disabled",
+                        "override": "merge",
+                        "command": "/root/candidsrv /root/config.yaml",
+                        "environment": {
+                            "ADMIN_AGENT_PUBLIC_KEY": "test-admin-public-key",
+                            "API_MACAROON_TIMEOUT": "10m",
+                            "DISCHARGE_MACAROON_TIMEOUT": "20m",
+                            "DISCHARGE_TOKEN_TIMEOUT": "30m",
+                            "IDENTITY_PROVIDERS": """\
 - type: static
   name: static
   description: Default identity provider
@@ -106,19 +113,22 @@ class TestCharm(unittest.TestCase):
       password: password1
       groups:
        - group1
-       - group3''',
-                        'LOCATION': 'https://test-location',
-                        'LOGGING_CONFIG': 'INFO',
-                        'PRIVATE_KEY': 'new-private-key',
-                        'PUBLIC_KEY': 'new-public-key',
-                        'RENDEZVOUS_TIMEOUT': '5m'
+       - group3""",
+                            "LOCATION": "https://test-location",
+                            "LOGGING_CONFIG": "INFO",
+                            "PRIVATE_KEY": "new-private-key",
+                            "PUBLIC_KEY": "new-public-key",
+                            "RENDEZVOUS_TIMEOUT": "5m",
+                        },
                     }
                 }
-            }}
+            },
         )
 
-        config = container.pull('/root/config.yaml')
-        self.assertEqual(textwrap.dedent('''\
+        config = container.pull("/root/config.yaml")
+        self.assertEqual(
+            textwrap.dedent(
+                """\
                             access-log: /root/logs/access.log
                             auth-username: admin
                             listen-address: :8081
@@ -144,10 +154,10 @@ class TestCharm(unittest.TestCase):
                                   password: password1
                                   groups:
                                    - group1
-                                   - group3'''
-                                         ),
-                         config.read()
-                         )
+                                   - group3"""
+            ),
+            config.read(),
+        )
 
     def test_on_config_changed(self):
         self.harness.update_config(MINIMAL_CONFIG)
@@ -159,18 +169,19 @@ class TestCharm(unittest.TestCase):
         plan = self.harness.get_container_pebble_plan("candid")
         self.assertEqual(
             plan.to_dict(),
-            {'services': {
-                'candid': {
-                    'summary': 'Candid Identity Service',
-                    'startup': 'disabled',
-                    'override': 'merge',
-                    'command': '/root/candidsrv /root/config.yaml',
-                    'environment': {
-                        'ADMIN_AGENT_PUBLIC_KEY': 'test-admin-public-key',
-                        'API_MACAROON_TIMEOUT': '10m',
-                        'DISCHARGE_MACAROON_TIMEOUT': '20m',
-                        'DISCHARGE_TOKEN_TIMEOUT': '30m',
-                        'IDENTITY_PROVIDERS': '''\
+            {
+                "services": {
+                    "candid": {
+                        "summary": "Candid Identity Service",
+                        "startup": "disabled",
+                        "override": "merge",
+                        "command": "/root/candidsrv /root/config.yaml",
+                        "environment": {
+                            "ADMIN_AGENT_PUBLIC_KEY": "test-admin-public-key",
+                            "API_MACAROON_TIMEOUT": "10m",
+                            "DISCHARGE_MACAROON_TIMEOUT": "20m",
+                            "DISCHARGE_TOKEN_TIMEOUT": "30m",
+                            "IDENTITY_PROVIDERS": """\
 - type: static
   name: static
   description: Default identity provider
@@ -182,19 +193,22 @@ class TestCharm(unittest.TestCase):
       password: password1
       groups:
        - group1
-       - group3''',
-                        'LOCATION': 'https://test-location',
-                        'LOGGING_CONFIG': 'INFO',
-                        'PRIVATE_KEY': 'test-private-key',
-                        'PUBLIC_KEY': 'test-public-key',
-                        'RENDEZVOUS_TIMEOUT': '5m'
+       - group3""",
+                            "LOCATION": "https://test-location",
+                            "LOGGING_CONFIG": "INFO",
+                            "PRIVATE_KEY": "test-private-key",
+                            "PUBLIC_KEY": "test-public-key",
+                            "RENDEZVOUS_TIMEOUT": "5m",
+                        },
                     }
                 }
-            }}
+            },
         )
 
-        config = container.pull('/root/config.yaml')
-        self.assertEqual(textwrap.dedent('''\
+        config = container.pull("/root/config.yaml")
+        self.assertEqual(
+            textwrap.dedent(
+                """\
                             access-log: /root/logs/access.log
                             auth-username: admin
                             listen-address: :8081
@@ -220,27 +234,30 @@ class TestCharm(unittest.TestCase):
                                   password: password1
                                   groups:
                                    - group1
-                                   - group3'''),
-                         config.read()
-                         )
+                                   - group3"""
+            ),
+            config.read(),
+        )
 
-    @patch('ops.model.Container.exec')
+    @patch("ops.model.Container.exec")
     def test_on_leader_elected(self, exec):
         exec.return_value = test_process()
         self.harness.charm.db = MagicMock()
 
-        self.harness.update_config({
-            'admin-agent-public-key': 'test-admin-public-key',
-            'api-macaroon-timeout': '10m',
-            'discharge-macaroon-timeout': '20m',
-            'discharge-token-timeout': '30m',
-            'identity-providers': 'test-identity-providers',
-            'location': 'https://test-location',
-            'rendezvous-timeout': '5m',
-        })
+        self.harness.update_config(
+            {
+                "admin-agent-public-key": "test-admin-public-key",
+                "api-macaroon-timeout": "10m",
+                "discharge-macaroon-timeout": "20m",
+                "discharge-token-timeout": "30m",
+                "identity-providers": "test-identity-providers",
+                "location": "https://test-location",
+                "rendezvous-timeout": "5m",
+            }
+        )
 
-        rel_id = self.harness.add_relation('candid', 'candid')
-        self.harness.add_relation_unit(rel_id, 'candid/1')
+        rel_id = self.harness.add_relation("candid", "candid")
+        self.harness.add_relation_unit(rel_id, "candid/1")
         self.harness.set_leader(True)
 
         self.harness.charm.on.leader_elected.emit()
@@ -249,49 +266,60 @@ class TestCharm(unittest.TestCase):
         plan = self.harness.get_container_pebble_plan("candid")
         self.assertEqual(
             plan.to_dict(),
-            {'services': {
-                'candid': {
-                    'summary': 'Candid Identity Service',
-                    'startup': 'disabled',
-                    'override': 'merge',
-                    'command': '/root/candidsrv /root/config.yaml',
-                    'environment': {
-                        'ADMIN_AGENT_PUBLIC_KEY': 'test-admin-public-key',
-                        'API_MACAROON_TIMEOUT': '10m',
-                        'DISCHARGE_MACAROON_TIMEOUT': '20m',
-                        'DISCHARGE_TOKEN_TIMEOUT': '30m',
-                        'IDENTITY_PROVIDERS': 'test-identity-providers',
-                        'LOCATION': 'https://test-location',
-                        'LOGGING_CONFIG': 'INFO',
-                        'PRIVATE_KEY': 'generated-private-key',
-                        'PUBLIC_KEY': 'generated-public-key',
-                        'RENDEZVOUS_TIMEOUT': '5m'
+            {
+                "services": {
+                    "candid": {
+                        "summary": "Candid Identity Service",
+                        "startup": "disabled",
+                        "override": "merge",
+                        "command": "/root/candidsrv /root/config.yaml",
+                        "environment": {
+                            "ADMIN_AGENT_PUBLIC_KEY": "test-admin-public-key",
+                            "API_MACAROON_TIMEOUT": "10m",
+                            "DISCHARGE_MACAROON_TIMEOUT": "20m",
+                            "DISCHARGE_TOKEN_TIMEOUT": "30m",
+                            "IDENTITY_PROVIDERS": "test-identity-providers",
+                            "LOCATION": "https://test-location",
+                            "LOGGING_CONFIG": "INFO",
+                            "PRIVATE_KEY": "generated-private-key",
+                            "PUBLIC_KEY": "generated-public-key",
+                            "RENDEZVOUS_TIMEOUT": "5m",
+                        },
                     }
                 }
-            }}
+            },
         )
 
-        self.assertEqual(self.harness.get_relation_data(rel_id, "candid-k8s"), {
-            'private-key': 'generated-private-key',
-            'public-key': 'generated-public-key'
-        })
+        self.assertEqual(
+            self.harness.get_relation_data(rel_id, "candid-k8s"),
+            {
+                "private-key": "generated-private-key",
+                "public-key": "generated-public-key",
+            },
+        )
 
     def test_keys_from_relation_data(self):
-        self.harness.update_config({
-            'no-proxy': '192.168.0.1'
-        })
+        self.harness.update_config({"no-proxy": "192.168.0.1"})
 
-        rel_id = self.harness.add_relation('candid', 'candid-k8s')
-        self.harness.add_relation_unit(rel_id, 'candid-k8s/1')
+        rel_id = self.harness.add_relation("candid", "candid-k8s")
+        self.harness.add_relation_unit(rel_id, "candid-k8s/1")
 
         self.harness.set_leader(False)
-        self.harness.update_relation_data(rel_id, 'candid-k8s', {
-            'private-key': 'generated-private-key',
-            'public-key': 'generated-public-key'
-        })
-        self.harness.update_relation_data(rel_id, 'candid-k8s/1', {
-            'private-address': '192.168.0.2',
-        })
+        self.harness.update_relation_data(
+            rel_id,
+            "candid-k8s",
+            {
+                "private-key": "generated-private-key",
+                "public-key": "generated-public-key",
+            },
+        )
+        self.harness.update_relation_data(
+            rel_id,
+            "candid-k8s/1",
+            {
+                "private-address": "192.168.0.2",
+            },
+        )
 
         container = self.harness.model.unit.get_container("candid")
         self.harness.charm.on.candid_pebble_ready.emit(container)
@@ -302,22 +330,24 @@ class TestCharm(unittest.TestCase):
         plan = self.harness.get_container_pebble_plan("candid")
         self.assertEqual(
             plan.to_dict(),
-            {'services': {
-                'candid': {
-                    'summary': 'Candid Identity Service',
-                    'startup': 'disabled',
-                    'override': 'merge',
-                    'command': '/root/candidsrv /root/config.yaml',
-                    'environment': {
-                        'API_MACAROON_TIMEOUT': '48h',
-                        'DISCHARGE_MACAROON_TIMEOUT': '48h',
-                        'DISCHARGE_TOKEN_TIMEOUT': '48h',
-                        'LOGGING_CONFIG': 'INFO',
-                        'NO_PROXY': '192.168.0.1,192.168.0.2',
-                        'PRIVATE_KEY': 'generated-private-key',
-                        'PUBLIC_KEY': 'generated-public-key',
-                        'RENDEZVOUS_TIMEOUT': '10m'
+            {
+                "services": {
+                    "candid": {
+                        "summary": "Candid Identity Service",
+                        "startup": "disabled",
+                        "override": "merge",
+                        "command": "/root/candidsrv /root/config.yaml",
+                        "environment": {
+                            "API_MACAROON_TIMEOUT": "48h",
+                            "DISCHARGE_MACAROON_TIMEOUT": "48h",
+                            "DISCHARGE_TOKEN_TIMEOUT": "48h",
+                            "LOGGING_CONFIG": "INFO",
+                            "NO_PROXY": "192.168.0.1,192.168.0.2",
+                            "PRIVATE_KEY": "generated-private-key",
+                            "PUBLIC_KEY": "generated-public-key",
+                            "RENDEZVOUS_TIMEOUT": "10m",
+                        },
                     }
                 }
-            }}
+            },
         )
