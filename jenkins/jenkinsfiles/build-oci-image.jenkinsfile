@@ -1,0 +1,88 @@
+/* groovylint-disable NestedBlockDepth */
+/* groovylint-disable-next-line CompileStatic, VariableTypeRequired, NoDef */
+def oci
+
+pipeline {
+    agent {
+        // Not all of our slaves have multipass installed
+        // TODO: Investigate why
+        label 'slave-2'
+    }
+
+    options {
+        // Some images rely on each other, each build should be run consecutively,
+        // not concurrently
+        disableConcurrentBuilds()
+        // These kinds of logs and artifacts do not matter to us,
+        // so, 10 should be fine for checking some history of the builds
+        buildDiscarder(logRotator(numToKeepStr: '10'))
+        // We always want the build to run fresh as vulnerabilities could have
+        // been introduced at a later date
+        disableResume()
+    }
+
+    environment {
+        // Buildkit enables concurrent layer building for multi-stage builds
+        // significantly speeding up build times
+        DOCKER_BUILDKIT = 1
+        // Auth required for the go packages within the image
+        GITHUB_PAT_AUTH = credentials('commercial-systems-bot')
+    }
+
+    parameters {
+        string(
+            name: 'http_proxy',
+            defaultValue: 'http://squid.internal:3128',
+            description: 'Enable access to HTTP via Squid proxy'
+        )
+    }
+
+    stages {
+        stage('Setup environment') {
+            steps {
+                checkout scm
+                script {
+                    try {
+                        // Load VM Utilities
+                        oci = load("${env.WORKSPACE}/jenkins/jenkinsfiles/utils/oci.groovy")
+                    } catch (err) {
+                        echo "error occured: ${err}"
+                    }
+                }
+            }
+        }
+        stage('Build image') {
+            steps {
+                script {
+                    try {
+                        oci.buildImage()
+                    } catch (err) {
+                        // TODO: Publish to mattermost or something
+                        echo "error occured: ${err}"
+                    }
+                }
+                echo 'Environment setup complete.'
+            }
+        }
+
+        stage('Scan image') {
+            // We do not care for output right now, just to fail our pipeline
+            // if N severities of J types are reached
+            steps {
+                script {
+                    try {
+                        oci.scanImage()
+                    } catch (err) {
+                        // TODO: Publish to mattermost or something
+                        echo "error occured: ${err}"
+                    }
+                }
+            }
+        }
+    }
+    post {
+        always {
+            sh "echo 'Image built'"
+        }
+    }
+}
