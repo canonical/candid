@@ -1423,8 +1423,9 @@ gopkg.in/httprequest.v1 v1.2.0/go.mod h1:T61ZUaJLpMnzvoJDO03ZD8yRXD4nZzBeDoW5e9s
 gopkg.in/httprequest.v1 v1.2.1 h1:pEPLMdF/gjWHnKxLpuCYaHFjc8vAB2wrYjXrqDVC16E=
 gopkg.in/httprequest.v1 v1.2.1/go.mod h1:x2Otw96yda5+8+6ZeWwHIJTFkEHWP/qP8pJOzqEtWPM=
 gopkg.in/ini.v1 v1.51.0/go.mod h1:pNLf8WUiyNEtQjuu5G5vTm06TEv9tsIgeAvK8hOrP4k=
-gopkg.in/juju/environschema.v1 v1.0.0 h1:51vT1bzbP9fntQ0I9ECSlku2p19Szj/N2beZFeIH2kM=
 gopkg.in/juju/environschema.v1 v1.0.0/go.mod h1:WTgU3KXKCVoO9bMmG/4KHzoaRvLeoxfjArpgd1MGWFA=
+gopkg.in/juju/environschema.v1 v1.0.1 h1:eXQQsfSJykpp1Kz79pVmKWE6G5yzKuiCqkR01LHFVS0=
+gopkg.in/juju/environschema.v1 v1.0.1/go.mod h1:WTgU3KXKCVoO9bMmG/4KHzoaRvLeoxfjArpgd1MGWFA=
 gopkg.in/ldap.v2 v2.5.1 h1:wiu0okdNfjlBzg6UWvd1Hn8Y+Ux17/u/4nlk4CQr6tU=
 gopkg.in/ldap.v2 v2.5.1/go.mod h1:oI0cpe/D7HRtBQl8aTg+ZmzFUAvu4lsv3eLXMLGFxWk=
 gopkg.in/macaroon-bakery.v3 v3.0.0 h1:bgTztGVwcj62/Zms7DIHTMtBPNBajeCzJfiA8TBsK8w=
