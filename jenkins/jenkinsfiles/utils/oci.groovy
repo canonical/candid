@@ -5,36 +5,38 @@
  * Builds the dockerfile frontendv/0 compliant image. 
  */
 /* groovylint-disable-next-line BuilderMethodWithSideEffects, FactoryMethodName */
-void buildImage() {
+void buildImage(String target) {
+//            --build-arg http_proxy=${env.HTTP_PROXY} \
+//            --build-arg https_proxy=${env.HTTPS_PROXY} \
     sh """
         docker build \
-            --build-arg http_proxy=${params.http_proxy} \
-            --build-arg https_proxy=${params.http_proxy} \
             --secret id=ghuser,env=GITHUB_PAT_AUTH_USR \
             --secret id=ghpat,env=GITHUB_PAT_AUTH_PSW \
-            . -f ./Dockerfile -t candid:latest
+            . -f ./Dockerfile -t ${target}
     """
 }
 
-void saveImage() {
+
+void saveImage(String target) {
     sh """
-        docker save candid:latest | gzip > candid-latest-image.tar.gz
+        docker save ${target} | gzip > ${target.split(':')[0]}-image.tar.gz
     """
 }
+
 
 
 /**
- * Scans an image using trivvy.
+ * Scans an image using trivy.
  */
-void scanImage() {
+void scanImage(String target) {
+    // # --build-arg http_proxy=${env.HTTP_PROXY} \
+    // # --build-arg https_proxy=${env.HTTPS_PROXY} \
     sh """
         docker run \
-            --env HTTP_PROXY=${params.http_proxy} \
-            --env HTTPS_PROXY=${params.http_proxy} \
             --rm \
             -v /var/run/docker.sock:/var/run/docker.sock \
-            -v $HOME/Library/Caches:/root/.cache/ \
-            aquasec/trivy:0.31.3 image candid:latest
+            -v ${env.JENKINS_HOME}/trivy-cache/${env.JOB_NAME}/Library/Caches:/root/.cache/ \
+            aquasec/trivy:0.31.3 image ${target}
     """
 }
 

@@ -1,0 +1,14 @@
+name: 'Setup go and vendor'
+description: 'Setup go with our auth'
+runs:
+  using: "composite"
+  steps:
+    - uses: actions/setup-go@v3
+      with:
+        go-version: 1.18
+        architecture: x64
+        cache: true
+    - run: git config --global url.https://alesstimec:$GH_AUTH@github.com/.insteadOf https://github.com/
+      shell: bash
+    - run: go mod vendor
+      shell: bash

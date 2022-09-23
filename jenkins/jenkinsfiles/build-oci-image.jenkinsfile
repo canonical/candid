@@ -2,39 +2,30 @@
 /* groovylint-disable-next-line CompileStatic, VariableTypeRequired, NoDef */
 def oci
 
+String pipelineLabel = 'docker'
+/* String proxyUrl = 'http://squid.internal:3128' */
+String proxyUrl = ''
+String githubCredId = '054810bf-9336-43b2-b9ed-e45dec6c31d2'
+
+String imageName = 'candid'
+
 pipeline {
     agent {
-        // Not all of our slaves have multipass installed
-        // TODO: Investigate why
-        label 'slave-2'
+        label "${pipelineLabel}"
     }
 
     options {
-        // Some images rely on each other, each build should be run consecutively,
-        // not concurrently
         disableConcurrentBuilds()
-        // These kinds of logs and artifacts do not matter to us,
-        // so, 10 should be fine for checking some history of the builds
         buildDiscarder(logRotator(numToKeepStr: '10'))
-        // We always want the build to run fresh as vulnerabilities could have
-        // been introduced at a later date
         disableResume()
     }
 
     environment {
-        // Buildkit enables concurrent layer building for multi-stage builds
-        // significantly speeding up build times
         DOCKER_BUILDKIT = 1
-        // Auth required for the go packages within the image
-        GITHUB_PAT_AUTH = credentials('commercial-systems-bot')
-    }
-
-    parameters {
-        string(
-            name: 'http_proxy',
-            defaultValue: 'http://squid.internal:3128',
-            description: 'Enable access to HTTP via Squid proxy'
-        )
+        GITHUB_PAT_AUTH = credentials("${githubCredId}")
+        HTTP_PROXY = "${proxyUrl}"
+        HTTPS_PROXY = "${proxyUrl}"
+        HOME = "${env.WORKSPACE}"
     }
 
     stages {
@@ -42,12 +33,7 @@ pipeline {
             steps {
                 checkout scm
                 script {
-                    try {
-                        // Load VM Utilities
-                        oci = load("${env.WORKSPACE}/jenkins/jenkinsfiles/utils/oci.groovy")
-                    } catch (err) {
-                        echo "error occured: ${err}"
-                    }
+                    oci = load("${env.WORKSPACE}/jenkins/jenkinsfiles/utils/oci.groovy")
                 }
             }
         }
@@ -55,46 +41,31 @@ pipeline {
         stage('Build image') {
             steps {
                 script {
-                    try {
-                        oci.buildImage()
-                    } catch (err) {
-                        // TODO: Publish to mattermost or something
-                        echo "error occured: ${err}"
-                    }
+                    oci.buildImage("${imageName}:latest")
+                    sh 'env'
                 }
                 echo 'Image built.'
+            }
+        }
+
+        stage('Scan image') {
+            steps {
+                script {
+                    oci.scanImage("${imageName}:latest")
+                }
             }
         }
 
         stage('Save image') {
             steps {
                 script {
-                    try {
-                        oci.saveImage()
-                        archiveArtifacts artifacts: 'candid-latest-image.tar.gz',
-                    } catch (err) {
-                        // TODO: Publish to mattermost or something
-                        echo "error occured: ${err}"
-                    }
+                    oci.saveImage("${imageName}:latest")
                 }
+                archiveArtifacts artifacts: '*.tar.gz', fingerprint: true, followSymlinks: false, onlyIfSuccessful: true
                 echo 'Image saved.'
             }
         }
 
-        stage('Scan image') {
-            // We do not care for output right now, just to fail our pipeline
-            // if N severities of J types are reached
-            steps {
-                script {
-                    try {
-                        oci.scanImage()
-                    } catch (err) {
-                        // TODO: Publish to mattermost or something
-                        echo "error occured: ${err}"
-                    }
-                }
-            }
-        }
     }
     post {
         always {
