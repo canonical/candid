@@ -16,6 +16,13 @@ void buildImage() {
     """
 }
 
+void saveImage() {
+    sh """
+        docker save candid:latest | gzip > candid-latest-image.tar.gz
+    """
+}
+
+
 /**
  * Scans an image using trivvy.
  */
