@@ -48,13 +48,18 @@ body {
 
 .sso-buttons {
   margin-top: 1.5rem;
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: space-between;
 }
 
 .sso-button {
   border-color: #cdcdcd;
   padding-bottom: 1rem;
   padding-top: 1rem;
-  width: 100%;
+  width: 195px;
+  height: 9rem;
 }
 
 .sso-icon {
@@ -66,6 +71,11 @@ body {
   width: auto;
 }
 
+.u-truncate--multiline {
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
 @media only screen and (min-width: 620px) {
   .sso-buttons {
     overflow: hidden;
@@ -73,8 +83,6 @@ body {
 
   .sso-button {
     float: left;
-    height: 125px;
-    width: 125px;
     display: flex;
     align-items: center;
     justify-content: center;
