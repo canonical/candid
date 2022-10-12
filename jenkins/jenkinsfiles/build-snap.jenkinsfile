@@ -1,0 +1,112 @@
+/* groovylint-disable LineLength, NestedBlockDepth, UnnecessaryObjectReferences */
+/* groovylint-disable-next-line CompileStatic, VariableTypeRequired, NoDef */
+def lxc
+
+// String proxyAddress = 'http://squid.internal:3128'
+// String proxyAddress = ' '
+String githubCredId = '054810bf-9336-43b2-b9ed-e45dec6c31d2'
+
+
+pipeline {
+    agent {
+        label 'slave-2'
+    }
+
+    environment {
+        // HTTP_PROXY = "${proxyAddress}"
+        // HTTPS_PROXY = "${proxyAddress}"
+        SNAPCRAFT_STORE_CREDENTIALS = credentials('snapcraft-export-login')
+        GITHUB_PAT_AUTH = credentials("${githubCredId}")
+    }
+
+    stages {
+        stage('Checkout to version') {
+            steps {
+                script {
+                    checkout changelog: false, poll: false, scm: [
+                        $class: 'GitSCM',
+                        branches: [[name: "*/test"]],
+                        extensions: [
+                            [$class: 'WipeWorkspace'],
+                        ],
+                        userRemoteConfigs: [
+                            [
+                                credentialsId: '054810bf-9336-43b2-b9ed-e45dec6c31d2',
+                                url: 'https://github.com/canonical/candid'
+                            ]
+                        ]
+                    ]
+                    // TODO: This is a workaround to make sure the scripts always exist.
+                    // Eventually once this is merged to develop we need to change target branch to develop
+                    // and then we will always have them.
+                    //
+                    // And once we have a jenkins 2.7+ we can use a dynamically loaded shared
+                    // library, but until then this is what we're working with.
+                    sh 'git checkout origin/test ./jenkins/jenkinsfiles/utils'
+                }
+            }
+        }
+        stage('Setup environment') {
+            steps {
+                script {
+                    lxc = load("${env.WORKSPACE}/jenkins/jenkinsfiles/utils/lxc.groovy")
+                    // lxc.pullFileFromHome('hibob')
+                    lxc.launchContainer('ubuntu:20.04')
+                    lxc.pushWorkspace()
+                    lxc.s('pwd')
+                    lxc.installSnap('go', true, '1.18/stable')
+                    lxc.installSnap('snapcraft', true, '7.x/stable')
+                    lxc.s('sudo apt update')
+                    lxc.s('sudo apt-get update')
+                    lxc.s('sudo apt install make')
+                    lxc.s('sudo apt-get install build-essential -y') // GCC for CGO
+                    usr = "${env.GITHUB_PAT_AUTH_USR}"
+                    psw = "${env.GITHUB_PAT_AUTH_PSW}"
+                    setGitCreds = """
+                    git config \
+                    --global \
+                    url."https://${usr}:${psw}@github.com".insteadOf \
+                    "https://github.com"
+                    """
+                    lxc.s(setGitCreds)
+                }
+                echo 'Environment setup complete.'
+            }
+        }
+        stage('Build snap') {
+            steps {
+                script {
+                    lxc.s('snapcraft --destructive-mode')
+                }
+            }
+        }
+        stage('Archive snap') {
+            steps {
+                script {
+                    String getSnapNamCmd = """echo "\$(cat ./snap/snapcraft.yaml | yq .name)_\$(git describe --tags --dirty --abbrev=0)_amd64.snap" """
+                    snapName = sh(
+                        script: getSnapNamCmd,
+                        returnStdout: true
+                    ).trim()
+                    lxc.pullFileFromHome("${env.JOB_BASE_NAME}/${snapName} ./")
+                    // archiveArtifacts
+                    archiveArtifacts artifacts: '*.snap',
+                    allowEmptyArchive: false,
+                    // We need fingerprint sha such that we don't upload over and over
+                    fingerprint: true,
+                    onlyIfSuccessful: true
+                }
+            }
+        }
+    }
+    post {
+        always {
+            node('worker-3') {
+                script {
+                    sh 'lxc delete $BUILD_TAG --force'
+                    sh 'lxc list'
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,48 @@
+name: BuildOCIImage
+on:
+  workflow_dispatch:
+    inputs:
+      caller:
+        type: string
+        description: "Address of the dispatch caller"
+        required: false
+        default: ""
+
+env:
+  GH_USER: alesstimec
+  GH_AUTH: ${{ secrets.GH_AUTH }}
+
+jobs:
+  candid-oci-image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - run: git fetch --prune --unshallow
+      - uses: ./.github/workflows/setupgo118amd64
+      - uses: docker/setup-qemu-action@v2
+      - uses: docker/setup-buildx-action@v2
+      - name: Setup version and commit
+        run: |
+          echo "GIT_COMMIT=$(git rev-parse --verify HEAD)" >> $GITHUB_ENV
+          echo "VERSION=$(git describe --dirty)" >> $GITHUB_ENV
+      - name: Build image
+        uses: docker/build-push-action@v3
+        with:
+          context: .
+          file: ./Dockerfile
+          target: deploy-env
+          tags: candid:latest
+          build-args: |
+            AUTH_TYPE=pat
+            GIT_COMMIT=${{ env.GIT_COMMIT }}
+            VERSION=${{ env.VERSION }}
+          secrets: |
+            "ghuser=${{ env.GH_USER }}"
+            "ghpat=${{ env.GH_AUTH }}"
+          outputs: |
+            type=docker,dest=candid-image.tar
+      - uses: actions/upload-artifact@v3
+        with:
+          name: candid-image
+          path: ./*.tar
+          if-no-files-found: error

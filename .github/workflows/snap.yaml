@@ -1,0 +1,26 @@
+name: BuildSnap
+on:
+  workflow_dispatch:
+    inputs:
+      caller:
+        type: string
+        description: "Address of the dispatch caller"
+        required: false
+        default: ""
+env:
+  GH_AUTH: ${{ secrets.GH_AUTH }}
+
+jobs:
+  build-snap:
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v3
+      - run: git fetch --prune --unshallow
+      - uses: ./.github/workflows/setupgo118amd64
+      - run: sudo snap install snapcraft --channel=7.x/stable --classic
+      - run: snapcraft --destructive-mode
+      - uses: actions/upload-artifact@v3
+        with:
+          name: candid-snap
+          path: ./*.snap
+          if-no-files-found: error
