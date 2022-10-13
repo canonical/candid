@@ -1,0 +1,25 @@
+name: "Setup go and vendor"
+description: "Setup go with our auth"
+
+inputs:
+  user:
+    description: "User to authenticate against"
+    required: true
+    default: ""
+  pat:
+    description: "PAT token to authenticate against"
+    required: true
+    default: ""
+
+runs:
+  using: "composite"
+  steps:
+    - uses: actions/setup-go@v3
+      with:
+        go-version: 1.18
+        architecture: x64
+        cache: true
+    - run: git config --global url.https://${{ inputs.user }}:${{ inputs.pat }}@github.com/.insteadOf https://github.com/
+      shell: bash
+    - run: go mod vendor
+      shell: bash
