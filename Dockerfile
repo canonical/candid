@@ -14,7 +14,6 @@ FROM build as build-with-github-auth
 ARG AUTH_TYPE
 ARG GIT_COMMIT
 ARG VERSION
-ARG TAGS
 WORKDIR /usr/src/candid
 SHELL ["/bin/bash", "-c"]
 COPY . .
@@ -31,7 +30,7 @@ RUN --mount=type=secret,id=ghuser \
     git config --global --add url."git@github.com:".insteadOf "https://github.com/" && \
     echo "SSH auth selected"; \
     fi
-RUN ./scripts/set-version.sh
+RUN --mount=type=ssh source /root/.gvm/scripts/gvm && ./scripts/set-version.sh
 RUN --mount=type=ssh source /root/.gvm/scripts/gvm && go mod vendor
 RUN --mount=type=ssh source /root/.gvm/scripts/gvm && GOBIN=/usr/src/candid go install gopkg.in/macaroon-bakery.v2/cmd/bakery-keygen@latest
 RUN --mount=type=ssh source /root/.gvm/scripts/gvm && go build -o candidsrv -race -v -a -mod vendor ./cmd/candidsrv
