@@ -7,12 +7,12 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
+	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery/postgresrootkeystore"
 	"github.com/juju/aclstore/v2"
 	"github.com/juju/simplekv/sqlsimplekv"
 	"github.com/juju/utils/v2/debugstatus"
 	errgo "gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v3/bakery"
-	"gopkg.in/macaroon-bakery.v3/bakery/postgresrootkeystore"
 
 	"github.com/canonical/candid/meeting"
 	"github.com/canonical/candid/store"

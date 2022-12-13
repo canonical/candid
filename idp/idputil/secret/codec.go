@@ -10,9 +10,9 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
 	"golang.org/x/crypto/nacl/box"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v3/bakery"
 )
 
 var (

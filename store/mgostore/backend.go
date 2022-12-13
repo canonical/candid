@@ -7,13 +7,13 @@ import (
 	"context"
 	"time"
 
+	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
+	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery/mgorootkeystore"
 	"github.com/juju/aclstore/v2"
 	mgo "github.com/juju/mgo/v2"
 	"github.com/juju/simplekv/mgosimplekv"
 	"github.com/juju/utils/v2/debugstatus"
 	errgo "gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v3/bakery"
-	"gopkg.in/macaroon-bakery.v3/bakery/mgorootkeystore"
 
 	"github.com/canonical/candid/meeting"
 	"github.com/canonical/candid/store"

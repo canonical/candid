@@ -4,8 +4,8 @@
 package v1
 
 import (
-	"gopkg.in/macaroon-bakery.v3/bakery"
-	"gopkg.in/macaroon-bakery.v3/bakery/identchecker"
+	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
+	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery/identchecker"
 
 	"github.com/canonical/candid/internal/auth"
 	"github.com/canonical/candid/params"

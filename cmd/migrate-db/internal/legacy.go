@@ -7,9 +7,9 @@ import (
 	"log"
 	"strings"
 
-	errgo "gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v3/bakery"
+	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
 	mgo "github.com/juju/mgo/v2"
+	errgo "gopkg.in/errgo.v1"
 
 	"github.com/canonical/candid/cmd/migrate-db/internal/mongodoc"
 	"github.com/canonical/candid/internal/auth"

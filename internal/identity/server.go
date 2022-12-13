@@ -11,6 +11,8 @@ import (
 	"runtime/debug"
 	"time"
 
+	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
+	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery/identchecker"
 	"github.com/juju/aclstore/v2"
 	"github.com/juju/loggo"
 	"github.com/juju/utils/v2/debugstatus"
@@ -19,8 +21,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/httprequest.v1"
-	"gopkg.in/macaroon-bakery.v3/bakery"
-	"gopkg.in/macaroon-bakery.v3/bakery/identchecker"
 
 	"github.com/canonical/candid/idp"
 	"github.com/canonical/candid/internal/auth"

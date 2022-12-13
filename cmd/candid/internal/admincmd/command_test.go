@@ -13,11 +13,11 @@ import (
 	"testing"
 
 	qt "github.com/frankban/quicktest"
+	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
+	"github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery/agent"
 	"github.com/juju/aclstore/v2"
 	"github.com/juju/cmd/v3"
 	"github.com/juju/simplekv/memsimplekv"
-	"gopkg.in/macaroon-bakery.v3/bakery"
-	"gopkg.in/macaroon-bakery.v3/httpbakery/agent"
 
 	"github.com/canonical/candid"
 	"github.com/canonical/candid/candidtest"

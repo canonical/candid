@@ -7,9 +7,9 @@ import (
 	"context"
 	"net/http"
 
+	"github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/httprequest.v1"
-	"gopkg.in/macaroon-bakery.v3/httpbakery"
 
 	"github.com/canonical/candid/params"
 )

@@ -8,13 +8,13 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery"
+	"github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery/form"
 	"github.com/juju/schema"
 	"gopkg.in/errgo.v1"
 	gooseidentity "gopkg.in/goose.v1/identity"
 	"gopkg.in/httprequest.v1"
 	"gopkg.in/juju/environschema.v1"
-	"gopkg.in/macaroon-bakery.v3/httpbakery"
-	"gopkg.in/macaroon-bakery.v3/httpbakery/form"
 
 	"github.com/canonical/candid/idp"
 	"github.com/canonical/candid/idp/idputil"
