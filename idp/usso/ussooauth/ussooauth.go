@@ -16,9 +16,9 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/httprequest.v1"
-	"gopkg.in/macaroon-bakery.v3/httpbakery"
 
 	"github.com/canonical/candid/candidclient/ussologin"
 	"github.com/canonical/candid/idp"
@@ -92,7 +92,7 @@ func (idp *identityProvider) SetInteraction(ierr *httpbakery.Error, dischargeID 
 	ussologin.SetInteraction(ierr, idputil.URL(idp.initParams.URLPrefix, "/interact", dischargeID))
 }
 
-//  GetGroups implements idp.IdentityProvider.GetGroups.
+// GetGroups implements idp.IdentityProvider.GetGroups.
 func (*identityProvider) GetGroups(context.Context, *store.Identity) ([]string, error) {
 	// This method should never be called as this IDP supports
 	// identities in the "usso" namespace.

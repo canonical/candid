@@ -6,8 +6,8 @@ package mgostore
 import (
 	"time"
 
+	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
 	"github.com/juju/loggo"
-	"gopkg.in/macaroon-bakery.v3/bakery"
 	"github.com/juju/mgo/v2/bson"
 
 	"github.com/canonical/candid/store"

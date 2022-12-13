@@ -4,6 +4,7 @@ require (
 	github.com/coreos/go-oidc v0.0.0-20170119174436-2cc7913f9f6f
 	github.com/duo-labs/webauthn v0.0.0-20220815211337-00c9fb5711f5
 	github.com/frankban/quicktest v1.14.3
+	github.com/go-macaroon-bakery/macaroon-bakery/v3 v3.0.1
 	github.com/gomodule/oauth1 v0.2.0
 	github.com/google/go-cmp v0.5.9
 	github.com/google/uuid v1.3.0
@@ -38,7 +39,6 @@ require (
 	gopkg.in/httprequest.v1 v1.2.1
 	gopkg.in/juju/environschema.v1 v1.0.1
 	gopkg.in/ldap.v2 v2.5.1
-	gopkg.in/macaroon-bakery.v3 v3.0.0
 	gopkg.in/macaroon.v2 v2.1.0
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0-20170531180850-df99d62fd42d
 	gopkg.in/square/go-jose.v2 v2.6.0
@@ -148,5 +148,7 @@ require (
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b // indirect
 	sigs.k8s.io/yaml v1.2.0 // indirect
 )
+
+//replace github.com/go-macaroon-bakery/macaroon-bakery/v3 => github.com/go-macaroon-bakery/macaroon-bakery/v3 v3.0.1
 
 go 1.18

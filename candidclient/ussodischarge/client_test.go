@@ -11,12 +11,12 @@ import (
 
 	qt "github.com/frankban/quicktest"
 	"github.com/frankban/quicktest/qtsuite"
+	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
+	"github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	errgo "gopkg.in/errgo.v1"
 	"gopkg.in/httprequest.v1"
-	"gopkg.in/macaroon-bakery.v3/bakery"
-	"gopkg.in/macaroon-bakery.v3/httpbakery"
 	"gopkg.in/macaroon.v2"
 
 	"github.com/canonical/candid/candidclient/ussodischarge"

@@ -8,9 +8,9 @@ import (
 	"testing"
 
 	qt "github.com/frankban/quicktest"
-	"gopkg.in/macaroon-bakery.v3/bakery"
-	"gopkg.in/macaroon-bakery.v3/bakery/identchecker"
-	"gopkg.in/macaroon-bakery.v3/httpbakery"
+	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
+	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery/identchecker"
+	"github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery"
 
 	"github.com/canonical/candid/candidclient"
 	"github.com/canonical/candid/candidtest"

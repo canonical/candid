@@ -7,9 +7,9 @@ import (
 	"context"
 	"strings"
 
+	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery/checkers"
+	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery/identchecker"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v3/bakery/checkers"
-	"gopkg.in/macaroon-bakery.v3/bakery/identchecker"
 )
 
 // StripDomain returns an implementation of identchecker.IdentityClient

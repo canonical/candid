@@ -13,8 +13,8 @@ import (
 
 	qt "github.com/frankban/quicktest"
 	"github.com/frankban/quicktest/qtsuite"
+	"github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery/form"
 	"github.com/juju/qthttptest"
-	"gopkg.in/macaroon-bakery.v3/httpbakery/form"
 	"gopkg.in/yaml.v2"
 
 	"github.com/canonical/candid/config"

@@ -10,9 +10,9 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery"
 	"github.com/juju/loggo"
 	errgo "gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v3/httpbakery"
 
 	"github.com/canonical/candid/idp"
 	"github.com/canonical/candid/idp/idputil"
@@ -148,7 +148,7 @@ func (idp *identityProvider) URL(state string) string {
 func (idp *identityProvider) SetInteraction(ierr *httpbakery.Error, dischargeID string) {
 }
 
-//  GetGroups implements idp.IdentityProvider.GetGroups.
+// GetGroups implements idp.IdentityProvider.GetGroups.
 func (*identityProvider) GetGroups(ctx context.Context, identity *store.Identity) ([]string, error) {
 	// TODO(mhilton) store the token in the identity ProviderInfo and
 	// retrieve groups on demand rather than on login.

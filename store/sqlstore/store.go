@@ -7,9 +7,9 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
 	"github.com/juju/loggo"
 	errgo "gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v3/bakery"
 
 	"github.com/canonical/candid/store"
 )

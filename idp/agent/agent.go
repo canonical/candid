@@ -8,8 +8,8 @@ import (
 	"context"
 	"net/http"
 
+	"github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery"
 	errgo "gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v3/httpbakery"
 
 	"github.com/canonical/candid/idp"
 	"github.com/canonical/candid/store"
@@ -81,7 +81,7 @@ func (*identityProvider) SetInteraction(ierr *httpbakery.Error, dischargeID stri
 func (*identityProvider) Handle(context.Context, http.ResponseWriter, *http.Request) {
 }
 
-//  GetGroups implements idp.IdentityProvider.GetGroups.
+// GetGroups implements idp.IdentityProvider.GetGroups.
 func (*identityProvider) GetGroups(context.Context, *store.Identity) ([]string, error) {
 	return nil, nil
 }

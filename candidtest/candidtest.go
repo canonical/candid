@@ -9,9 +9,9 @@ import (
 	"context"
 	"net/http/httptest"
 
+	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
 	"github.com/juju/aclstore/v2"
 	"github.com/juju/simplekv/memsimplekv"
-	"gopkg.in/macaroon-bakery.v3/bakery"
 
 	"github.com/canonical/candid"
 	"github.com/canonical/candid/store"

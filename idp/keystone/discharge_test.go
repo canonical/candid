@@ -9,11 +9,11 @@ import (
 
 	qt "github.com/frankban/quicktest"
 	"github.com/frankban/quicktest/qtsuite"
+	"github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery"
+	"github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery/form"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/httprequest.v1"
 	envschemaform "gopkg.in/juju/environschema.v1/form"
-	"gopkg.in/macaroon-bakery.v3/httpbakery"
-	"gopkg.in/macaroon-bakery.v3/httpbakery/form"
 
 	"github.com/canonical/candid/idp"
 	"github.com/canonical/candid/idp/keystone"

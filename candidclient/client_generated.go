@@ -7,7 +7,7 @@ import (
 	"context"
 	"github.com/canonical/candid/params"
 	"gopkg.in/httprequest.v1"
-	"gopkg.in/macaroon-bakery.v3/bakery"
+	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
 )
 
 type client struct {

@@ -12,12 +12,12 @@ import (
 	"net/url"
 	"time"
 
+	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
 	"github.com/juju/usso"
 	"github.com/juju/usso/openid"
 	"github.com/julienschmidt/httprouter"
 	"golang.org/x/crypto/nacl/box"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v3/bakery"
 
 	"github.com/canonical/candid/internal/identity"
 	"github.com/canonical/candid/params"
