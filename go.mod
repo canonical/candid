@@ -28,7 +28,7 @@ require (
 	github.com/julienschmidt/httprouter v1.3.0
 	github.com/lib/pq v1.10.7
 	github.com/mhilton/openid v0.0.0-20150511103207-7922a4e937d8
-	github.com/prometheus/client_golang v1.13.0
+	github.com/prometheus/client_golang v1.14.0
 	github.com/yohcop/openid-go v1.0.0
 	golang.org/x/crypto v0.0.0-20210711020723-a769d52b0f97
 	golang.org/x/net v0.0.0-20220624214902-1bab6f366d9e
@@ -101,7 +101,7 @@ require (
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
 	github.com/pquerna/cachecontrol v0.0.0-20160421231612-c97913dcbd76 // indirect
-	github.com/prometheus/client_model v0.2.0 // indirect
+	github.com/prometheus/client_model v0.3.0 // indirect
 	github.com/prometheus/common v0.37.0 // indirect
 	github.com/prometheus/procfs v0.8.0 // indirect
 	github.com/rivo/uniseg v0.2.0 // indirect
