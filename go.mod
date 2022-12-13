@@ -3,7 +3,7 @@ module github.com/canonical/candid
 require (
 	github.com/coreos/go-oidc v0.0.0-20170119174436-2cc7913f9f6f
 	github.com/duo-labs/webauthn v0.0.0-20220815211337-00c9fb5711f5
-	github.com/frankban/quicktest v1.14.3
+	github.com/frankban/quicktest v1.14.4
 	github.com/go-macaroon-bakery/macaroon-bakery/v3 v3.0.1
 	github.com/gomodule/oauth1 v0.2.0
 	github.com/google/go-cmp v0.5.9
@@ -89,7 +89,7 @@ require (
 	github.com/juju/retry v0.0.0-20180821225755-9058e192b216 // indirect
 	github.com/juju/version v0.0.0-20191219164919-81c1be00b9a6 // indirect
 	github.com/juju/webbrowser v0.0.0-20160309143629-54b8c57083b4 // indirect
-	github.com/kr/pretty v0.3.0 // indirect
+	github.com/kr/pretty v0.3.1 // indirect
 	github.com/kr/text v0.2.0 // indirect
 	github.com/lunixbochs/vtclean v1.0.0 // indirect
 	github.com/mattn/go-colorable v0.1.8 // indirect
@@ -106,7 +106,7 @@ require (
 	github.com/prometheus/procfs v0.8.0 // indirect
 	github.com/rivo/uniseg v0.2.0 // indirect
 	github.com/rogpeppe/fastuuid v1.2.0 // indirect
-	github.com/rogpeppe/go-internal v1.6.1 // indirect
+	github.com/rogpeppe/go-internal v1.9.0 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/sirupsen/logrus v1.8.1 // indirect
 	github.com/soheilhy/cmux v0.1.5 // indirect
