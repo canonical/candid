@@ -5,6 +5,7 @@
 GIT_COMMIT := $(shell git rev-parse --verify HEAD)
 GIT_VERSION := $(shell git describe --dirty)
 ARCH := $(shell dpkg --print-architecture)
+AUTH ?= ssh
 
 DEPENDENCIES := build-essential bzr
 SNAP_DEPENDENCIES := go snapcraft
@@ -69,15 +70,15 @@ else
 endif
 
 image:
-    DOCKER_BUILDKIT=1 \
-    docker build \
-        --build-arg AUTH_TYPE=ssh \
-        --cache-from candid:latest \
-        --progress=plain \
-        --secret id=ghuser,env=GH_USER \
-        --secret id=ghpat,env=GH_PAT \
-        --ssh default \
-        . -f ./docker/Dockerfile -t candid
+	DOCKER_BUILDKIT=1 \
+	docker build \
+		--build-arg AUTH_TYPE=$(AUTH) \
+		--cache-from candid:latest \
+		--progress=plain \
+		--secret id=ghuser,env=GH_USER \
+		--secret id=ghpat,env=GH_PAT \
+		--ssh default \
+		. -f ./Dockerfile -t candid
 
 help:
 	@echo -e 'Identity service - list of make targets:\n'
