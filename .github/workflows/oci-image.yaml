@@ -23,7 +23,7 @@ jobs:
           echo "GIT_COMMIT=$(git rev-parse --verify HEAD)" >> $GITHUB_ENV
           echo "VERSION=$(git describe --dirty)" >> $GITHUB_ENV
       - name: Build image
-        uses: docker/build-push-action@v3
+        uses: docker/build-push-action@v4
         with:
           context: .
           file: ./Dockerfile
