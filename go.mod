@@ -8,7 +8,7 @@ require (
 	github.com/gomodule/oauth1 v0.2.0
 	github.com/google/go-cmp v0.5.9
 	github.com/google/uuid v1.3.0
-	github.com/gorilla/handlers v0.0.0-20170224193955-13d73096a474
+	github.com/gorilla/handlers v1.3.0
 	github.com/juju/aclstore/v2 v2.1.0
 	github.com/juju/clock v0.0.0-20190205081909-9c5c9712527c
 	github.com/juju/cmd/v3 v3.0.0-20210809234809-65029dab4cd0
