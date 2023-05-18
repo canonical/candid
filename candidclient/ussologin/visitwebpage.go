@@ -8,10 +8,10 @@ import (
 	"net/http"
 	"net/url"
 
+	"github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery"
 	"github.com/juju/usso"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/httprequest.v1"
-	"gopkg.in/macaroon-bakery.v3/httpbakery"
 )
 
 const interactionMethod = "usso_oauth"

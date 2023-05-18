@@ -7,10 +7,10 @@ import (
 	"context"
 	"net/http"
 
+	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
 	"github.com/juju/loggo"
 	"github.com/juju/utils/v2/debugstatus"
 	"gopkg.in/httprequest.v1"
-	"gopkg.in/macaroon-bakery.v3/bakery"
 
 	"github.com/canonical/candid/internal/identity"
 	"github.com/canonical/candid/version"

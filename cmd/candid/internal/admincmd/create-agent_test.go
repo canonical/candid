@@ -12,7 +12,7 @@ import (
 
 	qt "github.com/frankban/quicktest"
 	"github.com/frankban/quicktest/qtsuite"
-	"gopkg.in/macaroon-bakery.v3/httpbakery/agent"
+	"github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery/agent"
 
 	"github.com/canonical/candid/cmd/candid/internal/admincmd"
 	"github.com/canonical/candid/store"

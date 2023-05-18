@@ -7,10 +7,10 @@ import (
 	"context"
 	"time"
 
+	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
 	"github.com/juju/cmd/v3"
 	"github.com/juju/gnuflag"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v3/bakery"
 
 	"github.com/canonical/candid/params"
 )

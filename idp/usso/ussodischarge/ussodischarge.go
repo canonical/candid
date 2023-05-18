@@ -20,13 +20,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
+	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery/checkers"
+	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery/identchecker"
+	"github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery"
 	"github.com/juju/loggo"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/httprequest.v1"
-	"gopkg.in/macaroon-bakery.v3/bakery"
-	"gopkg.in/macaroon-bakery.v3/bakery/checkers"
-	"gopkg.in/macaroon-bakery.v3/bakery/identchecker"
-	"gopkg.in/macaroon-bakery.v3/httpbakery"
 
 	"github.com/canonical/candid/candidclient/ussodischarge"
 	"github.com/canonical/candid/idp"
@@ -171,7 +171,7 @@ func (idp *identityProvider) SetInteraction(ierr *httpbakery.Error, dischargeID 
 	ussodischarge.SetInteraction(ierr, idputil.URL(idp.initParams.URLPrefix, "/interact", dischargeID))
 }
 
-//  GetGroups implements idp.IdentityProvider.GetGroups.
+// GetGroups implements idp.IdentityProvider.GetGroups.
 func (*identityProvider) GetGroups(context.Context, *store.Identity) ([]string, error) {
 	return nil, nil
 }

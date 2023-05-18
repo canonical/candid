@@ -17,12 +17,12 @@ import (
 
 	qt "github.com/frankban/quicktest"
 	"github.com/frankban/quicktest/qtsuite"
+	"github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery"
 	"github.com/juju/aclstore/v2/aclclient"
 	"github.com/juju/loggo"
 	"github.com/juju/qthttptest"
 	"github.com/julienschmidt/httprouter"
 	"gopkg.in/httprequest.v1"
-	"gopkg.in/macaroon-bakery.v3/httpbakery"
 
 	"github.com/canonical/candid/idp"
 	"github.com/canonical/candid/idp/static"

@@ -6,8 +6,8 @@ package candidclient
 import (
 	"context"
 
+	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery/identchecker"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v3/bakery/identchecker"
 
 	"github.com/canonical/candid/params"
 )

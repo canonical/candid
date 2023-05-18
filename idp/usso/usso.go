@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery"
 	"github.com/juju/loggo"
 	"github.com/juju/names/v4"
 	"github.com/juju/usso"
@@ -18,7 +19,6 @@ import (
 	"github.com/juju/utils/v2/cache"
 	"github.com/prometheus/client_golang/prometheus"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v3/httpbakery"
 	"launchpad.net/lpad"
 
 	"github.com/canonical/candid/idp"

@@ -11,9 +11,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
 	"github.com/juju/loggo"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v3/bakery"
 	"gopkg.in/yaml.v2"
 
 	"github.com/canonical/candid/idp"

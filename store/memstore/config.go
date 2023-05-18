@@ -1,10 +1,10 @@
 package memstore
 
 import (
+	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
 	"github.com/juju/aclstore/v2"
 	"github.com/juju/simplekv/memsimplekv"
 	"github.com/juju/utils/v2/debugstatus"
-	"gopkg.in/macaroon-bakery.v3/bakery"
 
 	"github.com/canonical/candid/meeting"
 	"github.com/canonical/candid/store"

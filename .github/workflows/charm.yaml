@@ -1,0 +1,30 @@
+name: BuildCharm
+on:
+  workflow_dispatch:
+    inputs:
+      charm:
+        description: "Charm to build."
+        default: "candid"
+        required: false
+        type: choice
+        options:
+          - candid
+          - candid-k8s
+
+env:
+  GH_USER: ${{ secrets.GH_USER }}
+  GH_AUTH: ${{ secrets.GH_AUTH }}
+
+jobs:
+  build-charm:
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v3
+      - run: git fetch --prune --unshallow
+      - run: sudo snap install charmcraft --channel=2.x/stable --classic
+      - run: charmcraft pack --project-dir ./charms/${{ inputs.charm }} --destructive-mode
+      - uses: actions/upload-artifact@v3
+        with:
+          name: ${{ inputs.charm }}-charm
+          path: ./*.charm
+          if-no-files-found: error

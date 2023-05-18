@@ -13,13 +13,13 @@ import (
 	"regexp"
 
 	"github.com/coreos/go-oidc"
+	"github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/juju/loggo"
 	"github.com/juju/names/v4"
 	"golang.org/x/oauth2"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v3/httpbakery"
 
 	"github.com/canonical/candid/idp"
 	"github.com/canonical/candid/idp/idputil"
@@ -231,7 +231,7 @@ func (idp *openidConnectIdentityProvider) URL(state string) string {
 func (idp *openidConnectIdentityProvider) SetInteraction(ierr *httpbakery.Error, dischargeID string) {
 }
 
-//  GetGroups implements idp.IdentityProvider.GetGroups.
+// GetGroups implements idp.IdentityProvider.GetGroups.
 func (idp *openidConnectIdentityProvider) GetGroups(_ context.Context, identity *store.Identity) ([]string, error) {
 	return identity.Groups, nil
 }
@@ -479,7 +479,7 @@ type registrationState struct {
 }
 
 // ProviderID creates a ProviderIdentity using the Subject and Issuer
-//from the given ID token.
+// from the given ID token.
 func ProviderID(provider string, id *oidc.IDToken) store.ProviderIdentity {
 	return store.MakeProviderIdentity(provider, fmt.Sprintf("%s:%s", id.Issuer, id.Subject))
 }

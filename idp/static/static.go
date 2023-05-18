@@ -11,9 +11,9 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery"
 	"github.com/juju/loggo"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v3/httpbakery"
 
 	"github.com/canonical/candid/idp"
 	"github.com/canonical/candid/idp/idputil"
@@ -165,7 +165,7 @@ func (idp *identityProvider) URL(state string) string {
 func (idp *identityProvider) SetInteraction(ierr *httpbakery.Error, dischargeID string) {
 }
 
-//  GetGroups implements idp.IdentityProvider.GetGroups.
+// GetGroups implements idp.IdentityProvider.GetGroups.
 func (idp *identityProvider) GetGroups(ctx context.Context, identity *store.Identity) ([]string, error) {
 	_, fulluser := identity.ProviderID.Split()
 	username := strings.SplitN(fulluser, "@", 2)[0]

@@ -205,6 +205,7 @@ class CandidOperatorCharm(CharmBase):
 
         if event.master:
             self._stored.db_uri = str(event.master.uri)
+            self._update_workload({"POSTGRESQL_DSN": self._stored.db_uri}, event)
 
     def _update_workload(self, envdata: dict, event):
         """' Update workload with all available configuration

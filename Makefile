@@ -69,15 +69,10 @@ else
 endif
 
 image:
-    DOCKER_BUILDKIT=1 \
-    docker build \
-        --build-arg AUTH_TYPE=ssh \
-        --cache-from candid:latest \
-        --progress=plain \
-        --secret id=ghuser,env=GH_USER \
-        --secret id=ghpat,env=GH_PAT \
-        --ssh default \
-        . -f ./docker/Dockerfile -t candid
+	DOCKER_BUILDKIT=1 \
+	docker build \
+		--cache-from candid:latest \
+		. -f ./Dockerfile -t candid
 
 help:
 	@echo -e 'Identity service - list of make targets:\n'

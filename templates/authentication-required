@@ -61,7 +61,7 @@
         {{ $length := len .IDPs }}
         {{ range .IDPs }}
                 <a href="{{.URL}}" class="p-button--neutral sso-button {{ if eq $length 1 }}sso-button--wide{{ end }}" data-idp-name="{{.Name}}" data-idp-domain="{{.Domain}}">
-                  <div class="u-truncate" title="{{.Description}}">
+                  <div class="u-truncate--multiline" title="{{.Description}}">
                     {{ if .Icon }}<p class="sso-icon"><img class="sso-icon__image" src="{{.Icon}}" alt="" width="32" height="32"></p>{{ end }}
                         {{.Description}}
                   </div>
