@@ -24,7 +24,7 @@ RUN --mount=type=ssh source /root/.gvm/scripts/gvm && go build -o candid -race -
 
 # Define a smaller single process image for deployment
 FROM ubuntu:20.04 AS deploy-env
-RUN apt-get -qq update && apt-get -qq install -y ca-certificates
+RUN apt-get -qq update && apt-get -qq install -y ca-certificates curl
 WORKDIR /root/
 RUN mkdir www
 RUN mkdir logs
