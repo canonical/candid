@@ -13,7 +13,7 @@ require (
 	github.com/juju/clock v0.0.0-20190205081909-9c5c9712527c
 	github.com/juju/cmd/v3 v3.0.0-20210809234809-65029dab4cd0
 	github.com/juju/gnuflag v0.0.0-20171113085948-2ce1bb71843d
-	github.com/juju/loggo v0.0.0-20210728185423-eebad3a902c4
+	github.com/juju/loggo v1.0.0
 	github.com/juju/mgo/v2 v2.0.0-20220111072304-f200228f1090
 	github.com/juju/mgotest v1.0.3
 	github.com/juju/names/v4 v4.0.0-20200929085019-be23e191fee0
