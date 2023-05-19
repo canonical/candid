@@ -29,7 +29,7 @@ require (
 	github.com/lib/pq v1.10.7
 	github.com/mhilton/openid v0.0.0-20150511103207-7922a4e937d8
 	github.com/prometheus/client_golang v1.14.0
-	github.com/yohcop/openid-go v1.0.0
+	github.com/yohcop/openid-go v1.0.1
 	golang.org/x/crypto v0.1.0
 	golang.org/x/net v0.7.0
 	golang.org/x/oauth2 v0.0.0-20220622183110-fd043fe589d2
