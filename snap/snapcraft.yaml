@@ -17,6 +17,7 @@ parts:
     build-packages:
      - bzr
      - gcc
+     - git
     build-snaps:
      - go
     prime:
@@ -40,20 +41,24 @@ parts:
   www-static:
     plugin: dump
     source: ./static
-    organize:
-      static: www/static/
+    source-type: local
+    override-build: |
+      mkdir -p $SNAPCRAFT_PART_INSTALL/www/static
+      mv ./* $SNAPCRAFT_PART_INSTALL/www/static
 
   www-templates:
     plugin: dump
     source: ./templates
-    organize:
-      templates: www/templates/
-
+    source-type: local
+    override-build: |
+      mkdir -p $SNAPCRAFT_PART_INSTALL/www/templates
+      mv ./* $SNAPCRAFT_PART_INSTALL/www/templates
 
   # Dump scripts required to configure candidsrv
   scripts:
     plugin: dump
     source: ./snap/local/scripts
+    source-type: local
     organize: 
       # Place wrapper in bin such that it can be called easily
       wrapper.sh: bin/
