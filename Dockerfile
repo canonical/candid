@@ -1,26 +1,18 @@
 # syntax=docker/dockerfile:1.3.1
-FROM ubuntu:20.04 AS build
-SHELL ["/bin/bash", "-c"]
-ENV GVM_VERSION=master
-COPY ./go.mod ./go.mod
-RUN apt-get update && \
-    apt-get -y install gcc bison binutils make git gcc curl build-essential mercurial ca-certificates
-RUN bash < <(curl -SL -v https://raw.githubusercontent.com/moovweb/gvm/${GVM_VERSION}/binscripts/gvm-installer) && \
-    source /root/.gvm/scripts/gvm && \
-    gvm install go$(cat go.mod | sed -n "/^go/p" | cut -d ' ' -f 2)  -B && \
-    gvm use go$(cat go.mod | sed -n "/^go/p" | cut -d ' ' -f 2)  --default
-
-FROM build as build-env
+FROM ubuntu:20.04 as build-env
 ARG GIT_COMMIT
 ARG VERSION
+ARG GO_VERSION
 WORKDIR /usr/src/candid
 SHELL ["/bin/bash", "-c"]
+RUN apt update && apt install wget git -y
+RUN wget -L "https://golang.org/dl/go${GO_VERSION}.linux-amd64.tar.gz"
+RUN tar -C /usr/local -xzf "go${GO_VERSION}.linux-amd64.tar.gz"
+ENV PATH="${PATH}:/usr/local/go/bin"
 COPY . .
-RUN --mount=type=ssh source /root/.gvm/scripts/gvm && ./scripts/set-version.sh
-RUN --mount=type=ssh source /root/.gvm/scripts/gvm && go mod vendor
-RUN --mount=type=ssh source /root/.gvm/scripts/gvm && GOBIN=/usr/src/candid go install gopkg.in/macaroon-bakery.v2/cmd/bakery-keygen@latest
-RUN --mount=type=ssh source /root/.gvm/scripts/gvm && go build -o candidsrv -race -v -a -mod vendor ./cmd/candidsrv
-RUN --mount=type=ssh source /root/.gvm/scripts/gvm && go build -o candid -race -v -a -mod vendor ./cmd/candid
+RUN go build -o candidsrv -v ./cmd/candidsrv
+RUN go build -o candid -v ./cmd/candid
+RUN GOBIN=/usr/src/candid go install gopkg.in/macaroon-bakery.v2/cmd/bakery-keygen@latest
 
 # Define a smaller single process image for deployment
 FROM ubuntu:20.04 AS deploy-env

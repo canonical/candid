@@ -4,6 +4,7 @@
 
 GIT_COMMIT := $(shell git rev-parse --verify HEAD)
 GIT_VERSION := $(shell git describe --dirty)
+GO_VERSION := $(shell go list -f {{.GoVersion}} -m)
 ARCH := $(shell dpkg --print-architecture)
 
 DEPENDENCIES := build-essential bzr
@@ -71,7 +72,9 @@ endif
 image:
 	DOCKER_BUILDKIT=1 \
 	docker build \
-		--cache-from candid:latest \
+		--build-arg="GIT_COMMIT=$(GIT_COMMIT)" \
+		--build-arg="VERSION=$(GIT_VERSION)" \
+		--build-arg="GO_VERSION=$(GO_VERSION)" \
 		. -f ./Dockerfile -t candid
 
 help:
