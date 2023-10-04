@@ -5,8 +5,9 @@
 
 import unittest
 
-from charm import CandidCharm
 from ops.testing import Harness
+
+from charm import CandidCharm
 
 
 class TestCharm(unittest.TestCase):

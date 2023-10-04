@@ -15,9 +15,7 @@ async def get_unit_by_name(
     unit_name: str, unit_index: str, unit_list: Dict[str, Unit]
 ) -> Unit:
     return unit_list.get(
-        "{unitname}/{unitindex}".format(
-            unitname=unit_name, unitindex=unit_index
-        )
+        "{unitname}/{unitindex}".format(unitname=unit_name, unitindex=unit_index)
     )
 
 
@@ -35,9 +33,7 @@ async def build_snap_and_charm(
     """
     LOGGER.info("Building snap...")
     LOGGER.info("Root directory is {}".format(root_directory))
-    snap_exists, path = await check_if_snap_exists(
-        root_directory, root_directory
-    )
+    snap_exists, path = await check_if_snap_exists(root_directory, root_directory)
     if snap_exists:
         LOGGER.info("Snap already exists, skipping build.")
         snap_path = path
@@ -97,9 +93,7 @@ async def build_snap_lxd(working_directory: Path) -> Path:
     return snap_path
 
 
-async def check_if_snap_exists(
-    git_dir: Path, snap_build_dir: Path
-) -> Tuple[bool, str]:
+async def check_if_snap_exists(git_dir: Path, snap_build_dir: Path) -> Tuple[bool, str]:
     """
     Finds if the snap exists already by version.
     If true, snap exists, else no no
@@ -123,9 +117,7 @@ async def check_if_snap_exists(
         if fname.endswith(".snap"):
             if git_version.strip() in fname.strip():
                 path = os.path.abspath(
-                    "{path}/{file}".format(
-                        path=str(snap_build_dir), file=fname.strip()
-                    )
+                    "{path}/{file}".format(path=str(snap_build_dir), file=fname.strip())
                 )
                 return True, path
             break
@@ -139,9 +131,7 @@ class FailedToBuildSnapError(Exception):
     """
 
     def __init__(self, respcode):
-        self.message = (
-            "Snap failed to build with response code: {respcode} ".format(
-                respcode=respcode
-            )
+        self.message = "Snap failed to build with response code: {respcode} ".format(
+            respcode=respcode
         )
         super().__init__(self.message)
