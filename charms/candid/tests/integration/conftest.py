@@ -1,12 +1,10 @@
 import logging
-from asyncio.log import logger
 from pathlib import Path
 from typing import Tuple
 
 import pytest
-from pytest_operator.plugin import OpsTest
-
 from integration.utils import build_snap_and_charm
+from pytest_operator.plugin import OpsTest
 
 LOGGER = logging.getLogger(__name__)
 
@@ -24,6 +22,7 @@ LOGGER = logging.getLogger(__name__)
 # into session fixtures. Then pull bundle path into each setupTest lifecycle func and
 # deploy per each test suite.
 
+
 # TODO: Figure out why snap sometimes builds, sometimes doesn't ...
 @pytest.fixture(name="snap_and_charm_paths", scope="module")
 async def build_snap_and_charm_fixture(ops_test: OpsTest):
@@ -39,9 +38,7 @@ async def build_snap_and_charm_fixture(ops_test: OpsTest):
 @pytest.fixture(
     name="bundle_path", scope="module"
 )  # snap_and_charm_paths: Tuple[str, str])
-def render_bundle_fixture(
-    ops_test: OpsTest, snap_and_charm_paths: Tuple[str, str]
-):
+def render_bundle_fixture(ops_test: OpsTest, snap_and_charm_paths: Tuple[str, str]):
     LOGGER.info("Rendering bundle with snap and charm paths.")
     charm_directory = Path.cwd()
     tests_directory = charm_directory.joinpath("tests")
