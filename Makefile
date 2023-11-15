@@ -75,6 +75,7 @@ image:
 		--build-arg="GIT_COMMIT=$(GIT_COMMIT)" \
 		--build-arg="VERSION=$(GIT_VERSION)" \
 		--build-arg="GO_VERSION=$(GO_VERSION)" \
+		--build-arg="ARCH=$(ARCH)" \
 		. -f ./Dockerfile -t candid
 
 help:
