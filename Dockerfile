@@ -3,11 +3,12 @@ FROM ubuntu:20.04 as build-env
 ARG GIT_COMMIT
 ARG VERSION
 ARG GO_VERSION
+ARG ARCH
 WORKDIR /usr/src/candid
 SHELL ["/bin/bash", "-c"]
 RUN apt update && apt install wget git -y
-RUN wget -L "https://golang.org/dl/go${GO_VERSION}.linux-amd64.tar.gz"
-RUN tar -C /usr/local -xzf "go${GO_VERSION}.linux-amd64.tar.gz"
+RUN wget -L "https://golang.org/dl/go${GO_VERSION}.linux-${ARCH}.tar.gz"
+RUN tar -C /usr/local -xzf "go${GO_VERSION}.linux-${ARCH}.tar.gz"
 ENV PATH="${PATH}:/usr/local/go/bin"
 COPY . .
 RUN go build -o candidsrv -v ./cmd/candidsrv
