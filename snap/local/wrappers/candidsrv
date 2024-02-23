@@ -1,0 +1,42 @@
+#!/bin/bash -eu
+
+CONFIG_FILE="${SNAP_DATA}/config.yaml"
+ADMIN_AGENT_FILE="${SNAP_DATA}/admin.keys"
+
+if [ ! -e "$CONFIG_FILE" ]; then
+    cp "${SNAP}/config/config.yaml" "$CONFIG_FILE"
+
+    # replace hostname
+    hostname="$(hostname -f)"
+    if [ -n "$hostname" ]; then
+        sed -i "s#%LOCATION%#${hostname}#g" "$CONFIG_FILE"
+    fi
+
+    # setup keys
+    key="$(bakery-keygen)"
+    private_key=$(echo "$key" | jq -r .private)
+    public_key=$(echo "$key" | jq -r .public)
+    sed -i "s#%PRIVATE-KEY%#${private_key}#g" "$CONFIG_FILE"
+    sed -i "s#%PUBLIC-KEY%#${public_key}#g" "$CONFIG_FILE"
+
+    # create admin credentials
+    admin_key="$(bakery-keygen)"
+    admin_private_key=$(echo "$admin_key" | jq -r .private)
+    admin_public_key=$(echo "$admin_key" | jq -r .public)
+    cat >"$ADMIN_AGENT_FILE" <<EOF
+{
+  "key": {
+    "public": "${admin_public_key}",
+    "private": "${admin_private_key}"},
+  "agents": [
+    {
+      "url": "http://${hostname}:8081",
+      "username": "admin@candid"
+    }
+  ]
+}
+EOF
+    sed -i "s#%ADMIN-PUBLIC-KEY%#${admin_public_key}#g" "$CONFIG_FILE"
+fi
+
+exec candidsrv "$CONFIG_FILE"
