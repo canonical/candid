@@ -6,20 +6,33 @@ confinement: strict
 base: core20
 adopt-info: candid # Version our app via set-version within an override
 
+apps:
+  candidsrv:
+    command: wrappers/candidsrv
+    daemon: simple
+    plugs:
+     - network
+     - network-bind
+  candid:
+    command: wrappers/candid
+    plugs:
+     - home
+     - network
+
 parts:
   # Candid
   candid:
     plugin: nil
-    source: ./
-    source-type: local
-    organize:
-      candidsrv: bin/
+    source: .
+    source-type: git
     build-packages:
      - bzr
      - gcc
      - git
     build-snaps:
      - go
+    stage-packages:
+      - jq
     prime:
      - bin/bakery-keygen
      - bin/candid
@@ -54,47 +67,9 @@ parts:
       mkdir -p $SNAPCRAFT_PART_INSTALL/www/templates
       mv ./* $SNAPCRAFT_PART_INSTALL/www/templates
 
-  # Dump scripts required to configure candidsrv
-  scripts:
+  local:
     plugin: dump
-    source: ./snap/local/scripts
-    source-type: local
-    organize: 
-      # Place wrapper in bin such that it can be called easily
-      wrapper.sh: bin/
-      manage_config.sh: scripts/
-      handle_schema_upgrade.sh: bin/
-      handle_schema_version_check.sh: bin/
-    filesets: 
-      include:
-        - bin/wrapper.sh
-        - scripts/manage_config.sh
-        - bin/handle_schema_upgrade.sh
-        - bin/handle_schema_version_check.sh
-    stage:
-      - $include
-
-  # Dump hooks, allow us to run preliminary hooks if we require such behaviour
-  hooks:
-    plugin: dump
-    source: ./snap/local/hooks
-    stage-snaps:
-    - yq
-    stage-packages:
-    - jq
-    organize: 
-      configure: snap/hooks/
-
-apps:
-  candidsrv:
-    command: bin/wrapper.sh
-    daemon: simple
-    install-mode: disable
-    plugs:
-      - "network" # Enables net interface writing (clients)
-      - "network-bind" # Enables socket binding
-  candid:
-    command: bin/candid
-    plugs:
-     - home
-     - network
+    source: snap/local/
+    prime:
+     - config
+     - wrappers
