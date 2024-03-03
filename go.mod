@@ -10,8 +10,8 @@ require (
 	github.com/google/uuid v1.3.0
 	github.com/gorilla/handlers v1.5.1
 	github.com/juju/aclstore/v2 v2.1.0
-	github.com/juju/clock v0.0.0-20190205081909-9c5c9712527c
-	github.com/juju/cmd/v3 v3.0.0-20210809234809-65029dab4cd0
+	github.com/juju/clock v0.0.0-20220203021603-d9deb868a28a
+	github.com/juju/cmd/v3 v3.0.13
 	github.com/juju/gnuflag v1.0.0
 	github.com/juju/loggo v1.0.0
 	github.com/juju/mgo/v2 v2.0.0-20220111072304-f200228f1090
@@ -22,7 +22,7 @@ require (
 	github.com/juju/qthttptest v0.1.3
 	github.com/juju/schema v1.0.1-0.20190814234152-1f8aaeef0989
 	github.com/juju/simplekv v1.1.0
-	github.com/juju/testing v0.0.0-20210302031854-2c7ee8570c07
+	github.com/juju/testing v0.0.0-20220203020004-a0ff61f03494
 	github.com/juju/usso v1.0.1
 	github.com/juju/utils/v2 v2.0.0-20210305225158-eedbe7b6b3e2
 	github.com/julienschmidt/httprouter v1.3.0
@@ -83,12 +83,13 @@ require (
 	github.com/jonboulle/clockwork v0.2.2 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/juju/ansiterm v0.0.0-20210706145210-9283cdf370b5 // indirect
-	github.com/juju/collections v0.0.0-20200605021417-0d0ec82b7271 // indirect
-	github.com/juju/errors v0.0.0-20200330140219-3fe23663418f // indirect
+	github.com/juju/collections v0.0.0-20220203020748-febd7cad8a7a // indirect
+	github.com/juju/errors v0.0.0-20220203013757-bd733f3c86b9 // indirect
 	github.com/juju/go4 v0.0.0-20160222163258-40d72ab9641a // indirect
 	github.com/juju/httpprof v0.0.0-20141217160036-14bf14c30767 // indirect
 	github.com/juju/retry v0.0.0-20180821225755-9058e192b216 // indirect
-	github.com/juju/version v0.0.0-20191219164919-81c1be00b9a6 // indirect
+	github.com/juju/utils/v3 v3.0.0-20220203023959-c3fbc78a33b0 // indirect
+	github.com/juju/version/v2 v2.0.0-20211007103408-2e8da085dc23 // indirect
 	github.com/juju/webbrowser v0.0.0-20160309143629-54b8c57083b4 // indirect
 	github.com/kr/pretty v0.3.1 // indirect
 	github.com/kr/text v0.2.0 // indirect
