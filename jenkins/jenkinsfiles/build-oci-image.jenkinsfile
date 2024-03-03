@@ -71,6 +71,7 @@ pipeline {
                 script {
                     try {
                         oci.saveImage()
+                        archiveArtifacts artifacts: 'candid-latest-image.tar.gz',
                     } catch (err) {
                         // TODO: Publish to mattermost or something
                         echo "error occured: ${err}"
@@ -97,7 +98,6 @@ pipeline {
     }
     post {
         always {
-            archiveArtifacts artifacts: 'candid-latest-image.tar.gz',
             sh "echo 'Image built'"
         }
     }
