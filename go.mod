@@ -26,7 +26,7 @@ require (
 	github.com/juju/usso v1.0.1
 	github.com/juju/utils/v2 v2.0.0-20210305225158-eedbe7b6b3e2
 	github.com/julienschmidt/httprouter v1.3.0
-	github.com/lib/pq v1.10.7
+	github.com/lib/pq v1.10.9
 	github.com/mhilton/openid v0.0.0-20150511103207-7922a4e937d8
 	github.com/prometheus/client_golang v1.14.0
 	github.com/yohcop/openid-go v1.0.0
