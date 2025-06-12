@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	qt "github.com/frankban/quicktest"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	jt "github.com/juju/testing"
 	"github.com/juju/usso"
 	errgo "gopkg.in/errgo.v1"
@@ -119,7 +120,7 @@ func TestTokenNotInStore(t *testing.T) {
 		FuncName: "Put",
 		Args:     []interface{}{testToken},
 	}})
-	c.Assert(fg.Calls(), qt.DeepEquals, []jt.StubCall{{
+	c.Assert(fg.Calls(), qt.CmpEquals(cmpopts.IgnoreUnexported()), []jt.StubCall{{
 		FuncName: "GetToken",
 		Args:     []interface{}{ctx},
 	}})
@@ -146,7 +147,7 @@ func TestCorrectUserPasswordSentToUSSOServer(t *testing.T) {
 	c.Assert(len(calls) > 0, qt.Equals, true)
 	c.Assert(calls[0], qt.DeepEquals, jt.StubCall{
 		FuncName: "GetTokenWithOTP",
-		Args:     []interface{}{"foobar", "pass", "1234", "testToken"},
+		Args:     []any{"foobar", "pass", "1234", "testToken"},
 	})
 }
 
