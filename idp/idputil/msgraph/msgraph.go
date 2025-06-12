@@ -9,7 +9,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strings"
 
@@ -79,7 +79,7 @@ func (msgr *MsGraphGroupsRetriever) RetrieveGroups(ctx context.Context, token *o
 	}
 
 	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, errgo.Notef(err, "Failed to read response body.")
 	}

@@ -8,7 +8,6 @@ package ussologin
 import (
 	"context"
 	"encoding/json"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 
@@ -159,7 +158,7 @@ func (f *FileTokenStore) Put(tok *usso.SSOData) error {
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		return errgo.Notef(err, "cannot create directory %q", dir)
 	}
-	if err := ioutil.WriteFile(f.path, data, 0600); err != nil {
+	if err := os.WriteFile(f.path, data, 0600); err != nil {
 		return errgo.Notef(err, "cannot write file")
 	}
 	return nil
@@ -168,7 +167,7 @@ func (f *FileTokenStore) Put(tok *usso.SSOData) error {
 // Get implements TokenStore.Get by
 // reading the token from the FileTokenStore's file.
 func (f *FileTokenStore) Get() (*usso.SSOData, error) {
-	data, err := ioutil.ReadFile(f.path)
+	data, err := os.ReadFile(f.path)
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot read token")
 	}

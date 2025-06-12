@@ -8,7 +8,7 @@ package candidtest
 import (
 	"bytes"
 	"context"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
@@ -165,7 +165,7 @@ func OpenWebBrowser(c *qt.C, rh ResponseHandler) func(u *url.URL) error {
 		}
 		defer resp.Body.Close()
 		if resp.StatusCode >= 400 {
-			buf, _ := ioutil.ReadAll(resp.Body)
+			buf, _ := io.ReadAll(resp.Body)
 			c.Logf("interaction returned error status (%s): %s", resp.Status, buf)
 		}
 		return nil
@@ -200,7 +200,7 @@ func SelectInteractiveLogin(rh ResponseHandler) ResponseHandler {
 		if resp.StatusCode != http.StatusOK {
 			return nil, errgo.Newf("unexpected status %q", resp.Status)
 		}
-		body, err := ioutil.ReadAll(resp.Body)
+		body, err := io.ReadAll(resp.Body)
 		if err != nil {
 			return nil, errgo.Mask(err)
 		}
@@ -236,7 +236,7 @@ func SelectInteractiveLogin(rh ResponseHandler) ResponseHandler {
 
 // LoginFormAction gets the action parameter (POST URL) of a login form.
 func LoginFormAction(resp *http.Response) (string, error) {
-	buf, err := ioutil.ReadAll(resp.Body)
+	buf, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return "", errgo.Mask(err, errgo.Any)
 	}

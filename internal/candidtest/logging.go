@@ -2,6 +2,7 @@ package candidtest
 
 import (
 	"os"
+	"testing"
 
 	qt "github.com/frankban/quicktest"
 	"github.com/juju/loggo"
@@ -26,7 +27,7 @@ func LogTo(c *qt.C) {
 	loggo.RegisterWriter("testlogger", &loggoWriter{c})
 	err := loggo.ConfigureLoggers(cfg)
 	c.Assert(err, qt.IsNil)
-	c.Defer(loggo.ResetLogging)
+	testing.TB.Cleanup(c, loggo.ResetLogging)
 }
 
 type loggoWriter struct {

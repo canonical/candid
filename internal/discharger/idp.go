@@ -230,7 +230,6 @@ func (c *visitCompleter) RedirectSuccess(ctx context.Context, w http.ResponseWri
 	if err := c.redirect(w, req, returnTo, v); err != nil {
 		identity.WriteError(ctx, w, err)
 	}
-	return
 }
 
 // RedirectMFA implements idp.VisitCompleter.RedirectMFA.
@@ -259,7 +258,6 @@ func (c *visitCompleter) RedirectMFA(ctx context.Context, w http.ResponseWriter,
 	if err := c.redirect(w, req, c.params.Location+"/login/mfa/login", v); err != nil {
 		identity.WriteError(ctx, w, err)
 	}
-	return
 }
 
 // RedirectFailure implements idp.VisitCompleter.RedirectFailure.

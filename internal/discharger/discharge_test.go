@@ -9,7 +9,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
@@ -326,7 +325,7 @@ func (t *responseBodyRecordingTransport) RoundTrip(req *http.Request) (*http.Res
 	}
 	var buf bytes.Buffer
 	io.Copy(&buf, resp.Body)
-	resp.Body = ioutil.NopCloser(&buf)
+	resp.Body = io.NopCloser(&buf)
 	if resp.StatusCode == 200 {
 		t.responses = append(t.responses, responseBody{
 			url:  req.URL,

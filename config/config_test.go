@@ -4,7 +4,7 @@
 package config_test
 
 import (
-	"io/ioutil"
+	"os"
 	"path"
 	"testing"
 	"time"
@@ -103,7 +103,7 @@ enable-email-login: true
 func readConfig(c *qt.C, content string) (*config.Config, error) {
 	// Write the configuration content to file.
 	path := path.Join(c.Mkdir(), "config.yaml")
-	err := ioutil.WriteFile(path, []byte(content), 0666)
+	err := os.WriteFile(path, []byte(content), 0666)
 	c.Assert(err, qt.IsNil)
 
 	// Read the configuration.

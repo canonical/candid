@@ -7,7 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -339,7 +339,7 @@ func (s *fullServerSuite) TestACLMACARAQResponse(c *qt.C) {
 	resp, err := http.Get(s.srv.URL + "/acl/read-user")
 	c.Assert(err, qt.IsNil)
 	defer resp.Body.Close()
-	buf, err := ioutil.ReadAll(resp.Body)
+	buf, err := io.ReadAll(resp.Body)
 	c.Assert(err, qt.IsNil)
 	var herr httpbakery.Error
 	err = json.Unmarshal(buf, &herr)

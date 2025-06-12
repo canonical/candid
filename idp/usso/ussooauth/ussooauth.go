@@ -9,7 +9,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"mime"
 	"net/http"
 	"net/url"
@@ -170,7 +170,7 @@ func verifyOAuthSignature(requestURL string, req *http.Request) (string, error) 
 		IsValid bool   `json:"is_valid"`
 		Error   string `json:"error"`
 	}
-	data, err := ioutil.ReadAll(resp.Body)
+	data, err := io.ReadAll(resp.Body)
 	if err := json.Unmarshal(data, &validated); err != nil {
 		return "", errgo.Mask(err)
 	}

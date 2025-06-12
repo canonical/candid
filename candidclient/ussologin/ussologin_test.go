@@ -7,7 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -40,7 +40,7 @@ func TestPutGetToken(t *testing.T) {
 	tok, err := store.Get()
 	c.Assert(err, qt.IsNil)
 	c.Assert(tok, qt.DeepEquals, token)
-	data, err := ioutil.ReadFile(path)
+	data, err := os.ReadFile(path)
 	c.Assert(err, qt.IsNil)
 	var storedToken *usso.SSOData
 	err = json.Unmarshal(data, &storedToken)
@@ -53,7 +53,7 @@ func TestReadInvalidToken(t *testing.T) {
 	defer c.Done()
 
 	path := fmt.Sprintf("%s/tokenFile", c.Mkdir())
-	err := ioutil.WriteFile(path, []byte("foobar"), 0700)
+	err := os.WriteFile(path, []byte("foobar"), 0700)
 	c.Assert(err, qt.IsNil)
 	store := ussologin.NewFileTokenStore(path)
 

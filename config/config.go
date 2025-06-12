@@ -6,7 +6,7 @@ package config
 
 import (
 	"crypto/tls"
-	"io/ioutil"
+	"io"
 	"os"
 	"strings"
 	"time"
@@ -193,7 +193,7 @@ func Read(path string) (*Config, error) {
 		return nil, errgo.Notef(err, "cannot open config file")
 	}
 	defer f.Close()
-	data, err := ioutil.ReadAll(f)
+	data, err := io.ReadAll(f)
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot read %q", path)
 	}

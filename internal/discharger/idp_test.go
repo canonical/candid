@@ -7,7 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"html/template"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -163,7 +163,7 @@ func (s *idpSuite) TestLoginRedirectSuccess(c *qt.C) {
 		Username: "test-user",
 	})
 	resp := rr.Result()
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	c.Assert(err, qt.IsNil)
 	c.Assert(resp.StatusCode, qt.Equals, http.StatusSeeOther, qt.Commentf("%s", body))
 	loc, err := resp.Location()

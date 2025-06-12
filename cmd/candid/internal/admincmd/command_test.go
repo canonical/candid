@@ -7,8 +7,8 @@ import (
 	"bytes"
 	"context"
 	"encoding/pem"
-	"io/ioutil"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -165,7 +165,7 @@ func TestLoadCACerts(t *testing.T) {
 	unreadableFile := filepath.Join(dir, "unreadable.pem")
 	nonExistentFile := filepath.Join(dir, "non-existent.pem")
 
-	err = ioutil.WriteFile(
+	err = os.WriteFile(
 		certFile,
 		pem.EncodeToMemory(
 			&pem.Block{
@@ -176,9 +176,9 @@ func TestLoadCACerts(t *testing.T) {
 		0600,
 	)
 	c.Assert(err, qt.IsNil)
-	err = ioutil.WriteFile(emptyFile, nil, 0600)
+	err = os.WriteFile(emptyFile, nil, 0600)
 	c.Assert(err, qt.IsNil)
-	err = ioutil.WriteFile(unreadableFile, nil, 0)
+	err = os.WriteFile(unreadableFile, nil, 0)
 	c.Assert(err, qt.IsNil)
 
 	c.Setenv("CANDID_CA_CERTS", emptyFile+":"+unreadableFile+":"+nonExistentFile+"::"+certFile)
