@@ -636,7 +636,7 @@ func (s *testOIDCServer) serveKeys(w http.ResponseWriter, req *http.Request) {
 		"e":   base64.RawURLEncoding.EncodeToString(big.NewInt(int64(s.key().PublicKey.E)).Bytes()),
 	}
 	keys := map[string][]map[string]string{
-		"keys": []map[string]string{jwk},
+		"keys": {jwk},
 	}
 	buf, err := json.Marshal(keys)
 	if err != nil {

@@ -453,7 +453,7 @@ func (s *ussoSuite) TestUpdateIdentity(c *qt.C) {
 		Name:       "Test User",
 		Email:      "test@example.com",
 		ProviderInfo: map[string][]string{
-			"groups": []string{"test1", "test2"},
+			"groups": {"test1", "test2"},
 		},
 	})
 
@@ -473,7 +473,7 @@ func (s *ussoSuite) TestUpdateIdentity(c *qt.C) {
 		Name:       "Test User Changed",
 		Email:      "test-changed@example.com",
 		ProviderInfo: map[string][]string{
-			"groups": []string{"test1", "test3"},
+			"groups": {"test1", "test3"},
 		},
 	})
 }
@@ -498,7 +498,7 @@ func (s *ussoSuite) TestUpdateIdentityKeepsUsernameIfNewNameInvalid(c *qt.C) {
 		Name:       "Test User",
 		Email:      "test@example.com",
 		ProviderInfo: map[string][]string{
-			"groups": []string{"test1", "test2"},
+			"groups": {"test1", "test2"},
 		},
 	})
 
@@ -518,7 +518,7 @@ func (s *ussoSuite) TestUpdateIdentityKeepsUsernameIfNewNameInvalid(c *qt.C) {
 		Name:       "Test User Changed",
 		Email:      "test-changed@example.com",
 		ProviderInfo: map[string][]string{
-			"groups": []string{"test1", "test3"},
+			"groups": {"test1", "test3"},
 		},
 	})
 }
@@ -549,7 +549,7 @@ func (s *ussoSuite) TestUpdateIdentityKeepsUsernameIfFixed(c *qt.C) {
 		Name:       "Test User",
 		Email:      "test@example.com",
 		ProviderInfo: map[string][]string{
-			"groups": []string{"test1", "test2"},
+			"groups": {"test1", "test2"},
 		},
 	})
 
@@ -569,7 +569,7 @@ func (s *ussoSuite) TestUpdateIdentityKeepsUsernameIfFixed(c *qt.C) {
 		Name:       "Test User Changed",
 		Email:      "test-changed@example.com",
 		ProviderInfo: map[string][]string{
-			"groups": []string{"test1", "test3"},
+			"groups": {"test1", "test3"},
 		},
 	})
 }

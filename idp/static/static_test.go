@@ -41,7 +41,7 @@ func getSampleParams() static.Params {
 	return static.Params{
 		Name: "test",
 		Users: map[string]static.UserInfo{
-			"user1": static.UserInfo{
+			"user1": {
 				Password: "pass1",
 				Name:     "User One",
 				Email:    "user1@example.com",
