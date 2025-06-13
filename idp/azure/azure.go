@@ -5,7 +5,7 @@
 package azure
 
 import (
-	oidc "github.com/coreos/go-oidc"
+	oidc "github.com/coreos/go-oidc/v3/oidc"
 	"gopkg.in/errgo.v1"
 
 	"github.com/canonical/candid/idp"
