@@ -148,7 +148,7 @@ func (s *serverSuite) TestServerHasAccessControlAllowHeaders(c *qt.C) {
 		Handler: h,
 		URL:     "/a",
 	})
-	headers := rec.Result().Request.Response.Header
+	headers := rec.Result().Header
 	c.Assert(rec.Code, qt.Equals, http.StatusOK)
 	c.Assert(len(headers["Access-Control-Allow-Origin"]), qt.Equals, 1)
 	c.Assert(headers["Access-Control-Allow-Origin"][0], qt.Equals, "*")

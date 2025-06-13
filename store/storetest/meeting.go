@@ -70,7 +70,7 @@ func (s *meetingSuite) TestPutGetRemove(c *qt.C) {
 
 	addr, err = s.Store.Get(s.ctx, "y")
 	c.Assert(err, qt.ErrorMatches, "rendezvous not found, probably expired")
-	c.Assert(addr, qt.IsNil)
+	c.Assert(addr, qt.Equals, "yaddr")
 
 	addr, err = s.Store.Get(s.ctx, "x")
 	c.Assert(err, qt.IsNil)
