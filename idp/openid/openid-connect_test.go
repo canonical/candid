@@ -20,10 +20,10 @@ import (
 	"time"
 
 	qt "github.com/frankban/quicktest"
+	"github.com/go-jose/go-jose/v3"
+	"github.com/go-jose/go-jose/v3/jwt"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/google/uuid"
-	"gopkg.in/square/go-jose.v2"
-	"gopkg.in/square/go-jose.v2/jwt"
 	"gopkg.in/yaml.v2"
 
 	"github.com/canonical/candid/config"

@@ -155,6 +155,7 @@ func (c *Config) TLSConfig() *tls.Config {
 		Certificates: []tls.Certificate{
 			cert,
 		},
+		MinVersion: tls.VersionTLS12,
 	}
 }
 

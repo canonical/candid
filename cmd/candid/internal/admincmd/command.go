@@ -186,7 +186,8 @@ func (c *candidCommand) loadCACerts(client *http.Client) error {
 	}
 	client.Transport = &http.Transport{
 		TLSClientConfig: &tls.Config{
-			RootCAs: certPool,
+			RootCAs:    certPool,
+			MinVersion: tls.VersionTLS12,
 		},
 	}
 	return nil
