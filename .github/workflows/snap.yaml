@@ -12,7 +12,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - run: git fetch --prune --unshallow
-      - uses: ./.github/workflows/setupgo118amd64
+      - uses: ./.github/workflows/setupgoamd64
         with:
           user: ${{ secrets.GH_USER }}
           pat: ${{ secrets.GH_AUTH }}
