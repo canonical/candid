@@ -4,7 +4,6 @@
 package ussologin_test
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -12,7 +11,6 @@ import (
 	"testing"
 
 	qt "github.com/frankban/quicktest"
-	"github.com/google/go-cmp/cmp/cmpopts"
 	jt "github.com/juju/testing"
 	"github.com/juju/usso"
 	errgo "gopkg.in/errgo.v1"
@@ -80,8 +78,7 @@ func TestTokenInStore(t *testing.T) {
 	g := &ussologin.StoreTokenGetter{
 		Store: st,
 	}
-	ctx := context.Background()
-	tok, err := g.GetToken(ctx)
+	tok, err := g.GetToken()
 	c.Assert(err, qt.IsNil)
 	c.Assert(tok, qt.DeepEquals, testToken)
 	c.Assert(st.Calls(), qt.DeepEquals, []jt.StubCall{{
@@ -110,8 +107,7 @@ func TestTokenNotInStore(t *testing.T) {
 		Store:       st,
 		TokenGetter: fg,
 	}
-	ctx := context.Background()
-	tok, err := g.GetToken(ctx)
+	tok, err := g.GetToken()
 	c.Assert(err, qt.IsNil)
 	c.Assert(tok, qt.DeepEquals, testToken)
 	c.Assert(st.Calls(), qt.DeepEquals, []jt.StubCall{{
@@ -120,9 +116,9 @@ func TestTokenNotInStore(t *testing.T) {
 		FuncName: "Put",
 		Args:     []interface{}{testToken},
 	}})
-	c.Assert(fg.Calls(), qt.CmpEquals(cmpopts.IgnoreUnexported()), []jt.StubCall{{
+	c.Assert(fg.Calls(), qt.DeepEquals, []jt.StubCall{{
 		FuncName: "GetToken",
-		Args:     []interface{}{ctx},
+		Args:     nil,
 	}})
 }
 
@@ -141,7 +137,7 @@ func TestCorrectUserPasswordSentToUSSOServer(t *testing.T) {
 			}},
 		Name: "testToken",
 	}
-	_, err := tg.GetToken(context.Background())
+	_, err := tg.GetToken()
 	c.Assert(err, qt.IsNil)
 	calls := ussoStub.Calls()
 	c.Assert(len(calls) > 0, qt.Equals, true)
@@ -167,7 +163,7 @@ func TestLoginFailsToGetToken(t *testing.T) {
 			}},
 		Name: "testToken",
 	}
-	_, err := tg.GetToken(context.Background())
+	_, err := tg.GetToken()
 	c.Assert(err, qt.ErrorMatches, "cannot get token: something failed")
 }
 
@@ -180,7 +176,7 @@ func TestFailedToReadLoginParameters(t *testing.T) {
 	tg := ussologin.FormTokenGetter{
 		Filler: &errFiller{},
 	}
-	_, err := tg.GetToken(context.Background())
+	_, err := tg.GetToken()
 	c.Assert(err, qt.ErrorMatches, "cannot read login parameters: something failed")
 	c.Assert(ussoStub.Calls(), qt.HasLen, 0)
 }
@@ -213,8 +209,8 @@ type testTokenGetter struct {
 	tok *usso.SSOData
 }
 
-func (g *testTokenGetter) GetToken(ctx context.Context) (*usso.SSOData, error) {
-	g.MethodCall(g, "GetToken", ctx)
+func (g *testTokenGetter) GetToken() (*usso.SSOData, error) {
+	g.MethodCall(g, "GetToken")
 	return g.tok, g.NextErr()
 }
 

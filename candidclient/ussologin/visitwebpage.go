@@ -64,7 +64,7 @@ func (i *interactor) LegacyInteract(ctx context.Context, client *httpbakery.Clie
 }
 
 func (i *interactor) interact(ctx context.Context, client *httprequest.Client, url string, resp interface{}) error {
-	tok, err := i.tg.GetToken(ctx)
+	tok, err := i.tg.GetToken()
 	if err != nil {
 		return errgo.NoteMask(err, "cannot get token", errgo.Any)
 	}

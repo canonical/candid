@@ -6,7 +6,6 @@
 package ussologin
 
 import (
-	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -44,7 +43,7 @@ type FormTokenGetter struct {
 // The tokenName argument is used as the name of the generated token in
 // Ubuntu SSO. If Ubuntu SSO returned an error when trying to retrieve
 // the token the error will have a cause of type *usso.Error.
-func (g FormTokenGetter) GetToken(ctx context.Context) (*usso.SSOData, error) {
+func (g FormTokenGetter) GetToken() (*usso.SSOData, error) {
 	if g.Name == "" {
 		g.Name = "candidclient"
 	}
@@ -93,7 +92,7 @@ var loginForm = form.Form{
 
 // A TokenGetter is used to fetch a Ubuntu SSO OAuth token.
 type TokenGetter interface {
-	GetToken(context.Context) (*usso.SSOData, error)
+	GetToken() (*usso.SSOData, error)
 }
 
 // A StoreTokenGetter is a TokenGetter that will try to retrieve the
@@ -108,7 +107,7 @@ type StoreTokenGetter struct {
 // GetToken implements TokenGetter.GetToken. A token is first attmepted
 // to retireve from the store. If a stored token is not available then
 // GetToken will fallback to TokenGetter.GetToken (if configured).
-func (g StoreTokenGetter) GetToken(ctx context.Context) (*usso.SSOData, error) {
+func (g StoreTokenGetter) GetToken() (*usso.SSOData, error) {
 	tok, err := g.Store.Get()
 	if err == nil {
 		return tok, nil
@@ -116,7 +115,7 @@ func (g StoreTokenGetter) GetToken(ctx context.Context) (*usso.SSOData, error) {
 	if g.TokenGetter == nil {
 		return nil, errgo.Mask(err, errgo.Any)
 	}
-	tok, err = g.TokenGetter.GetToken(ctx)
+	tok, err = g.TokenGetter.GetToken()
 	if err == nil {
 		// Ignore any errors storing the token, the user will
 		// just have to get it again next time.
