@@ -102,13 +102,15 @@ func (d *updateDocument) addUpdate(op store.Operation, name string, v interface{
 	switch op {
 	case store.NoUpdate:
 	case store.Set:
-		d.Set = append(d.Set, bson.DocElem{name, v})
+		d.Set = append(d.Set, bson.DocElem{Name: name, Value: v})
 	case store.Clear:
-		d.Unset = append(d.Unset, bson.DocElem{name, ""})
+		d.Unset = append(d.Unset, bson.DocElem{Name: name, Value: ""})
 	case store.Push:
-		d.AddToSet = append(d.AddToSet, bson.DocElem{name, bson.D{{"$each", v}}})
+		d.AddToSet = append(d.AddToSet, bson.DocElem{Name: name, Value: bson.D{
+			{Name: "$each", Value: v}},
+		})
 	case store.Pull:
-		d.PullAll = append(d.PullAll, bson.DocElem{name, v})
+		d.PullAll = append(d.PullAll, bson.DocElem{Name: name, Value: v})
 	default:
 		panic("invalid update operation")
 	}

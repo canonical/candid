@@ -157,7 +157,8 @@ func (s *ldapSuite) setupIdp(c *qt.C, params ldap.Params, db ldapDB) idp.Identit
 	i, err := ldap.NewIdentityProvider(params)
 	c.Assert(err, qt.IsNil)
 	ldap.SetLDAP(i, newMockLDAPDialer(db).Dial)
-	i.Init(context.TODO(), s.idptest.InitParams(c, idpPrefix))
+	err = i.Init(context.TODO(), s.idptest.InitParams(c, idpPrefix))
+	c.Assert(err, qt.IsNil)
 	return i
 }
 
@@ -249,9 +250,10 @@ func (s *ldapSuite) TestHidden(c *qt.C) {
 func (s *ldapSuite) TestURL(c *qt.C) {
 	i, err := ldap.NewIdentityProvider(getSampleParams())
 	c.Assert(err, qt.IsNil)
-	i.Init(context.Background(), idp.InitParams{
+	err = i.Init(context.Background(), idp.InitParams{
 		URLPrefix: idpPrefix,
 	})
+	c.Assert(err, qt.IsNil)
 	c.Assert(i.URL("1"), qt.Equals, idpPrefix+"/login?state=1")
 }
 

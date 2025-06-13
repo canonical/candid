@@ -71,7 +71,7 @@ func (s *clientSuite) Init(c *qt.C) {
 	c.Assert(err, qt.IsNil)
 
 	s.srv = httptest.NewServer(s)
-	c.Defer(s.srv.Close)
+	c.Cleanup(s.srv.Close)
 	s.macaroon = nil
 }
 

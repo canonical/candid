@@ -114,10 +114,7 @@ func (s *StoreSource) Next() bool {
 		return false
 	}
 	s.index++
-	if s.index > len(s.identities) {
-		return false
-	}
-	return true
+	return s.index <= len(s.identities)
 }
 
 // Identity implements Source.Identity.

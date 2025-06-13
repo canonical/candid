@@ -185,7 +185,7 @@ func newFixture(c *qt.C) *fixture {
 	backend, err := sqlstore.NewBackend("postgres", pg.DB)
 	c.Assert(err, qt.IsNil)
 	// Note: closing backend also closes the db.
-	c.Defer(backend.Close)
+	c.Cleanup(backend.Close)
 
 	return &fixture{
 		pg:      pg,

@@ -40,7 +40,7 @@ func newFixture(c *qt.C, p fixtureParams) *fixture {
 	candidtest.LogTo(c)
 	s.idptest = idptest.NewFixture(c, candidtest.NewStore())
 	s.server = mockkeystone.NewServer()
-	c.Defer(s.server.Close)
+	c.Cleanup(s.server.Close)
 	s.params = keystoneidp.Params{
 		Name:        "openstack",
 		Description: "OpenStack",

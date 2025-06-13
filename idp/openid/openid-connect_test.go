@@ -408,6 +408,7 @@ func TestHandleCallback(t *testing.T) {
 				srv.setClaim(k, v)
 			}
 			resp, err := cl.Get("/callback?code=" + srv.code())
+			c.Assert(err, qt.IsNil)
 			id, err := f.ParseResponse(c, resp)
 			c.Assert(err, qt.IsNil)
 			if test.expectIdentity == nil {
@@ -605,7 +606,10 @@ func (s *testOIDCServer) serveToken(w http.ResponseWriter, req *http.Request) {
 	tok := map[string]string{
 		"access_token": uuid.New().String(),
 	}
-	signer, err := jose.NewSigner(jose.SigningKey{jose.RS256, s.key()}, nil)
+	signer, err := jose.NewSigner(jose.SigningKey{
+		Algorithm: jose.RS256,
+		Key:       s.key(),
+	}, nil)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

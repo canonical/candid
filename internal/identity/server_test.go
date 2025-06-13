@@ -148,15 +148,16 @@ func (s *serverSuite) TestServerHasAccessControlAllowHeaders(c *qt.C) {
 		Handler: h,
 		URL:     "/a",
 	})
+	headers := rec.Result().Request.Response.Header
 	c.Assert(rec.Code, qt.Equals, http.StatusOK)
-	c.Assert(len(rec.HeaderMap["Access-Control-Allow-Origin"]), qt.Equals, 1)
-	c.Assert(rec.HeaderMap["Access-Control-Allow-Origin"][0], qt.Equals, "*")
-	c.Assert(len(rec.HeaderMap["Access-Control-Allow-Headers"]), qt.Equals, 1)
-	c.Assert(rec.HeaderMap["Access-Control-Allow-Headers"][0], qt.Equals, "Bakery-Protocol-Version, Macaroons, X-Requested-With, Content-Type")
-	c.Assert(len(rec.HeaderMap["Access-Control-Allow-Origin"]), qt.Equals, 1)
-	c.Assert(rec.HeaderMap["Access-Control-Allow-Origin"][0], qt.Equals, "*")
-	c.Assert(len(rec.HeaderMap["Access-Control-Cache-Max-Age"]), qt.Equals, 1)
-	c.Assert(rec.HeaderMap["Access-Control-Cache-Max-Age"][0], qt.Equals, "600")
+	c.Assert(len(headers["Access-Control-Allow-Origin"]), qt.Equals, 1)
+	c.Assert(headers["Access-Control-Allow-Origin"][0], qt.Equals, "*")
+	c.Assert(len(headers["Access-Control-Allow-Headers"]), qt.Equals, 1)
+	c.Assert(headers["Access-Control-Allow-Headers"][0], qt.Equals, "Bakery-Protocol-Version, Macaroons, X-Requested-With, Content-Type")
+	c.Assert(len(headers["Access-Control-Allow-Origin"]), qt.Equals, 1)
+	c.Assert(headers["Access-Control-Allow-Origin"][0], qt.Equals, "*")
+	c.Assert(len(headers["Access-Control-Cache-Max-Age"]), qt.Equals, 1)
+	c.Assert(headers["Access-Control-Cache-Max-Age"][0], qt.Equals, "600")
 
 	rec = qthttptest.DoRequest(c, qthttptest.DoRequestParams{
 		Handler: h,
@@ -165,8 +166,8 @@ func (s *serverSuite) TestServerHasAccessControlAllowHeaders(c *qt.C) {
 		Header:  http.Header{"Origin": []string{"MyHost"}},
 	})
 	c.Assert(rec.Code, qt.Equals, http.StatusOK)
-	c.Assert(len(rec.HeaderMap["Access-Control-Allow-Origin"]), qt.Equals, 1)
-	c.Assert(rec.HeaderMap["Access-Control-Allow-Origin"][0], qt.Equals, "*")
+	c.Assert(len(headers["Access-Control-Allow-Origin"]), qt.Equals, 1)
+	c.Assert(headers["Access-Control-Allow-Origin"][0], qt.Equals, "*")
 }
 
 func (s *serverSuite) TestServerPanicRecovery(c *qt.C) {
@@ -223,7 +224,7 @@ func (s *serverSuite) TestServerStaticFiles(c *qt.C) {
 			}}, nil
 		}
 	}
-	path := c.Mkdir()
+	path := c.TempDir()
 	h, err := identity.New(identity.ServerParams{
 		Store:            s.store.Store,
 		MeetingStore:     s.store.MeetingStore,

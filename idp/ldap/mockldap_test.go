@@ -171,9 +171,9 @@ func packetFilterMatcher(packet *ber.Packet) func(ldapDoc) bool {
 		}
 
 	case ldap.FilterEqualityMatch:
-		expected := string(packet.Children[1].Data.Bytes())
+		expected := packet.Children[1].Data.String()
 		return func(doc ldapDoc) bool {
-			values, ok := doc[string(packet.Children[0].Data.Bytes())]
+			values, ok := doc[packet.Children[0].Data.String()]
 			if !ok {
 				return false
 			}

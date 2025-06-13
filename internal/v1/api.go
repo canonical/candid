@@ -32,7 +32,7 @@ func new(hParams identity.HandlerParams) func(p httprequest.Params, arg interfac
 	return func(p httprequest.Params, arg interface{}) (*handler, context.Context, error) {
 		t := trace.New("identity.internal.v1", p.PathPattern)
 		ctx := trace.NewContext(p.Context, t)
-		ctx, close1 := hParams.Store.Context(p.Context)
+		ctx, close1 := hParams.Store.Context(ctx)
 		ctx, close2 := hParams.MeetingStore.Context(ctx)
 		hnd := &handler{
 			params: hParams,

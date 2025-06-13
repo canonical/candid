@@ -4,6 +4,7 @@
 package agent_test
 
 import (
+	"context"
 	"testing"
 
 	qt "github.com/frankban/quicktest"
@@ -60,6 +61,6 @@ func TestURL(t *testing.T) {
 
 func TestInitProducesError(t *testing.T) {
 	c := qt.New(t)
-	err := agent.IdentityProvider.Init(nil, idp.InitParams{})
+	err := agent.IdentityProvider.Init(context.Background(), idp.InitParams{})
 	c.Assert(err, qt.ErrorMatches, "agent login IDP no longer supported")
 }

@@ -236,7 +236,6 @@ func (h *Handler) validate(w http.ResponseWriter, r *http.Request, _ httprouter.
 	}
 	response.IsValid = true
 	enc.Encode(response)
-	return
 }
 
 // parse the OAuth Authorization header see

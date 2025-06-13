@@ -33,7 +33,8 @@ func (s *staticSuite) Init(c *qt.C) {
 
 func (s *staticSuite) setupIdp(c *qt.C, params static.Params) idp.IdentityProvider {
 	i := static.NewIdentityProvider(params)
-	i.Init(context.TODO(), s.idptest.InitParams(c, idpPrefix))
+	err := i.Init(context.TODO(), s.idptest.InitParams(c, idpPrefix))
+	c.Assert(err, qt.IsNil)
 	return i
 }
 

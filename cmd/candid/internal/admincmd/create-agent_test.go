@@ -75,7 +75,7 @@ func (s *createAgentSuite) TestCreateAgentWithGeneratedKeyAndAgentFileNotSpecifi
 }
 
 func (s *createAgentSuite) TestCreateAgentWithNonExistentAgentsFileSpecified(c *qt.C) {
-	agentFile := filepath.Join(c.Mkdir(), ".agents")
+	agentFile := filepath.Join(c.TempDir(), ".agents")
 	out := s.fixture.CheckSuccess(c, "create-agent", "-a", "admin.agent", "-f", agentFile)
 	c.Assert(out, qt.Matches, `added agent a-[0-9a-f]+@candid for http://.* to .+\n`)
 

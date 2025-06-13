@@ -81,7 +81,7 @@ func convert(doc *mongodoc.Identity) (*store.Identity, error) {
 	for _, k := range doc.PublicKeys {
 		var key bakery.Key
 		copy(key[:], k.Key)
-		identity.PublicKeys = append(identity.PublicKeys, bakery.PublicKey{key})
+		identity.PublicKeys = append(identity.PublicKeys, bakery.PublicKey{Key: key})
 	}
 	if doc.Owner != "" {
 		if doc.Owner == legacyAdminGroup {

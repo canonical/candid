@@ -31,7 +31,7 @@ func TestPutGetToken(t *testing.T) {
 		TokenName:      "tokenname",
 		TokenSecret:    "tokensecret",
 	}
-	path := filepath.Join(c.Mkdir(), "subdir", "tokenFile")
+	path := filepath.Join(c.TempDir(), "subdir", "tokenFile")
 	store := ussologin.NewFileTokenStore(path)
 	err := store.Put(token)
 	c.Assert(err, qt.IsNil)
@@ -51,7 +51,7 @@ func TestReadInvalidToken(t *testing.T) {
 	c := qt.New(t)
 	defer c.Done()
 
-	path := fmt.Sprintf("%s/tokenFile", c.Mkdir())
+	path := fmt.Sprintf("%s/tokenFile", c.TempDir())
 	err := os.WriteFile(path, []byte("foobar"), 0700)
 	c.Assert(err, qt.IsNil)
 	store := ussologin.NewFileTokenStore(path)

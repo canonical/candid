@@ -64,11 +64,11 @@ func newFixture(c *qt.C) *fixture {
 		},
 	})
 	c.Assert(err, qt.IsNil)
-	c.Defer(func() {
+	c.Cleanup(func() {
 		f.server.Close()
 	})
 
-	f.Dir = c.Mkdir()
+	f.Dir = c.TempDir()
 	// If the cookiejar gets saved, it gets saved to $HOME/.go-cookiejar, so make
 	// sure that's not in the current directory.
 	c.Setenv("HOME", f.Dir)
@@ -147,7 +147,7 @@ func TestLoadCACerts(t *testing.T) {
 		Username:   "bob",
 	})
 
-	dir := c.Mkdir()
+	dir := c.TempDir()
 	c.Setenv("HOME", dir)
 	c.Setenv("CANDID_URL", srv.URL)
 	c.Setenv("BAKERY_AGENT_FILE", filepath.Join(dir, "admin.agent"))
@@ -214,5 +214,5 @@ type candidtestT struct {
 }
 
 func (t candidtestT) Cleanup(f func()) {
-	t.Defer(f)
+	t.TB.Cleanup(f)
 }

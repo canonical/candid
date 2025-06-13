@@ -55,6 +55,7 @@ func TestRendezvousWaitBeforeDone(t *testing.T) {
 	id, err := newId()
 	c.Assert(err, qt.IsNil)
 	err = m.NewRendezvous(ctx, id, []byte("first data"))
+	c.Assert(err, qt.IsNil)
 	c.Assert(id, qt.Not(qt.Equals), "")
 
 	waitDone := make(chan struct{})

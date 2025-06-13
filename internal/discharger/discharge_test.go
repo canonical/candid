@@ -41,7 +41,7 @@ import (
 	"github.com/canonical/candid/store"
 )
 
-var groupOp = bakery.Op{"group", "group"}
+var groupOp = bakery.Op{Entity: "group", Action: "group"}
 
 var testContext = context.Background()
 
@@ -149,6 +149,7 @@ func (s *dischargeSuite) TestInteractiveDischargeJSON(c *qt.C) {
 		}
 		payload := &params.IDPChoice{}
 		err = httprequest.UnmarshalJSONResponse(resp, payload)
+		c.Assert(err, qt.IsNil)
 		c.Assert(resp.Header.Get("Content-Type"), qt.Equals, "application/json")
 		c.Assert(len(payload.IDPs) > 1, qt.Equals, true)
 		// do normal interactive login
@@ -478,6 +479,7 @@ func (s *dischargeSuite) TestDischargeForUser(c *qt.C) {
 		}
 		c.Assert(err, qt.IsNil)
 		ui, err := s.dischargeCreator.Bakery.Checker.Auth(ms).Allow(context.Background(), identchecker.LoginOp)
+		c.Assert(err, qt.IsNil)
 		c.Assert(ui.Identity.Id(), qt.Equals, test.expectUser)
 	}
 }

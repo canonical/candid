@@ -333,7 +333,8 @@ func (s *ussoSuite) TestGetGroups(c *qt.C) {
 		c.Logf("path: %s", r.URL.Path)
 		switch r.URL.Path {
 		case "/people":
-			r.ParseForm()
+			err := r.ParseForm()
+			c.Assert(err, qt.IsNil)
 			c.Check(r.Form.Get("ws.op"), qt.Equals, "getByOpenIDIdentifier")
 			c.Check(r.Form.Get("identifier"), qt.Equals, "https://login.launchpad.net/+id/test")
 			w.Header().Set("Content-Type", "application/json")
@@ -368,7 +369,8 @@ func (s *ussoSuite) TestGetGroupsReturnsNewSlice(c *qt.C) {
 		c.Logf("path: %s", r.URL.Path)
 		switch r.URL.Path {
 		case "/people":
-			r.ParseForm()
+			err := r.ParseForm()
+			c.Assert(err, qt.IsNil)
 			c.Check(r.Form.Get("ws.op"), qt.Equals, "getByOpenIDIdentifier")
 			c.Check(r.Form.Get("identifier"), qt.Equals, "https://login.launchpad.net/+id/test")
 			w.Header().Set("Content-Type", "application/json")

@@ -94,7 +94,7 @@ func newServer(c *qt.C, p identity.ServerParams, versions map[string]identity.Ne
 		s.params.ACLStore = aclstore.NewACLStore(memsimplekv.NewStore())
 	}
 	s.server = httptest.NewUnstartedServer(nil)
-	c.Defer(s.server.Close)
+	c.Cleanup(s.server.Close)
 	s.params.Location = "http://" + s.server.Listener.Addr().String() + sublocation
 	if s.params.Key == nil {
 		var err error
@@ -118,17 +118,17 @@ func newServer(c *qt.C, p identity.ServerParams, versions map[string]identity.Ne
 	var err error
 	s.handler, err = identity.New(s.params, versions)
 	c.Assert(err, qt.IsNil)
-	c.Defer(s.handler.Close)
+	c.Cleanup(s.handler.Close)
 
 	s.server.Config.Handler = http.StripPrefix(sublocation, s.handler)
 	s.server.Start()
 	s.URL = s.server.URL
 	ctx := context.Background()
 	ctx, closeStore := s.params.Store.Context(ctx)
-	c.Defer(closeStore)
+	c.Cleanup(closeStore)
 
 	ctx, closeMeetingStore := s.params.MeetingStore.Context(ctx)
-	c.Defer(closeMeetingStore)
+	c.Cleanup(closeMeetingStore)
 	s.Ctx = ctx
 	return s
 }
