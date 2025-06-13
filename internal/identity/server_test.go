@@ -94,6 +94,7 @@ func (s *serverSuite) TestNewServerWithVersions(c *qt.C) {
 	assertServesVersion(c, h, "version1")
 	assertDoesNotServeVersion(c, h, "version2")
 	assertDoesNotServeVersion(c, h, "version3")
+	h.Close()
 
 	h, err = identity.New(identity.ServerParams{
 		Store:        s.store.Store,
@@ -108,6 +109,7 @@ func (s *serverSuite) TestNewServerWithVersions(c *qt.C) {
 	assertServesVersion(c, h, "version1")
 	assertServesVersion(c, h, "version2")
 	assertDoesNotServeVersion(c, h, "version3")
+	h.Close()
 
 	h, err = identity.New(identity.ServerParams{
 		Store:        s.store.Store,
@@ -123,6 +125,7 @@ func (s *serverSuite) TestNewServerWithVersions(c *qt.C) {
 	assertServesVersion(c, h, "version1")
 	assertServesVersion(c, h, "version2")
 	assertServesVersion(c, h, "version3")
+	h.Close()
 }
 
 func (s *serverSuite) TestServerHasAccessControlAllowHeaders(c *qt.C) {
