@@ -4,7 +4,7 @@ on:
 
 jobs:
   candid-oci-image:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v3
       - run: git fetch --prune --unshallow
