@@ -15,7 +15,7 @@ The configuration file used by the snap can be found in
 
 ### Requirements
 
-Candid requires go1.22 or later to build. This is available in the go snap:
+Candid requires go1.23 or later to build. This is available in the go snap:
 
     snap install go
 
