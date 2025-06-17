@@ -33,9 +33,7 @@ func NewAPIHandler(params identity.HandlerParams) ([]httprequest.Handler, error)
 		Path:   "/debug/login",
 		Handle: h.login,
 	}}
-	for _, hnd := range identity.ReqServer.Handlers(h.handler) {
-		handlers = append(handlers, hnd)
-	}
+	handlers = append(handlers, identity.ReqServer.Handlers(h.handler)...)
 	return handlers, nil
 }
 

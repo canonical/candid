@@ -38,7 +38,7 @@ func (s *dischargeSuite) Init(c *qt.C) {
 	candidtest.LogTo(c)
 
 	s.server = mockkeystone.NewServer()
-	c.Defer(s.server.Close)
+	c.Cleanup(s.server.Close)
 	s.params = keystone.Params{
 		Name:        "openstack",
 		Description: "OpenStack",

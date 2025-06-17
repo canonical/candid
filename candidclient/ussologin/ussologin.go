@@ -6,9 +6,7 @@
 package ussologin
 
 import (
-	"context"
 	"encoding/json"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 
@@ -45,7 +43,7 @@ type FormTokenGetter struct {
 // The tokenName argument is used as the name of the generated token in
 // Ubuntu SSO. If Ubuntu SSO returned an error when trying to retrieve
 // the token the error will have a cause of type *usso.Error.
-func (g FormTokenGetter) GetToken(ctx context.Context) (*usso.SSOData, error) {
+func (g FormTokenGetter) GetToken() (*usso.SSOData, error) {
 	if g.Name == "" {
 		g.Name = "candidclient"
 	}
@@ -94,7 +92,7 @@ var loginForm = form.Form{
 
 // A TokenGetter is used to fetch a Ubuntu SSO OAuth token.
 type TokenGetter interface {
-	GetToken(context.Context) (*usso.SSOData, error)
+	GetToken() (*usso.SSOData, error)
 }
 
 // A StoreTokenGetter is a TokenGetter that will try to retrieve the
@@ -109,7 +107,7 @@ type StoreTokenGetter struct {
 // GetToken implements TokenGetter.GetToken. A token is first attmepted
 // to retireve from the store. If a stored token is not available then
 // GetToken will fallback to TokenGetter.GetToken (if configured).
-func (g StoreTokenGetter) GetToken(ctx context.Context) (*usso.SSOData, error) {
+func (g StoreTokenGetter) GetToken() (*usso.SSOData, error) {
 	tok, err := g.Store.Get()
 	if err == nil {
 		return tok, nil
@@ -117,7 +115,7 @@ func (g StoreTokenGetter) GetToken(ctx context.Context) (*usso.SSOData, error) {
 	if g.TokenGetter == nil {
 		return nil, errgo.Mask(err, errgo.Any)
 	}
-	tok, err = g.TokenGetter.GetToken(ctx)
+	tok, err = g.TokenGetter.GetToken()
 	if err == nil {
 		// Ignore any errors storing the token, the user will
 		// just have to get it again next time.
@@ -159,7 +157,7 @@ func (f *FileTokenStore) Put(tok *usso.SSOData) error {
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		return errgo.Notef(err, "cannot create directory %q", dir)
 	}
-	if err := ioutil.WriteFile(f.path, data, 0600); err != nil {
+	if err := os.WriteFile(f.path, data, 0600); err != nil {
 		return errgo.Notef(err, "cannot write file")
 	}
 	return nil
@@ -168,7 +166,7 @@ func (f *FileTokenStore) Put(tok *usso.SSOData) error {
 // Get implements TokenStore.Get by
 // reading the token from the FileTokenStore's file.
 func (f *FileTokenStore) Get() (*usso.SSOData, error) {
-	data, err := ioutil.ReadFile(f.path)
+	data, err := os.ReadFile(f.path)
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot read token")
 	}

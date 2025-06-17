@@ -100,7 +100,7 @@ func newFixture(c *qt.C) *fixture {
 		c.Fatal(err)
 	}
 	c.Assert(err, qt.IsNil)
-	c.Defer(backend.Close)
+	c.Cleanup(backend.Close)
 
 	sp := identity.ServerParams{
 		MeetingStore:            backend.MeetingStore(),

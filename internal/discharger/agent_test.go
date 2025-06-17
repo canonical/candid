@@ -8,7 +8,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -238,6 +238,6 @@ func (t fakeLegacyServerTransport) RoundTrip(req *http.Request) (*http.Response,
 	if err != nil {
 		panic("cannot re-marshal bakery error")
 	}
-	resp.Body = ioutil.NopCloser(bytes.NewReader(bodyData))
+	resp.Body = io.NopCloser(bytes.NewReader(bodyData))
 	return resp, nil
 }

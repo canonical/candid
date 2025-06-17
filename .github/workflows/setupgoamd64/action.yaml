@@ -14,9 +14,9 @@ inputs:
 runs:
   using: "composite"
   steps:
-    - uses: actions/setup-go@v3
+    - uses: actions/setup-go@v5
       with:
-        go-version: 1.18
+        go-version: 1.23
         architecture: x64
         cache: true
     - run: git config --global url.https://${{ inputs.user }}:${{ inputs.pat }}@github.com/.insteadOf https://github.com/

@@ -6,7 +6,7 @@ package mockusso
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"mime"
 	"net/http"
 	"strings"
@@ -204,7 +204,7 @@ func (h *Handler) validate(w http.ResponseWriter, r *http.Request, _ httprouter.
 		enc.Encode(response)
 		return
 	}
-	buf, err := ioutil.ReadAll(r.Body)
+	buf, err := io.ReadAll(r.Body)
 	if err != nil {
 		response.Error = fmt.Sprintf("error reading request: %s", err)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -236,7 +236,6 @@ func (h *Handler) validate(w http.ResponseWriter, r *http.Request, _ httprouter.
 	}
 	response.IsValid = true
 	enc.Encode(response)
-	return
 }
 
 // parse the OAuth Authorization header see

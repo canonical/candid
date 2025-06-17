@@ -8,11 +8,11 @@ env:
 
 jobs:
   build-snap:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v3
       - run: git fetch --prune --unshallow
-      - uses: ./.github/workflows/setupgo118amd64
+      - uses: ./.github/workflows/setupgoamd64
         with:
           user: ${{ secrets.GH_USER }}
           pat: ${{ secrets.GH_AUTH }}

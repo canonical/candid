@@ -9,7 +9,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"html/template"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/cookiejar"
 	"net/http/httptest"
@@ -142,7 +142,7 @@ func (s *Fixture) Client(c *qt.C, prefix, replacement, stopPrefix string) *http.
 func (s *Fixture) ParseResponse(c *qt.C, resp *http.Response) (*store.Identity, error) {
 	switch resp.StatusCode {
 	case http.StatusOK:
-		buf, err := ioutil.ReadAll(resp.Body)
+		buf, err := io.ReadAll(resp.Body)
 		c.Assert(err, qt.IsNil)
 		parts := bytes.Split(buf, []byte("\n"))
 		if len(parts) > 1 && len(parts[1]) > 0 {

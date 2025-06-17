@@ -20,10 +20,10 @@ import (
 	"time"
 
 	qt "github.com/frankban/quicktest"
+	"github.com/go-jose/go-jose/v3"
+	"github.com/go-jose/go-jose/v3/jwt"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/google/uuid"
-	"gopkg.in/square/go-jose.v2"
-	"gopkg.in/square/go-jose.v2/jwt"
 	"gopkg.in/yaml.v2"
 
 	"github.com/canonical/candid/config"
@@ -408,6 +408,7 @@ func TestHandleCallback(t *testing.T) {
 				srv.setClaim(k, v)
 			}
 			resp, err := cl.Get("/callback?code=" + srv.code())
+			c.Assert(err, qt.IsNil)
 			id, err := f.ParseResponse(c, resp)
 			c.Assert(err, qt.IsNil)
 			if test.expectIdentity == nil {
@@ -605,7 +606,10 @@ func (s *testOIDCServer) serveToken(w http.ResponseWriter, req *http.Request) {
 	tok := map[string]string{
 		"access_token": uuid.New().String(),
 	}
-	signer, err := jose.NewSigner(jose.SigningKey{jose.RS256, s.key()}, nil)
+	signer, err := jose.NewSigner(jose.SigningKey{
+		Algorithm: jose.RS256,
+		Key:       s.key(),
+	}, nil)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -636,7 +640,7 @@ func (s *testOIDCServer) serveKeys(w http.ResponseWriter, req *http.Request) {
 		"e":   base64.RawURLEncoding.EncodeToString(big.NewInt(int64(s.key().PublicKey.E)).Bytes()),
 	}
 	keys := map[string][]map[string]string{
-		"keys": []map[string]string{jwk},
+		"keys": {jwk},
 	}
 	buf, err := json.Marshal(keys)
 	if err != nil {

@@ -4,7 +4,7 @@
 package keystone_test
 
 import (
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -40,7 +40,7 @@ func TestUnmarshalError(t *testing.T) {
 	for _, test := range unmarshalErrorTests {
 		c.Run(test.about, func(c *qt.C) {
 			resp := &http.Response{
-				Body: ioutil.NopCloser(strings.NewReader(test.body)),
+				Body: io.NopCloser(strings.NewReader(test.body)),
 				Header: http.Header{
 					"Content-Type": {"application/json"},
 				},

@@ -51,7 +51,8 @@ func TestHandleErrorsInternalServerError(t *testing.T) {
 	defer c.Done()
 	candidtest.LogTo(c)
 	w := new(loggo.TestWriter)
-	loggo.RegisterWriter("test", w)
+	err := loggo.RegisterWriter("test", w)
+	c.Assert(err, qt.IsNil)
 	mux := httprouter.New()
 	mux.Handle("GET", "/error/", identity.ReqServer.HandleErrors(func(httprequest.Params) error {
 		return errgo.New("bad wolf")

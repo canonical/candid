@@ -9,7 +9,6 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -172,7 +171,7 @@ func (c *candidCommand) loadCACerts(client *http.Client) error {
 		return errgo.Notef(err, "cannot load system CA certificates")
 	}
 	for _, fn := range filepath.SplitList(os.Getenv("CANDID_CA_CERTS")) {
-		buf, err := ioutil.ReadFile(fn)
+		buf, err := os.ReadFile(fn)
 		if os.IsNotExist(err) || os.IsPermission(err) {
 			// If the file doesn't exist, or is not readable
 			// ignore it. This allows the environment
@@ -187,7 +186,8 @@ func (c *candidCommand) loadCACerts(client *http.Client) error {
 	}
 	client.Transport = &http.Transport{
 		TLSClientConfig: &tls.Config{
-			RootCAs: certPool,
+			RootCAs:    certPool,
+			MinVersion: tls.VersionTLS12,
 		},
 	}
 	return nil
@@ -331,7 +331,7 @@ func (v publicKeyValue) Get() interface{} {
 }
 
 func readAgentFile(f string) (*agent.AuthInfo, error) {
-	data, err := ioutil.ReadFile(f)
+	data, err := os.ReadFile(f)
 	if err != nil {
 		return nil, errgo.Mask(err, os.IsNotExist)
 	}
@@ -349,7 +349,7 @@ func writeAgentFile(f string, v *agent.AuthInfo) error {
 	}
 	data = append(data, '\n')
 	// TODO should we write this atomically?
-	if err := ioutil.WriteFile(f, data, 0600); err != nil {
+	if err := os.WriteFile(f, data, 0600); err != nil {
 		return errgo.Mask(err)
 	}
 	return nil

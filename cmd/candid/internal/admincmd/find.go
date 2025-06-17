@@ -147,9 +147,7 @@ func (c *findCommand) formatTab(writer io.Writer, value interface{}) error {
 
 func (c *findCommand) formatTabMap(writer io.Writer, users []map[string]string) error {
 	fields := []string{"username"}
-	for _, f := range strings.Split(c.detail, ",") {
-		fields = append(fields, f)
-	}
+	fields = append(fields, strings.Split(c.detail, ",")...)
 	i := 0
 	s := len(fields)
 	for _, k := range fields {

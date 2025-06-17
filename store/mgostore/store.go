@@ -62,16 +62,16 @@ func identityQuery(identity *store.Identity) bson.D {
 		if !bson.IsObjectIdHex(identity.ID) {
 			break
 		}
-		return bson.D{{"_id", bson.ObjectIdHex(identity.ID)}}
+		return bson.D{{Name: "_id", Value: bson.ObjectIdHex(identity.ID)}}
 	case identity.ProviderID != "":
-		return bson.D{{"providerid", identity.ProviderID}}
+		return bson.D{{Name: "providerid", Value: identity.ProviderID}}
 	case identity.Username != "":
-		return bson.D{{"username", identity.Username}}
+		return bson.D{{Name: "username", Value: identity.Username}}
 	default:
 	}
 	// The identity specifies no identifying fields, return something
 	// that will fail.
-	return bson.D{{"_id", ""}}
+	return bson.D{{Name: "_id", Value: ""}}
 }
 
 // FindIdentities implements store.Store.FindIdentities by querying the
@@ -143,9 +143,11 @@ func appendComparison(query bson.D, fieldName string, p store.Comparison, value 
 	case store.Equal:
 		// TODO with Mongo 3.0, we could remove this special case
 		// and use $eq instead.
-		return append(query, bson.DocElem{fieldName, value})
+		return append(query, bson.DocElem{Name: fieldName, Value: value})
 	default:
-		return append(query, bson.DocElem{fieldName, bson.D{{comparisonOps[p], value}}})
+		return append(query, bson.DocElem{Name: fieldName, Value: bson.D{
+			{Name: comparisonOps[p], Value: value}}},
+		)
 	}
 }
 
@@ -190,7 +192,10 @@ func (s *identityStore) UpdateIdentity(ctx context.Context, identity *store.Iden
 }
 
 func (s *identityStore) upsertIdentity(coll *mgo.Collection, identity *store.Identity, update store.Update) error {
-	changeInfo, err := coll.Upsert(bson.D{{"providerid", identity.ProviderID}}, identityUpdate(identity, update))
+	changeInfo, err := coll.Upsert(
+		bson.D{{Name: "providerid", Value: identity.ProviderID}},
+		identityUpdate(identity, update),
+	)
 	if err != nil {
 		if mgo.IsDup(err) {
 			return store.DuplicateUsernameError(identity.Username)

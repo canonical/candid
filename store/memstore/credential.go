@@ -82,7 +82,7 @@ func (s *memStore) IncrementMFACredentialSignCount(ctx context.Context, credenti
 	defer s.mu.Unlock()
 
 	for key, c := range s.credentials {
-		if bytes.Compare(c.ID, credentialID) == 0 {
+		if bytes.Equal(c.ID, credentialID) {
 			c.AuthenticatorSignCount++
 			s.credentials[key] = c
 			break

@@ -128,6 +128,7 @@ func (s *authSuite) TestAuthorizeMacaroonRequired(c *qt.C) {
 		MacaroonVerifier: s.oven,
 		ACLManager:       s.aclManager,
 	})
+	c.Assert(err, qt.IsNil)
 	httpAuthorizer := httpauth.New(s.oven, authorizer, 0)
 	req, err := http.NewRequest("GET", "http://example.com/v1/test", nil)
 	c.Assert(err, qt.IsNil)

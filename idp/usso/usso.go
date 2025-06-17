@@ -342,10 +342,13 @@ func (idp *identityProvider) getLaunchpadGroupsNoCache(ussoID string) ([]string,
 		return nil, errgo.Notef(err, "cannot get team list for launchpad user %q", user.Name())
 	}
 	groups := make([]string, 0, teams.TotalSize())
-	teams.For(func(team *lpad.Value) error {
+	err = teams.For(func(team *lpad.Value) error {
 		groups = append(groups, team.StringField("name"))
 		return nil
 	})
+	if err != nil {
+		return nil, errgo.Notef(err, "cannot parse team list for launchpad user %q", user.Name())
+	}
 	return groups, nil
 }
 
@@ -364,7 +367,7 @@ func (idp *identityProvider) getLaunchpadPersonByOpenID(root *lpad.Root, ussoID 
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot find user %s", ussoID)
 	}
-	return &lpad.Person{v}, nil
+	return &lpad.Person{Value: v}, nil
 }
 
 // valuesMatch determines if string sets a and b contain exactly the same

@@ -44,7 +44,7 @@ func TestInteractGetTokenError(t *testing.T) {
 	defer c.Done()
 
 	terr := errgo.New("test error")
-	i := ussologin.NewInteractor(tokenGetterFunc(func(_ context.Context) (*usso.SSOData, error) {
+	i := ussologin.NewInteractor(tokenGetterFunc(func() (*usso.SSOData, error) {
 		return nil, terr
 	}))
 	ierr := interactionRequiredError(c, "")
@@ -69,7 +69,7 @@ func TestAuthenticatedRequest(t *testing.T) {
 	}))
 	defer server.Close()
 
-	i := ussologin.NewInteractor(tokenGetterFunc(func(_ context.Context) (*usso.SSOData, error) {
+	i := ussologin.NewInteractor(tokenGetterFunc(func() (*usso.SSOData, error) {
 		return &usso.SSOData{
 			ConsumerKey:    "test-user",
 			ConsumerSecret: "test-user-secret",
@@ -101,7 +101,7 @@ func TestAuthenticatedRequestError(t *testing.T) {
 	}))
 	defer server.Close()
 
-	i := ussologin.NewInteractor(tokenGetterFunc(func(_ context.Context) (*usso.SSOData, error) {
+	i := ussologin.NewInteractor(tokenGetterFunc(func() (*usso.SSOData, error) {
 		return &usso.SSOData{
 			ConsumerKey:    "test-user",
 			ConsumerSecret: "test-user-secret",
@@ -124,8 +124,8 @@ func interactionRequiredError(c *qt.C, url string) *httpbakery.Error {
 	return ierr
 }
 
-type tokenGetterFunc func(ctx context.Context) (*usso.SSOData, error)
+type tokenGetterFunc func() (*usso.SSOData, error)
 
-func (f tokenGetterFunc) GetToken(ctx context.Context) (*usso.SSOData, error) {
-	return f(ctx)
+func (f tokenGetterFunc) GetToken() (*usso.SSOData, error) {
+	return f()
 }

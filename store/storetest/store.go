@@ -44,7 +44,7 @@ func (s *storeSuite) Init(c *qt.C) {
 	s.Store = s.newStore(c)
 
 	ctx, close := s.Store.Context(context.Background())
-	c.Defer(close)
+	c.Cleanup(close)
 	s.ctx = ctx
 }
 

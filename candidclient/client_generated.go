@@ -6,8 +6,8 @@ package candidclient
 import (
 	"context"
 	"github.com/canonical/candid/params"
-	"gopkg.in/httprequest.v1"
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
+	"gopkg.in/httprequest.v1"
 )
 
 type client struct {

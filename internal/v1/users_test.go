@@ -254,6 +254,7 @@ func (s *usersSuite) TestCreateAgentWithGroups(c *qt.C) {
 		},
 	})
 	c.Assert(err, qt.ErrorMatches, `Post .*: cannot add agent to groups that you are not a member of`)
+	c.Assert(resp, qt.IsNil)
 
 	s.setUserGroups(c, "bob", "g3")
 

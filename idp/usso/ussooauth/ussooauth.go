@@ -9,7 +9,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"mime"
 	"net/http"
 	"net/url"
@@ -133,7 +133,10 @@ var consumerKeyRegexp = regexp.MustCompile(`oauth_consumer_key="([^"]*)"`)
 // verifyOAuthSignature verifies with Ubuntu SSO that the request is correctly
 // signed.
 func verifyOAuthSignature(requestURL string, req *http.Request) (string, error) {
-	req.ParseForm()
+	err := req.ParseForm()
+	if err != nil {
+		return "", errgo.Notef(err, "cannot parse request form")
+	}
 	u, err := url.Parse(requestURL)
 	if err != nil {
 		return "", errgo.Notef(err, "cannot parse request URL")
@@ -170,7 +173,10 @@ func verifyOAuthSignature(requestURL string, req *http.Request) (string, error) 
 		IsValid bool   `json:"is_valid"`
 		Error   string `json:"error"`
 	}
-	data, err := ioutil.ReadAll(resp.Body)
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", errgo.Mask(err)
+	}
 	if err := json.Unmarshal(data, &validated); err != nil {
 		return "", errgo.Mask(err)
 	}

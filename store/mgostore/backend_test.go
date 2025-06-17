@@ -32,7 +32,7 @@ func TestNewBackend(t *testing.T) {
 	testdb = testdb.With(s)
 	backend, err := mgostore.NewBackend(testdb)
 	c.Assert(err, qt.IsNil)
-	c.Defer(backend.Close)
+	c.Cleanup(backend.Close)
 	s.Close()
 
 	ctx := context.Background()

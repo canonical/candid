@@ -97,7 +97,7 @@ available login methods.
             return err
          }
          defer resp.Close()
-         body, err := ioutil.ReadAll(resp.Body)
+         body, err := io.ReadAll(resp.Body)
          if err != nil {
             return err
          }
@@ -167,7 +167,7 @@ available login methods.
             return err
          }
          defer resp.Close()
-         body, err := ioutil.ReadAll(resp.Body)
+         body, err := io.ReadAll(resp.Body)
          if err != nil {
             return err
          }

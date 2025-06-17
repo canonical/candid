@@ -341,7 +341,7 @@ func (s *ussoMacaroonSuite) TestHandlePostV1(c *qt.C) {
 	rr := httptest.NewRecorder()
 	s.idp.Handle(s.idptest.Ctx, rr, req)
 	c.Assert(rr.Code, qt.Equals, http.StatusOK)
-	c.Assert(rr.HeaderMap.Get("Content-Type"), qt.Equals, "application/json")
+	c.Assert(rr.Result().Header.Get("Content-Type"), qt.Equals, "application/json")
 	var resp udclient.LoginResponse
 	err = json.Unmarshal(rr.Body.Bytes(), &resp)
 	c.Assert(err, qt.IsNil)

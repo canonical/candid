@@ -36,12 +36,12 @@ func (s *findSuite) TestFindEmail(c *qt.C) {
 		Email:      "bob@example.com",
 	})
 	stdout := s.fixture.CheckSuccess(c, "find", "-a", "admin.agent", "-e", "bob@example.com")
-	c.Assert(stdout, qt.Equals, "bob\n")
+	c.Assert(stdout, qt.Equals, "bob")
 }
 
 func (s *findSuite) TestFindEmailNotFound(c *qt.C) {
 	stdout := s.fixture.CheckSuccess(c, "find", "-a", "admin.agent", "-e", "bob@example.com")
-	c.Assert(stdout, qt.Equals, "\n")
+	c.Assert(stdout, qt.Equals, "")
 }
 
 func (s *findSuite) TestFindNoParameters(c *qt.C) {

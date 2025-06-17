@@ -7,7 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"html/template"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -65,7 +65,7 @@ func (s *idpSuite) Init(c *qt.C) {
 		ListenAddr: "localhost",
 	})
 	c.Assert(err, qt.IsNil)
-	c.Defer(s.meetingPlace.Close)
+	c.Cleanup(s.meetingPlace.Close)
 
 	kvs, err := s.store.ProviderDataStore.KeyValueStore(context.Background(), "test-discharge-tokens")
 	c.Assert(err, qt.IsNil)
@@ -137,7 +137,7 @@ func (s *idpSuite) TestLoginSuccess(c *qt.C) {
 		Username: "test-user",
 	})
 	c.Assert(rr.Code, qt.Equals, http.StatusOK)
-	c.Assert(rr.HeaderMap.Get("Content-Type"), qt.Equals, "text/plain; charset=utf-8")
+	c.Assert(rr.Result().Header.Get("Content-Type"), qt.Equals, "text/plain; charset=utf-8")
 	c.Assert(rr.Body.String(), qt.Equals, "Login successful as test-user")
 }
 
@@ -151,7 +151,7 @@ func (s *idpSuite) TestLoginSuccessWithTemplate(c *qt.C) {
 		Username: "test-user",
 	})
 	c.Assert(rr.Code, qt.Equals, http.StatusOK)
-	c.Assert(rr.HeaderMap.Get("Content-Type"), qt.Equals, "text/html;charset=utf-8")
+	c.Assert(rr.Result().Header.Get("Content-Type"), qt.Equals, "text/html;charset=utf-8")
 	c.Assert(rr.Body.String(), qt.Equals, "<h1>Login successful as test-user</h1>")
 }
 
@@ -163,7 +163,7 @@ func (s *idpSuite) TestLoginRedirectSuccess(c *qt.C) {
 		Username: "test-user",
 	})
 	resp := rr.Result()
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	c.Assert(err, qt.IsNil)
 	c.Assert(resp.StatusCode, qt.Equals, http.StatusSeeOther, qt.Commentf("%s", body))
 	loc, err := resp.Location()

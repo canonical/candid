@@ -9,7 +9,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
@@ -42,7 +41,7 @@ import (
 	"github.com/canonical/candid/store"
 )
 
-var groupOp = bakery.Op{"group", "group"}
+var groupOp = bakery.Op{Entity: "group", Action: "group"}
 
 var testContext = context.Background()
 
@@ -150,6 +149,7 @@ func (s *dischargeSuite) TestInteractiveDischargeJSON(c *qt.C) {
 		}
 		payload := &params.IDPChoice{}
 		err = httprequest.UnmarshalJSONResponse(resp, payload)
+		c.Assert(err, qt.IsNil)
 		c.Assert(resp.Header.Get("Content-Type"), qt.Equals, "application/json")
 		c.Assert(len(payload.IDPs) > 1, qt.Equals, true)
 		// do normal interactive login
@@ -326,7 +326,7 @@ func (t *responseBodyRecordingTransport) RoundTrip(req *http.Request) (*http.Res
 	}
 	var buf bytes.Buffer
 	io.Copy(&buf, resp.Body)
-	resp.Body = ioutil.NopCloser(&buf)
+	resp.Body = io.NopCloser(&buf)
 	if resp.StatusCode == 200 {
 		t.responses = append(t.responses, responseBody{
 			url:  req.URL,
@@ -479,6 +479,7 @@ func (s *dischargeSuite) TestDischargeForUser(c *qt.C) {
 		}
 		c.Assert(err, qt.IsNil)
 		ui, err := s.dischargeCreator.Bakery.Checker.Auth(ms).Allow(context.Background(), identchecker.LoginOp)
+		c.Assert(err, qt.IsNil)
 		c.Assert(ui.Identity.Id(), qt.Equals, test.expectUser)
 	}
 }

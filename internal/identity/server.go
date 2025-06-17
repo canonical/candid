@@ -133,7 +133,10 @@ func New(sp ServerParams, versions map[string]NewAPIHandlerFunc) (*Server, error
 	}
 
 	storeCollector := monitoring.StoreCollector{Store: sp.Store}
-	prometheus.Register(storeCollector)
+	err = prometheus.Register(storeCollector)
+	if err != nil {
+		return nil, errgo.Notef(err, "cannot register store collector with Prometheus")
+	}
 
 	// Create the HTTP server.
 	srv := &Server{

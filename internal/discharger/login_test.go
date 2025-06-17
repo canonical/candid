@@ -6,7 +6,7 @@ package discharger_test
 import (
 	"encoding/json"
 	"html/template"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -152,7 +152,7 @@ func (s *loginSuite) TestLoginMethodsIncludesAgent(c *qt.C) {
 	resp := s.srv.Do(c, req)
 	defer resp.Body.Close()
 	c.Assert(resp.StatusCode, qt.Equals, http.StatusOK)
-	buf, err := ioutil.ReadAll(resp.Body)
+	buf, err := io.ReadAll(resp.Body)
 	c.Assert(err, qt.IsNil)
 	var lm params.LoginMethods
 	err = json.Unmarshal(buf, &lm)
@@ -181,7 +181,7 @@ func (s *loginSuite) TestLoginIDPChoice(c *qt.C) {
 	resp := s.srv.Do(c, req)
 	defer resp.Body.Close()
 	c.Assert(resp.StatusCode, qt.Equals, http.StatusOK)
-	buf, err := ioutil.ReadAll(resp.Body)
+	buf, err := io.ReadAll(resp.Body)
 	c.Assert(err, qt.IsNil)
 	var choice params.IDPChoice
 	err = json.Unmarshal(buf, &choice)
@@ -216,7 +216,7 @@ func (s *loginSuite) TestLoginIDPChoiceHidden(c *qt.C) {
 	resp := s.srv.Do(c, req)
 	defer resp.Body.Close()
 	c.Assert(resp.StatusCode, qt.Equals, http.StatusOK)
-	buf, err := ioutil.ReadAll(resp.Body)
+	buf, err := io.ReadAll(resp.Body)
 	c.Assert(err, qt.IsNil)
 	var choice params.IDPChoice
 	err = json.Unmarshal(buf, &choice)
@@ -246,7 +246,7 @@ func (s *loginSuite) TestLoginRedirectNotTrusted(c *qt.C) {
 	resp := s.srv.Do(c, req)
 	defer resp.Body.Close()
 	c.Assert(resp.StatusCode, qt.Equals, http.StatusOK)
-	buf, err := ioutil.ReadAll(resp.Body)
+	buf, err := io.ReadAll(resp.Body)
 	c.Assert(err, qt.IsNil)
 	var choice params.IDPChoice
 	err = json.Unmarshal(buf, &choice)
@@ -262,7 +262,7 @@ func (s *loginSuite) TestLoginRedirectNotTrusted(c *qt.C) {
 	req.ParseForm()
 	resp = s.srv.Do(c, req)
 	defer resp.Body.Close()
-	buf, err = ioutil.ReadAll(resp.Body)
+	buf, err = io.ReadAll(resp.Body)
 	c.Assert(err, qt.IsNil)
 
 	c.Assert(resp.StatusCode, qt.Equals, http.StatusBadRequest, qt.Commentf("unexpected status code %s: %q", resp.Status, buf))
@@ -282,7 +282,7 @@ func (s *loginSuite) TestLoginRedirect(c *qt.C) {
 	resp := s.srv.Do(c, req)
 	defer resp.Body.Close()
 	c.Assert(resp.StatusCode, qt.Equals, http.StatusOK)
-	buf, err := ioutil.ReadAll(resp.Body)
+	buf, err := io.ReadAll(resp.Body)
 	c.Assert(err, qt.IsNil)
 	var choice params.IDPChoice
 	err = json.Unmarshal(buf, &choice)
@@ -298,7 +298,7 @@ func (s *loginSuite) TestLoginRedirect(c *qt.C) {
 	req.ParseForm()
 	resp = s.srv.RoundTrip(c, req)
 	defer resp.Body.Close()
-	buf, err = ioutil.ReadAll(resp.Body)
+	buf, err = io.ReadAll(resp.Body)
 	c.Assert(err, qt.IsNil)
 
 	c.Assert(resp.StatusCode, qt.Equals, http.StatusSeeOther, qt.Commentf("unexpected status code %s: %q", resp.Status, buf))
@@ -317,7 +317,7 @@ func (s *loginSuite) TestLoginEmail(c *qt.C) {
 	resp := s.srv.Do(c, req)
 	defer resp.Body.Close()
 	c.Check(resp.StatusCode, qt.Equals, http.StatusOK)
-	buf, err := ioutil.ReadAll(resp.Body)
+	buf, err := io.ReadAll(resp.Body)
 	c.Assert(err, qt.IsNil)
 	c.Check(string(buf), qt.Matches, `
 .*/login/test/login\?state=12345
@@ -336,7 +336,7 @@ func (s *loginSuite) TestLoginEmailSubmitNoMatch(c *qt.C) {
 	resp := s.srv.Do(c, req)
 	defer resp.Body.Close()
 	c.Check(resp.StatusCode, qt.Equals, http.StatusOK)
-	buf, err := ioutil.ReadAll(resp.Body)
+	buf, err := io.ReadAll(resp.Body)
 	c.Assert(err, qt.IsNil)
 	c.Check(string(buf), qt.Matches, `
 .*/login/test/login\?state=12345
@@ -354,7 +354,7 @@ func (s *loginSuite) TestLoginEmailSubmitMatch(c *qt.C) {
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	resp := s.srv.RoundTrip(c, req)
 	defer resp.Body.Close()
-	buf, err := ioutil.ReadAll(resp.Body)
+	buf, err := io.ReadAll(resp.Body)
 	c.Assert(err, qt.IsNil)
 	c.Check(resp.StatusCode, qt.Equals, http.StatusSeeOther, qt.Commentf("%s %s", resp.Status, buf))
 	c.Check(resp.Header.Get("Location"), qt.Matches, `.*/login/test2/login\?state=12345`)

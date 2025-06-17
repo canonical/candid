@@ -7,8 +7,8 @@ import (
 	"bytes"
 	"context"
 	"encoding/pem"
-	"io/ioutil"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -64,11 +64,11 @@ func newFixture(c *qt.C) *fixture {
 		},
 	})
 	c.Assert(err, qt.IsNil)
-	c.Defer(func() {
+	c.Cleanup(func() {
 		f.server.Close()
 	})
 
-	f.Dir = c.Mkdir()
+	f.Dir = c.TempDir()
 	// If the cookiejar gets saved, it gets saved to $HOME/.go-cookiejar, so make
 	// sure that's not in the current directory.
 	c.Setenv("HOME", f.Dir)
@@ -147,7 +147,7 @@ func TestLoadCACerts(t *testing.T) {
 		Username:   "bob",
 	})
 
-	dir := c.Mkdir()
+	dir := c.TempDir()
 	c.Setenv("HOME", dir)
 	c.Setenv("CANDID_URL", srv.URL)
 	c.Setenv("BAKERY_AGENT_FILE", filepath.Join(dir, "admin.agent"))
@@ -165,7 +165,7 @@ func TestLoadCACerts(t *testing.T) {
 	unreadableFile := filepath.Join(dir, "unreadable.pem")
 	nonExistentFile := filepath.Join(dir, "non-existent.pem")
 
-	err = ioutil.WriteFile(
+	err = os.WriteFile(
 		certFile,
 		pem.EncodeToMemory(
 			&pem.Block{
@@ -176,9 +176,9 @@ func TestLoadCACerts(t *testing.T) {
 		0600,
 	)
 	c.Assert(err, qt.IsNil)
-	err = ioutil.WriteFile(emptyFile, nil, 0600)
+	err = os.WriteFile(emptyFile, nil, 0600)
 	c.Assert(err, qt.IsNil)
-	err = ioutil.WriteFile(unreadableFile, nil, 0)
+	err = os.WriteFile(unreadableFile, nil, 0)
 	c.Assert(err, qt.IsNil)
 
 	c.Setenv("CANDID_CA_CERTS", emptyFile+":"+unreadableFile+":"+nonExistentFile+"::"+certFile)
@@ -214,5 +214,5 @@ type candidtestT struct {
 }
 
 func (t candidtestT) Cleanup(f func()) {
-	t.Defer(f)
+	t.TB.Cleanup(f)
 }

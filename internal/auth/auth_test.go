@@ -63,7 +63,7 @@ func (s *authSuite) Init(c *qt.C) {
 	})
 	c.Assert(err, qt.IsNil)
 	ctx, close := s.store.Store.Context(context.Background())
-	c.Defer(close)
+	c.Cleanup(close)
 	s.context = ctx
 	s.authorizer, err = auth.New(auth.Params{
 		AdminPassword:    "password",

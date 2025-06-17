@@ -12,8 +12,8 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/duo-labs/webauthn/protocol"
-	"github.com/duo-labs/webauthn/webauthn"
+	"github.com/go-webauthn/webauthn/protocol"
+	"github.com/go-webauthn/webauthn/webauthn"
 	"github.com/juju/loggo"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/httprequest.v1"
@@ -144,7 +144,7 @@ func NewAuthenticator(id, name, origin string) (*Authenticator, error) {
 	auth, err := webauthn.New(&webauthn.Config{
 		RPDisplayName: name,
 		RPID:          id,
-		RPOrigin:      origin,
+		RPOrigins:     []string{origin},
 	})
 	if err != nil {
 		return nil, errgo.Mask(err)
@@ -290,7 +290,7 @@ func (a *Authenticator) registrationData(ctx context.Context, user webauthn.User
 		user,
 		webauthn.WithAuthenticatorSelection(
 			protocol.AuthenticatorSelection{
-				RequireResidentKey: protocol.ResidentKeyUnrequired(),
+				RequireResidentKey: protocol.ResidentKeyNotRequired(),
 				UserVerification:   protocol.VerificationDiscouraged,
 			}),
 		webauthn.WithConveyancePreference(protocol.PreferNoAttestation),

@@ -22,11 +22,13 @@ func LogTo(c *qt.C) {
 	// means we can still get logging output from tests that
 	// replace the default writer.
 	loggo.ResetLogging()
-	loggo.RegisterWriter(loggo.DefaultWriterName, discardWriter{})
-	loggo.RegisterWriter("testlogger", &loggoWriter{c})
-	err := loggo.ConfigureLoggers(cfg)
+	err := loggo.RegisterWriter(loggo.DefaultWriterName, discardWriter{})
 	c.Assert(err, qt.IsNil)
-	c.Defer(loggo.ResetLogging)
+	err = loggo.RegisterWriter("testlogger", &loggoWriter{c})
+	c.Assert(err, qt.IsNil)
+	err = loggo.ConfigureLoggers(cfg)
+	c.Assert(err, qt.IsNil)
+	c.Cleanup(loggo.ResetLogging)
 }
 
 type loggoWriter struct {

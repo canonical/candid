@@ -7,9 +7,9 @@ import (
 	"context"
 
 	"github.com/canonical/candid/store"
-	"gopkg.in/errgo.v1"
 	"github.com/juju/mgo/v2"
 	"github.com/juju/mgo/v2/bson"
+	"gopkg.in/errgo.v1"
 )
 
 type credentialDoc struct {

@@ -7,7 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -94,6 +94,7 @@ func (s *serverSuite) TestNewServerWithVersions(c *qt.C) {
 	assertServesVersion(c, h, "version1")
 	assertDoesNotServeVersion(c, h, "version2")
 	assertDoesNotServeVersion(c, h, "version3")
+	h.Close()
 
 	h, err = identity.New(identity.ServerParams{
 		Store:        s.store.Store,
@@ -108,6 +109,7 @@ func (s *serverSuite) TestNewServerWithVersions(c *qt.C) {
 	assertServesVersion(c, h, "version1")
 	assertServesVersion(c, h, "version2")
 	assertDoesNotServeVersion(c, h, "version3")
+	h.Close()
 
 	h, err = identity.New(identity.ServerParams{
 		Store:        s.store.Store,
@@ -123,6 +125,7 @@ func (s *serverSuite) TestNewServerWithVersions(c *qt.C) {
 	assertServesVersion(c, h, "version1")
 	assertServesVersion(c, h, "version2")
 	assertServesVersion(c, h, "version3")
+	h.Close()
 }
 
 func (s *serverSuite) TestServerHasAccessControlAllowHeaders(c *qt.C) {
@@ -148,15 +151,16 @@ func (s *serverSuite) TestServerHasAccessControlAllowHeaders(c *qt.C) {
 		Handler: h,
 		URL:     "/a",
 	})
+	headers := rec.Result().Header
 	c.Assert(rec.Code, qt.Equals, http.StatusOK)
-	c.Assert(len(rec.HeaderMap["Access-Control-Allow-Origin"]), qt.Equals, 1)
-	c.Assert(rec.HeaderMap["Access-Control-Allow-Origin"][0], qt.Equals, "*")
-	c.Assert(len(rec.HeaderMap["Access-Control-Allow-Headers"]), qt.Equals, 1)
-	c.Assert(rec.HeaderMap["Access-Control-Allow-Headers"][0], qt.Equals, "Bakery-Protocol-Version, Macaroons, X-Requested-With, Content-Type")
-	c.Assert(len(rec.HeaderMap["Access-Control-Allow-Origin"]), qt.Equals, 1)
-	c.Assert(rec.HeaderMap["Access-Control-Allow-Origin"][0], qt.Equals, "*")
-	c.Assert(len(rec.HeaderMap["Access-Control-Cache-Max-Age"]), qt.Equals, 1)
-	c.Assert(rec.HeaderMap["Access-Control-Cache-Max-Age"][0], qt.Equals, "600")
+	c.Assert(len(headers["Access-Control-Allow-Origin"]), qt.Equals, 1)
+	c.Assert(headers["Access-Control-Allow-Origin"][0], qt.Equals, "*")
+	c.Assert(len(headers["Access-Control-Allow-Headers"]), qt.Equals, 1)
+	c.Assert(headers["Access-Control-Allow-Headers"][0], qt.Equals, "Bakery-Protocol-Version, Macaroons, X-Requested-With, Content-Type")
+	c.Assert(len(headers["Access-Control-Allow-Origin"]), qt.Equals, 1)
+	c.Assert(headers["Access-Control-Allow-Origin"][0], qt.Equals, "*")
+	c.Assert(len(headers["Access-Control-Cache-Max-Age"]), qt.Equals, 1)
+	c.Assert(headers["Access-Control-Cache-Max-Age"][0], qt.Equals, "600")
 
 	rec = qthttptest.DoRequest(c, qthttptest.DoRequestParams{
 		Handler: h,
@@ -165,8 +169,8 @@ func (s *serverSuite) TestServerHasAccessControlAllowHeaders(c *qt.C) {
 		Header:  http.Header{"Origin": []string{"MyHost"}},
 	})
 	c.Assert(rec.Code, qt.Equals, http.StatusOK)
-	c.Assert(len(rec.HeaderMap["Access-Control-Allow-Origin"]), qt.Equals, 1)
-	c.Assert(rec.HeaderMap["Access-Control-Allow-Origin"][0], qt.Equals, "*")
+	c.Assert(len(headers["Access-Control-Allow-Origin"]), qt.Equals, 1)
+	c.Assert(headers["Access-Control-Allow-Origin"][0], qt.Equals, "*")
 }
 
 func (s *serverSuite) TestServerPanicRecovery(c *qt.C) {
@@ -223,7 +227,7 @@ func (s *serverSuite) TestServerStaticFiles(c *qt.C) {
 			}}, nil
 		}
 	}
-	path := c.Mkdir()
+	path := c.TempDir()
 	h, err := identity.New(identity.ServerParams{
 		Store:            s.store.Store,
 		MeetingStore:     s.store.MeetingStore,
@@ -339,7 +343,7 @@ func (s *fullServerSuite) TestACLMACARAQResponse(c *qt.C) {
 	resp, err := http.Get(s.srv.URL + "/acl/read-user")
 	c.Assert(err, qt.IsNil)
 	defer resp.Body.Close()
-	buf, err := ioutil.ReadAll(resp.Body)
+	buf, err := io.ReadAll(resp.Body)
 	c.Assert(err, qt.IsNil)
 	var herr httpbakery.Error
 	err = json.Unmarshal(buf, &herr)

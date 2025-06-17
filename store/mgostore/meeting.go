@@ -95,9 +95,16 @@ func (s *meetingStore) RemoveOld(ctx context.Context, addr string, olderThan tim
 	coll := s.b.c(ctx, meetingCollection)
 	defer coll.Database.Session.Close()
 
-	query := bson.D{{"created", bson.D{{"$lt", olderThan}}}}
+	query := bson.D{
+		{
+			Name: "created", Value: bson.D{{
+				Name:  "$lt",
+				Value: olderThan,
+			}},
+		},
+	}
 	if addr != "" {
-		query = append(query, bson.DocElem{"addr", addr})
+		query = append(query, bson.DocElem{Name: "addr", Value: addr})
 	}
 	iter := coll.Find(query).Select(nil).Iter()
 	var entry doc

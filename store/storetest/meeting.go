@@ -44,7 +44,7 @@ func (s *meetingSuite) Init(c *qt.C) {
 	s.Store = s.newStore(c)
 	ctx, close := s.Store.Context(context.Background())
 	s.ctx = ctx
-	c.Defer(close)
+	c.Cleanup(close)
 }
 
 func (s *meetingSuite) TestPutGetRemove(c *qt.C) {
@@ -70,6 +70,7 @@ func (s *meetingSuite) TestPutGetRemove(c *qt.C) {
 
 	addr, err = s.Store.Get(s.ctx, "y")
 	c.Assert(err, qt.ErrorMatches, "rendezvous not found, probably expired")
+	c.Assert(addr, qt.Equals, "")
 
 	addr, err = s.Store.Get(s.ctx, "x")
 	c.Assert(err, qt.IsNil)

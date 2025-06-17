@@ -94,7 +94,7 @@ func newFixture(c *qt.C) *fixture {
 		c.Fatal(err)
 	}
 	c.Assert(err, qt.IsNil)
-	c.Defer(backend.Close)
+	c.Cleanup(backend.Close)
 
 	connStr := os.Getenv("MGOCONNECTIONSTRING")
 	if connStr == "" {

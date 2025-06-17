@@ -4,7 +4,6 @@
 package ussooauth_test
 
 import (
-	"context"
 	"testing"
 
 	qt "github.com/frankban/quicktest"
@@ -67,7 +66,7 @@ func TestDischarge(t *testing.T) {
 		TokenSecret:    "secret2",
 	})
 	ussoSrv.MockUSSO.SetLoginUser("1234")
-	interactor := ussologin.NewInteractor(tokenGetterFunc(func(_ context.Context) (*usso.SSOData, error) {
+	interactor := ussologin.NewInteractor(tokenGetterFunc(func() (*usso.SSOData, error) {
 		return &usso.SSOData{
 			ConsumerKey:    "1234",
 			ConsumerSecret: "secret1",
@@ -79,8 +78,8 @@ func TestDischarge(t *testing.T) {
 	dischargeCreator.AssertDischarge(c, interactor)
 }
 
-type tokenGetterFunc func(context.Context) (*usso.SSOData, error)
+type tokenGetterFunc func() (*usso.SSOData, error)
 
-func (f tokenGetterFunc) GetToken(ctx context.Context) (*usso.SSOData, error) {
-	return f(ctx)
+func (f tokenGetterFunc) GetToken() (*usso.SSOData, error) {
+	return f()
 }

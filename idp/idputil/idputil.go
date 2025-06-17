@@ -124,7 +124,7 @@ type RegistrationParams struct {
 func RegistrationForm(ctx context.Context, w http.ResponseWriter, args RegistrationParams, t *template.Template) error {
 	t = t.Lookup("register")
 	if t == nil {
-		errgo.New("registration template not found")
+		return errgo.New("registration template not found")
 	}
 	w.Header().Set("Content-Type", "text/html;charset=utf-8")
 	args.TemplateBrandParameters = params.BrandParameters()

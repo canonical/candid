@@ -4,7 +4,7 @@
 package config_test
 
 import (
-	"io/ioutil"
+	"os"
 	"path"
 	"testing"
 	"time"
@@ -102,8 +102,8 @@ enable-email-login: true
 
 func readConfig(c *qt.C, content string) (*config.Config, error) {
 	// Write the configuration content to file.
-	path := path.Join(c.Mkdir(), "config.yaml")
-	err := ioutil.WriteFile(path, []byte(content), 0666)
+	path := path.Join(c.TempDir(), "config.yaml")
+	err := os.WriteFile(path, []byte(content), 0666)
 	c.Assert(err, qt.IsNil)
 
 	// Read the configuration.
@@ -189,7 +189,7 @@ func TestReadErrorNotFound(t *testing.T) {
 	c := qt.New(t)
 	defer c.Done()
 
-	cfg, err := config.Read(path.Join(c.Mkdir(), "no-such-file.yaml"))
+	cfg, err := config.Read(path.Join(c.TempDir(), "no-such-file.yaml"))
 	c.Assert(err, qt.ErrorMatches, ".* no such file or directory")
 	c.Assert(cfg, qt.IsNil)
 }

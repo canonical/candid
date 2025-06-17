@@ -173,15 +173,15 @@ func fieldValue(f store.Field, id *store.Identity) interface{} {
 	case store.Username:
 		return id.Username
 	case store.Name:
-		return sql.NullString{id.Name, id.Name != ""}
+		return sql.NullString{String: id.Name, Valid: id.Name != ""}
 	case store.Email:
-		return sql.NullString{id.Email, id.Email != ""}
+		return sql.NullString{String: id.Email, Valid: id.Email != ""}
 	case store.LastLogin:
 		return nullTime{id.LastLogin, !id.LastLogin.IsZero()}
 	case store.LastDischarge:
 		return nullTime{id.LastDischarge, !id.LastDischarge.IsZero()}
 	case store.Owner:
-		return sql.NullString{string(id.Owner), id.Owner != ""}
+		return sql.NullString{String: string(id.Owner), Valid: id.Owner != ""}
 	}
 	return nil
 }
@@ -420,10 +420,6 @@ func (s *identityStore) updateSet(tx *sql.Tx, table, id, key string, op store.Op
 		Values:     values,
 	}
 	if op == store.Clear || op == store.Set {
-		args := []interface{}{id}
-		if key != "" {
-			args = append(args, key)
-		}
 		if _, err := s.driver.exec(tx, tmplClearIdentitySet, params); err != nil {
 			return errgo.Mask(err)
 		}
