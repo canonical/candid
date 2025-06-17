@@ -10,7 +10,7 @@ jobs:
   build-snap:
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - run: git fetch --prune --unshallow
       - uses: ./.github/workflows/setupgoamd64
         with:
@@ -18,7 +18,7 @@ jobs:
           pat: ${{ secrets.GH_AUTH }}
       - run: sudo snap install snapcraft --channel=7.x/stable --classic
       - run: snapcraft --destructive-mode
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: candid-snap
           path: ./*.snap
