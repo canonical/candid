@@ -12,7 +12,7 @@ require (
 	github.com/gorilla/handlers v1.5.2
 	github.com/juju/aclstore/v2 v2.1.0
 	github.com/juju/clock v1.0.3
-	github.com/juju/cmd/v3 v3.0.16
+	github.com/juju/cmd/v3 v3.2.0
 	github.com/juju/gnuflag v1.0.0
 	github.com/juju/loggo v1.0.0
 	github.com/juju/mgo/v2 v2.0.2
