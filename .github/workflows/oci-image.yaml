@@ -6,7 +6,7 @@ jobs:
   candid-oci-image:
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - run: git fetch --prune --unshallow
       - uses: ./.github/workflows/setupgoamd64
       - uses: docker/setup-qemu-action@v2
@@ -16,7 +16,7 @@ jobs:
           echo "GIT_COMMIT=$(git rev-parse --verify HEAD)" >> $GITHUB_ENV
           echo "VERSION=$(git describe --dirty)" >> $GITHUB_ENV
       - name: Build image
-        uses: docker/build-push-action@v4
+        uses: docker/build-push-action@v6
         with:
           context: .
           file: ./Dockerfile
@@ -27,7 +27,7 @@ jobs:
             VERSION=${{ env.VERSION }}
           outputs: |
             type=docker,dest=candid-image.tar
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: candid-image
           path: ./*.tar
