@@ -10,7 +10,7 @@ jobs:
       - run: git fetch --prune --unshallow
       - uses: ./.github/workflows/setupgoamd64
       - uses: docker/setup-qemu-action@v2
-      - uses: docker/setup-buildx-action@v2
+      - uses: docker/setup-buildx-action@v3
       - name: Setup version and commit
         run: |
           echo "GIT_COMMIT=$(git rev-parse --verify HEAD)" >> $GITHUB_ENV
