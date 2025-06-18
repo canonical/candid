@@ -21,7 +21,7 @@ require (
 	github.com/juju/persistent-cookiejar v1.0.0
 	github.com/juju/postgrestest v1.1.1
 	github.com/juju/qthttptest v0.1.3
-	github.com/juju/schema v1.0.1
+	github.com/juju/schema v1.2.0
 	github.com/juju/simplekv v1.1.0
 	github.com/juju/testing v1.2.0
 	github.com/juju/usso v1.0.1
