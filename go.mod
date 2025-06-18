@@ -11,8 +11,8 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/handlers v1.5.2
 	github.com/juju/aclstore/v2 v2.1.0
-	github.com/juju/clock v1.0.3
-	github.com/juju/cmd/v3 v3.0.16
+	github.com/juju/clock v1.1.1
+	github.com/juju/cmd/v3 v3.2.0
 	github.com/juju/gnuflag v1.0.0
 	github.com/juju/loggo v1.0.0
 	github.com/juju/mgo/v2 v2.0.2
@@ -21,7 +21,7 @@ require (
 	github.com/juju/persistent-cookiejar v1.0.0
 	github.com/juju/postgrestest v1.1.1
 	github.com/juju/qthttptest v0.1.3
-	github.com/juju/schema v1.0.1
+	github.com/juju/schema v1.2.0
 	github.com/juju/simplekv v1.1.0
 	github.com/juju/testing v1.2.0
 	github.com/juju/usso v1.0.1
@@ -29,7 +29,7 @@ require (
 	github.com/julienschmidt/httprouter v1.3.0
 	github.com/lib/pq v1.10.9
 	github.com/mhilton/openid v0.0.0-20150511103207-7922a4e937d8
-	github.com/prometheus/client_golang v1.16.0
+	github.com/prometheus/client_golang v1.22.0
 	github.com/yohcop/openid-go v1.0.1
 	golang.org/x/crypto v0.39.0
 	golang.org/x/net v0.41.0
