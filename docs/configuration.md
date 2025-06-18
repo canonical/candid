@@ -372,6 +372,7 @@ authenticate the user.
 ```yaml
 - type: azure
   icon: /static/images/azure-icon.bmp
+  loginurl: https://login.microsoftonline.com/9188040d-6c67-4c5b-b112-36a304b66dad
   client-id: 43444f68-3666-4f95-bd34-6fc24b108019
   client-secret: tXV2SRFflAGT9sUdxkdIi7mwfmQ=
   hidden: false
@@ -391,6 +392,10 @@ The `client-id` and `client-secret` parameters must be specified and
 are created by registering the candid instance as an application at
 https://apps.dev.microsoft.com. When registering the application the
 redirect URLs should include `$CANDID_URL/login/azure/callback` .
+
+The `loginurl` parameter is optional and used to specify an Azure AD
+tenant login URL in the form of https://login.microsoftonline.com/{TENANT_Id}
+or https://sts.windows.net/{TENANT_ID}
 
 The `hidden` value is an optional value that can be used to not list
 this identity provider in the list of possible identity providers when
