@@ -18,7 +18,7 @@ jobs:
           user: ${{ secrets.GH_USER }}
           pat: ${{ secrets.GH_AUTH }}
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v3
+        uses: golangci/golangci-lint-action@v8
         with:
           version: latest
           only-new-issues: true
