@@ -14,7 +14,7 @@ import (
 
 	"github.com/juju/clock"
 	"github.com/juju/loggo"
-	"github.com/juju/utils/v2"
+	"github.com/juju/utils/v3"
 	"github.com/julienschmidt/httprouter"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/httprequest.v1"

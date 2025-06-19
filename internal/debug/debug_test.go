@@ -14,11 +14,11 @@ import (
 	"github.com/frankban/quicktest/qtsuite"
 	"github.com/juju/mgotest"
 	"github.com/juju/qthttptest"
-	"github.com/juju/utils/v2/debugstatus"
 	errgo "gopkg.in/errgo.v1"
 
 	"github.com/canonical/candid/internal/candidtest"
 	"github.com/canonical/candid/internal/debug"
+	"github.com/canonical/candid/internal/debugstatus"
 	"github.com/canonical/candid/internal/identity"
 	"github.com/canonical/candid/store/mgostore"
 	buildver "github.com/canonical/candid/version"

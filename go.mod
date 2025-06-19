@@ -25,7 +25,7 @@ require (
 	github.com/juju/simplekv v1.1.0
 	github.com/juju/testing v1.2.0
 	github.com/juju/usso v1.0.1
-	github.com/juju/utils/v2 v2.0.0-20210305225158-eedbe7b6b3e2
+	github.com/juju/utils/v3 v3.2.1
 	github.com/julienschmidt/httprouter v1.3.0
 	github.com/lib/pq v1.10.9
 	github.com/mhilton/openid v0.0.0-20150511103207-7922a4e937d8
@@ -61,9 +61,7 @@ require (
 	github.com/juju/ansiterm v0.0.0-20210706145210-9283cdf370b5 // indirect
 	github.com/juju/errors v1.0.0 // indirect
 	github.com/juju/go4 v0.0.0-20160222163258-40d72ab9641a // indirect
-	github.com/juju/httpprof v0.0.0-20141217160036-14bf14c30767 // indirect
 	github.com/juju/loggo/v2 v2.0.0 // indirect
-	github.com/juju/utils/v3 v3.1.0 // indirect
 	github.com/juju/webbrowser v0.0.0-20160309143629-54b8c57083b4 // indirect
 	github.com/kr/pretty v0.3.1 // indirect
 	github.com/kr/text v0.2.0 // indirect

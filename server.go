@@ -11,12 +11,12 @@ import (
 
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
 	"github.com/juju/aclstore/v2"
-	"github.com/juju/utils/v2/debugstatus"
 	"gopkg.in/errgo.v1"
 
 	"github.com/canonical/candid/idp"
 	"github.com/canonical/candid/idp/agent"
 	"github.com/canonical/candid/internal/debug"
+	"github.com/canonical/candid/internal/debugstatus"
 	"github.com/canonical/candid/internal/discharger"
 	"github.com/canonical/candid/internal/identity"
 	"github.com/canonical/candid/internal/mfa"

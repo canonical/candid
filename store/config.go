@@ -3,9 +3,9 @@ package store
 import (
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
 	"github.com/juju/aclstore/v2"
-	"github.com/juju/utils/v2/debugstatus"
 	errgo "gopkg.in/errgo.v1"
 
+	"github.com/canonical/candid/internal/debugstatus"
 	"github.com/canonical/candid/meeting"
 )
 

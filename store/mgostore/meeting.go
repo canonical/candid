@@ -10,8 +10,9 @@ import (
 
 	"github.com/juju/mgo/v2"
 	"github.com/juju/mgo/v2/bson"
-	"github.com/juju/utils/v2/debugstatus"
 	"gopkg.in/errgo.v1"
+
+	"github.com/canonical/candid/internal/debugstatus"
 )
 
 type doc struct {

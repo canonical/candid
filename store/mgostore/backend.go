@@ -12,9 +12,9 @@ import (
 	"github.com/juju/aclstore/v2"
 	mgo "github.com/juju/mgo/v2"
 	"github.com/juju/simplekv/mgosimplekv"
-	"github.com/juju/utils/v2/debugstatus"
 	errgo "gopkg.in/errgo.v1"
 
+	"github.com/canonical/candid/internal/debugstatus"
 	"github.com/canonical/candid/meeting"
 	"github.com/canonical/candid/store"
 )
