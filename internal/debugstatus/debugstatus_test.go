@@ -83,15 +83,6 @@ func (s *statusSuite) TestServerStartTime(c *gc.C) {
 	})
 }
 
-// pinger implements a debugstatus.Pinger used for tests.
-type pinger struct {
-	err error
-}
-
-func (p pinger) Ping() error {
-	return p.err
-}
-
 var mongoCollectionsTests = []struct {
 	about        string
 	collector    collector
@@ -157,32 +148,6 @@ func (c collector) Collections() []*mgo.Collection {
 		collections[i] = &mgo.Collection{Name: name}
 	}
 	return collections
-}
-
-var renameTests = []struct {
-	about string
-	key   string
-	name  string
-}{{
-	about: "rename key",
-	key:   "new-key",
-}, {
-	about: "rename name",
-	name:  "new name",
-}, {
-	about: "rename both",
-	key:   "another-key",
-	name:  "another name",
-}, {
-	about: "do not rename",
-}}
-
-var reqServer = httprequest.Server{
-	ErrorMapper: func(ctx context.Context, err error) (httpStatus int, errorBody interface{}) {
-		return http.StatusInternalServerError, httprequest.RemoteError{
-			Message: err.Error(),
-		}
-	},
 }
 
 type handlerSuite struct {
