@@ -150,6 +150,14 @@ func (c collector) Collections() []*mgo.Collection {
 	return collections
 }
 
+var reqServer = httprequest.Server{
+	ErrorMapper: func(ctx context.Context, err error) (httpStatus int, errorBody interface{}) {
+		return http.StatusInternalServerError, httprequest.RemoteError{
+			Message: err.Error(),
+		}
+	},
+}
+
 type handlerSuite struct {
 }
 
