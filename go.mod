@@ -11,8 +11,8 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/handlers v1.5.2
 	github.com/juju/aclstore/v2 v2.1.0
-	github.com/juju/clock v1.0.3
-	github.com/juju/cmd/v3 v3.0.16
+	github.com/juju/clock v1.1.1
+	github.com/juju/cmd/v3 v3.2.0
 	github.com/juju/gnuflag v1.0.0
 	github.com/juju/loggo v1.0.0
 	github.com/juju/mgo/v2 v2.0.2
@@ -21,7 +21,7 @@ require (
 	github.com/juju/persistent-cookiejar v1.0.0
 	github.com/juju/postgrestest v1.1.1
 	github.com/juju/qthttptest v0.1.3
-	github.com/juju/schema v1.0.1
+	github.com/juju/schema v1.2.0
 	github.com/juju/simplekv v1.1.0
 	github.com/juju/testing v1.2.0
 	github.com/juju/usso v1.0.1
@@ -29,7 +29,7 @@ require (
 	github.com/julienschmidt/httprouter v1.3.0
 	github.com/lib/pq v1.10.9
 	github.com/mhilton/openid v0.0.0-20150511103207-7922a4e937d8
-	github.com/prometheus/client_golang v1.16.0
+	github.com/prometheus/client_golang v1.22.0
 	github.com/yohcop/openid-go v1.0.1
 	golang.org/x/crypto v0.39.0
 	golang.org/x/net v0.41.0
@@ -49,7 +49,7 @@ require (
 
 require (
 	github.com/beorn7/perks v1.0.1 // indirect
-	github.com/cespare/xxhash/v2 v2.2.0 // indirect
+	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/felixge/httpsnoop v1.0.3 // indirect
 	github.com/fxamacker/cbor/v2 v2.8.0 // indirect
 	github.com/go-jose/go-jose/v4 v4.0.5 // indirect
@@ -70,19 +70,19 @@ require (
 	github.com/lunixbochs/vtclean v1.0.0 // indirect
 	github.com/mattn/go-colorable v0.1.8 // indirect
 	github.com/mattn/go-isatty v0.0.13 // indirect
-	github.com/matttproud/golang_protobuf_extensions v1.0.4 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
-	github.com/prometheus/client_model v0.3.0 // indirect
-	github.com/prometheus/common v0.42.0 // indirect
-	github.com/prometheus/procfs v0.10.1 // indirect
+	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
+	github.com/prometheus/client_model v0.6.1 // indirect
+	github.com/prometheus/common v0.62.0 // indirect
+	github.com/prometheus/procfs v0.15.1 // indirect
 	github.com/rogpeppe/fastuuid v1.2.0 // indirect
-	github.com/rogpeppe/go-internal v1.9.0 // indirect
+	github.com/rogpeppe/go-internal v1.10.0 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/xdg-go/stringprep v1.0.3 // indirect
 	golang.org/x/sys v0.33.0 // indirect
 	golang.org/x/term v0.32.0 // indirect
 	golang.org/x/text v0.26.0 // indirect
-	google.golang.org/protobuf v1.33.0 // indirect
+	google.golang.org/protobuf v1.36.5 // indirect
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
 	gopkg.in/mgo.v2 v2.0.0-20190816093944-a6b53ec6cb22 // indirect
 	gopkg.in/retry.v1 v1.0.3 // indirect

@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.3.1
-FROM ubuntu:20.04 as build-env
+FROM ubuntu:20.04 AS build-env
 ARG GIT_COMMIT
 ARG VERSION
 ARG GO_VERSION
