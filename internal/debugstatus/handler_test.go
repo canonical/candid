@@ -15,14 +15,6 @@ import (
 	"github.com/canonical/candid/internal/debugstatus"
 )
 
-var reqServer = httprequest.Server{
-	ErrorMapper: func(ctx context.Context, err error) (httpStatus int, errorBody interface{}) {
-		return http.StatusInternalServerError, httprequest.RemoteError{
-			Message: err.Error(),
-		}
-	},
-}
-
 type handlerSuite struct {
 }
 
