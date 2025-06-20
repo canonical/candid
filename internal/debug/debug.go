@@ -9,9 +9,9 @@ import (
 
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
 	"github.com/juju/loggo"
-	"github.com/juju/utils/v2/debugstatus"
 	"gopkg.in/httprequest.v1"
 
+	"github.com/canonical/candid/internal/debugstatus"
 	"github.com/canonical/candid/internal/identity"
 	"github.com/canonical/candid/version"
 )

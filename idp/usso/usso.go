@@ -16,7 +16,7 @@ import (
 	"github.com/juju/names/v4"
 	"github.com/juju/usso"
 	"github.com/juju/usso/openid"
-	"github.com/juju/utils/v2/cache"
+	"github.com/juju/utils/v3/cache"
 	"github.com/prometheus/client_golang/prometheus"
 	"gopkg.in/errgo.v1"
 	"launchpad.net/lpad"
