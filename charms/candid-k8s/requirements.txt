@@ -1,4 +1,4 @@
-Jinja2 == 2.11.3
+Jinja2 == 3.1.6
 ops >= 1.4.0
 ops-lib-pgsql
 markupsafe == 2.0.1
