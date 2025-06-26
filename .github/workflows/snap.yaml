@@ -1,6 +1,8 @@
 name: BuildSnap
 on:
   workflow_dispatch:
+  push:
+  pull_request:  
 
 env:
   GH_AUTH: ${{ secrets.GH_AUTH }}
