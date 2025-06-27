@@ -29,7 +29,7 @@ parts:
      - bzr
      - gcc
     build-snaps:
-     - go
+     - go/1.16/stable
     prime:
      - bin/bakery-keygen
      - bin/candid

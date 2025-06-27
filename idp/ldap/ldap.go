@@ -184,6 +184,7 @@ func NewIdentityProvider(p Params) (idp.IdentityProvider, error) {
 		return nil, errgo.Newf("unsupported scheme %q", u.Scheme)
 	}
 	idp.baseDN = strings.TrimPrefix(u.Path, "/")
+	idp.tlsConfig.MinVersion = tls.VersionTLS12
 	if p.CACertificate != "" {
 		idp.tlsConfig.RootCAs = x509.NewCertPool()
 		idp.tlsConfig.RootCAs.AppendCertsFromPEM([]byte(p.CACertificate))
@@ -250,7 +251,7 @@ func (idp *identityProvider) URL(state string) string {
 func (idp *identityProvider) SetInteraction(ierr *httpbakery.Error, dischargeID string) {
 }
 
-//  GetGroups implements idp.IdentityProvider.GetGroups.
+// GetGroups implements idp.IdentityProvider.GetGroups.
 func (idp *identityProvider) GetGroups(ctx context.Context, identity *store.Identity) ([]string, error) {
 	conn, err := idp.dial()
 	if err != nil {
