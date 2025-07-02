@@ -440,6 +440,31 @@ a user attempts to login via an email address the address will be
 checked against the regular expression and if they match the identity
 provider will be used to perform the login.
 
+### Generic OpenID Connect
+
+```yaml
+- type: openid-connect
+  domain: example
+  client-id: 483156874216
+  client-secret: 32hf3uhud23dS@#e
+  issuer: https://example.com/application/o/client/
+  scopes: ["openid", "profile", "email"]
+  hidden: false
+  description: "Generic OIDC"
+```
+
+The generic OpenID Connect identity provider uses any OIDC compliant issuer (e.g. Authentik) to login using configured credentials.
+
+The `client-id` and `client-secret` must be specified and will be available through the OIDC provider.
+
+The `issuer` is required and must match the issuer value in the `/.well-known/openid-configuration` endpoint exactly.
+
+It is recommended to include the `scopes` value with at least the openid, profile, and email scopes configured. If this value is not set, Candid will default to only using the openid scope, which may require users to input name and email upon their first login.
+
+The `hidden` value is an optional value that can be used to not list this identity provider in the list of possible identity providers when performing an interactive login.
+
+The `description` value is an optional value that can be used to customize the name of the provider as it appears in the Candid login portal.
+
 ### Google OpenID Connect
 
 ```yaml
