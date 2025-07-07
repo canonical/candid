@@ -38,10 +38,10 @@ github.com/go-macaroon-bakery/macaroon-bakery/v3 v3.0.2 h1:MKi1SVBLUmEB5Kfqw2UTc
 github.com/go-macaroon-bakery/macaroon-bakery/v3 v3.0.2/go.mod h1:H59IYeChwvD1po3dhGUPvq5na+4NVD7SJlbhGKvslr0=
 github.com/go-macaroon-bakery/macaroonpb v1.0.0 h1:It9exBaRMZ9iix1iJ6gwzfwsDE6ExNuwtAJ9e09v6XE=
 github.com/go-macaroon-bakery/macaroonpb v1.0.0/go.mod h1:UzrGOcbiwTXISFP2XDLDPjfhMINZa+fX/7A2lMd31zc=
-github.com/go-webauthn/webauthn v0.13.0 h1:cJIL1/1l+22UekVhipziAaSgESJxokYkowUqAIsWs0Y=
-github.com/go-webauthn/webauthn v0.13.0/go.mod h1:Oy9o2o79dbLKRPZWWgRIOdtBGAhKnDIaBp2PFkICRHs=
-github.com/go-webauthn/x v0.1.21 h1:nFbckQxudvHEJn2uy1VEi713MeSpApoAv9eRqsb9AdQ=
-github.com/go-webauthn/x v0.1.21/go.mod h1:sEYohtg1zL4An1TXIUIQ5csdmoO+WO0R4R2pGKaHYKA=
+github.com/go-webauthn/webauthn v0.13.1 h1:Q3/GLXsckVJUPE+BGR6ex26yRIiZ/X2ITaMeSkOftuc=
+github.com/go-webauthn/webauthn v0.13.1/go.mod h1:HeaBromTjgMg1sHZOzyjEiqcrk4Og7mxafDTWDepaXI=
+github.com/go-webauthn/x v0.1.22 h1:rHilV/rYXawarI0uA3uZ5nhLb30Ex8RgbVAsOSt/57o=
+github.com/go-webauthn/x v0.1.22/go.mod h1:+iV9BF4OsvLYzETdc0lmQO2webTos10oH6QydSoWxDM=
 github.com/gofrs/uuid v4.2.0+incompatible/go.mod h1:b2aQJv3Z4Fp6yNu3cdSllBxTCLRxnplIgP/c0N/04lM=
 github.com/golang-jwt/jwt/v5 v5.2.2 h1:Rl4B7itRWVtYIHFrSNd7vhTiz9UpLdi6gZhZ3wEeDy8=
 github.com/golang-jwt/jwt/v5 v5.2.2/go.mod h1:pqrtFR0X4osieyHYxtmOUWsAWrfe1Q5UVIyoH402zdk=
