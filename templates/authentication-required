@@ -70,7 +70,6 @@
 </div>
 
 {{ if .ShowEmailLink }}
-        <a href="{{.WithEmailURL}}">Or login with email address</a>
 {{ end }}
       </div>
     </div>
