@@ -18,7 +18,7 @@ jobs:
           pat: ${{ secrets.GH_AUTH }}
       - run: sudo snap install snapcraft --channel=7.x/stable --classic
       - run: snapcraft --destructive-mode
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: candid-snap
           path: ./*.snap
