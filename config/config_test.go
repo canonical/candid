@@ -85,6 +85,12 @@ tls-key: |
   ORfedwfVln37uivduCeyBLMhaYWiW6CN4Di/d8LsI1hwe1MlNHuV2EptaFDzfjx8
   FWQQKAkL5KolhJye0Kz/X8CT3UMmhOK73UkUaOvMvdSjxLFgIruxWQ==
   -----END RSA PRIVATE KEY-----
+HSTS-max-age: 31536000
+HSTS-include-subdomains: true
+TLS-cipher-suites:
+- TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256
+- TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
+- WRONG_CIPHER_SUITE
 resource-path: /resources
 http-proxy: http://proxy.example.com:3128
 no-proxy: localhost,.example.com

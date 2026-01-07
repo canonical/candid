@@ -114,6 +114,21 @@ func serve(conf *config.Config) error {
 	})
 }
 
+// hstsMiddleware adds HSTS headers when configured
+func hstsMiddleware(next http.Handler, maxAge int, includeSubDomains bool) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if maxAge > 0 {
+			headerParams := fmt.Sprintf("max-age: %d", maxAge)
+			if includeSubDomains {
+				// Capital 'D' per RFC 6797
+				headerParams += "; includeSubDomains"
+			}
+			w.Header().Add("Strict-Transport-Security", headerParams)
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
 func serveIdentity(conf *config.Config, params candid.ServerParams) error {
 	logger.Infof("setting up the identity server")
 	params.IdentityProviders = defaultIDPs
@@ -171,6 +186,11 @@ func serveIdentity(conf *config.Config, params candid.ServerParams) error {
 	// Cast the Server to an http.Handler so that it can be
 	// optionally wrapped by the logging handler below.
 	var server http.Handler = srv
+
+	// Add HSTS middleware if configured
+	if conf.HSTSMaxAge > 0 {
+		server = hstsMiddleware(server, conf.HSTSMaxAge, conf.HSTSIncludeSubdomains)
+	}
 
 	if conf.AccessLog != "" {
 		accesslog := &lumberjack.Logger{
