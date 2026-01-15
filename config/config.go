@@ -63,16 +63,16 @@ type Config struct {
 
 	// HSTSMaxAge holds the max-age value for HSTS headers in seconds.
 	// If 0, HSTS headers will not be added. Typically set to 31536000 (1 year).
-	HSTSMaxAge int `yaml:"hsts-max-age"`
+	HSTSMaxAge int `yaml:"HSTS-max-age"`
 
 	// HSTSIncludeSubdomains controls whether the includeSubDomains directive
 	// is added to the HSTS header.
-	HSTSIncludeSubdomains bool `yaml:"hsts-include-subdomains"`
+	HSTSIncludeSubdomains bool `yaml:"HSTS-include-subdomains"`
 
 	// TLSCipherSuites holds a list of enabled TLS cipher suites.
 	// If empty, Go's default secure cipher suites are used.
 	// Values should be standard cipher suite names (e.g., "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256")
-	TLSCipherSuites []string `yaml:"tls-cipher-suites"`
+	TLSCipherSuites []string `yaml:"TLS-cipher-suites"`
 
 	// PublicKey and PrivateKey holds the key pair used by the Candid
 	// server for encryption and decryption of third party caveats.
@@ -157,13 +157,16 @@ func parseCipherSuites(names []string) ([]uint16, error) {
 	// https://cs.opensource.google/go/go/+/refs/tags/go1.25.4:src/crypto/tls/cipher_suites.go
 	var suites []uint16
 
-	for _, cs := range tls.CipherSuites() {
-		for _, name := range names {
+	for _, name := range names {
+		var cipherSuiteSupported bool = false
+		for _, cs := range tls.CipherSuites() {
 			if cs.Name == name {
 				suites = append(suites, cs.ID)
-			} else {
-				return nil, errgo.Newf("Unknown cipher suite name: %s", name)
+				cipherSuiteSupported = true
 			}
+		}
+		if !cipherSuiteSupported {
+			return nil, errgo.Newf("Unsupported cipher suite: %s", name)
 		}
 	}
 	return suites, nil
@@ -208,6 +211,9 @@ func (c *Config) validate() error {
 	}
 	if c.ListenAddress == "" {
 		missing = append(missing, "listen-address")
+	}
+	if c.HSTSIncludeSubdomains == true && c.HSTSMaxAge == 0 {
+		missing = append(missing, "HSTS-max-age (required when HSTS-include-subdomains is true)")
 	}
 	if c.PrivateKey == nil {
 		missing = append(missing, "private-key")

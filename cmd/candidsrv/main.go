@@ -120,7 +120,7 @@ func hstsMiddleware(next http.Handler, maxAge int, includeSubDomains bool) http.
 		if maxAge > 0 {
 			headerParams := fmt.Sprintf("max-age: %d", maxAge)
 			if includeSubDomains {
-				// Capital 'D' per RFC 6797
+				// Capital 'S and D' per RFC 6797
 				headerParams += "; includeSubDomains"
 			}
 			w.Header().Add("Strict-Transport-Security", headerParams)
