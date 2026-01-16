@@ -66,7 +66,8 @@ type Config struct {
 	HSTSMaxAge int `yaml:"HSTS-max-age"`
 
 	// HSTSIncludeSubdomains controls whether the includeSubDomains directive
-	// is added to the HSTS header.
+	// is added to the HSTS header. If this is true, HSTSMaxAge must be
+	// greater than 0.
 	HSTSIncludeSubdomains bool `yaml:"HSTS-include-subdomains"`
 
 	// TLSCipherSuites holds a list of enabled TLS cipher suites.
