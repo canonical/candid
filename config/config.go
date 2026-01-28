@@ -159,7 +159,7 @@ func parseCipherSuites(names []string) ([]uint16, error) {
 	var suites []uint16
 
 	for _, name := range names {
-		var cipherSuiteSupported bool = false
+		var cipherSuiteSupported = false
 		for _, cs := range tls.CipherSuites() {
 			if cs.Name == name {
 				suites = append(suites, cs.ID)
@@ -213,7 +213,7 @@ func (c *Config) validate() error {
 	if c.ListenAddress == "" {
 		missing = append(missing, "listen-address")
 	}
-	if c.HSTSIncludeSubdomains == true && c.HSTSMaxAge == 0 {
+	if c.HSTSIncludeSubdomains && c.HSTSMaxAge == 0 {
 		missing = append(missing, "HSTS-max-age (required when HSTS-include-subdomains is true)")
 	}
 	if c.PrivateKey == nil {

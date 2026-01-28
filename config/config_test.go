@@ -212,12 +212,12 @@ func TestRead(t *testing.T) {
 	store.Register("test", testStorageBackend)
 
 	// check if wrong cipher suite names are detected
-	conf, err := readConfig(c, testConfigWithUnsupportedCipher)
+	conf, _ := readConfig(c, testConfigWithUnsupportedCipher)
 	tlsConfig := conf.TLSConfig()
 	c.Assert(tlsConfig, qt.IsNil)
 
 	// continue with valid config
-	conf, err = readConfig(c, testConfig)
+	conf, err := readConfig(c, testConfig)
 	c.Assert(err, qt.IsNil)
 	// Check that the TLS configuration creates a valid *tls.Config
 	tlsConfig = conf.TLSConfig()
