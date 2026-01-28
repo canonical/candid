@@ -20,6 +20,11 @@ storage:
     address: localhost:27017
 public-key: OAG9EVDFgXzWQKIk+MTxpLVO1Mp1Ws/pIkzhxv5Jk1M=
 private-key: q2G3A2NjTe7MP9D8iugCH9XfBAyrnV8n8u8ACbNyNOY=
+HSTS-max-age: 31536000
+HSTS-include-subdomains: true
+TLS-cipher-suites:
+  - TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
+  - TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384
 identity-providers:
 - type: usso
 ```
@@ -61,6 +66,34 @@ a suitable key pair.
 The access-log configures the name of a file used to record all
 accesses to the identity manager. If this is not configured then no
 logging will take place.
+
+### HSTS-max-age
+This configures the max-age value (in seconds) for HTTP Strict Transport Security (HSTS) headers. When set to a positive value, Candid will add the Strict-Transport-Security header to all responses, instructing browsers to only access the service over HTTPS for the specified duration.
+
+A typical value is 31536000 (one year). If set to 0 or not configured, HSTS headers will not be added.
+
+HSTS is a security feature that helps protect against protocol downgrade attacks and cookie hijacking by ensuring that browsers only connect to the server via HTTPS.
+
+### HSTS-include-subdomains
+When set to `true`, adds the `includeSubDomains` directive to the HSTS header, which applies the HSTS policy to all subdomains of the Candid service. This setting requires `HSTS-max-age` to be greater than 0.
+
+### TLS-cipher-suites
+This configures the list of enabled TLS cipher suites for TLS 1.2 connections. If not specified, Go's default secure cipher suites will be used.
+
+Values should be standard cipher suite names as defined in the Go `crypto/tls` package. For example:
+
+```yaml
+TLS-cipher-suites:
+  - TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
+  - TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384
+  - TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256
+  - TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384
+```
+
+Important Notes:
+
+- This setting only applies to TLS 1.2 connections. TLS 1.3 cipher suites are not configurable in Go and will always use the secure defaults (`TLS_AES_128_GCM_SHA256`, `TLS_AES_256_GCM_SHA384`, `TLS_CHACHA20_POLY1305_SHA256`).
+- Invalid cipher suite names will cause Candid to fail to start.
 
 ### identity-providers
 
