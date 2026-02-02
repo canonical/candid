@@ -7,7 +7,17 @@ package candidtest
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/tls"
+	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/pem"
+	"math/big"
+	"net"
+	"net/http"
 	"net/http/httptest"
+	"time"
 
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
 	"github.com/juju/aclstore/v2"
@@ -134,4 +144,88 @@ func AddIdentity(ctx context.Context, st store.Store, identity *store.Identity) 
 	if err := st.UpdateIdentity(ctx, identity, update); err != nil {
 		panic(err)
 	}
+}
+
+// GenerateTestCert generates a self-signed test certificate and returns
+// the certificate, certificate PEM, and key PEM.
+func GenerateTestCert(commonName string) (tls.Certificate, []byte, []byte, error) {
+	// Generate private key
+	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		return tls.Certificate{}, nil, nil, err
+	}
+
+	// Create certificate
+	now := time.Now()
+	template := x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject: pkix.Name{
+			CommonName: commonName,
+		},
+		NotBefore: now,
+		NotAfter:  now.Add(24 * time.Hour),
+		KeyUsage:  x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
+		ExtKeyUsage: []x509.ExtKeyUsage{
+			x509.ExtKeyUsageServerAuth,
+		},
+		IPAddresses: []net.IP{net.ParseIP("127.0.0.1"), net.ParseIP("::1")},
+		DNSNames:    []string{commonName, "localhost"},
+	}
+
+	// Self-sign the certificate
+	certBytes, err := x509.CreateCertificate(rand.Reader, &template, &template, &privateKey.PublicKey, privateKey)
+	if err != nil {
+		return tls.Certificate{}, nil, nil, err
+	}
+
+	// Encode certificate to PEM
+	certPEM := pem.EncodeToMemory(&pem.Block{
+		Type:  "CERTIFICATE",
+		Bytes: certBytes,
+	})
+
+	// Encode private key to PEM
+	privateKeyBytes, err := x509.MarshalPKCS8PrivateKey(privateKey)
+	if err != nil {
+		return tls.Certificate{}, nil, nil, err
+	}
+
+	keyPEM := pem.EncodeToMemory(&pem.Block{
+		Type:  "PRIVATE KEY",
+		Bytes: privateKeyBytes,
+	})
+
+	// Create tls.Certificate
+	cert, err := tls.X509KeyPair(certPEM, keyPEM)
+	if err != nil {
+		return tls.Certificate{}, nil, nil, err
+	}
+
+	return cert, certPEM, keyPEM, nil
+}
+
+// NewTLSServerWithConfig creates a new TLS HTTPS server with the given handler,
+// TLS configuration, and certificate/key PEM data.
+func NewTLSServerWithConfig(handler http.Handler, tlsConfig *tls.Config, certPEM, keyPEM []byte) *httptest.Server {
+	srv := httptest.NewUnstartedServer(handler)
+
+	// Parse the certificate
+	cert, err := tls.X509KeyPair(certPEM, keyPEM)
+	if err != nil {
+		panic(err)
+	}
+
+	// Ensure the TLS config has the certificate
+	if tlsConfig.Certificates == nil {
+		tlsConfig.Certificates = []tls.Certificate{cert}
+	}
+
+	// Enable HTTP/2 by setting NextProtos
+	if tlsConfig.NextProtos == nil {
+		tlsConfig.NextProtos = []string{"h2", "http/1.1"}
+	}
+
+	srv.TLS = tlsConfig
+	srv.StartTLS()
+	return srv
 }

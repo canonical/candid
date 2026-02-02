@@ -61,6 +61,20 @@ type Config struct {
 	TLSCert string `yaml:"tls-cert"`
 	TLSKey  string `yaml:"tls-key"`
 
+	// HSTSMaxAge holds the max-age value for HSTS headers in seconds.
+	// If 0, HSTS headers will not be added. Typically set to 31536000 (1 year).
+	HSTSMaxAge int `yaml:"HSTS-max-age"`
+
+	// HSTSIncludeSubdomains controls whether the includeSubDomains directive
+	// is added to the HSTS header. If this is true, HSTSMaxAge must be
+	// greater than 0.
+	HSTSIncludeSubdomains bool `yaml:"HSTS-include-subdomains"`
+
+	// TLSCipherSuites holds a list of enabled TLS cipher suites.
+	// If empty, Go's default secure cipher suites are used.
+	// Values should be standard cipher suite names (e.g., "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256").
+	TLSCipherSuites []string `yaml:"TLS-cipher-suites"`
+
 	// PublicKey and PrivateKey holds the key pair used by the Candid
 	// server for encryption and decryption of third party caveats.
 	// These must be specified.
@@ -139,8 +153,30 @@ type Config struct {
 	BrandLogoLocation string `yaml:"brand-logo-location"`
 }
 
-// TLSConfig returns a TLS configuration to be used for serving
-// the API. If the TLS certficate and key are not specified, it returns nil.
+func parseCipherSuites(names []string) ([]uint16, error) {
+	// this list is inspired by Golang's current cypher suite prioritization:
+	// https://cs.opensource.google/go/go/+/refs/tags/go1.25.4:src/crypto/tls/cipher_suites.go
+	var suites []uint16
+
+	for _, name := range names {
+		var cipherSuiteSupported = false
+		for _, cs := range tls.CipherSuites() {
+			if cs.Name == name {
+				suites = append(suites, cs.ID)
+				cipherSuiteSupported = true
+			}
+		}
+		if !cipherSuiteSupported {
+			return nil, errgo.Newf("Unsupported cipher suite: %s", name)
+		}
+	}
+	return suites, nil
+}
+
+// TLSConfig returns a TLS configuration to be used for serving the API.
+// If the TLS certificate and key are not specified, it returns nil.
+// If tls-cipher-suites are configured they will be used.
+// If tls-cipher-suites are not configured the Golang defaults are used.
 func (c *Config) TLSConfig() *tls.Config {
 	if c.TLSCert == "" || c.TLSKey == "" {
 		return nil
@@ -151,12 +187,21 @@ func (c *Config) TLSConfig() *tls.Config {
 		logger.Errorf("cannot create certificate: %s", err)
 		return nil
 	}
-	return &tls.Config{
-		Certificates: []tls.Certificate{
-			cert,
-		},
-		MinVersion: tls.VersionTLS12,
+
+	tlsConfig := &tls.Config{
+		Certificates: []tls.Certificate{cert},
+		MinVersion:   tls.VersionTLS12,
 	}
+
+	if len(c.TLSCipherSuites) > 0 {
+		cipherSuites, err := parseCipherSuites(c.TLSCipherSuites)
+		if err != nil {
+			logger.Errorf("cannot parse cipher suites: %s", err)
+			return nil
+		}
+		tlsConfig.CipherSuites = cipherSuites
+	}
+	return tlsConfig
 }
 
 func (c *Config) validate() error {
@@ -167,6 +212,9 @@ func (c *Config) validate() error {
 	}
 	if c.ListenAddress == "" {
 		missing = append(missing, "listen-address")
+	}
+	if c.HSTSIncludeSubdomains && c.HSTSMaxAge == 0 {
+		missing = append(missing, "HSTS-max-age (required when HSTS-include-subdomains is true)")
 	}
 	if c.PrivateKey == nil {
 		missing = append(missing, "private-key")
