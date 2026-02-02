@@ -206,13 +206,6 @@ func GenerateTestCert(commonName string) (tls.Certificate, []byte, []byte, error
 
 // NewTLSServerWithConfig creates a new TLS HTTPS server with the given handler,
 // TLS configuration, and certificate/key PEM data.
-// func NewTLSServerWithConfig(handler http.Handler, tlsConfig *tls.Config, certPEM, keyPEM []byte) *httptest.Server {
-// 	srv := httptest.NewUnstartedServer(handler)
-// 	srv.TLS = tlsConfig
-// 	srv.StartTLS()
-// 	return srv
-// }
-
 func NewTLSServerWithConfig(handler http.Handler, tlsConfig *tls.Config, certPEM, keyPEM []byte) *httptest.Server {
 	srv := httptest.NewUnstartedServer(handler)
 

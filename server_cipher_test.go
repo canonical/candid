@@ -8,7 +8,6 @@ package candid_test
 
 import (
 	"crypto/tls"
-	"fmt"
 	"net/http"
 	"testing"
 
@@ -75,7 +74,7 @@ func serverTLSCipherSuitesRunner(t *testing.T, configuredCiphers []string, clien
 
 	resp, err := client.Get(srv.URL + "/v1/discharge")
 	c.Assert(err, qt.IsNil)
-	defer resp.Body.Close()
+	defer func() { c.Assert(resp.Body.Close(), qt.IsNil) }()
 
 	c.Assert(resp.TLS, qt.Not(qt.IsNil), qt.Commentf("expected TLS connection"))
 
@@ -83,8 +82,6 @@ func serverTLSCipherSuitesRunner(t *testing.T, configuredCiphers []string, clien
 
 	// Verify that the cipher suite used is one of the configured ones
 	usedCipherID := resp.TLS.CipherSuite
-	fmt.Printf("Server selected cipher suite name %s and ID: %d\n", tls.CipherSuiteName(usedCipherID), usedCipherID)
-	fmt.Printf("Configured cipher suite names %s and IDs: %v\n", configuredCiphers, cipherSuiteIDs)
 	found := false
 	for _, id := range cipherSuiteIDs {
 		if id == usedCipherID {

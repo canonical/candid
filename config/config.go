@@ -72,7 +72,7 @@ type Config struct {
 
 	// TLSCipherSuites holds a list of enabled TLS cipher suites.
 	// If empty, Go's default secure cipher suites are used.
-	// Values should be standard cipher suite names (e.g., "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256")
+	// Values should be standard cipher suite names (e.g., "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256").
 	TLSCipherSuites []string `yaml:"TLS-cipher-suites"`
 
 	// PublicKey and PrivateKey holds the key pair used by the Candid
@@ -154,7 +154,7 @@ type Config struct {
 }
 
 func parseCipherSuites(names []string) ([]uint16, error) {
-	// this list is inspired by golangs current cypher suite prioritization
+	// this list is inspired by Golang's current cypher suite prioritization:
 	// https://cs.opensource.google/go/go/+/refs/tags/go1.25.4:src/crypto/tls/cipher_suites.go
 	var suites []uint16
 
@@ -175,8 +175,8 @@ func parseCipherSuites(names []string) ([]uint16, error) {
 
 // TLSConfig returns a TLS configuration to be used for serving the API.
 // If the TLS certificate and key are not specified, it returns nil.
-// If tls-cipher-suites are configured they will be used
-// If tls-cipher-suites are not configured the golang defaults are used
+// If tls-cipher-suites are configured they will be used.
+// If tls-cipher-suites are not configured the Golang defaults are used.
 func (c *Config) TLSConfig() *tls.Config {
 	if c.TLSCert == "" || c.TLSKey == "" {
 		return nil
