@@ -197,13 +197,6 @@ func GenerateTestCert(commonName string) (tls.Certificate, []byte, []byte, error
 
 	// Create tls.Certificate
 	cert, err := tls.X509KeyPair(certPEM, keyPEM)
-	if err != nil {
-		return tls.Certificate{}, nil, nil, err
-	}
-
-	return cert, certPEM, keyPEM, nil
-}
-
 // NewTLSServerWithConfig creates a new TLS HTTPS server with the given handler,
 // TLS configuration, and certificate/key PEM data.
 func NewTLSServerWithConfig(handler http.Handler, tlsConfig *tls.Config, certPEM, keyPEM []byte) *httptest.Server {
