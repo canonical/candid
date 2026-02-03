@@ -32,7 +32,7 @@ require (
 	github.com/mhilton/openid v0.0.0-20150511103207-7922a4e937d8
 	github.com/prometheus/client_golang v1.22.0
 	github.com/yohcop/openid-go v1.0.1
-	golang.org/x/crypto v0.39.0
+	golang.org/x/crypto v0.40.0
 	golang.org/x/net v0.41.0
 	golang.org/x/oauth2 v0.30.0
 	gopkg.in/asn1-ber.v1 v1.0.0-20170511165959-379148ca0225
@@ -79,9 +79,9 @@ require (
 	github.com/rogpeppe/go-internal v1.10.0 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/xdg-go/stringprep v1.0.3 // indirect
-	golang.org/x/sys v0.33.0 // indirect
-	golang.org/x/term v0.32.0 // indirect
-	golang.org/x/text v0.26.0 // indirect
+	golang.org/x/sys v0.34.0 // indirect
+	golang.org/x/term v0.33.0 // indirect
+	golang.org/x/text v0.27.0 // indirect
 	google.golang.org/protobuf v1.36.5 // indirect
 	gopkg.in/mgo.v2 v2.0.0-20190816093944-a6b53ec6cb22 // indirect
 	gopkg.in/retry.v1 v1.0.3 // indirect
