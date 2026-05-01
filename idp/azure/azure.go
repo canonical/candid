@@ -56,6 +56,11 @@ type Params struct {
 	// Hidden is set if the IDP should be hidden from interactive
 	// prompts.
 	Hidden bool `yaml:"hidden"`
+
+	//LoginURL is the Azure login URL
+	//For Azure AD it should be set to https://login.microsoftonline.com/${TENANT_ID} or https://sts.windows.net/${TENANT_ID}/
+	//Default to "https://login.live.com" (consumer account login)
+	LoginURL string `yam:"loginurl"`
 }
 
 // NewIdentityProvider creates an azure identity provider with the
@@ -70,10 +75,13 @@ func NewIdentityProvider(p Params) idp.IdentityProvider {
 	if p.Icon == "" {
 		p.Icon = "/static/images/icons/azure.svg"
 	}
+	if p.LoginURL == "" {
+		p.LoginURL = "https://login.live.com/"
+	}
 
 	return openid.NewOpenIDConnectIdentityProvider(openid.OpenIDConnectParams{
 		Name:            p.Name,
-		Issuer:          "https://login.live.com",
+		Issuer:          p.LoginURL,
 		Description:     p.Description,
 		Icon:            p.Icon,
 		Domain:          p.Domain,
