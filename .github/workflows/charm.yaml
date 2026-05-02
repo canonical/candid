@@ -19,7 +19,7 @@ jobs:
   build-charm:
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - run: git fetch --prune --unshallow
       - run: sudo snap install charmcraft --channel=2.x/stable --classic
       - run: charmcraft pack --project-dir ./charms/${{ inputs.charm }} --destructive-mode
